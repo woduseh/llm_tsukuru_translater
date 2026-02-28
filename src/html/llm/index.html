@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <script src="../../lib/enlang/enlang.js"></script>
     <link href="./styles.css" rel="stylesheet">
-    <title>LLM Translation Settings</title>
+    <title>LLM 번역 설정</title>
 </head>
 <body>
     <div id="container">
@@ -16,7 +16,7 @@
         </div>
 
         <div class="form-group">
-            <label for="model">모델 선택</label>
+            <label for="model">모델</label>
             <select id="model" class="select-input">
                 <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
                 <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
@@ -41,30 +41,30 @@
         <div class="form-group">
             <label for="translationUnit">번역 단위</label>
             <select id="translationUnit" class="select-input">
-                <option value="chunk">청크 단위 (기본)</option>
+                <option value="chunk">청크 단위</option>
                 <option value="file">파일 단위</option>
             </select>
         </div>
 
         <div class="form-group" id="chunkSizeGroup">
-            <label for="chunkSize">청크 크기 <span class="hint">(한 번에 번역할 대사 블록 수)</span></label>
+            <label for="chunkSize">청크 크기 <span class="hint">한 번에 번역할 대사 블록 수</span></label>
             <input type="number" id="chunkSize" class="text-input short" value="30" min="1" max="200">
         </div>
 
         <div class="form-group">
-            <label for="translatorNotes">번역가의 노트 <span class="hint">(고유명사 사전: 원문=번역)</span></label>
-            <textarea id="translatorNotes" spellcheck="false" placeholder="ひかり=히카리&#10;橋本=하시모토&#10;魔王=마왕&#10;.."></textarea>
+            <label for="translatorNotes">번역가의 노트 <span class="hint">고유명사 사전 (원문=번역)</span></label>
+            <textarea id="translatorNotes" spellcheck="false" placeholder="ひかり=히카리&#10;橋本=하시모토&#10;魔王=마왕"></textarea>
         </div>
 
         <div class="form-group">
-            <label for="customPrompt">커스텀 프롬프트 <span class="hint">(추가 번역 지시사항)</span></label>
+            <label for="customPrompt">커스텀 프롬프트 <span class="hint">추가 번역 지시사항</span></label>
             <textarea id="customPrompt" spellcheck="false" placeholder="예: 존댓말을 사용하세요, 판타지 스타일로 번역하세요 등"></textarea>
         </div>
     </div>
 
     <div class="button-bar">
-        <button id="startBtn" class="btn primary">번역 시작</button>
         <button id="cancelBtn" class="btn">취소</button>
+        <button id="startBtn" class="btn primary">번역 시작</button>
     </div>
 
     <script src="./script.js"></script>

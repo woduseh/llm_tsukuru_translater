@@ -34,8 +34,8 @@ ipcRenderer.on("settings", (evt, arg) => {
     CheckboxValues.forEach((val) => {
       (document.getElementById(val) as HTMLInputElement).checked = gsettings[val]
     })
-    document.getElementById('update').innerText = `업데이트 확인 (현재: ${gsettings.version})`
-    document.getElementById('update').onclick = () => {ipcRenderer.send('updates')}
+    const updateBtn = document.getElementById('update')
+    if (updateBtn) { updateBtn.style.display = 'none' }
     document.getElementById('license').onclick = () => {ipcRenderer.send('license')}
     _reload()
   }
