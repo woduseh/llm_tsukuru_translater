@@ -32,7 +32,8 @@ export const settings = {
     llmCustomPrompt: '',
     llmTranslatorNotes: '',
     llmChunkSize: 30,
-    llmTranslationUnit: 'chunk'
+    llmTranslationUnit: 'chunk',
+    llmTargetLang: 'ko'
 }
 
 export const onebyone = {

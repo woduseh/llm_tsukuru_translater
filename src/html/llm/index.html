@@ -17,11 +17,12 @@
 
         <div class="form-group">
             <label for="model">모델</label>
-            <select id="model" class="select-input">
+            <input type="text" id="model" class="text-input" list="modelList" placeholder="모델 이름 입력 또는 선택">
+            <datalist id="modelList">
                 <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
                 <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                 <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-            </select>
+            </datalist>
         </div>
 
         <div class="form-group">
@@ -35,6 +36,29 @@
                 <option value="es">스페인어 (Español)</option>
                 <option value="ru">러시아어 (Русский)</option>
                 <option value="de">독일어 (Deutsch)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="targetLang">번역 언어</label>
+            <select id="targetLang" class="select-input">
+                <option value="ko">한국어 (Korean)</option>
+                <option value="en">영어 (English)</option>
+                <option value="ja">일본어 (日本語)</option>
+                <option value="zh-CN">중국어 간체 (简体中文)</option>
+                <option value="zh-TW">중국어 정체 (繁體中文)</option>
+                <option value="fr">프랑스어 (Français)</option>
+                <option value="es">스페인어 (Español)</option>
+                <option value="ru">러시아어 (Русский)</option>
+                <option value="de">독일어 (Deutsch)</option>
+                <option value="pt">포르투갈어 (Português)</option>
+                <option value="it">이탈리아어 (Italiano)</option>
+                <option value="th">태국어 (ไทย)</option>
+                <option value="vi">베트남어 (Tiếng Việt)</option>
+                <option value="ar">아랍어 (العربية)</option>
+                <option value="pl">폴란드어 (Polski)</option>
+                <option value="nl">네덜란드어 (Nederlands)</option>
+                <option value="tr">터키어 (Türkçe)</option>
             </select>
         </div>
 
