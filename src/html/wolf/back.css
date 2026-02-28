@@ -4,6 +4,19 @@
   box-sizing: border-box;
 }
 
+:root {
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --border: 1px solid rgba(255,255,255,0.06);
+  --transition: all 0.15s ease;
+}
+
+@font-face {
+  font-family: 'NotoSansKR';
+  src: url("../main/fonts/NotoSansKR.otf");
+}
+
 body {
   background: var(--Background);
   color: var(--mainColor);
@@ -56,7 +69,7 @@ body {
   cursor: pointer;
   font-size: 14px;
   opacity: 0.5;
-  transition: all 0.15s ease;
+  transition: var(--transition);
 }
 
 .icon:hover { opacity: 1; background: rgba(255,255,255,0.08); }
@@ -73,6 +86,10 @@ body {
   flex-direction: column;
   gap: 12px;
 }
+
+.app-content::-webkit-scrollbar { width: 5px; }
+.app-content::-webkit-scrollbar-track { background: transparent; }
+.app-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 
 /* ── Sections ── */
 .section-label {
@@ -96,13 +113,13 @@ body {
   flex: 1;
   padding: 8px 12px;
   background: var(--Highlight3);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 8px;
+  border: var(--border);
+  border-radius: var(--radius-md);
   color: var(--mainColor);
   font-family: inherit;
   font-size: 13px;
   outline: none;
-  transition: all 0.15s ease;
+  transition: var(--transition);
 }
 
 .input:focus {
@@ -115,18 +132,19 @@ body {
 .btn-secondary {
   padding: 8px 16px;
   background: var(--Highlight1);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 8px;
+  border: var(--border);
+  border-radius: var(--radius-md);
   color: var(--mainColor);
   font-family: inherit;
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--transition);
   white-space: nowrap;
 }
 
 .btn-secondary:hover {
   background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.12);
 }
 
 /* ── Mode Tabs ── */
@@ -139,7 +157,7 @@ body {
 .mode-tabs {
   display: flex;
   background: var(--Highlight1);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 3px;
   gap: 2px;
 }
@@ -148,13 +166,13 @@ body {
   padding: 7px 20px;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--mainColor);
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--transition);
   opacity: 0.6;
 }
 
@@ -175,20 +193,21 @@ body {
 }
 
 .option-btn {
-  padding: 14px 8px;
+  padding: 12px 8px;
   background: var(--Highlight1);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 8px;
+  border: var(--border);
+  border-radius: var(--radius-md);
   color: var(--mainColor);
   font-family: inherit;
   font-size: 12px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--transition);
   text-align: center;
 }
 
 .option-btn:hover {
   background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.1);
 }
 
 [btn-active] {
@@ -201,19 +220,23 @@ body {
   padding: 7px 28px;
   background: var(--Selected);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: #1a1a2e;
   font-family: inherit;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--transition);
   margin-left: auto;
 }
 
 .btn-run:hover {
   opacity: 0.85;
   box-shadow: 0 4px 16px rgba(189,147,249,0.3);
+}
+
+.btn-run:active {
+  transform: scale(0.97);
 }
 
 /* ── Tools Section ── */
@@ -226,13 +249,13 @@ body {
 .tool-btn {
   padding: 10px 8px;
   background: var(--Highlight3);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 8px;
+  border: var(--border);
+  border-radius: var(--radius-md);
   color: var(--mainColor);
   font-family: inherit;
   font-size: 12px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--transition);
   text-align: center;
 }
 
@@ -258,10 +281,11 @@ body {
   padding: 6px 20px;
   font-size: 12px;
   font-weight: 500;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--transition);
   opacity: 0.4;
+  background: transparent;
 }
 
 .page-tab:hover { opacity: 0.7; background: rgba(255,255,255,0.04); }
@@ -334,14 +358,13 @@ body {
 .highlight2 { border-radius: 10px; background: var(--Highlight3); color: var(--mainColor); font-family: var(--font); border: transparent; }
 .vw7 { width: 70vw; }
 .gaps { gap: 8px; }
-.tooltip { background: rgba(0,0,0,0.85); color: white; padding: 6px 10px; font-size: 12px; border-radius: 6px; display: none; backdrop-filter: blur(8px); }
-.tooltip[data-show] { display: block; }
+.tooltip { display: none; }
+.tooltip[data-show] { display: none; }
 .smalmar { display: none; }
 .btnx { display: none; }
 .container2 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; grid-gap: var(--Gap); }
 .btn { border: transparent; background: var(--Highlight2); font-family: var(--font); color: var(--mainColor); }
 .trans_input { height: 15px; }
+#addons-block { padding: 0; }
 
-::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar { display: none; }

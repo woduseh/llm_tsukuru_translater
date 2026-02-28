@@ -3,7 +3,6 @@
     const bottomMenu = document.querySelector('.smalmar') as HTMLDivElement
     const mainMenu = document.querySelector('#mainMenu') as HTMLDivElement
     const simpleMenu = document.querySelector('#simpleMenu') as HTMLDivElement
-    const Popper = (window as any).Popper as any
     let running = false
     let globalSettings:{[key:string]:any}
     let LastPercent = -1.0
@@ -45,45 +44,6 @@
     let config:{[key:string]:boolean} = {}
     let LastTime = -1
 
-
-    function genPopper(id:string, text:string, entext:string|null = null){
-        entext = entext ?? text
-        const tooltip = document.createElement('div')
-        tooltip.classList.add('tooltip')
-        document.body.appendChild(tooltip)
-        const button = document.getElementById(id)
-        console.log(button)
-        tooltip.innerHTML = text.replace(/\r/g, '').replace(/\n/g, '<br>');
-        tooltip.setAttribute('enlang', entext)
-        const popperInstance = Popper.createPopper(button, tooltip, {
-            modifiers: [
-              {
-                name: 'offset',
-                options: {
-                  offset: [0, 8],
-                },
-              },
-            ],
-        });
-        function show() {
-            tooltip.setAttribute('data-show', '');
-            popperInstance.update();
-        }
-        function hide() {
-            tooltip.removeAttribute('data-show');
-        }
-        const showEvents = ['mouseenter', 'focus'];
-        const hideEvents = ['mouseleave', 'blur'];
-
-        showEvents.forEach((event) => {
-            button.addEventListener(event, show);
-        });
-
-        hideEvents.forEach((event) => {
-            button.addEventListener(event, hide);
-        });
-    }
-
     function changeMenu(type:'main'|'simple'){
         bottomMenu.style.display = 'none'
         simpleMenu.style.display = 'none'
@@ -109,14 +69,6 @@
     }
     changeMenu('simple')
     {
-        genPopper('ext-buran', '수정 시 불안정할 수 있는 텍스트도 추출합니다.', 'Extract text that can make errors the game when modifying it.')
-        genPopper('ext-all', '발견할 수 있는 이벤트 내의 모든 텍스트를 추출합니다.\n수정 시 오류가 나기 쉽습니다.', 'Extract all Texts from game.\nEditing these strings is prone to errors.')
-        genPopper('extpat', '패턴 기반으로 추출합니다.\n더욱 더 많은 텍스트가 추출되지만, 느리고 오류가 나올 수 있습니다.', 'Extract based on pattern.\nMore text is extracted, but it may be slow and error-prone.')
-        genPopper('runbtn', '추출을 시작합니다', 'Start extract')
-        genPopper('runbtn2', '적용을 시작합니다', 'Start apply')
-        genPopper('marTrans', '게임에서 텍스트를 추출합니다', 'Extract strings from the game')
-        genPopper('handTrans', '추출한 텍스트를 다시 게임에 적용합니다', 'Apply the extracted text back to the game')
-
         document.getElementById('marTrans').onclick = () => {
             document.getElementById('handTrans').removeAttribute('selected')
             document.getElementById('marTrans').setAttribute('selected', '')
@@ -127,9 +79,7 @@
             }
             else{
                 document.getElementById('ext-all').style.display = 'block'
-
             }
-
         }
         document.getElementById('handTrans').onclick = () => {
             document.getElementById('marTrans').removeAttribute('selected')
