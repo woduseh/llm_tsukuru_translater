@@ -34,7 +34,6 @@
     "@types/fs-extra": "^9.0.13",
     "@types/glob": "^8.0.0",
     "@types/jsdom": "^16.2.14",
-    "@vitalets/google-translate-api": "^9.0.0",
     "aes-js": "^3.1.2",
     "axios": "^0.24.0",
     "bson": "^4.6.1",
@@ -53,8 +52,7 @@
     "open": "^8.4.0",
     "os-locale": "^6.0.2",
     "request": "^2.88.2",
-    "sha3": "^2.1.4",
-    "tcp-port-used": "^1.0.2"
+    "sha3": "^2.1.4"
   },
   "build": {
     "productName": "Tsukuru Extractor",

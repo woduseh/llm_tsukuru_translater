@@ -31,6 +31,7 @@ interface GeminiConfig {
     customPrompt: string;
     translatorNotes: string;
     chunkSize: number;
+    translationUnit: string;
     sourceLang: string;
     targetLang: string;
     doNotTransHangul: boolean;
@@ -206,7 +207,8 @@ export class GeminiTranslator {
         onProgress?: (current: number, total: number) => void
     ): Promise<{ translatedContent: string; validation: BlockValidation[] }> {
         const allBlocks = splitIntoBlocks(content);
-        const chunkSize = this.config.chunkSize;
+        const isFileMode = this.config.translationUnit === 'file';
+        const chunkSize = isFileMode ? allBlocks.length : this.config.chunkSize;
         const allValidations: BlockValidation[] = [];
         const allTranslatedBlocks: { separator: string; lines: string[] }[] = [];
 
@@ -321,6 +323,7 @@ export function createGeminiTranslator(settings: any, sourceLang: string, target
         customPrompt: settings.llmCustomPrompt,
         translatorNotes: settings.llmTranslatorNotes,
         chunkSize: settings.llmChunkSize || 30,
+        translationUnit: settings.llmTranslationUnit || 'chunk',
         sourceLang,
         targetLang,
         doNotTransHangul: settings.DoNotTransHangul

@@ -31,7 +31,8 @@ export const settings = {
     llmModel: 'gemini-2.0-flash',
     llmCustomPrompt: '',
     llmTranslatorNotes: '',
-    llmChunkSize: 30
+    llmChunkSize: 30,
+    llmTranslationUnit: 'chunk'
 }
 
 export const onebyone = {

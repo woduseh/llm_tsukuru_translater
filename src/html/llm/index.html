@@ -39,6 +39,14 @@
         </div>
 
         <div class="form-group">
+            <label for="translationUnit">번역 단위</label>
+            <select id="translationUnit" class="select-input">
+                <option value="chunk">청크 단위 (기본)</option>
+                <option value="file">파일 단위</option>
+            </select>
+        </div>
+
+        <div class="form-group" id="chunkSizeGroup">
             <label for="chunkSize">청크 크기 <span class="hint">(한 번에 번역할 대사 블록 수)</span></label>
             <input type="number" id="chunkSize" class="text-input short" value="30" min="1" max="200">
         </div>

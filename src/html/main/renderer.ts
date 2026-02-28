@@ -45,20 +45,6 @@
         }
     });
     
-    ipcRenderer.on('updateFound', (evn, tt) => {
-        Swal.fire({
-            icon: 'question',
-            text: '업데이트가 발견되었습니다. \n업데이트 하시겠습니까?',
-            confirmButtonText: '예',
-            showDenyButton: true,
-            denyButtonText: `아니오`,
-        }).then((result) => {
-            if (result.isConfirmed) {
-                ipcRenderer.send('updatePage');
-            }
-        })
-    });
-    
     
     
     ipcRenderer.on('getGlobalSettings', (evn, tt) => {
@@ -123,18 +109,6 @@
     });
     
     ipcRenderer.on('worked', () => {running = false})
-    
-    ipcRenderer.on('eztransError', async () => {
-        const result = await Swal.fire({
-            icon: 'error',
-            text: 'dotnet 6.0 이 설치되지 않은 것 같습니다. 5초 내에 다운로드 창을 띄웁니다.',
-            showDenyButton: true,
-            denyButtonText: `설치 후에도 계속 뜨나요?`,
-        })
-        if (result.isDenied){
-            ipcRenderer.send('eztransHelp')
-        }
-    })
     
     ipcRenderer.on('check_force', (evn, arg) => {
         Swal.fire({
@@ -239,9 +213,8 @@
             'ext_src': '추출 시 스크립트를\n추출합니다',
             'ext': '추출 모드로\n전환합니다',
             'apply': '적용 모드로\n전환합니다',
-            'changeAll': '문자열을 일괄\n변경합니다',
             'addons_btn': '도움말을\n펼칩니다',
-            'eztrans': 'Extract 폴더 내\n파일을 번역기로\n번역합니다',
+            'eztrans': 'LLM 번역기로\n번역합니다',
             'ext_note': '노트/메모를\n추출합니다',
             'exJson': 'Rpg Maker에\n기본적으로는\n존재하지 않는\nJSON 또는 CSV를\n추출합니다',
             'autoline': '적용 시 자동\n줄바꿈을 합니다',
@@ -484,169 +457,8 @@
             })
             return
         }
-        const result = await Swal.fire({
-            icon: 'warning',
-            text: "정말로 번역기를 사용하시겠습니까?",
-            confirmButtonText: '예',
-            showDenyButton: true,
-            denyButtonText: `아니오`,
-        })
-        let confirmit = 5
-        let lastvalue = -1
-        if (!result.isConfirmed) {
-            return
-        }
-        const infos = {
-            'eztrans': '최대한 많이 번역하는 모드입니다.<br>많은 스크립트를 안전하게 번역합니다.<br>적은 확률로 번역 한 게임에 오류가 발생할 수 있습니다.<br>일본어만 지원합니다.',
-            'eztransh': '오류가 나올 만한 부분을 번역하지 않는 모드입니다.<br>번역되지 않는 부분이 있을 수 있습니다.<br>일본어만 지원합니다.',
-            'kakao': '카카오 번역 모드입니다.<br>일본어 이외의 언어를 번역하는데 유용합니다',
-            'googleh': '구글 안전 모드입니다.<br>변수들이 흩어지지 않습니다.<br>중간에 번역이 멈출 수 있습니다.<br>여러가지 언어를 지원합니다.',
-            'google': '권장되지 않는 모드의 번역기입니다<br>중간에 번역이 멈출 수 있습니다.<br>여러가지 언어를 지원합니다.',
-            'papago': '권장되지 않는 베타 번역기입니다.<br>속도가 굉장히 느리며, 중간에 번역이 멈출 수 있습니다.<br>여러가지 언어를 지원합니다.',
-            'gemini': 'Gemini API를 사용한 LLM 번역기입니다.<br>다국어 지원, 번역가의 노트, 커스텀 프롬프트를 지원합니다.<br>API 키가 필요합니다.'
-        }
-    
-    
-        const selectOptions = globalSettings.hideUnrecomenedTranslators ? {
-            'gemini': 'Gemini (LLM 번역기)',
-            'eztrans': 'eztrans (스마트 모드, 권장)',
-            'kakao': '카카오 번역기 (안전 모드, 권장)',
-            'eztransh': 'eztrans (안전 모드)',
-        }:{
-            'gemini': 'Gemini (LLM 번역기)',
-            'eztrans': 'eztrans (스마트 모드, 권장)',
-            'kakao': '카카오 번역기 (안전 모드, 권장)',
-            'eztransh': 'eztrans (안전 모드)',
-            'googleh': '구글 번역기 (안전 모드, 비권장)',
-            'google': '구글 번역기 (위험 모드, 비권장)',
-            'papago': '파파고 (베타, 비권장)'
-        }
-    
-        const v = await Swal.fire({
-            icon: 'info',
-            title: '번역기를 선택해주세요',
-            input: 'select',
-            inputOptions: selectOptions,
-            confirmButtonText: '확인',
-            inputValidator: (value) => {
-                return new Promise<void|string>((resolve) => {
-                    if(lastvalue !== value){
-                        lastvalue = value
-                        confirmit = 3
-                    }
-                    if (value) {
-                        if(confirmit > 0){
-                            resolve(`${infos[value]}<br>계속하려면 확인 버튼을 ${confirmit}번 더 눌려주세요`)
-                            confirmit -= 1
-                        }
-                        resolve()
-                    }
-                    else {
-                        ipcRenderer.send('log', value)
-                        resolve('설정되지 않음')
-                    }
-                })
-            }
-        })
-        const transtype = v.value
-        if(!transtype){
-            return
-        }
-        if(transtype === 'gemini'){
-            const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
-            ipcRenderer.send('openLLMSettings', { dir: dir, game: 'mv' });
-            return
-        }
-        let langu = 'jp'
-        if(!(transtype === 'eztrans'|| transtype === 'eztransh')){
-            const inputs = transtype === 'kakao' ? {
-                'en': '영어 (english)',
-                'jp': '일본어 (日本語)',
-                'cn': '대만어 (台灣語)',
-                'fr': '프랑스어 (Français)',
-                'es': '스페인어 (español)',
-                'ru': '러시아어 (Русский)',
-                'de': "독일어 (deutches)"
-            } : {
-                'en': '영어 (english)',
-                'ja': '일본어 (日本語)',
-                'zh-CN': '대만어-간체 (台灣語)',
-                'zh-TW': '대만어-정체 (台灣語)',
-                'fr': '프랑스어 (Français)',
-                'es': '스페인어 (español)',
-                'ru': '러시아어 (Русский)'
-            }
-    
-            const langu2 = await Swal.fire({
-                icon: 'info',
-                title: '시작 언어를 선택해주세요',
-                input: 'select',
-                inputOptions: inputs,
-                confirmButtonText: '확인',
-                inputValidator: (value) => {
-                    return new Promise<void|string>((resolve) => {
-                        if (value) {
-                            resolve()
-                        }
-                        else {
-                            ipcRenderer.send('log', value)
-                            resolve('설정되지 않음')
-                        }
-                    })
-                }
-            })
-            langu = langu2.value
-            if(!langu){
-                return
-            }
-        }
-        ipcRenderer.send('log', v.value)
-        const a = {
-            dir: Buffer.from((document.getElementById('folder_input') as HTMLInputElement).value.replace('\\','/'), "utf8").toString('base64'),
-            type: transtype,
-            langu: langu,
-            game: 'mv'
-        };
-        running = true
-        ipcRenderer.send('eztrans', a);
-        return
-    }
-    
-    document.getElementById('changeAll').onclick = async () => {
-        if(running){
-            Swal.fire({
-                icon: 'error',
-                text: '이미 다른 작업이 시행중입니다!',
-            })
-            return
-        }
-        const { value: formValues } = await Swal.fire({
-            title: '문자열 일괄 변경',
-            html:
-              '<input id="swal-input1" class="swal2-input" placeholder="기존 값">' +
-              '<input id="swal-input2" class="swal2-input" placeholder="변경할 값">',
-            focusConfirm: false,
-            showDenyButton: true,
-            denyButtonText: `취소`,
-            preConfirm: () => {
-              return [
-                (document.getElementById('swal-input1') as HTMLInputElement).value,
-                (document.getElementById('swal-input2') as HTMLInputElement).value
-              ]
-            }
-        })
-        
-        if (formValues) {
-            if(!(formValues[0] === formValues[1] || formValues[0] === '' || formValues[1] === '' )){
-                const kas = (document.getElementById('folder_input') as HTMLInputElement).value
-                const a = {
-                    dir: Buffer.from(kas.replace('\\','/'), "utf8").toString('base64'),
-                    data: formValues
-                };
-                running = true
-                ipcRenderer.send("changeAllString",(a))
-            }
-        }
+        const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
+        ipcRenderer.send('openLLMSettings', { dir: dir, game: 'mv' });
     }
     
     
