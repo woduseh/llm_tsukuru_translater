@@ -26,7 +26,12 @@ export const settings = {
     themeList: Object.keys(styles),
     hideUnrecomenedTranslators: true,
     language: 'en',
-    HideExtractAll: true
+    HideExtractAll: true,
+    llmApiKey: '',
+    llmModel: 'gemini-2.0-flash',
+    llmCustomPrompt: '',
+    llmTranslatorNotes: '',
+    llmChunkSize: 30
 }
 
 export const onebyone = {

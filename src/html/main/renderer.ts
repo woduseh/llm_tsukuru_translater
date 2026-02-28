@@ -502,15 +502,18 @@
             'kakao': '카카오 번역 모드입니다.<br>일본어 이외의 언어를 번역하는데 유용합니다',
             'googleh': '구글 안전 모드입니다.<br>변수들이 흩어지지 않습니다.<br>중간에 번역이 멈출 수 있습니다.<br>여러가지 언어를 지원합니다.',
             'google': '권장되지 않는 모드의 번역기입니다<br>중간에 번역이 멈출 수 있습니다.<br>여러가지 언어를 지원합니다.',
-            'papago': '권장되지 않는 베타 번역기입니다.<br>속도가 굉장히 느리며, 중간에 번역이 멈출 수 있습니다.<br>여러가지 언어를 지원합니다.'
+            'papago': '권장되지 않는 베타 번역기입니다.<br>속도가 굉장히 느리며, 중간에 번역이 멈출 수 있습니다.<br>여러가지 언어를 지원합니다.',
+            'gemini': 'Gemini API를 사용한 LLM 번역기입니다.<br>다국어 지원, 번역가의 노트, 커스텀 프롬프트를 지원합니다.<br>API 키가 필요합니다.'
         }
     
     
         const selectOptions = globalSettings.hideUnrecomenedTranslators ? {
+            'gemini': 'Gemini (LLM 번역기)',
             'eztrans': 'eztrans (스마트 모드, 권장)',
             'kakao': '카카오 번역기 (안전 모드, 권장)',
             'eztransh': 'eztrans (안전 모드)',
         }:{
+            'gemini': 'Gemini (LLM 번역기)',
             'eztrans': 'eztrans (스마트 모드, 권장)',
             'kakao': '카카오 번역기 (안전 모드, 권장)',
             'eztransh': 'eztrans (안전 모드)',
@@ -547,6 +550,11 @@
         })
         const transtype = v.value
         if(!transtype){
+            return
+        }
+        if(transtype === 'gemini'){
+            const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
+            ipcRenderer.send('openLLMSettings', { dir: dir, game: 'mv' });
             return
         }
         let langu = 'jp'
