@@ -12,7 +12,6 @@ import * as edTool from './src/js/rpgmv/edtool.js';
 let mainid = 0
 const defaultHeight = 550
 // 350 + 170
-import axios from 'axios';
 import * as dataBaseO from './src/js/rpgmv/datas.js';
 import * as applyjs from "./src/js/rpgmv/apply.js";
 import * as eztrans from "./src/js/rpgmv/translator.js";
@@ -20,10 +19,8 @@ import { checkIsMapFile, sleep } from './src/js/rpgmv/globalutils.js';
 import * as yaml from 'js-yaml';
 import * as prjc from './src/js/rpgmv/projectConvert';
 import Themes from './src/js/rpgmv/styles'
-import sendUpdateInfo from './main_update'
 import { wolfInit } from './src/js/wolf/main.js';
 import { initFontIPC } from './src/js/rpgmv/fonts';
-import { papagoTrans } from './src/js/libs/papagotrans';
 import { initExtentions } from './src/js/libs/extentions';
 
 
@@ -88,31 +85,6 @@ function createWindow() {
   mainWindow.webContents.on('did-finish-load', function () {
     mainWindow.show();
     getMainWindow().webContents.send('is_version', app.getVersion());
-    async function v(currentVersionNumber){
-      function c(yy){
-        yy = yy.split('.')
-        let v = 0
-        for(let i in yy){
-          v = (v*100)+parseInt(yy[i])
-        }
-        return v
-      }
-      const currentVersion = c(currentVersionNumber)
-      const ver = (await axios.get('https://raw.githubusercontent.com/gramedcart/tsukuru_extractor/main/version.json')).data.version
-      let last_version = c(ver)
-      if(!storage.has('myversion')){
-        storage.set("myversion", 0)
-      }
-      const myversion = storage.has('myversion') ? storage.get('myversion') : currentVersion
-      if(currentVersion < last_version){
-        getMainWindow().webContents.send('updateFound');
-      }
-      else if(myversion !== currentVersion){
-        storage.set("myversion", currentVersion)
-        sendUpdateInfo()
-      }
-    }
-    v(app.getVersion())
     globalThis.settings.themeData = Themes[globalThis.settings.theme]
     getMainWindow().webContents.send('getGlobalSettings', globalThis.settings);
     if(!tools.packed){
@@ -237,9 +209,6 @@ ipcMain.on('gamePatcher', (ev, dir) => {
 })
 
 
-ipcMain.on('updatePage', () => {
-  open('https://github.com/gramedcart/tsukuru_extractor/releases/latest')
-})
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
@@ -503,8 +472,6 @@ function setOPath(){
 
 ipcMain.on('eztrans', eztrans.trans)
 
-ipcMain.on('eztransHelp', () => {open('https://github.com/gramedcart/tsukuru_extractor/wiki/ezTrans-%EC%98%A4%EB%A5%98-%ED%95%B4%EA%B2%B0')})
-
 // LLM Settings Window
 let llmSettingsWindow: Electron.BrowserWindow = null;
 let llmPendingArg: any = null;
@@ -617,39 +584,8 @@ ipcMain.on('app_version', (event) => {
   event.sender.send('app_version', { version: app.getVersion() });
 });
 
-ipcMain.on('updates', ()=> {
-  open("https://github.com/gramedcart/tsukuru_extractor/releases/")
-})
-
-ipcMain.on('updates', ()=> {
-  open("https://github.com/gramedcart/tsukuru_extractor/releases/")
-})
-
 ipcMain.on('openFolder', (ev, arg) => {
   open(arg)
-})
-
-ipcMain.on('changeAllString', async (ev, arg) => {
-  try {
-    const dir = path.join(Buffer.from(arg.dir, "base64").toString('utf8'), 'Extract');
-    if(fs.existsSync(dir)){
-      const fileList = fs.readdirSync(dir)
-      for(const i in fileList){
-        const filePath = (path.join(dir,fileList[i]))
-        const v = fs.readFileSync(filePath, "utf-8").replaceAll(arg.data[0], arg.data[1])
-        fs.writeFileSync(filePath, v, "utf-8")
-      }
-      worked()
-      getMainWindow().webContents.send('alert', "완료되었습니다"); 
-    }
-    else{
-      worked()
-      getMainWindow().webContents.send('alert', {icon: 'error', message: 'Extract 폴더가 존재하지 않습니다'}); 
-    } 
-  } catch (err) {
-    worked()
-    getMainWindow().webContents.send('alert', {icon: 'error', message: JSON.stringify(err, Object.getOwnPropertyNames(err))}); 
-  }
 })
 
 ipcMain.on('updateVersion', async (ev, arg) => {

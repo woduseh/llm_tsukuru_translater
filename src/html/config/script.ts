@@ -11,8 +11,7 @@ const CheckboxValues = [
   'loadingText',
   'ExternMsgJson',
   'DoNotTransHangul',
-  'formatNice',
-  'hideUnrecomenedTranslators'
+  'formatNice'
 ]
 
 ipcRenderer.on("settings", (evt, arg) => {
