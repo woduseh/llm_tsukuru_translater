@@ -213,7 +213,6 @@
             'ext_src': '추출 시 스크립트를\n추출합니다',
             'ext': '추출 모드로\n전환합니다',
             'apply': '적용 모드로\n전환합니다',
-            'addons_btn': '도움말을\n펼칩니다',
             'eztrans': 'LLM 번역기로\n번역합니다',
             'ext_note': '노트/메모를\n추출합니다',
             'exJson': 'Rpg Maker에\n기본적으로는\n존재하지 않는\nJSON 또는 CSV를\n추출합니다',
