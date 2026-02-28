@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { hanguls } from '../rpgmv/datas';
 import * as crypto from 'crypto';
 
-const SEPARATOR_REGEX = /^--- \d+ ---$/;
+const SEPARATOR_REGEX = /^--- 101 ---$/;
 
 export interface TranslationValidation {
     fileIndex: number;
@@ -122,7 +122,7 @@ function buildPrompt(config: GeminiConfig, text: string): string {
     let prompt = '';
     prompt += `You are a professional game dialogue translator. Translate the following RPG game text from ${sourceLangName} to ${targetLangName}.\n\n`;
     prompt += `CRITICAL RULES:\n`;
-    prompt += `1. Lines matching the EXACT pattern "--- <number> ---" (e.g., "--- 101 ---") are dialogue separators. Do NOT translate, modify, or remove them. Output them EXACTLY as-is.\n`;
+    prompt += `1. Lines that are exactly "--- 101 ---" are dialogue separators. Do NOT translate, modify, or remove them. Output them EXACTLY as "--- 101 ---".\n`;
     prompt += `2. Preserve the EXACT number of line breaks within each dialogue block. If the original has 3 lines between separators, the translation must also have exactly 3 lines.\n`;
     prompt += `3. Preserve any special codes like \\V[1], \\N[2], \\C[3], \\G, \\$, etc. exactly as they appear.\n`;
     prompt += `4. Output ONLY the translated text. No explanations, no markdown formatting, no code blocks.\n`;
