@@ -6,8 +6,9 @@
     ipcRenderer.on('llmSettings', (ev: any, arg: any) => {
         settings = arg;
         (document.getElementById('apiKey') as HTMLInputElement).value = settings.llmApiKey || '';
-        (document.getElementById('model') as HTMLSelectElement).value = settings.llmModel || 'gemini-2.0-flash';
+        (document.getElementById('model') as HTMLInputElement).value = settings.llmModel || 'gemini-2.0-flash';
         (document.getElementById('sourceLang') as HTMLSelectElement).value = settings.llmSourceLang || 'ja';
+        (document.getElementById('targetLang') as HTMLSelectElement).value = settings.llmTargetLang || 'ko';
         (document.getElementById('translationUnit') as HTMLSelectElement).value = settings.llmTranslationUnit || 'chunk';
         (document.getElementById('chunkSize') as HTMLInputElement).value = String(settings.llmChunkSize || 30);
         (document.getElementById('translatorNotes') as HTMLTextAreaElement).value = settings.llmTranslatorNotes || '';
@@ -42,8 +43,9 @@
         }
         const data = {
             llmApiKey: apiKey,
-            llmModel: (document.getElementById('model') as HTMLSelectElement).value,
+            llmModel: (document.getElementById('model') as HTMLInputElement).value.trim() || 'gemini-2.0-flash',
             llmSourceLang: (document.getElementById('sourceLang') as HTMLSelectElement).value,
+            llmTargetLang: (document.getElementById('targetLang') as HTMLSelectElement).value,
             llmTranslationUnit: (document.getElementById('translationUnit') as HTMLSelectElement).value,
             llmChunkSize: parseInt((document.getElementById('chunkSize') as HTMLInputElement).value) || 30,
             llmTranslatorNotes: (document.getElementById('translatorNotes') as HTMLTextAreaElement).value,
