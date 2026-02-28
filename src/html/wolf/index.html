@@ -34,8 +34,8 @@
             <section class="section">
                 <div class="mode-row">
                     <div class="mode-tabs">
-                        <div class="mode-tab" id="marTrans" enlang="Extract">추출</div>
-                        <div class="mode-tab" id="handTrans" enlang="Apply">적용</div>
+                        <div class="mode-tab" id="marTrans" enlang="Extract" data-tooltip="게임 데이터에서&#10;텍스트를 추출합니다" data-tooltip-pos="bottom">추출</div>
+                        <div class="mode-tab" id="handTrans" enlang="Apply" data-tooltip="번역된 텍스트를&#10;게임에 적용합니다" data-tooltip-pos="bottom">적용</div>
                     </div>
                 </div>
             </section>
@@ -44,9 +44,9 @@
             <div id="marCont" style="display: none">
                 <section class="section">
                     <div class="options-grid">
-                        <div class="option-btn" id="ext-buran" enlang="Extract Unstable" btn-val="extBuran">불안정 추출</div>
-                        <div class="option-btn" id="extpat" enlang="Pattern Based Extraction" btn-val="extPattern">패턴 기반 추출</div>
-                        <div class="option-btn" id="ext-all" enlang="Extract All" btn-val="extAll">모두 추출</div>
+                        <div class="option-btn" id="ext-buran" enlang="Extract Unstable" btn-val="extBuran" data-tooltip="불안정한 방식으로 텍스트를&#10;추출합니다. 일반 추출이&#10;실패할 때 사용하세요">불안정 추출</div>
+                        <div class="option-btn" id="extpat" enlang="Pattern Based Extraction" btn-val="extPattern" data-tooltip="정규식 패턴을 기반으로&#10;텍스트를 선별 추출합니다">패턴 기반 추출</div>
+                        <div class="option-btn" id="ext-all" enlang="Extract All" btn-val="extAll" data-tooltip="필터 없이 모든 텍스트를&#10;추출합니다">모두 추출</div>
                     </div>
                     <div id="runbtn" class="btn-run" style="margin-top:8px;text-align:center;padding:14px;margin-left:0;">RUN</div>
                 </section>
@@ -64,8 +64,8 @@
                 <label class="section-label">도구</label>
                 <div id="addons">
                     <div class="tools-grid">
-                        <button class="tool-btn" id="eztrans" enlang="LLM Translation">LLM 번역</button>
-                        <button class="tool-btn" id="settings" enlang="Config">설정</button>
+                        <button class="tool-btn" id="eztrans" enlang="LLM Translation" data-tooltip="Gemini AI를 사용하여&#10;추출된 텍스트를 자동 번역합니다" data-tooltip-pos="bottom">LLM 번역</button>
+                        <button class="tool-btn" id="settings" enlang="Config" data-tooltip="추출/적용 옵션 및&#10;테마를 설정합니다" data-tooltip-pos="bottom">설정</button>
                     </div>
                 </div>
             </section>

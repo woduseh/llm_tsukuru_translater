@@ -31,8 +31,8 @@
     <section class="section">
       <div class="mode-row">
         <div class="mode-tabs">
-          <button class="mode-tab" id="ext" enlang="Extract">추출</button>
-          <button class="mode-tab" id="apply" enlang="Apply">적용</button>
+          <button class="mode-tab" id="ext" enlang="Extract" data-tooltip="게임 데이터에서&#10;텍스트를 추출합니다" data-tooltip-pos="bottom">추출</button>
+          <button class="mode-tab" id="apply" enlang="Apply" data-tooltip="번역된 텍스트를&#10;게임에 적용합니다" data-tooltip-pos="bottom">적용</button>
         </div>
         <button class="btn-run" id="run">RUN</button>
       </div>
@@ -41,17 +41,17 @@
     <!-- Options -->
     <section class="section options-section">
       <div class="options-grid hiddenc" id="c-ext">
-        <button class="option-btn" id="ext_plugin" enlang="Extract Plugins">플러그인</button>
-        <button class="option-btn" id="ext_src" enlang="Extract Scripts">스크립트</button>
-        <button class="option-btn" id="ext_note" enlang="Extract Memo">노트 / 메모</button>
-        <button class="option-btn" id="exJson" enlang="Extract nonstandard">비표준 리소스</button>
-        <button class="option-btn" id="decryptImg" enlang="Decrypt Images">이미지 복호화</button>
-        <button class="option-btn" id="decryptAudio" enlang="Decrypt Audios">오디오 복호화</button>
-        <button class="option-btn" id="ext_javascript" enlang="Decrypt Javascript">자바스크립트</button>
+        <button class="option-btn" id="ext_plugin" enlang="Extract Plugins" data-tooltip="플러그인 폴더의 .js 파일에서&#10;텍스트를 추출합니다">플러그인</button>
+        <button class="option-btn" id="ext_src" enlang="Extract Scripts" data-tooltip="js 폴더의 스크립트 파일에서&#10;텍스트를 추출합니다">스크립트</button>
+        <button class="option-btn" id="ext_note" enlang="Extract Memo" data-tooltip="이벤트의 노트/메모 필드도&#10;함께 추출합니다">노트 / 메모</button>
+        <button class="option-btn" id="exJson" enlang="Extract nonstandard" data-tooltip="표준 RPG Maker 형식이 아닌&#10;JSON 파일에서도 텍스트를 추출합니다">비표준 리소스</button>
+        <button class="option-btn" id="decryptImg" enlang="Decrypt Images" data-tooltip="암호화된 .rpgmvp/.png_&#10;이미지 파일을 복호화합니다">이미지 복호화</button>
+        <button class="option-btn" id="decryptAudio" enlang="Decrypt Audios" data-tooltip="암호화된 .rpgmvo/.ogg_&#10;오디오 파일을 복호화합니다">오디오 복호화</button>
+        <button class="option-btn" id="ext_javascript" enlang="Decrypt Javascript" data-tooltip="암호화된 JavaScript 파일을&#10;복호화합니다">자바스크립트</button>
       </div>
       <div class="options-grid hiddenc" id="c-app">
-        <button class="option-btn" id="autoline" enlang="Auto Line">자동 줄바꿈</button>
-        <button class="option-btn" id="instantapply" enlang="Instant Apply">즉시 적용</button>
+        <button class="option-btn" id="autoline" enlang="Auto Line" data-tooltip="번역된 텍스트가 대화창을&#10;넘지 않도록 자동으로&#10;줄바꿈을 삽입합니다">자동 줄바꿈</button>
+        <button class="option-btn" id="instantapply" enlang="Instant Apply" data-tooltip="추출 없이 바로 번역 파일을&#10;게임에 적용합니다">즉시 적용</button>
       </div>
     </section>
 
@@ -60,11 +60,11 @@
       <label class="section-label">도구</label>
       <div id="addons">
         <div class="tools-grid">
-          <button class="tool-btn" id="eztrans" enlang="LLM Translation">LLM 번역</button>
-          <button class="tool-btn" id="versionUp" enlang="Version-Up Tool">버전 업</button>
-          <button class="tool-btn" id="fontConfig" enlang="Change Font">폰트</button>
-          <button class="tool-btn" id="toProject" enlang="Convert to Project">프로젝트 변환</button>
-          <button class="tool-btn" id="settings" enlang="Config">설정</button>
+          <button class="tool-btn" id="eztrans" enlang="LLM Translation" data-tooltip="Gemini AI를 사용하여&#10;추출된 텍스트를 자동 번역합니다" data-tooltip-pos="bottom">LLM 번역</button>
+          <button class="tool-btn" id="versionUp" enlang="Version-Up Tool" data-tooltip="게임의 새 버전이 출시되었을 때&#10;기존 번역을 유지하면서&#10;새 텍스트만 추출합니다" data-tooltip-pos="bottom">버전 업</button>
+          <button class="tool-btn" id="fontConfig" enlang="Change Font" data-tooltip="게임에서 사용하는&#10;폰트를 변경합니다" data-tooltip-pos="bottom">폰트</button>
+          <button class="tool-btn" id="toProject" enlang="Convert to Project" data-tooltip="배포용 게임을 RPG Maker&#10;에디터에서 열 수 있는&#10;프로젝트 형식으로 변환합니다" data-tooltip-pos="bottom">프로젝트 변환</button>
+          <button class="tool-btn" id="settings" enlang="Config" data-tooltip="추출/적용 옵션 및&#10;테마를 설정합니다" data-tooltip-pos="bottom">설정</button>
         </div>
       </div>
     </section>
