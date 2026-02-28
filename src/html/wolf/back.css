@@ -6,6 +6,11 @@
 }
 
 /* ── Wolf RPG Page Specific ── */
+#marCont .section,
+#handCont .section {
+  min-height: 120px;
+}
+
 .mode-tab[selected] {
   background: var(--Selected);
   color: #1a1a2e;
