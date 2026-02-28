@@ -5,58 +5,89 @@
         <meta charset="utf-8">
         <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
         <link href="./styles.css" rel="stylesheet">
-        <title>Config</title>
+        <title>설정</title>
     </head>
     <body>
         <div id="container">
-            <div class="boxc">진행도 퍼센트 표시
-                <input type="checkbox" id="loadingText">
-            </div><br>
-            <div class="boxc">적용 JSON에서 줄바꿈 사용
-                <input type="checkbox" id="JsonChangeLine">
-            </div><br>
-            <div class="boxc">기계번역 시 한글을 포함한 문자열 번역하지 않기
-                <input type="checkbox" id="DoNotTransHangul">
-            </div><br>
-            <div class="boxc">내용 없는 문자열 추출 <label class="rec">(MV/MZ)</label>
-                <input type="checkbox" id="ExtractAddLine">
-            </div><br>
-            <div>기계번역 사용자 사전</label><br>
-            <textarea id="userdict" spellcheck="false" placeholder="Hina=히나&#10;橋本=하시모토&#10;ひかり=히카리&#10;.."></textarea><br>
-            </div><br>
+            <!-- General settings -->
+            <div class="settings-group">
+                <div class="group-title">일반</div>
+                <div class="setting-item">
+                    <label for="loadingText">진행도 퍼센트 표시</label>
+                    <input type="checkbox" id="loadingText">
+                </div>
+                <div class="setting-item">
+                    <label for="JsonChangeLine">적용 JSON에서 줄바꿈 사용</label>
+                    <input type="checkbox" id="JsonChangeLine">
+                </div>
+                <div class="setting-item">
+                    <label for="DoNotTransHangul">한글을 포함한 문자열 번역하지 않기</label>
+                    <input type="checkbox" id="DoNotTransHangul">
+                </div>
+                <div class="setting-item">
+                    <label for="ExtractAddLine">내용 없는 문자열 추출 <span class="tag">MV/MZ</span></label>
+                    <input type="checkbox" id="ExtractAddLine">
+                </div>
+            </div>
+
+            <!-- User Dictionary -->
+            <div class="settings-group">
+                <div class="group-title">사용자 사전</div>
+                <textarea id="userdict" spellcheck="false" placeholder="Hina=히나&#10;橋本=하시모토&#10;ひかり=히카리"></textarea>
+            </div>
+
+            <!-- Advanced settings -->
             <details>
-                <summary>고급 설정: [접기/펼치기]</summary>
-                <br><div class="boxc warn">고급 설정을 변경 할 시 기계번역에 문제가 생길 수 있습니다</div><br>
-                <div class="boxc">별도의 파일로 스크립트 추출 <label class="rec">(MV/MZ)</label>
-                <input type="checkbox" id="onefile_src">
-                </div><br>
-                <div class="boxc">별도의 파일로 노트 추출 <label class="rec">(MV/MZ)</label>
+                <summary>고급 설정</summary>
+                <div class="warn-text">고급 설정 변경 시 번역에 문제가 생길 수 있습니다</div>
+
+                <div class="setting-item">
+                    <label for="onefile_src">별도 파일로 스크립트 추출 <span class="tag">MV/MZ</span></label>
+                    <input type="checkbox" id="onefile_src">
+                </div>
+                <div class="setting-item">
+                    <label for="onefile_note">별도 파일로 노트 추출 <span class="tag">MV/MZ</span></label>
                     <input type="checkbox" id="onefile_note">
-                </div><br>
-                <div class="boxc">ExternMessage.csv 다른 파일로 추출 <label class="rec">(MV/MZ)</label>
+                </div>
+                <div class="setting-item">
+                    <label for="ExternMsgJson">ExternMessage.csv 분리 추출 <span class="tag">MV/MZ</span></label>
                     <input type="checkbox" id="ExternMsgJson">
-                </div><br>
-                <div class="boxc">Map 파일 하나로 만들기 <label class="rec">(MV/MZ)</label>
-                <input type="checkbox" id="oneMapFile">
-                </div><br>
-                <div class="boxc">추출 시 구분을 편하게 만들기 <label class="rec">(MV/MZ)</label>
+                </div>
+                <div class="setting-item">
+                    <label for="oneMapFile">Map 파일 하나로 만들기 <span class="tag">MV/MZ</span></label>
+                    <input type="checkbox" id="oneMapFile">
+                </div>
+                <div class="setting-item">
+                    <label for="formatNice">추출 시 구분을 편하게 만들기 <span class="tag">MV/MZ</span></label>
                     <input type="checkbox" id="formatNice">
-                </div><br>
-                <div class="boxc">모두 추출 숨기기 <label class="rec">(Wolf)</label>
+                </div>
+                <div class="setting-item">
+                    <label for="HideExtractAll">모두 추출 숨기기 <span class="tag">Wolf</span></label>
                     <input type="checkbox" id="HideExtractAll">
-                </div><br>
-                <div class="boxc">다음 code를 가진 데이터를 추가로 추출하기 <label class="rec">(MV/MZ)</label>
+                </div>
+
+                <div class="settings-group" style="margin-top:12px">
+                    <div class="textarea-label">추가 추출 코드 <span class="tag">MV/MZ</span></div>
                     <textarea id="extractPlus" spellcheck="false" placeholder="122&#10;300&#10;.."></textarea>
-                </div><br>
-                <div class="boxc">특정 문자열을 가진 스크립트/노트만 추출
+                </div>
+
+                <div class="setting-item">
+                    <label for="extractSomeScript">특정 문자열을 가진 스크립트/노트만 추출</label>
                     <input type="checkbox" id="extractSomeScript">
                 </div>
-                <textarea id="extractSomeScript2" class="invisible" spellcheck="false" placeholder="showtext&#10;maintext&#10;.."></textarea><br>
-            </details><br>
-            <button id="update" class="btn2">업데이트 확인</button><button id="license" class="btn2">오픈소스 라이센스</button>
+                <textarea id="extractSomeScript2" class="invisible" spellcheck="false" placeholder="showtext&#10;maintext&#10;.."></textarea>
+            </details>
+
+            <div style="margin-top:12px">
+                <button id="license" class="btn2">오픈소스 라이센스</button>
+            </div>
+            <button id="update" style="display:none"></button>
         </div>
-        <button id="apply" class="btn">적용</button>
-        <button id="close" class="btn">취소</button>
+
+        <div class="button-bar">
+            <button id="apply" class="btn btn-primary">적용</button>
+            <button id="close" class="btn">취소</button>
+        </div>
         <script src="./script.js"></script>
     </body>
 </html>
