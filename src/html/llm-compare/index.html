@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <script src="../../lib/enlang/enlang.js"></script>
+    <link href="./styles.css" rel="stylesheet">
+    <title>Translation Compare</title>
+</head>
+<body>
+    <div id="header">
+        <h2>번역 비교 / 검증 결과</h2>
+        <div id="summary"></div>
+        <div id="file-tabs"></div>
+    </div>
+    <div id="compare-container">
+        <div class="column" id="col-original">
+            <div class="column-header">원본 (Original)</div>
+            <div class="blocks" id="original-blocks"></div>
+        </div>
+        <div class="column" id="col-translated">
+            <div class="column-header">번역 (Translated)</div>
+            <div class="blocks" id="translated-blocks"></div>
+        </div>
+    </div>
+    <div class="button-bar">
+        <button id="closeBtn" class="btn">닫기</button>
+    </div>
+    <script src="./script.js"></script>
+</body>
+</html>

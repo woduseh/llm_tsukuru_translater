@@ -505,6 +505,106 @@ ipcMain.on('eztrans', eztrans.trans)
 
 ipcMain.on('eztransHelp', () => {open('https://github.com/gramedcart/tsukuru_extractor/wiki/ezTrans-%EC%98%A4%EB%A5%98-%ED%95%B4%EA%B2%B0')})
 
+// LLM Settings Window
+let llmSettingsWindow: Electron.BrowserWindow = null;
+let llmPendingArg: any = null;
+
+ipcMain.on('openLLMSettings', (ev, arg) => {
+  llmPendingArg = arg;
+  if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
+    llmSettingsWindow.focus();
+    return;
+  }
+  llmSettingsWindow = new BrowserWindow({
+    width: 550,
+    height: 650,
+    resizable: true,
+    show: false,
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+    icon: path.join(__dirname, 'res/icon.png'),
+  });
+  llmSettingsWindow.setMenu(null);
+  llmSettingsWindow.loadFile('src/html/llm/index.html');
+  llmSettingsWindow.webContents.on('did-finish-load', () => {
+    llmSettingsWindow.show();
+    llmSettingsWindow.webContents.send('llmSettings', globalThis.settings);
+  });
+  llmSettingsWindow.on('closed', () => {
+    llmSettingsWindow = null;
+  });
+})
+
+ipcMain.on('llmSettingsApply', (ev, data) => {
+  // Save LLM settings
+  globalThis.settings = { ...globalThis.settings, ...data };
+  storage.set('settings', JSON.stringify(globalThis.settings));
+
+  if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
+    llmSettingsWindow.close();
+  }
+
+  // Start Gemini translation
+  if (llmPendingArg) {
+    const a = {
+      dir: Buffer.from(llmPendingArg.dir, 'utf8').toString('base64'),
+      type: 'gemini',
+      langu: data.llmSourceLang || 'ja',
+      game: llmPendingArg.game
+    };
+    getMainWindow().webContents.send('loading', 1);
+    eztrans.trans(null, a);
+    llmPendingArg = null;
+  }
+})
+
+ipcMain.on('llmSettingsClose', () => {
+  if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
+    llmSettingsWindow.close();
+  }
+})
+
+// LLM Compare Viewer
+let llmCompareWindow: Electron.BrowserWindow = null;
+
+ipcMain.on('openLLMCompare', (ev, compareData) => {
+  if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+    llmCompareWindow.webContents.send('compareData', compareData);
+    llmCompareWindow.focus();
+    return;
+  }
+  llmCompareWindow = new BrowserWindow({
+    width: 1000,
+    height: 700,
+    resizable: true,
+    show: false,
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+    icon: path.join(__dirname, 'res/icon.png'),
+  });
+  llmCompareWindow.setMenu(null);
+  llmCompareWindow.loadFile('src/html/llm-compare/index.html');
+  llmCompareWindow.webContents.on('did-finish-load', () => {
+    llmCompareWindow.show();
+    llmCompareWindow.webContents.send('compareData', compareData);
+  });
+  llmCompareWindow.on('closed', () => {
+    llmCompareWindow = null;
+  });
+})
+
+ipcMain.on('llmCompareClose', () => {
+  if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+    llmCompareWindow.close();
+  }
+})
+
 ipcMain.on('minimize', () => {
   getMainWindow().minimize()
 })

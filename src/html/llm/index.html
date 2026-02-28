@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <script src="../../lib/enlang/enlang.js"></script>
+    <link href="./styles.css" rel="stylesheet">
+    <title>LLM Translation Settings</title>
+</head>
+<body>
+    <div id="container">
+        <h2>LLM 번역 설정</h2>
+
+        <div class="form-group">
+            <label for="apiKey">Gemini API 키</label>
+            <input type="password" id="apiKey" class="text-input" placeholder="API 키를 입력하세요">
+        </div>
+
+        <div class="form-group">
+            <label for="model">모델 선택</label>
+            <select id="model" class="select-input">
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="sourceLang">원문 언어</label>
+            <select id="sourceLang" class="select-input">
+                <option value="ja">일본어 (日本語)</option>
+                <option value="en">영어 (English)</option>
+                <option value="zh-CN">중국어 간체 (简体中文)</option>
+                <option value="zh-TW">중국어 정체 (繁體中文)</option>
+                <option value="fr">프랑스어 (Français)</option>
+                <option value="es">스페인어 (Español)</option>
+                <option value="ru">러시아어 (Русский)</option>
+                <option value="de">독일어 (Deutsch)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="chunkSize">청크 크기 <span class="hint">(한 번에 번역할 대사 블록 수)</span></label>
+            <input type="number" id="chunkSize" class="text-input short" value="30" min="1" max="200">
+        </div>
+
+        <div class="form-group">
+            <label for="translatorNotes">번역가의 노트 <span class="hint">(고유명사 사전: 원문=번역)</span></label>
+            <textarea id="translatorNotes" spellcheck="false" placeholder="ひかり=히카리&#10;橋本=하시모토&#10;魔王=마왕&#10;.."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="customPrompt">커스텀 프롬프트 <span class="hint">(추가 번역 지시사항)</span></label>
+            <textarea id="customPrompt" spellcheck="false" placeholder="예: 존댓말을 사용하세요, 판타지 스타일로 번역하세요 등"></textarea>
+        </div>
+    </div>
+
+    <div class="button-bar">
+        <button id="startBtn" class="btn primary">번역 시작</button>
+        <button id="cancelBtn" class="btn">취소</button>
+    </div>
+
+    <script src="./script.js"></script>
+</body>
+</html>

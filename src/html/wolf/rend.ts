@@ -281,10 +281,12 @@
         const infos = {
             'eztrans': '일본어만 지원합니다. Eztrans가 설치되어 있어야 합니다.',
             'kakao': '카카오 번역 모드입니다.<br>일본어 이외의 언어를 번역하는데 유용합니다',
+            'gemini': 'Gemini API를 사용한 LLM 번역기입니다.<br>다국어 지원, 번역가의 노트, 커스텀 프롬프트를 지원합니다.<br>API 키가 필요합니다.'
         }
     
     
         const selectOptions = {
+            'gemini': 'Gemini (LLM 번역기)',
             'eztrans': 'EzTrans',
             'kakao': '카카오 번역기',
         }
@@ -317,6 +319,11 @@
         })
         const transtype = v.value
         if(!transtype){
+            return
+        }
+        if(transtype === 'gemini'){
+            const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
+            ipcRenderer.send('openLLMSettings', { dir: dir, game: 'wolf' });
             return
         }
         let langu = 'jp'
