@@ -11,8 +11,6 @@ export function decodeEncoding(buffer:Uint8Array){
     }
 }
 
-export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 export function getAllFileInDir(Directory:string, ext:null|string = null) {
     let Files:string[] = [];
 

@@ -2,15 +2,12 @@
 const styles = require('./styles').default
 
 export const settings = {
-    userdict: {},
     extractJs: false,
     extractSomeScript: false,
     extractSomeScript2: [],
     code122: false,
     onefile_src: true,
     onefile_note: true,
-    safeTrans: true,
-    smartTrans: true,
     exJson: false,
     loadingText: true,
     JsonChangeLine: false,
@@ -19,18 +16,15 @@ export const settings = {
     ExternMsgJson: true,
     DoNotTransHangul: true,
     formatNice: true,
-    fastEztrans: true,
     theme: "Dracula",
     themeData: {},
     extractPlus: [],
     themeList: Object.keys(styles),
-    hideUnrecomenedTranslators: true,
     language: 'en',
     HideExtractAll: true,
     llmApiKey: '',
-    llmModel: 'gemini-2.0-flash',
+    llmModel: 'gemini-3.0-flash-preview',
     llmCustomPrompt: '',
-    llmTranslatorNotes: '',
     llmChunkSize: 30,
     llmTranslationUnit: 'chunk',
     llmTargetLang: 'ko'
@@ -63,7 +57,6 @@ const odat = [
     'Troops.txt',
     'Weapons.txt',
     'Items.txt',
-    'Troops.txt',
 ]
 export default odat
 
@@ -74,7 +67,6 @@ export const ignores = [
     'Classes.json',
     'CommonEvents.json',
     'Enemies.json',
-    'Troops.json',
     'Items.json',
     'Skills.json',
     'States.json',
@@ -104,7 +96,7 @@ export const note2able = [
     '選択肢ヘルプ',
 ]
 
-export const hanguls = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/;
+export const hanguls = /[ㄱ-ㅎㅏ-ㅣ가-힣]/;
 
 export const beautifyCodes = [
     108

@@ -100,6 +100,13 @@ textarea:focus {
 
 textarea::placeholder { opacity: 0.3; }
 
+.config-hint {
+  font-size: 11px;
+  opacity: 0.4;
+  margin-top: 8px;
+  text-align: center;
+}
+
 /* ── Buttons ── */
 .button-bar {
   display: flex;
@@ -136,4 +143,18 @@ textarea::placeholder { opacity: 0.3; }
 .btn.primary:hover {
   opacity: 0.85;
   box-shadow: 0 4px 16px rgba(189,147,249,0.25);
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.checkbox-group input[type="checkbox"] {
+  margin-top: 2px;
+  accent-color: var(--accent-color, #bd93f9);
 }

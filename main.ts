@@ -1,5 +1,4 @@
 // Modules to control application life and create native browser window
-// E:\Gamr\Tool\PPLSS\www\data\Extracted
 import { app, BrowserWindow, ipcMain, dialog, globalShortcut } from 'electron';
 import fs from 'fs';
 import open from 'open';
@@ -11,7 +10,6 @@ import path from 'path';
 import * as edTool from './src/js/rpgmv/edtool.js';
 let mainid = 0
 const defaultHeight = 550
-// 350 + 170
 import * as dataBaseO from './src/js/rpgmv/datas.js';
 import * as applyjs from "./src/js/rpgmv/apply.js";
 import * as eztrans from "./src/js/rpgmv/translator.js";
@@ -23,10 +21,8 @@ import { wolfInit } from './src/js/wolf/main.js';
 import { initFontIPC } from './src/js/rpgmv/fonts';
 import { initExtentions } from './src/js/libs/extentions';
 
+const ErrorAlert = (msg) => sendError(msg)
 
-function ErrorAlert(msg){
-  sendError(msg)
-}
 
 export function worked(){
   getMainWindow().webContents.send('worked', 0);
@@ -79,8 +75,6 @@ function createWindow() {
   })
   
   mainWindow.setMenu(null)
-  // and load the index.html of the app.
-  // mainWindow.loadFile('./src/html/main/index.html')
   mainWindow.loadFile('./src/html/simple/index.html')
   mainWindow.webContents.on('did-finish-load', function () {
     mainWindow.show();
@@ -110,10 +104,6 @@ const getMainWindow = () => {
 
 function sendAlert(txt){
   getMainWindow().webContents.send('alert', txt);
-}
-
-function sendAlertSmall(txt){
-  getMainWindow().webContents.send('alert_free', {html: txt, width:"90vw", height:"95vh"});
 }
 
 function sendError(txt){
@@ -149,15 +139,13 @@ ipcMain.on('license', () => {
 
 ipcMain.on('changeURL', (ev, arg) => {
   globalThis.mwindow.loadFile(arg)
-  if(arg.endsWith('main/index.html')){
-  }
 })
 
 ipcMain.on('settings', () => {
   globalThis.settingsWindow = new BrowserWindow({
     width: 800,
-    height: 700,
-    resizable: false,
+    height: 900,
+    resizable: true,
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -221,7 +209,6 @@ ipcMain.on('applysettings', async (ev, arg) => {
   storage.set('settings', JSON.stringify(globalThis.settings))
   globalThis.settingsWindow.close()
   globalThis.settings.themeData = Themes[globalThis.settings.theme]
-  console.log(globalThis.settings)
   getMainWindow().webContents.send('getGlobalSettings', globalThis.settings);
   worked()
 })
@@ -275,8 +262,7 @@ async function extractor(arg){
       arg.silent = false
     }
     const dir = Buffer.from(arg.dir, "base64").toString('utf8');
-    if(fs.existsSync(dir)){}
-    else{
+    if(!fs.existsSync(dir)){
       getMainWindow().webContents.send('alert', {icon: 'error', message: '지정된 디렉토리가 없습니다'}); 
       worked()
       return
@@ -299,13 +285,10 @@ async function extractor(arg){
         }
       }
     }
-    console.log(arg.ext_plugin)
     if(arg.ext_plugin){
-      if(true){
         let jsdir = ((dir.substring(0,dir.length-5) + '/js').replaceAll('//','/'))
         if(!fs.existsSync(jsdir + '/plugins.js')){
           jsdir = path.join(path.dirname(path.dirname(path.dirname(jsdir))), 'js')
-          console.log(jsdir)
           if(!fs.existsSync(jsdir + '/plugins.js')){
             getMainWindow().webContents.send('alert', {icon: 'error', message: 'plugin.js가 존재하지 않습니다'}); 
             worked()
@@ -317,12 +300,10 @@ async function extractor(arg){
         hail2 = hail[hail.length - 1] + '  '
         hail2 = hail2.substring(hail2.indexOf('['), hail2.lastIndexOf(']') + 1)
         fs.writeFileSync(dir + '/ext_plugins.json', JSON.stringify(JSON.parse(hail2)), 'utf-8')
-      }
     }
     globalThis.externMsg = {}
     globalThis.useExternMsg = false
     if(fs.existsSync(dir + '/ExternMessage.csv') && arg.exJson && globalThis.settings.ExternMsgJson){
-      console.log('extern Exists')
       const Emsg = await ExtTool.parse_externMsg(dir + '/ExternMessage.csv', !globalThis.settings.ExternMsgJson)
       globalThis.externMsg = Emsg
       if(globalThis.settings.ExternMsgJson){
@@ -339,7 +320,6 @@ async function extractor(arg){
       const f = path.join(dir, fileList2[i])
       const pf = path.parse(f)
       if(f.endsWith('.json.yaml')){
-        console.log(f)
         const fname = path.join(pf.dir, pf.name)
         const fd = JSON.stringify(yaml.load(fs.readFileSync(f, 'utf-8')))
         fs.writeFileSync(fname, fd, 'utf-8')
@@ -359,9 +339,7 @@ async function extractor(arg){
 
     const max_files = fileList.length
     let worked_files = 0
-    let jT = 0
     ExtTool.init_extract(arg)
-    let performT = performance.now()
     for (const i in fileList){
       worked_files += 1
       const fileName = fileList[i]
@@ -385,26 +363,21 @@ async function extractor(arg){
       runBackup()
       if (checkIsMapFile(fileName)){
         file = fs.readFileSync(dir + '/' + fileName, 'utf8')
-        jT += file.length
         await ExtTool.format_extracted(await ExtTool.extract(file, conf, 'map'))
       }
       else if (Object.keys(onebyone).includes(fileName)){
         file = fs.readFileSync(dir + '/' + fileName, 'utf8')
-        jT += file.length
         await ExtTool.format_extracted(await ExtTool.extract(file, conf, onebyone[fileName]))
       }
       else if (arg.exJson){
         if(!dataBaseO.ignores.includes(fileName)){
           file = fs.readFileSync(dir + '/' + fileName, 'utf8')
-          jT += file.length
           await ExtTool.format_extracted(await ExtTool.extract(file, conf, 'ex'))
         }
       }
       getMainWindow().webContents.send('loading', worked_files/max_files*100);
       await sleep(0)
     }
-    const pTime = performance.now() - performT
-    console.log(`perform in ${(pTime).toFixed(3)}ms\nPerformed Texts: ${jT}\nText per ms: ${(jT / pTime).toFixed(3)}`)
     const gbKeys = {...Object.keys(globalThis.gb)}
     for (const i in gbKeys){
       const fileName = gbKeys[i]
@@ -484,7 +457,7 @@ ipcMain.on('openLLMSettings', (ev, arg) => {
   }
   llmSettingsWindow = new BrowserWindow({
     width: 550,
-    height: 720,
+    height: 300,
     resizable: true,
     show: false,
     autoHideMenuBar: true,
@@ -506,26 +479,34 @@ ipcMain.on('openLLMSettings', (ev, arg) => {
 })
 
 ipcMain.on('llmSettingsApply', (ev, data) => {
-  // Save LLM settings
-  globalThis.settings = { ...globalThis.settings, ...data };
+  // Save per-translation settings (sortOrder)
+  globalThis.settings = { ...globalThis.settings, llmSortOrder: data.llmSortOrder };
   storage.set('settings', JSON.stringify(globalThis.settings));
 
   if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
     llmSettingsWindow.close();
   }
 
-  // Start Gemini translation
+  // Start Gemini translation using persistent settings from config
   if (llmPendingArg) {
+    globalThis.llmAbort = false;
     const a = {
       dir: Buffer.from(llmPendingArg.dir, 'utf8').toString('base64'),
       type: 'gemini',
-      langu: data.llmSourceLang || 'ja',
-      game: llmPendingArg.game
+      langu: globalThis.settings.llmSourceLang || 'ja',
+      game: llmPendingArg.game,
+      resetProgress: data.llmResetProgress || false,
+      sortOrder: data.llmSortOrder || 'name-asc',
+      translationMode: data.llmTranslationMode || 'untranslated'
     };
     getMainWindow().webContents.send('loading', 1);
     eztrans.trans(null, a);
     llmPendingArg = null;
   }
+})
+
+ipcMain.on('abortLLM', () => {
+  globalThis.llmAbort = true;
 })
 
 ipcMain.on('llmSettingsClose', () => {
@@ -537,15 +518,15 @@ ipcMain.on('llmSettingsClose', () => {
 // LLM Compare Viewer
 let llmCompareWindow: Electron.BrowserWindow = null;
 
-ipcMain.on('openLLMCompare', (ev, compareData) => {
+ipcMain.on('openLLMCompare', (ev, dir: string) => {
   if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
-    llmCompareWindow.webContents.send('compareData', compareData);
+    llmCompareWindow.webContents.send('initCompare', dir);
     llmCompareWindow.focus();
     return;
   }
   llmCompareWindow = new BrowserWindow({
-    width: 1000,
-    height: 700,
+    width: 1100,
+    height: 750,
     resizable: true,
     show: false,
     autoHideMenuBar: true,
@@ -559,7 +540,7 @@ ipcMain.on('openLLMCompare', (ev, compareData) => {
   llmCompareWindow.loadFile('src/html/llm-compare/index.html');
   llmCompareWindow.webContents.on('did-finish-load', () => {
     llmCompareWindow.show();
-    llmCompareWindow.webContents.send('compareData', compareData);
+    llmCompareWindow.webContents.send('initCompare', dir);
   });
   llmCompareWindow.on('closed', () => {
     llmCompareWindow = null;
@@ -569,6 +550,63 @@ ipcMain.on('openLLMCompare', (ev, compareData) => {
 ipcMain.on('llmCompareClose', () => {
   if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
     llmCompareWindow.close();
+  }
+})
+
+ipcMain.on('retranslateFile', async (_ev, data: { dir: string; fileName: string }) => {
+  // Detect Wolf RPG vs RPG Maker extract path
+  const wolfEdir = path.join(data.dir, '_Extract', 'Texts');
+  const mvEdir = path.join(data.dir, 'Extract');
+  const edir = (fs.existsSync(wolfEdir) && fs.existsSync(wolfEdir + '_backup')) ? wolfEdir : mvEdir;
+  globalThis.llmAbort = false;
+  try {
+    const result = await eztrans.retranslateFile(
+      edir,
+      data.fileName,
+      globalThis.settings.llmSourceLang || 'ja',
+      globalThis.settings.llmTargetLang || 'ko',
+      (msg: string) => {
+        if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+          llmCompareWindow.webContents.send('retranslateProgress', msg);
+        }
+      }
+    );
+    if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+      llmCompareWindow.webContents.send('retranslateFileDone', result);
+    }
+  } catch (err: any) {
+    if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+      llmCompareWindow.webContents.send('retranslateFileDone', { success: false, error: err.message || String(err) });
+    }
+  }
+})
+
+ipcMain.on('retranslateBlocks', async (_ev, data: { dir: string; fileName: string; blockIndices: number[] }) => {
+  // Detect Wolf RPG vs RPG Maker extract path
+  const wolfEdir = path.join(data.dir, '_Extract', 'Texts');
+  const mvEdir = path.join(data.dir, 'Extract');
+  const edir = (fs.existsSync(wolfEdir) && fs.existsSync(wolfEdir + '_backup')) ? wolfEdir : mvEdir;
+  globalThis.llmAbort = false;
+  try {
+    const result = await eztrans.retranslateBlocks(
+      edir,
+      data.fileName,
+      data.blockIndices,
+      globalThis.settings.llmSourceLang || 'ja',
+      globalThis.settings.llmTargetLang || 'ko',
+      (msg: string) => {
+        if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+          llmCompareWindow.webContents.send('retranslateProgress', msg);
+        }
+      }
+    );
+    if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+      llmCompareWindow.webContents.send('retranslateBlocksDone', result);
+    }
+  } catch (err: any) {
+    if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+      llmCompareWindow.webContents.send('retranslateBlocksDone', { success: false, error: err.message || String(err) });
+    }
   }
 })
 
@@ -599,14 +637,12 @@ ipcMain.on('updateVersion', async (ev, arg) => {
       return
     }
     
-    console.log(arg.dir3)
     await extractor({
       ...arg.dir3,
       dir: Buffer.from(path.join(arg.dir3_base), "utf8").toString('base64'),
       force: true,
       silent: true
     })
-    console.log(arg.dir2)
     await extractor({
       ...arg.dir2,
       dir: Buffer.from(path.join(arg.dir2_base), "utf8").toString('base64'),
@@ -621,7 +657,6 @@ ipcMain.on('updateVersion', async (ev, arg) => {
       const parsed = path.parse(fileList1[i])
       const file = parsed.name.concat(parsed.ext)
       let TransDict = {}
-      console.log(file)
       const dat1 = fs.readFileSync(path.join(OldDir, file), 'utf-8').split('\n')
       if(!((fs.existsSync(path.join(TranslatedDir, file))))){
         ErrorAlert('구버전의 번역본 파일과 미번역본 파일이 서로 통하지 않습니다. ')

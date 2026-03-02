@@ -6,21 +6,16 @@
 }
 
 /* ── Wolf RPG Page Specific ── */
-#marCont .section,
-#handCont .section {
-  min-height: 120px;
-}
-
 .mode-tab[selected] {
   background: var(--Selected);
-  color: #1a1a2e;
+  color: #fff;
   opacity: 1;
   font-weight: 600;
 }
 
 [btn-active] {
   background: var(--Selected) !important;
-  color: #1a1a2e !important;
+  color: #fff !important;
   border-color: var(--Selected) !important;
 }
 

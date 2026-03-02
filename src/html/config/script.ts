@@ -17,16 +17,10 @@ const CheckboxValues = [
 ipcRenderer.on("settings", (evt, arg) => {
   try{
     gsettings = arg
-    const userdict = arg.userdict
     const ess2 = arg.extractSomeScript2
     const extractPlus = arg.extractPlus
     if(arg.language === 'en'){
       globalThis.loadEn()
-    }
-  
-    for(const keys in Object.keys(userdict)){
-      const key = Object.keys(userdict)[keys];
-      (document.getElementById('userdict') as HTMLTextAreaElement).value += key + '=' + userdict[key] + '\n'
     }
   
     (document.getElementById('extractSomeScript2') as HTMLTextAreaElement).value += ess2.join('\n');
@@ -34,6 +28,20 @@ ipcRenderer.on("settings", (evt, arg) => {
     CheckboxValues.forEach((val) => {
       (document.getElementById(val) as HTMLInputElement).checked = gsettings[val]
     })
+
+    // LLM settings
+    ;(document.getElementById('llmApiKey') as HTMLInputElement).value = gsettings.llmApiKey || '';
+    (document.getElementById('llmModel') as HTMLInputElement).value = gsettings.llmModel || 'gemini-3.0-flash-preview';
+    (document.getElementById('llmSourceLang') as HTMLSelectElement).value = gsettings.llmSourceLang || 'ja';
+    (document.getElementById('llmTargetLang') as HTMLSelectElement).value = gsettings.llmTargetLang || 'ko';
+    (document.getElementById('llmTranslationUnit') as HTMLSelectElement).value = gsettings.llmTranslationUnit || 'file';
+    (document.getElementById('llmChunkSize') as HTMLInputElement).value = String(gsettings.llmChunkSize || 30);
+    (document.getElementById('llmMaxRetries') as HTMLInputElement).value = String(gsettings.llmMaxRetries ?? 2);
+    (document.getElementById('llmMaxApiRetries') as HTMLInputElement).value = String(gsettings.llmMaxApiRetries ?? 5);
+    (document.getElementById('llmTimeout') as HTMLInputElement).value = String(gsettings.llmTimeout ?? 600);
+    (document.getElementById('llmCustomPrompt') as HTMLTextAreaElement).value = gsettings.llmCustomPrompt || '';
+    updateChunkSizeVisibility()
+
     document.getElementById('license').onclick = () => {ipcRenderer.send('license')}
     _reload()
   }
@@ -51,23 +59,19 @@ function _reload(){
   }
 }
 
+function updateChunkSizeVisibility(){
+  const unit = (document.getElementById('llmTranslationUnit') as HTMLSelectElement).value;
+  (document.getElementById('chunkSizeGroup') as HTMLElement).style.display = unit === 'file' ? 'none' : '';
+}
+
+document.getElementById('llmTranslationUnit').addEventListener('change', updateChunkSizeVisibility)
+
 document.getElementById('extractSomeScript').addEventListener('change', (event) => {
   gsettings.extractSomeScript = (document.getElementById('extractSomeScript') as HTMLInputElement).checked
   _reload()
 })
 
 document.getElementById('apply').onclick = () => {
-  const iVal = ((document.getElementById('userdict') as HTMLInputElement).value).split('\n')
-  let userdict = {}
-  for(let i=0;i<iVal.length;i++){
-    if(typeof(iVal[i]) == 'string'){
-      if(iVal[i].includes('=')&& (iVal[i].split('=').length == 2)){
-        const temp = iVal[i].split('=')
-        userdict[temp[0]] = temp[1]
-      }
-    }
-  }
-  gsettings.userdict = userdict
   CheckboxValues.forEach((val) => {
     gsettings[val] = (document.getElementById(val) as HTMLInputElement).checked
   })
@@ -83,6 +87,18 @@ document.getElementById('apply').onclick = () => {
     }
   }
   gsettings.extractPlus = extP
+
+  // LLM settings
+  gsettings.llmApiKey = (document.getElementById('llmApiKey') as HTMLInputElement).value;
+  gsettings.llmModel = (document.getElementById('llmModel') as HTMLInputElement).value;
+  gsettings.llmSourceLang = (document.getElementById('llmSourceLang') as HTMLSelectElement).value;
+  gsettings.llmTargetLang = (document.getElementById('llmTargetLang') as HTMLSelectElement).value;
+  gsettings.llmTranslationUnit = (document.getElementById('llmTranslationUnit') as HTMLSelectElement).value;
+  gsettings.llmChunkSize = parseInt((document.getElementById('llmChunkSize') as HTMLInputElement).value) || 30;
+  gsettings.llmMaxRetries = parseInt((document.getElementById('llmMaxRetries') as HTMLInputElement).value) ?? 2;
+  gsettings.llmMaxApiRetries = parseInt((document.getElementById('llmMaxApiRetries') as HTMLInputElement).value) ?? 5;
+  gsettings.llmTimeout = parseInt((document.getElementById('llmTimeout') as HTMLInputElement).value) || 600;
+  gsettings.llmCustomPrompt = (document.getElementById('llmCustomPrompt') as HTMLTextAreaElement).value;
 
   ipcRenderer.send('applysettings', gsettings);
 }

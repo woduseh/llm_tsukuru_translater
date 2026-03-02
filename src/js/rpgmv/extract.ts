@@ -82,7 +82,6 @@ const returnVal = (key, temppp) => {
     let Keys = key.split('.');
     const fkey = Keys[0]
     if(temppp === undefined){
-        console.log(key)
         return ''
     }
     if(Keys.length==1){
@@ -236,7 +235,6 @@ export const extract = async (filedata, conf, ftype) => {
             for(let i =0;i<(data.events.length);i++){
                 if(obNullSafe(data.events[i]) && obNullSafe(data.events[i].pages)){
                     if(conf.note){
-                        console.log(data.events[i].note)
                         if(globalThis.settings.extractSomeScript){
                             if(isIncludeAble(data.events[i].note)){
                                 dat_obj = addtodic(`events.${i}.note`, dat_obj, 'note')
@@ -372,9 +370,6 @@ export const extract = async (filedata, conf, ftype) => {
                                 dat_obj = addComment(dat_obj, `//== ${d.name} ==//`, '', 'force')
                                 shownName = true
                             }
-                            if(obNullSafe(targ)){
-                                console.log('obj')
-                            }
                             dat_obj = addComment(dat_obj, `--- ${v[i2]}`, '', 'force')
                             dat_obj = addtodic(Path + '.parameters.' + v[i2], dat_obj, d.name)
                             dat_obj = addComment(dat_obj, ``)
@@ -404,9 +399,6 @@ export const extract = async (filedata, conf, ftype) => {
 }
 
 function isIncludeAble(sc){
-    console.log('includeable')
-    console.log(sc)
-
     const ess = globalThis.settings.extractSomeScript2
     let able = false
     if(sc === null || sc === undefined){
@@ -542,7 +534,6 @@ export const format_extracted = async(dats, typ = 0) => {
                 }
             }
             if(!LenKeys.includes(jpath)){
-                console.log(jpath)
                 LenMemory[jpath] = (globalThis.gb[jpath].outputText.split('\n').length - 1)
                 LenKeys.push(jpath)
             }
@@ -570,7 +561,6 @@ export const format_extracted = async(dats, typ = 0) => {
             globalThis.gb[jpath].data[cid].conf = datobj[d].conf
             globalThis.gb[jpath].data[cid].originText = datobj[d].var
 
-            // const toadd = datobj[d].var + ` -- ${fileName}` +'\n' //for testing
             const toadd = datobj[d].var +'\n'
 
             globalThis.gb[jpath].outputText += toadd

@@ -30,14 +30,10 @@ export async function wolfAppyier() {
         const pos3 = dat.str.pos3 + currentOffset
         const strLen = source.subarray(pos1, pos2).readUInt32LE()
         if(strLen !== dat.str.len){
-            console.log(`invaild len ${strLen} / ${dat.str.len}`)
             continue
         }
         const oneT = source.subarray(pos2, pos3)
         if(!Buffer.from(oneT).equals(dat.str.str)) {
-            console.log(`invaild text`)
-            console.log(Buffer.from(oneT).byteLength)
-            console.log(Buffer.from(dat.str.str).byteLength)
             continue
         }
         let strArr:string[] = []
@@ -58,6 +54,5 @@ export async function wolfAppyier() {
     for(const key in sourceDic){
         fs.writeFileSync(key,sourceDic[key])
     }
-    console.log('apply end')
     setProgressBar(0,1)
 }

@@ -1,0 +1,27 @@
+[2026-02-28T21:00:38.867Z] trans() called with arg: {"dir":"QzovVXNlcnMvd29kdXMvRG93bmxvYWRzL+W3qOeglOekvuesrOS6jOWto+OAkOWujOaVtOeJiOOAkS93d3cvZGF0YQ==","type":"gemini","langu":"zh-CN","game":"mv"}
+[2026-02-28T21:00:38.867Z] dir: C:/Users/wodus/Downloads/巨研社第二季【完整版】/www/data
+[2026-02-28T21:00:38.868Z] edir: C:\Users\wodus\Downloads\巨研社第二季【完整版】\www\data\Extract
+[2026-02-28T21:00:38.868Z] edir exists: true
+[2026-02-28T21:00:38.868Z] apiKey present
+[2026-02-28T21:00:38.869Z] gemini translator created
+[2026-02-28T21:00:38.869Z] fileList count: 729
+[2026-02-28T21:00:38.869Z] creating backup...
+[2026-02-28T21:00:39.360Z] backup done: C:\Users\wodus\Downloads\巨研社第二季【完整版】\www\data\Extract_backup
+[2026-02-28T21:00:39.360Z] progress loaded
+[2026-02-28T21:00:39.361Z] loading cache...
+[2026-02-28T21:00:39.361Z] cache loaded, keys: 4
+[2026-02-28T21:00:39.361Z] processing file: Actors.txt
+[2026-02-28T21:00:39.361Z] file read OK, size: 813
+[2026-02-28T21:00:39.362Z] processing file: Armors.txt
+[2026-02-28T21:00:39.362Z] file read OK, size: 3758
+[2026-02-28T21:00:39.362Z] processing file: Classes.txt
+[2026-02-28T21:00:39.362Z] file read OK, size: 36
+[2026-02-28T21:00:39.363Z] processing file: CommonEvents.txt
+[2026-02-28T21:00:39.363Z] file read OK, size: 7744
+[2026-02-28T21:00:39.363Z] processing file: Enemies.txt
+[2026-02-28T21:00:39.363Z] file read OK, size: 813
+[2026-02-28T21:00:39.364Z] calling translateFileContent for: Enemies.txt
+[2026-02-28T21:02:33.345Z] translateFileContent done for: Enemies.txt
+[2026-02-28T21:02:33.346Z] processing file: Items.txt
+[2026-02-28T21:02:33.346Z] file read OK, size: 4566
+[2026-02-28T21:02:33.346Z] calling translateFileContent for: Items.txt

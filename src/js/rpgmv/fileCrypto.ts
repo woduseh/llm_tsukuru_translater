@@ -53,7 +53,6 @@ export async function DecryptDir (DataDir:string, type:string):Promise<void> {
     fs.mkdirSync(ExtractImgDir)
 
     const imgDir = path.join(path.dirname(DataDir), type)
-    console.log(imgDir)
     const files:string[] = getFilesRecursively(imgDir)
     for(let i=0;i<files.length;i++){
         globalThis.mwindow.webContents.send('loadingTag', `${type} 복호화 중 : `);
@@ -65,7 +64,6 @@ export async function DecryptDir (DataDir:string, type:string):Promise<void> {
         }
         try{
             const pat =path.join(ExtractImgDir , tlan)
-            console.log(loc)
             fsx.mkdirsSync(pat)
             rpgencrypt.Decrypt(loc, pat, Key)
         }catch{}
@@ -88,14 +86,12 @@ export async function EncryptDir (DataDir:string, type:string, instantapply:bool
         return path.join(DataDir, 'Completed', type)
     })()
     if(!fs.existsSync(ExtractImgDirReal)){
-        console.log('encrypt')
         return
     }
     if(!fs.existsSync(CompleteDir)){
         fs.mkdirSync(CompleteDir)
     }
     const files = getFilesRecursively(ExtractImgDir)
-    console.log(ExtractImgDir)
     const wwwDir = (dirname(dirname(dirname(CompleteDir))))
     let MVMode = (wwwDir.endsWith('www\\') || wwwDir.endsWith('www/') || wwwDir.endsWith('www'))
 

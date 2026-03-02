@@ -6,11 +6,24 @@
     let running = false
     let globalSettings:{[key:string]:any}
     let LastPercent = -1.0
-    let zinheng = [0, 0]
+    let speedSamples:number[] = []
+    const ETA_WINDOW = 10
     let estimatedTime = ''
     let loadingTag = ''
 
-    ipcRenderer.send('setheight', 420);
+    function toHHMMSS(num:number) {
+        const sec_num = Math.max(0, Math.round(num))
+        const hours = Math.floor(sec_num / 3600)
+        const minutes = Math.floor((sec_num % 3600) / 60)
+        const seconds = sec_num % 60
+        let timeString = ''
+        if (hours > 0) timeString += `${hours}시간 `
+        if (minutes > 0) timeString += `${minutes}분 `
+        timeString += `${seconds}초`
+        return timeString
+    }
+
+    ipcRenderer.send('setheight', 550);
     //@ts-ignore
     const Swal = window.Swal
     
@@ -48,7 +61,8 @@
         bottomMenu.style.display = 'none'
         simpleMenu.style.display = 'none'
         if(type === 'simple'){
-            simpleMenu.style.display = 'block'
+            simpleMenu.style.display = 'flex'
+            simpleMenu.style.flexDirection = 'column'
             bottomMenu.style.display = 'flex'
         }
     }
@@ -72,7 +86,7 @@
         document.getElementById('marTrans').onclick = () => {
             document.getElementById('handTrans').removeAttribute('selected')
             document.getElementById('marTrans').setAttribute('selected', '')
-            document.getElementById('marCont').style.display = 'flex'
+            document.getElementById('marCont').style.display = 'block'
             document.getElementById('handCont').style.display = 'none'
             if(globalSettings.HideExtractAll){
                 document.getElementById('ext-all').style.display = 'none'
@@ -84,7 +98,7 @@
         document.getElementById('handTrans').onclick = () => {
             document.getElementById('marTrans').removeAttribute('selected')
             document.getElementById('handTrans').setAttribute('selected', '')
-            document.getElementById('handCont').style.display = 'flex'
+            document.getElementById('handCont').style.display = 'block'
             document.getElementById('marCont').style.display = 'none'
         }
         document.getElementById('runbtn').onclick = () => {
@@ -156,37 +170,26 @@
         let ds = Math.floor(new Date().getTime()/1000)
         if(tt > 0 && globalSettings.loadingText){
             if(LastTime != ds){
-                const toHHMMSS = function (num) {
-                    const sec_num = parseInt(num, 10);
-                    const hours   = Math.floor(sec_num / 3600);
-                    const minutes = Math.floor((sec_num - (hours * 3600)) / 60);
-                    const seconds = sec_num - (hours * 3600) - (minutes * 60);
-                    let timeString = ''
-                    if(hours > 0){timeString += `${hours}시간 `}
-                    if(minutes > 0){timeString += `${minutes}분 `}
-                    timeString += `${seconds}초`
-                    return timeString;
-                }
                 const ChangedTime = ds - LastTime
                 LastTime = ds
                 let OldPercent = LastPercent
                 LastPercent = parseFloat(tt)
                 const movedPercent = (LastPercent - OldPercent) / ChangedTime
-                if(zinheng[1] == 0){
-                    zinheng[0] = movedPercent
+                if(movedPercent > 0){
+                    speedSamples.push(movedPercent)
+                    if(speedSamples.length > ETA_WINDOW) speedSamples.shift()
                 }
-                else{
-                    zinheng[0] = ((zinheng[0]*zinheng[1]) + movedPercent)/(zinheng[1]+1)
+                if(speedSamples.length > 0){
+                    const avgSpeed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length
+                    let TimeLeftSec = (100 - LastPercent) / avgSpeed
+                    estimatedTime = `${toHHMMSS(TimeLeftSec)} 남음`
                 }
-                zinheng[1] += 1
-                let TimeLeftSec = (100 - LastPercent)/zinheng[0]
-                estimatedTime = `${toHHMMSS(TimeLeftSec)} 남음`
             }
-            document.getElementById('loading-text').innerText = `${loadingTag}${Number.parseFloat(tt).toFixed(3)}% ${estimatedTime}`
+            document.getElementById('loading-text').innerText = `${loadingTag}${loadingTag ? ' · ' : ''}${Number.parseFloat(tt).toFixed(1)}% ${estimatedTime}`
             document.getElementById('loading-text').style.visibility = 'visible'
         }
         else{
-            zinheng = [0, 0]
+            speedSamples = []
             estimatedTime = ''
             LastTime = ds
             LastPercent = -1.0
@@ -219,6 +222,52 @@
         const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
         ipcRenderer.send('openLLMSettings', { dir: dir, game: 'wolf' });
     }
+
+    document.getElementById('llmCompare').onclick = () => {
+        const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
+        if (!dir) {
+            Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' })
+            return
+        }
+        ipcRenderer.send('openLLMCompare', dir)
+    }
+
+    // LLM translation abort button
+    let llmTranslating = false;
+
+    ipcRenderer.on('llmTranslating', (ev, val) => {
+        llmTranslating = val;
+        document.getElementById('abort-llm-btn').style.display = val ? 'block' : 'none';
+    })
+
+    document.getElementById('abort-llm-btn').onclick = async () => {
+        const result = await Swal.fire({
+            icon: 'warning',
+            text: '번역을 중단하시겠습니까?\n현재까지의 진행 상태는 저장됩니다.',
+            confirmButtonText: '중단',
+            showDenyButton: true,
+            denyButtonText: '계속',
+        })
+        if (result.isConfirmed) {
+            ipcRenderer.send('abortLLM');
+        }
+    }
+
+    document.addEventListener('keydown', async (e) => {
+        if (e.key === 'Escape' && llmTranslating) {
+            const result = await Swal.fire({
+                icon: 'warning',
+                text: '번역을 중단하시겠습니까?\n현재까지의 진행 상태는 저장됩니다.',
+                confirmButtonText: '중단',
+                showDenyButton: true,
+                denyButtonText: '계속',
+            })
+            if (result.isConfirmed) {
+                ipcRenderer.send('abortLLM');
+            }
+        }
+    })
+
     ipcRenderer.on('worked', () => {
         running = false
     })
