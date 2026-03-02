@@ -553,6 +553,39 @@ ipcMain.on('llmCompareClose', () => {
   }
 })
 
+// JSON Structure Verify Window
+let jsonVerifyWindow: Electron.BrowserWindow = null;
+
+ipcMain.on('openJsonVerify', (ev, dir: string) => {
+  if (jsonVerifyWindow && !jsonVerifyWindow.isDestroyed()) {
+    jsonVerifyWindow.webContents.send('initVerify', dir);
+    jsonVerifyWindow.focus();
+    return;
+  }
+  jsonVerifyWindow = new BrowserWindow({
+    width: 900,
+    height: 700,
+    resizable: true,
+    show: false,
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+    icon: path.join(__dirname, 'res/icon.png'),
+  });
+  jsonVerifyWindow.setMenu(null);
+  jsonVerifyWindow.loadFile('src/html/json-verify/index.html');
+  jsonVerifyWindow.webContents.on('did-finish-load', () => {
+    jsonVerifyWindow.show();
+    jsonVerifyWindow.webContents.send('verifySettings', globalThis.settings);
+    jsonVerifyWindow.webContents.send('initVerify', dir);
+  });
+  jsonVerifyWindow.on('closed', () => {
+    jsonVerifyWindow = null;
+  });
+})
+
 ipcMain.on('retranslateFile', async (_ev, data: { dir: string; fileName: string }) => {
   // Detect Wolf RPG vs RPG Maker extract path
   const wolfEdir = path.join(data.dir, '_Extract', 'Texts');

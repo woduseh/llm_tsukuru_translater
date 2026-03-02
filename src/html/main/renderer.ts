@@ -486,6 +486,15 @@
         }
         ipcRenderer.send('openLLMCompare', dir);
     }
+
+    document.getElementById('jsonVerify').onclick = () => {
+        const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
+        if (!dir) {
+            Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' })
+            return
+        }
+        ipcRenderer.send('openJsonVerify', dir);
+    }
     
     
     document.getElementById('versionUp').onclick = async () => {
