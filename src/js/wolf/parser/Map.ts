@@ -8,7 +8,6 @@ export function wolfExtractMap(data:Buffer){
             globalThis.WolfMetadata.ver = 2
         }
         else{
-            console.log(Uint8Array.from(magic))
             throw 'Unvalid 1'
         }
     }
@@ -19,13 +18,11 @@ export function wolfExtractMap(data:Buffer){
     const check = io.readU1()
     if(globalThis.WolfMetadata.ver === 2){
         if (!(check == 101)) {
-            console.log(check)
             throw 'Unvalid 2'
         }
     }
     else{
         if (!(check == 102)) {
-            console.log(check)
             throw 'Unvalid 2'
         }
     }
@@ -44,7 +41,6 @@ export function wolfExtractMap(data:Buffer){
     }
     const check3 = io.readU1();
     if (!(check3 == 102)) {
-        console.log(check3)
         throw 'ValidationNotEqualError'
     }
     return {
@@ -60,7 +56,6 @@ export function wolfExtractCommon(data:Buffer){
 
         }
         else{
-            console.log(Uint8Array.from(magic))
         }
     }
     const check = io.readU1();
@@ -86,10 +81,8 @@ export function wolfExtractCommon(data:Buffer){
                 break
             }   
         } catch (error) {
-            console.log(error)
             break
         }
     }
-    console.log(events)
     return events
 }

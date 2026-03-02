@@ -4,86 +4,38 @@
     <meta charset="UTF-8">
     <script src="../../lib/enlang/enlang.js"></script>
     <link href="./styles.css" rel="stylesheet">
-    <title>LLM 번역 설정</title>
+    <title>번역</title>
 </head>
 <body>
     <div id="container">
-        <h2>LLM 번역 설정</h2>
+        <h2>번역</h2>
 
         <div class="form-group">
-            <label for="apiKey">Gemini API 키</label>
-            <input type="password" id="apiKey" class="text-input" placeholder="API 키를 입력하세요">
-        </div>
-
-        <div class="form-group">
-            <label for="model">모델</label>
-            <input type="text" id="model" class="text-input" list="modelList" placeholder="모델 이름 입력 또는 선택">
-            <datalist id="modelList">
-                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-            </datalist>
-        </div>
-
-        <div class="form-group">
-            <label for="sourceLang">원문 언어</label>
-            <select id="sourceLang" class="select-input">
-                <option value="ja">일본어 (日本語)</option>
-                <option value="en">영어 (English)</option>
-                <option value="zh-CN">중국어 간체 (简体中文)</option>
-                <option value="zh-TW">중국어 정체 (繁體中文)</option>
-                <option value="fr">프랑스어 (Français)</option>
-                <option value="es">스페인어 (Español)</option>
-                <option value="ru">러시아어 (Русский)</option>
-                <option value="de">독일어 (Deutsch)</option>
+            <label for="translationMode">번역 범위</label>
+            <select id="translationMode" class="select-input">
+                <option value="untranslated">미번역 파일만</option>
+                <option value="all">전체 번역</option>
             </select>
         </div>
 
+        <div class="form-group checkbox-group">
+            <label>
+                <input type="checkbox" id="resetProgress" />
+                <span>처음부터 번역 <span class="hint">이전 진행 상태와 캐시를 삭제하고 백업에서 원본을 복원합니다</span></span>
+            </label>
+        </div>
+
         <div class="form-group">
-            <label for="targetLang">번역 언어</label>
-            <select id="targetLang" class="select-input">
-                <option value="ko">한국어 (Korean)</option>
-                <option value="en">영어 (English)</option>
-                <option value="ja">일본어 (日本語)</option>
-                <option value="zh-CN">중국어 간체 (简体中文)</option>
-                <option value="zh-TW">중국어 정체 (繁體中文)</option>
-                <option value="fr">프랑스어 (Français)</option>
-                <option value="es">스페인어 (Español)</option>
-                <option value="ru">러시아어 (Русский)</option>
-                <option value="de">독일어 (Deutsch)</option>
-                <option value="pt">포르투갈어 (Português)</option>
-                <option value="it">이탈리아어 (Italiano)</option>
-                <option value="th">태국어 (ไทย)</option>
-                <option value="vi">베트남어 (Tiếng Việt)</option>
-                <option value="ar">아랍어 (العربية)</option>
-                <option value="pl">폴란드어 (Polski)</option>
-                <option value="nl">네덜란드어 (Nederlands)</option>
-                <option value="tr">터키어 (Türkçe)</option>
+            <label for="sortOrder">번역 순서</label>
+            <select id="sortOrder" class="select-input">
+                <option value="name-asc">이름순 (오름차순)</option>
+                <option value="name-desc">이름순 (내림차순)</option>
+                <option value="size-asc">크기순 (작은 파일 먼저)</option>
+                <option value="size-desc">크기순 (큰 파일 먼저)</option>
             </select>
         </div>
 
-        <div class="form-group">
-            <label for="translationUnit">번역 단위 <span class="hint">청크: 안정적, 파일: 문맥 유지에 유리</span></label>
-            <select id="translationUnit" class="select-input">
-                <option value="chunk">청크 단위 — 대사 블록을 나눠서 번역</option>
-                <option value="file">파일 단위 — 파일 전체를 한 번에 번역</option>
-            </select>
-        </div>
-
-        <div class="form-group" id="chunkSizeGroup">
-            <label for="chunkSize">청크 크기 <span class="hint">한 번에 번역할 대사 블록 수</span></label>
-            <input type="number" id="chunkSize" class="text-input short" value="30" min="1" max="200">
-        </div>
-
-        <div class="form-group">
-            <label for="translatorNotes">번역가의 노트 <span class="hint">고유명사 사전 (원문=번역)</span></label>
-            <textarea id="translatorNotes" spellcheck="false" placeholder="ひかり=히카리&#10;橋本=하시모토&#10;魔王=마왕"></textarea>
-        </div>
-
-        <div class="form-group">
-            <label for="customPrompt">커스텀 프롬프트 <span class="hint">추가 번역 지시사항</span></label>
-            <textarea id="customPrompt" spellcheck="false" placeholder="예: 존댓말을 사용하세요, 판타지 스타일로 번역하세요 등"></textarea>
-        </div>
+        <p class="config-hint">API 키, 모델, 프롬프트 등 번역 설정은 메인 설정에서 변경할 수 있습니다.</p>
     </div>
 
     <div class="button-bar">

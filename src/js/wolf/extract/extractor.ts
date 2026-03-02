@@ -37,24 +37,10 @@ export async function extractWolfFolder(DataDir:string, conf:{[key:string]:boole
                 }
             }
         } catch (error) {
-            console.log(`failed on ${map}`)
-            console.log(error)
         }
         await sleep(1)
         i += 1
 
     }
-    // {
-    //     try {
-    //         const buf = fs.readFileSync(commonEvent)
-    //         WolfCache[commonEvent] = buf
-    //         const c = wolfExtractCommon(fs.readFileSync(commonEvent))
-    //         extractEvent(c, commonEvent, conf, {commonevent:true})   
-    //     } catch (error) {
-    //         console.log(`failed on ${commonEvent}`)
-    //         console.log(error)
-    //     }
-    // }   
     setProgressBar(1,1)
-    console.log('extract done')
 }

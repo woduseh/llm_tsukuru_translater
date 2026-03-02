@@ -42,7 +42,6 @@ export default async function makeText(){
 
         const PushPerformace = performance.now() - perform
         perform = performance.now()
-        // console.log(`Decode: ${DecodePerformace.toFixed(2)}\nSplit: ${SplitPerformace.toFixed(2)}\nPush: ${PushPerformace.toFixed(2)}\n`)
     }
     const extTextDir = path.join(globalThis.sourceDir, '_Extract')
     if(fs.existsSync(extTextDir)){
@@ -52,7 +51,6 @@ export default async function makeText(){
     fs.mkdirSync(path.join(extTextDir, 'Texts'))
 
     for(const key in texts){
-        console.log(path.join(extTextDir, 'Texts',`${key}.txt`))
         fs.writeFileSync(path.join(extTextDir, 'Texts',`${key}.txt`),texts[key].join('\n'), 'utf-8')
     }
     globalThis.mwindow.webContents.send('loading', 0);

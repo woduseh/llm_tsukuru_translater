@@ -26,7 +26,6 @@ export async function wolfDecrypt(files:string[]) {
         let i=0;
         for(const file of files){
             setProgressBar(i, files.length)
-            console.log(file)
             await DecryptFile(file)
             i+=1
         }

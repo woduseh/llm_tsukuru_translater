@@ -6,18 +6,8 @@
 }
 
 /* ── MV/MZ Page Specific ── */
-.options-section {
-  min-height: 120px;
-}
 
 /* ── Status Bar ── */
-.status-bar {
-  padding: 6px 0;
-  font-size: 11px;
-  opacity: 0.4;
-  min-height: 24px;
-  white-space: pre-wrap;
-}
 
 /* ── Legacy compat (used by renderer.ts) ── */
 .cfolder { text-overflow: ellipsis !important; padding: 20px; border: solid 2px var(--mainColor); margin-bottom: 10px; white-space: nowrap; }

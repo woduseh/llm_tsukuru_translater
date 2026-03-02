@@ -18,88 +18,74 @@ body {
 #loading_bar {
   -webkit-app-region: drag;
   user-select: none;
-  height: 32px;
+  height: 38px;
   background: var(--Highlight2);
   display: flex;
   align-items: center;
   position: relative;
   flex-shrink: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
 }
 
 #border_r {
   position: absolute;
-  left: 0;
-  top: 0;
-  height: 32px;
+  left: 0; top: 0;
+  height: 38px;
   width: 0;
-  background: linear-gradient(90deg, rgba(0,150,136,0.3), rgba(0,150,136,0.15));
+  background: linear-gradient(90deg, rgba(124,111,219,0.25), rgba(124,111,219,0.08));
   user-select: none;
   -webkit-app-region: drag;
-  transition: width 0.3s ease;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #loading-text {
   position: absolute;
-  left: 12px;
+  left: 14px;
   font-size: 11px;
   visibility: hidden;
-  opacity: 0.7;
+  opacity: 0.6;
+  font-weight: 500;
 }
 
 .icon {
   -webkit-app-region: no-drag;
-  width: 36px;
-  height: 32px;
+  width: 40px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   font-size: 14px;
-  opacity: 0.5;
-  transition: all 0.15s ease;
+  opacity: 0.45;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--mainColor);
 }
 
-.icon:hover {
-  opacity: 1;
-  background: rgba(255,255,255,0.08);
-}
-
-#icon1 {
-  position: absolute;
-  right: 0;
-  top: 0;
-}
-
-#icon1:hover {
-  background: #e81123;
-  opacity: 1;
-}
-
-#icon2 {
-  position: absolute;
-  right: 36px;
-  top: 0;
-}
+.icon:hover { opacity: 1; background: rgba(255,255,255,0.06); }
+#icon1 { position: absolute; right: 0; top: 0; }
+#icon1:hover { background: #e81123; opacity: 1; }
+#icon2 { position: absolute; right: 40px; top: 0; }
 
 /* ── Language Selector ── */
 .flags {
   display: flex;
   position: absolute;
-  top: 40px;
-  right: 16px;
-  gap: 4px;
+  top: 46px;
+  right: 20px;
+  gap: 6px;
   z-index: 10;
 }
 
 .box2 {
-  padding: 4px 12px;
-  border-radius: 6px;
+  padding: 5px 14px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 500;
   background: transparent;
   border: 1px solid rgba(255,255,255,0.08);
-  transition: all 0.15s ease;
-  opacity: 0.5;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0.45;
 }
 
 .box2:hover {
@@ -109,6 +95,7 @@ body {
 
 .btxSel {
   background: var(--Selected) !important;
+  color: #fff !important;
   opacity: 1 !important;
   border-color: transparent !important;
 }
@@ -140,7 +127,8 @@ body {
 
 .app-icon {
   opacity: 0.9;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  border-radius: 18px;
 }
 
 h1 {
@@ -151,33 +139,34 @@ h1 {
 
 .subtitle {
   font-size: 13px;
-  opacity: 0.4;
-  margin-top: 4px;
+  opacity: 0.35;
+  margin-top: 6px;
+  letter-spacing: 0.3px;
 }
 
 /* ── Game Cards ── */
 .box-cont {
   display: flex;
   justify-content: center;
-  gap: 20px;
-  margin-top: 40px;
+  gap: 24px;
+  margin-top: 44px;
 }
 
 .box {
   background: var(--Highlight1);
   border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 16px;
-  padding: 32px 48px;
+  border-radius: 18px;
+  padding: 36px 52px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: center;
-  min-width: 180px;
+  min-width: 190px;
 }
 
 .box:hover {
-  transform: translateY(-3px);
-  border-color: var(--Selected);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px var(--Selected);
+  transform: translateY(-4px);
+  border-color: rgba(124,111,219,0.5);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.3), 0 0 24px rgba(124,111,219,0.12);
 }
 
 .box:active {
@@ -185,27 +174,29 @@ h1 {
 }
 
 .card-emoji {
-  font-size: 36px;
-  margin-bottom: 12px;
+  font-size: 40px;
+  margin-bottom: 14px;
   display: block;
 }
 
 .box-title {
   font-size: 16px;
   font-weight: 600;
+  display: block;
 }
 
 .card-sub {
-  font-size: 12px;
-  opacity: 0.4;
-  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.35;
+  margin-top: 6px;
   display: block;
+  letter-spacing: 0.3px;
 }
 
 /* ── Utilities ── */
 .highlight2 {
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.07);
   background: var(--Highlight3);
   color: var(--mainColor);
   font-family: inherit;
@@ -215,13 +206,13 @@ h1 {
 .gaps { gap: 8px; }
 
 .tooltip {
-  background: rgba(0,0,0,0.85);
+  background: rgba(15,15,25,0.95);
   color: white;
-  padding: 6px 10px;
-  font-size: 12px;
-  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  border-radius: 8px;
   display: none;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(16px);
 }
 
 .tooltip[data-show] { display: block; }
@@ -232,7 +223,7 @@ h1 {
 .updateInfoContainer { display: none; }
 .trans_input { height: 15px; }
 
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }

@@ -5,17 +5,8 @@
 
     ipcRenderer.on('llmSettings', (ev: any, arg: any) => {
         settings = arg;
-        (document.getElementById('apiKey') as HTMLInputElement).value = settings.llmApiKey || '';
-        (document.getElementById('model') as HTMLInputElement).value = settings.llmModel || 'gemini-2.0-flash';
-        (document.getElementById('sourceLang') as HTMLSelectElement).value = settings.llmSourceLang || 'ja';
-        (document.getElementById('targetLang') as HTMLSelectElement).value = settings.llmTargetLang || 'ko';
-        (document.getElementById('translationUnit') as HTMLSelectElement).value = settings.llmTranslationUnit || 'chunk';
-        (document.getElementById('chunkSize') as HTMLInputElement).value = String(settings.llmChunkSize || 30);
-        (document.getElementById('translatorNotes') as HTMLTextAreaElement).value = settings.llmTranslatorNotes || '';
-        (document.getElementById('customPrompt') as HTMLTextAreaElement).value = settings.llmCustomPrompt || '';
-        updateChunkSizeVisibility();
+        (document.getElementById('sortOrder') as HTMLSelectElement).value = settings.llmSortOrder || 'name-asc';
 
-        // Apply theme
         if (settings.themeData) {
             const root = document.documentElement;
             for (const key in settings.themeData) {
@@ -27,29 +18,15 @@
         }
     });
 
-    function updateChunkSizeVisibility() {
-        const unit = (document.getElementById('translationUnit') as HTMLSelectElement).value;
-        const chunkGroup = document.getElementById('chunkSizeGroup');
-        chunkGroup.style.display = unit === 'file' ? 'none' : 'block';
-    }
-
-    document.getElementById('translationUnit').addEventListener('change', updateChunkSizeVisibility);
-
     document.getElementById('startBtn').onclick = () => {
-        const apiKey = (document.getElementById('apiKey') as HTMLInputElement).value.trim();
-        if (!apiKey) {
-            alert('API 키를 입력해주세요.');
+        if (!settings.llmApiKey) {
+            alert('API 키가 설정되지 않았습니다. 메인 설정에서 API 키를 입력해주세요.');
             return;
         }
         const data = {
-            llmApiKey: apiKey,
-            llmModel: (document.getElementById('model') as HTMLInputElement).value.trim() || 'gemini-2.0-flash',
-            llmSourceLang: (document.getElementById('sourceLang') as HTMLSelectElement).value,
-            llmTargetLang: (document.getElementById('targetLang') as HTMLSelectElement).value,
-            llmTranslationUnit: (document.getElementById('translationUnit') as HTMLSelectElement).value,
-            llmChunkSize: parseInt((document.getElementById('chunkSize') as HTMLInputElement).value) || 30,
-            llmTranslatorNotes: (document.getElementById('translatorNotes') as HTMLTextAreaElement).value,
-            llmCustomPrompt: (document.getElementById('customPrompt') as HTMLTextAreaElement).value
+            llmResetProgress: (document.getElementById('resetProgress') as HTMLInputElement).checked,
+            llmSortOrder: (document.getElementById('sortOrder') as HTMLSelectElement).value,
+            llmTranslationMode: (document.getElementById('translationMode') as HTMLSelectElement).value
         };
         ipcRenderer.send('llmSettingsApply', data);
     };

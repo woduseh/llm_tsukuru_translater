@@ -207,3 +207,33 @@ details[open] summary {
   height: 0;
   width: 0;
 }
+
+/* ── Text Inputs & Selects ── */
+.text-input {
+  padding: 6px 10px;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  background: #21222c;
+  color: #f8f8f2;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s ease;
+  min-width: 160px;
+}
+
+.text-input:focus {
+  border-color: #bd93f9;
+}
+
+.text-input.short {
+  min-width: 70px;
+  width: 70px;
+  text-align: center;
+}
+
+.hint {
+  font-size: 11px;
+  opacity: 0.4;
+  font-weight: 400;
+}

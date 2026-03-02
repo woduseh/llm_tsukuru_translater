@@ -1,7 +1,6 @@
 (() => {
     const { ipcRenderer } = window.require('electron');
     const {_} = window.require('lodash');
-    const info = document.getElementById('info')
     let running = false
     let loadingTag = ''
     let menu_open = false
@@ -9,7 +8,20 @@
     let LastTime = -1
     let LastPercent = -1.0
     let estimatedTime = ''
-    let zinheng = [0, 0]
+    let speedSamples:number[] = []
+    const ETA_WINDOW = 10
+
+    function toHHMMSS(num:number) {
+        const sec_num = Math.max(0, Math.round(num))
+        const hours = Math.floor(sec_num / 3600)
+        const minutes = Math.floor((sec_num % 3600) / 60)
+        const seconds = sec_num % 60
+        let timeString = ''
+        if (hours > 0) timeString += `${hours}시간 `
+        if (minutes > 0) timeString += `${minutes}분 `
+        timeString += `${seconds}초`
+        return timeString
+    }
 
     //@ts-ignore
     const Swal = window.Swal
@@ -69,37 +81,26 @@
         let ds = Math.floor(new Date().getTime()/1000)
         if(tt > 0 && globalSettings.loadingText){
             if(LastTime != ds){
-                const toHHMMSS = function (num) {
-                    const sec_num = parseInt(num, 10);
-                    const hours   = Math.floor(sec_num / 3600);
-                    const minutes = Math.floor((sec_num - (hours * 3600)) / 60);
-                    const seconds = sec_num - (hours * 3600) - (minutes * 60);
-                    let timeString = ''
-                    if(hours > 0){timeString += `${hours}시간 `}
-                    if(minutes > 0){timeString += `${minutes}분 `}
-                    timeString += `${seconds}초`
-                    return timeString;
-                }
                 const ChangedTime = ds - LastTime
                 LastTime = ds
                 let OldPercent = LastPercent
                 LastPercent = parseFloat(tt)
                 const movedPercent = (LastPercent - OldPercent) / ChangedTime
-                if(zinheng[1] == 0){
-                    zinheng[0] = movedPercent
+                if(movedPercent > 0){
+                    speedSamples.push(movedPercent)
+                    if(speedSamples.length > ETA_WINDOW) speedSamples.shift()
                 }
-                else{
-                    zinheng[0] = ((zinheng[0]*zinheng[1]) + movedPercent)/(zinheng[1]+1)
+                if(speedSamples.length > 0){
+                    const avgSpeed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length
+                    let TimeLeftSec = (100 - LastPercent) / avgSpeed
+                    estimatedTime = `${toHHMMSS(TimeLeftSec)} 남음`
                 }
-                zinheng[1] += 1
-                let TimeLeftSec = (100 - LastPercent)/zinheng[0]
-                estimatedTime = `${toHHMMSS(TimeLeftSec)} 남음`
             }
-            document.getElementById('loading-text').innerText = `${loadingTag}${Number.parseFloat(tt).toFixed(3)}% ${estimatedTime}`
+            document.getElementById('loading-text').innerText = `${loadingTag}${loadingTag ? ' · ' : ''}${Number.parseFloat(tt).toFixed(1)}% ${estimatedTime}`
             document.getElementById('loading-text').style.visibility = 'visible'
         }
         else{
-            zinheng = [0, 0]
+            speedSamples = []
             estimatedTime = ''
             LastTime = ds
             LastPercent = -1.0
@@ -164,31 +165,45 @@
     function _reload(){
         if(_mode == 0){
             document.getElementById('ext').style.backgroundColor = 'var(--Selected)'
-            document.getElementById('apply').style.backgroundColor = 'var(--Highlight2)'
+            document.getElementById('ext').style.opacity = '1'
+            document.getElementById('ext').style.color = '#fff'
+            document.getElementById('apply').style.backgroundColor = ''
+            document.getElementById('apply').style.opacity = ''
+            document.getElementById('apply').style.color = ''
             if (document.getElementById('c-ext').classList.contains("hiddenc")) {
                 document.getElementById('c-ext').classList.remove("hiddenc");}
             if (!document.getElementById('c-app').classList.contains("hiddenc")) {
                 document.getElementById('c-app').classList.add("hiddenc");}
         }
         else if(_mode == 1){
-            document.getElementById('ext').style.backgroundColor = 'var(--Highlight2)'
+            document.getElementById('ext').style.backgroundColor = ''
+            document.getElementById('ext').style.opacity = ''
+            document.getElementById('ext').style.color = ''
             document.getElementById('apply').style.backgroundColor = 'var(--Selected)'
+            document.getElementById('apply').style.opacity = '1'
+            document.getElementById('apply').style.color = '#fff'
             if (document.getElementById('c-app').classList.contains("hiddenc")) {
                 document.getElementById('c-app').classList.remove("hiddenc");}
             if (!document.getElementById('c-ext').classList.contains("hiddenc")) {
                 document.getElementById('c-ext').classList.add("hiddenc");}
         }
         else{
-            document.getElementById('ext').style.backgroundColor = 'var(--Highlight2)'
-            document.getElementById('apply').style.backgroundColor = 'var(--Highlight2)'
+            document.getElementById('ext').style.backgroundColor = ''
+            document.getElementById('ext').style.opacity = ''
+            document.getElementById('ext').style.color = ''
+            document.getElementById('apply').style.backgroundColor = ''
+            document.getElementById('apply').style.opacity = ''
+            document.getElementById('apply').style.color = ''
         }
         const DomList = ['ext_plugin','ext_note','ext_src','autoline','instantapply','exJson','decryptImg','decryptAudio', 'ext_javascript']
         for(const i in DomList){
             if(config[DomList[i]]){
                 document.getElementById(DomList[i]).style.backgroundColor = 'var(--Selected)'
+                document.getElementById(DomList[i]).style.color = '#fff'
             }
             else{
-                document.getElementById(DomList[i]).style.backgroundColor = 'var(--Highlight2)'
+                document.getElementById(DomList[i]).style.backgroundColor = ''
+                document.getElementById(DomList[i]).style.color = ''
             }
         }
     }
@@ -202,42 +217,45 @@
     _reload()
     
     if(true){
-        document.getElementById("addons").style.height = "165px";
-        ipcRenderer.send('extend', 460)
         menu_open = true
-        
-        const InfoList = {
-            'ext_plugin': '추출 시 플러그인을\n추출합니다',
-            'decryptImg': '추출 시 이미지의\n암호화를 해제하고\n추출합니다',
-            'decryptAudio': '추출 시 오디오의\n암호화를 해제하고\n추출합니다',
-            'ext_src': '추출 시 스크립트를\n추출합니다',
-            'ext': '추출 모드로\n전환합니다',
-            'apply': '적용 모드로\n전환합니다',
-            'eztrans': 'LLM 번역기로\n번역합니다',
-            'ext_note': '노트/메모를\n추출합니다',
-            'exJson': 'Rpg Maker에\n기본적으로는\n존재하지 않는\nJSON 또는 CSV를\n추출합니다',
-            'autoline': '적용 시 자동\n줄바꿈을 합니다',
-            'instantapply': '적용 시 Completed\n폴더 대신\n원본 폴더에\n즉시 적용합니다',
-            'versionUp': '버전 업 툴을\n엽니다',
-            'settings': '설정',
-            'fontConfig': '게임 내 폰트를\n변경합니다',
-            'ext_javascript': '게임 내\n자바스크립트를\n추출합니다.',
-            'toProject': 'RPG MAKER 에디터에서 열 수 있는 파일로 변환합니다.'
-        }
-        for(const i in InfoList){
-            document.getElementById(i).addEventListener('mouseenter', ()=>{
-                info.innerText = InfoList[i]
-            })
-        }
-        document.getElementById('run').addEventListener('mouseenter', ()=>{
-            if(_mode == 0){
-                info.innerText = "추출을 시작합니다"
-            }
-            else{
-                info.innerText = "적용을 시작합니다"
-            }
-        })
     }
+
+    // LLM translation abort button
+    let llmTranslating = false;
+
+    ipcRenderer.on('llmTranslating', (ev, val) => {
+        llmTranslating = val;
+        document.getElementById('abort-llm-btn').style.display = val ? 'block' : 'none';
+    })
+
+    document.getElementById('abort-llm-btn').onclick = async () => {
+        const result = await Swal.fire({
+            icon: 'warning',
+            text: '번역을 중단하시겠습니까?\n현재까지의 진행 상태는 저장됩니다.',
+            confirmButtonText: '중단',
+            showDenyButton: true,
+            denyButtonText: '계속',
+        })
+        if (result.isConfirmed) {
+            ipcRenderer.send('abortLLM');
+        }
+    }
+
+    // Escape key aborts LLM translation (with confirmation)
+    document.addEventListener('keydown', async (e) => {
+        if (e.key === 'Escape' && llmTranslating) {
+            const result = await Swal.fire({
+                icon: 'warning',
+                text: '번역을 중단하시겠습니까?\n현재까지의 진행 상태는 저장됩니다.',
+                confirmButtonText: '중단',
+                showDenyButton: true,
+                denyButtonText: '계속',
+            })
+            if (result.isConfirmed) {
+                ipcRenderer.send('abortLLM');
+            }
+        }
+    })
     
     document.getElementById('ext_plugin').onclick = () => {
         if(!config.ext_plugin){
@@ -458,6 +476,15 @@
         }
         const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
         ipcRenderer.send('openLLMSettings', { dir: dir, game: 'mv' });
+    }
+
+    document.getElementById('llmCompare').onclick = () => {
+        const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
+        if (!dir) {
+            Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' })
+            return
+        }
+        ipcRenderer.send('openLLMCompare', dir);
     }
     
     

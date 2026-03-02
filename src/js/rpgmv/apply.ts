@@ -2,7 +2,6 @@ import fs from 'fs';
 import * as  ExtTool from './extract.js';
 import path from 'path';
 import * as edTool from './edtool.js';
-import tools from '../libs/projectTools'
 import yaml from 'js-yaml';
 
 function sleep(ms) {
@@ -42,16 +41,6 @@ export const apply = async (ev, arg) => {
       }
       const jsdir = ((dir.substring(0,dir.length-5) + '/js').replaceAll('//','/'))
       let ext_data = edTool.read(dir)
-      if(!tools.packed){
-        const JD = JSON.stringify(ext_data, null, 4)
-        try {
-          fs.writeFileSync('./test/ed.json', JD, 'utf-8')
-          if(fs.existsSync('./test/ed2.json')){
-            const dats = fs.readFileSync('./test/ed2.json','utf-8')
-            console.log(`Match ${JD === dats}`)
-          } 
-        } catch (error) {}
-      }
       const ext_dat = ext_data.main
       const max_files = Object.keys(ext_dat).length
       let worked_files = 0
@@ -71,7 +60,6 @@ export const apply = async (ev, arg) => {
         worked_files += 1
         if(i.includes('.json')){
           let fname = (i === 'ext_javascript.json') ? dir + '/Extract/ext_javascript.js' : dir + '/Extract/' + path.parse(i).name + '.txt'
-          console.log(fname)
           let Edata = fs.readFileSync(fname, 'utf8').split('\n')
           for(const q of Object.keys(ext_dat[i].data)){
             let output = ''
@@ -112,15 +100,11 @@ export const apply = async (ev, arg) => {
                   }
                   try {
                     OutputData[originFile] = JSON.parse(filedata)
-                    console.log(`restored${originFile}`)
                   } catch (error) {}
                 }
               }
               OutputData[originFile] = ExtTool.setObj(ext_dat[i].data[q].val, output, OutputData[originFile]) 
-            } catch (error) {
-              console.log(ext_dat[i].data[q].val)
-              console.log(error)
-            }
+            } catch (error) {}
           }
         }
         globalThis.mwindow.webContents.send('loading', worked_files/max_files*100);

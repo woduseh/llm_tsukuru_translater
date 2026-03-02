@@ -1,6 +1,6 @@
 {
-  "name": "mv-extractor-pp",
-  "version": "2.0.0",
+  "name": "gemini-tsukuru-extractor",
+  "version": "3.0.0",
   "description": "Tsukuru Extractor",
   "main": "main.js",
   "scripts": {
@@ -10,15 +10,14 @@
     "build": "electron-builder --windows portable nsis:x64",
     "build2": "electron-builder --windows portable"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/gramedcart/mvextractor.git"
-  },
-  "author": "Sziya",
+  "author": "Jackdu",
   "license": "MIT",
   "devDependencies": {
     "@types/aes-js": "^3.1.4",
+    "@types/adm-zip": "^0.5.7",
+    "@types/fs-extra": "^11.0.4",
     "@types/js-yaml": "^4.0.9",
+    "@types/jsdom": "^28.0.0",
     "@types/lodash": "^4.17.24",
     "electron": "^40.6.1",
     "electron-builder": "^26.8.1",
@@ -26,15 +25,9 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@msgpack/msgpack": "^3.1.3",
-    "@types/adm-zip": "^0.5.7",
-    "@types/fs-extra": "^11.0.4",
-    "@types/jsdom": "^28.0.0",
     "aes-js": "^3.1.2",
     "axios": "^1.13.6",
-    "bson": "^4.6.1",
-    "electron-log": "^5.4.3",
     "electron-store": "^8.2.0",
     "encoding-japanese": "^2.2.0",
     "fast-csv": "^5.0.5",
@@ -45,7 +38,6 @@
     "js-yaml": "^4.1.0",
     "jsdom": "^28.1.0",
     "lodash": "^4.17.21",
-    "lz-string": "^1.5.0",
     "open": "^8.4.0"
   },
   "build": {
@@ -61,7 +53,6 @@
       "!**/*.d.ts"
     ],
     "extraResources": [
-      "./exfiles/**"
     ],
     "protocols": {
       "name": "MVExtractor",

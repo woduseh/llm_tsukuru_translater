@@ -10,23 +10,9 @@ function setProgressBar(now:number, max:number=100){
     globalThis.mwindow.webContents.send('loading', (now/max) * 100);
 }
 
-function sleep(ms:number){
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function createTempFolder(){
-    const qTemp = path.join(app.getPath('temp'), 'Extractorpp')
-    if(!fs.existsSync(qTemp)){
-        fs.mkdirSync(qTemp)
-    }
-    const tempDir = path.join(qTemp, Date.now().toString(16))
-    return tempDir
-}
-
 async function clearTemp() {
     const qTemp = path.join(app.getPath('temp'), 'Extractorpp')
     fsa.emptyDirSync(qTemp)
-    console.log('temp clear')
 }
 
 
@@ -75,7 +61,6 @@ export async function ConvertProject(dir:string){
             await fsa.copyFile(files[i], targetdir)
             setProgressBar((i/files.length*50))
         }
-        // await fsa.copy(dir, projectSaveDir)
     
         // plugin.js
         const pluginjsPath = path.join(projectSaveDir, 'js', 'plugins.js')
@@ -93,7 +78,6 @@ export async function ConvertProject(dir:string){
             }
             pluginDat = pluginDat.substring(0, pluginDat.length-1) + '\n];\n'
             fs.writeFileSync(pluginjsPath, pluginDat, 'utf8')
-            console.log('pluginjs')
         }
         const sysJsonDir = path.join(projectSaveDir, 'data', 'System.json')
         if(fs.existsSync(sysJsonDir)){
@@ -131,7 +115,6 @@ export async function ConvertProject(dir:string){
                     break
                 }
             }
-            console.log('mv core')
         }
         if(fs.existsSync(mzCoreDir)){
             isMz = true
@@ -145,9 +128,7 @@ export async function ConvertProject(dir:string){
                     break
                 }
             }
-            console.log('mz core')
         }
-        console.log(fileVersion)
         if(isMz){
             fs.writeFileSync(path.join(projectSaveDir, 'game.rmmzproject'), fileVersion)
         }

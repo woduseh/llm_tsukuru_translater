@@ -34,9 +34,4 @@
         }
     });
     mainMenu.style.display = 'block'
-
-    ipcRenderer.on('alert_free', (evn, tt) => {
-        //@ts-ignore
-        Swal.fire(tt)
-    });
 })()

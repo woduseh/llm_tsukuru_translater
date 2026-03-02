@@ -21,7 +21,7 @@
                     <input type="checkbox" id="JsonChangeLine">
                 </div>
                 <div class="setting-item">
-                    <label for="DoNotTransHangul">한글을 포함한 문자열 번역하지 않기</label>
+                    <label for="DoNotTransHangul">한글 문자열 번역하지 않기</label>
                     <input type="checkbox" id="DoNotTransHangul">
                 </div>
                 <div class="setting-item">
@@ -30,10 +30,81 @@
                 </div>
             </div>
 
-            <!-- User Dictionary -->
+            <!-- LLM Translation Settings -->
             <div class="settings-group">
-                <div class="group-title">사용자 사전</div>
-                <textarea id="userdict" spellcheck="false" placeholder="Hina=히나&#10;橋本=하시모토&#10;ひかり=히카리"></textarea>
+                <div class="group-title">LLM 번역</div>
+                <div class="setting-item">
+                    <label for="llmApiKey">Gemini API 키</label>
+                    <input type="password" id="llmApiKey" class="text-input" placeholder="API 키">
+                </div>
+                <div class="setting-item">
+                    <label for="llmModel">모델</label>
+                    <input type="text" id="llmModel" class="text-input" list="modelList" placeholder="모델 이름">
+                    <datalist id="modelList">
+                        <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
+                        <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+                    </datalist>
+                </div>
+                <div class="setting-item">
+                    <label for="llmSourceLang">원문 언어</label>
+                    <select id="llmSourceLang" class="text-input">
+                        <option value="ja">일본어</option>
+                        <option value="en">영어</option>
+                        <option value="zh-CN">중국어 간체</option>
+                        <option value="zh-TW">중국어 정체</option>
+                        <option value="fr">프랑스어</option>
+                        <option value="es">스페인어</option>
+                        <option value="ru">러시아어</option>
+                        <option value="de">독일어</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="llmTargetLang">번역 언어</label>
+                    <select id="llmTargetLang" class="text-input">
+                        <option value="ko">한국어</option>
+                        <option value="en">영어</option>
+                        <option value="ja">일본어</option>
+                        <option value="zh-CN">중국어 간체</option>
+                        <option value="zh-TW">중국어 정체</option>
+                        <option value="fr">프랑스어</option>
+                        <option value="es">스페인어</option>
+                        <option value="ru">러시아어</option>
+                        <option value="de">독일어</option>
+                        <option value="pt">포르투갈어</option>
+                        <option value="it">이탈리아어</option>
+                        <option value="th">태국어</option>
+                        <option value="vi">베트남어</option>
+                        <option value="ar">아랍어</option>
+                        <option value="pl">폴란드어</option>
+                        <option value="nl">네덜란드어</option>
+                        <option value="tr">터키어</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="llmTranslationUnit">번역 단위</label>
+                    <select id="llmTranslationUnit" class="text-input">
+                        <option value="file">파일 단위</option>
+                        <option value="chunk">청크 단위</option>
+                    </select>
+                </div>
+                <div class="setting-item" id="chunkSizeGroup">
+                    <label for="llmChunkSize">청크 크기</label>
+                    <input type="number" id="llmChunkSize" class="text-input short" value="30" min="1" max="200">
+                </div>
+                <div class="setting-item">
+                    <label for="llmMaxRetries">검증 재시도 <span class="hint">번역 검증 실패 시</span></label>
+                    <input type="number" id="llmMaxRetries" class="text-input short" value="2" min="0" max="10">
+                </div>
+                <div class="setting-item">
+                    <label for="llmMaxApiRetries">API 오류 재시도 <span class="hint">429/503 등</span></label>
+                    <input type="number" id="llmMaxApiRetries" class="text-input short" value="5" min="0" max="20">
+                </div>
+                <div class="setting-item">
+                    <label for="llmTimeout">API 타임아웃 (초) <span class="hint">큰 파일은 길게 설정</span></label>
+                    <input type="number" id="llmTimeout" class="text-input short" value="600" min="30" max="3600">
+                </div>
+                <div class="textarea-label" style="margin-top:8px">추가 지시사항 <span class="hint">번역 스타일, 용어집, 기타 지시</span></div>
+                <textarea id="llmCustomPrompt" spellcheck="false" placeholder="예: 존댓말을 사용하세요&#10;ひかり는 히카리로 번역하세요&#10;판타지 스타일로 번역하세요"></textarea>
             </div>
 
             <!-- Advanced settings -->

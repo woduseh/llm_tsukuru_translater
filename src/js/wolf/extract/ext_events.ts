@@ -1,6 +1,4 @@
 import { lenStr } from '../../../../globals'
-import crypto from 'crypto'
-import { decodeEncoding } from '../../../utils.js'
 
 interface Commands{
     numArg:number[]
@@ -26,8 +24,6 @@ function addString(str:lenStr, sourceFile:string, targetFile:string, codeStr:str
         codeStr: codeStr
     })
 }
-
-const untranslates = [140, 112, 300, 212, 250, 122, 150, 210, 213]
 
 export function extractEvent(cmds:Commands[], file:string, conf:{[key:string]:boolean}, conf2:{[key:string]:boolean} = {}){
     for(const cmd of cmds){
@@ -64,12 +60,6 @@ export function extractEvent(cmds:Commands[], file:string, conf:{[key:string]:bo
             }
             default:{
                 if(cmd.strArg.length > 0){
-                    if(!untranslates.includes(type)){
-                        console.log(`=====\nTYPE: ${cmd.numArg[0]}`) //Type
-                        for(let i=0;i<cmd.strArg.length;i++){
-                            console.log(`${i} : ${decodeEncoding(cmd.strArg[i].str)}`)
-                        }
-                    }
                     if(conf.extAll){
                         let i = 0;
                         for(const str of cmd.strArg){
