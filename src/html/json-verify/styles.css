@@ -1,0 +1,300 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #282a36;
+  color: #f8f8f2;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Header ── */
+#header {
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+
+#header h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #bd93f9;
+  margin-bottom: 8px;
+  letter-spacing: -0.3px;
+}
+
+#summary {
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.summary-ok { color: #50fa7b; }
+.summary-error { color: #ff5555; }
+.summary-warn { color: #ffb86c; }
+.summary-total { color: rgba(255,255,255,0.5); font-size: 12px; }
+
+/* ── Toolbar ── */
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+#file-search {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: #f8f8f2;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 5px 10px;
+  outline: none;
+}
+
+#file-search:focus { border-color: #bd93f9; }
+#file-search::placeholder { color: rgba(255,255,255,0.3); }
+
+#filter-issues-label {
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(255,255,255,0.7);
+}
+
+#filter-issues-label:hover { color: #f8f8f2; }
+
+#file-count {
+  font-size: 11px;
+  opacity: 0.5;
+  white-space: nowrap;
+}
+
+/* ── File List ── */
+#file-list-wrap {
+  max-height: 140px;
+  overflow-y: auto;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  background: rgba(0,0,0,0.15);
+}
+
+#file-list-wrap::-webkit-scrollbar { width: 5px; }
+#file-list-wrap::-webkit-scrollbar-track { background: transparent; }
+#file-list-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+#file-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.file-item {
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-left: 3px solid transparent;
+  transition: background 0.1s ease;
+}
+
+.file-item:hover { background: rgba(255,255,255,0.05); }
+
+.file-item.active {
+  background: rgba(189,147,249,0.15);
+  border-left-color: #bd93f9;
+  font-weight: 600;
+}
+
+.file-item .badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.badge-error {
+  background: rgba(255,85,85,0.2);
+  color: #ff5555;
+}
+
+.badge-warn {
+  background: rgba(255,184,108,0.2);
+  color: #ffb86c;
+}
+
+.badge-ok {
+  background: rgba(80,250,123,0.15);
+  color: #50fa7b;
+}
+
+.badge-repaired {
+  background: rgba(139,233,253,0.2);
+  color: #8be9fd;
+}
+
+/* ── Issues Container ── */
+#issues-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#issues-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+  flex-shrink: 0;
+}
+
+#issues-file-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f8f8f2;
+}
+
+#issues-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#issues-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 20px;
+}
+
+#issues-list::-webkit-scrollbar { width: 5px; }
+#issues-list::-webkit-scrollbar-track { background: transparent; }
+#issues-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+/* ── Issue Item ── */
+.issue-item {
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+  background: rgba(0,0,0,0.15);
+  transition: background 0.1s ease;
+}
+
+.issue-item:hover {
+  background: rgba(0,0,0,0.25);
+}
+
+.issue-item.error {
+  border-left-color: #ff5555;
+}
+
+.issue-item.warning {
+  border-left-color: #ffb86c;
+}
+
+.issue-path {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 11px;
+  color: #8be9fd;
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.issue-type {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.issue-item.error .issue-type { color: #ff5555; }
+.issue-item.warning .issue-type { color: #ffb86c; }
+
+.issue-message {
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+}
+
+.no-issues {
+  text-align: center;
+  padding: 40px 20px;
+  color: #50fa7b;
+  font-size: 14px;
+}
+
+.no-files {
+  text-align: center;
+  padding: 40px 20px;
+  color: rgba(255,255,255,0.4);
+  font-size: 14px;
+}
+
+/* ── Button Bar ── */
+.button-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+
+#status {
+  font-size: 12px;
+  margin-right: auto;
+}
+
+.status-ok { color: #50fa7b; }
+.status-error { color: #ff5555; }
+
+.btn {
+  border: 1px solid rgba(255,255,255,0.06);
+  background: #21222C;
+  color: #f8f8f2;
+  padding: 8px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.btn:hover { background: rgba(255,255,255,0.06); }
+.btn:disabled { opacity: 0.3; cursor: default; }
+
+.btn-primary {
+  background: #bd93f9;
+  color: #282a36;
+  font-weight: 600;
+  border-color: transparent;
+}
+
+.btn-primary:hover { background: #caa8ff; }
+.btn-primary:disabled { background: #bd93f9; opacity: 0.3; }
+
+.btn-repair {
+  background: #50fa7b;
+  color: #282a36;
+  font-weight: 600;
+  border-color: transparent;
+  padding: 6px 16px;
+  font-size: 12px;
+}
+
+.btn-repair:hover { background: #69ff92; }
+.btn-repair:disabled { background: #50fa7b; opacity: 0.3; }

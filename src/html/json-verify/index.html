@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link href="./styles.css" rel="stylesheet">
+    <title>JSON 구조 검증</title>
+</head>
+<body>
+    <div id="header">
+        <h2>JSON 구조 검증</h2>
+        <div id="summary"></div>
+        <div id="toolbar">
+            <input type="text" id="file-search" placeholder="파일명 검색..." />
+            <label id="filter-issues-label">
+                <input type="checkbox" id="filter-issues" /> 문제만
+            </label>
+            <span id="file-count"></span>
+        </div>
+        <div id="file-list-wrap">
+            <div id="file-list"></div>
+        </div>
+    </div>
+    <div id="issues-container">
+        <div id="issues-header">
+            <span id="issues-file-name"></span>
+            <div id="issues-actions">
+                <button id="repairFileBtn" class="btn btn-repair" disabled>이 파일 수정</button>
+            </div>
+        </div>
+        <div id="issues-list"></div>
+    </div>
+    <div class="button-bar">
+        <span id="status"></span>
+        <button id="repairAllBtn" class="btn btn-primary" disabled>전체 수정</button>
+        <button id="closeBtn" class="btn">닫기</button>
+    </div>
+    <script src="./script.js"></script>
+</body>
+</html>
