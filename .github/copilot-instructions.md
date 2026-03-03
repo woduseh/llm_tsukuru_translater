@@ -1,4 +1,4 @@
-# Copilot Instructions — Tsukuru Extractor
+# Copilot Instructions — LLM Tsukuru Translater
 
 ## Project Overview
 
@@ -12,7 +12,7 @@ npm start                  # builds renderer (Vite), then launches Electron
 npm run dev                # Vite dev server + Electron with HMR (parallel)
 npm run build              # production build (Windows x64 portable + NSIS installer)
 npm run build:renderer     # Vite build only → dist-renderer/
-npm test                   # vitest run (all ~165 tests)
+npm test                   # vitest run (all ~324 tests)
 npx vitest run test/unit/edtool.test.ts          # single test file
 npx vitest run -t "round-trip"                   # tests matching name pattern
 npm run test:watch         # vitest in watch mode

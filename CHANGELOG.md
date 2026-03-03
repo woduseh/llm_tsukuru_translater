@@ -1,5 +1,27 @@
 # Changelog
 
+## [3.0.1] - 2026-03-03
+
+### 추가
+
+- 번역 비교 — 역방향 텍스트 줄밀림 감지 (헤더 패턴이 번역값에 누출된 경우)
+- 테스트 324개 (47개 추출/적용, 59개 검증, 54개 비교, 61개 번역기 등)
+- GitHub Actions Release 워크플로우 (v* 태그 → 자동 빌드 및 배포)
+
+### 개선
+
+- `removeDuplicateHeaders` 캐스케이드 병합 버그 수정
+- 핫패스 성능 최적화 (parser: O(k²)→O(k), formatter: Set 변환, apply: `in` 연산자)
+- 데드 코드 제거 (parser/formatter 미사용 변수 정리)
+- `src/js/` → `src/ts/` 폴더 구조 개선
+- 생성된 `.js` 파일 git에서 제거 및 `.gitignore` 패턴 추가
+- copilot-instructions 문서에서 폐기된 dual-file 규칙 삭제
+
+### 변경
+
+- 프로젝트명 LLM Tsukuru Translater로 변경
+- `appId`: `net.electron.LlmTsukuruTranslater`
+
 ## [3.0.0] - 2026-03-03
 
 ### 추가

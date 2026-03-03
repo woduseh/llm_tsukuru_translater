@@ -1,7 +1,7 @@
 {
-  "name": "gemini-tsukuru-extractor",
-  "version": "3.0.0",
-  "description": "Tsukuru Extractor",
+  "name": "llm-tsukuru-translater",
+  "version": "3.0.1",
+  "description": "LLM Tsukuru Translater",
   "main": "dist-main/main.js",
   "scripts": {
     "codepage": "chcp 65001",
@@ -63,8 +63,8 @@
     "vue-router": "^5.0.3"
   },
   "build": {
-    "productName": "Tsukuru Extractor",
-    "appId": "net.electron.MVExtractor",
+    "productName": "LLM Tsukuru Translater",
+    "appId": "net.electron.LlmTsukuruTranslater",
     "asar": true,
     "files": [
       "dist-main/**",
@@ -79,9 +79,9 @@
     ],
     "extraResources": [],
     "protocols": {
-      "name": "MVExtractor",
+      "name": "LlmTsukuruTranslater",
       "schemes": [
-        "MVExtractor"
+        "LlmTsukuruTranslater"
       ]
     },
     "win": {
