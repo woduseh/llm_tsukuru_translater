@@ -25,7 +25,7 @@ export interface VerifyResult {
 const TRANSLATABLE_CODES = new Set([401, 405, 102]);
 // 추출 설정에 따라 번역 가능 (스크립트/플러그인/노트)
 const EXTENDED_TRANSLATABLE_CODES = new Set([355, 655, 356, 357, 108, 408]);
-// 101: param[4]만, 320/324: param[1]만
+// 101: param[4]만, 320/324/325: param[1]만, 402: param[1]만
 
 // ── 번역 가능한 직접 문자열 필드 ──
 const TRANSLATABLE_FIELDS = new Set([
@@ -111,7 +111,8 @@ function checkControlChars(orig: string, trans: string, path: string, issues: Ve
 function getParamPolicy(code: number, paramIndex: number): StringPolicy {
     if (TRANSLATABLE_CODES.has(code)) return 'allow';
     if (code === 101) return paramIndex === 4 ? 'allow' : 'deny';
-    if (code === 320 || code === 324) return paramIndex === 1 ? 'allow' : 'deny';
+    if (code === 402) return paramIndex === 1 ? 'allow' : 'deny';
+    if (code === 320 || code === 324 || code === 325) return paramIndex === 1 ? 'allow' : 'deny';
     if (EXTENDED_TRANSLATABLE_CODES.has(code)) return 'warn';
     return 'deny';
 }
@@ -122,10 +123,14 @@ function getFieldPolicy(key: string, parentObj: any): StringPolicy | null {
     if (TRANSLATABLE_FIELDS.has(key)) {
         if (key === 'name') {
             // 데이터 항목(Actor, Item 등)의 name만 번역 허용
-            // 이벤트(pages 있음)나 커먼이벤트(list 있음)의 name은 제외
             if (parentObj && typeof parentObj.id === 'number' &&
                 !parentObj.pages && !parentObj.list) {
                 return 'allow';
+            }
+            // 맵이나 이벤트의 name은 플러그인 참조용일 수 있으므로 warn
+            if (parentObj && (parentObj.pages || parentObj.list ||
+                parentObj.events || parentObj.autoplayBgm !== undefined)) {
+                return 'warn';
             }
             return null;
         }
@@ -229,7 +234,18 @@ export function verifyJsonIntegrity(
                     origValue: orig,
                     transValue: trans
                 });
+            } else if (stringPolicy === 'warn') {
+                issues.push({
+                    path,
+                    type: 'string_changed',
+                    severity: 'warning',
+                    message: `주의 필요 위치의 문자열 변경: "${truncate(orig)}" → "${truncate(trans)}"`,
+                    origValue: orig,
+                    transValue: trans
+                });
+                checkControlChars(orig, trans, path, issues);
             } else {
+                // allow: 번역 허용, 제어문자만 검사
                 checkControlChars(orig, trans, path, issues);
             }
         }

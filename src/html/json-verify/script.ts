@@ -247,9 +247,9 @@
         (document.getElementById('repairFileBtn') as HTMLButtonElement).disabled = !currentHasIssues;
     }
 
-    function repairFile(idx: number): boolean {
+    function repairFile(idx: number): { success: boolean; error?: string } {
         const f = files[idx];
-        if (f.issues.length === 0) return false;
+        if (f.issues.length === 0) return { success: false, error: '문제가 없는 파일입니다' };
 
         try {
             let origData = fs.readFileSync(f.origPath, 'utf-8');
@@ -263,17 +263,26 @@
 
             const indent = 4 * (globalThis.settings?.JsonChangeLine || 0);
             const output = JSON.stringify(repaired, null, indent);
+
+            // 실제 저장
             fs.writeFileSync(f.transPath, output, 'utf-8');
 
+            // 저장 확인: 파일이 실제로 기록되었는지 검증
+            const written = fs.readFileSync(f.transPath, 'utf-8');
+            if (written !== output) {
+                return { success: false, error: '파일 저장 후 검증 실패: 기록된 내용이 일치하지 않습니다' };
+            }
+
             // Re-verify
-            const newIssues = verifyJsonIntegrity(orig, repaired);
+            const newIssues: VerifyIssue[] = verifyJsonIntegrity(orig, repaired);
             f.issues = newIssues;
             f.errorCount = newIssues.filter(i => i.severity === 'error').length;
             f.warningCount = newIssues.filter(i => i.severity === 'warning').length;
             f.repaired = true;
-            return true;
+            return { success: true };
         } catch (e) {
-            return false;
+            console.error('repairFile error:', e);
+            return { success: false, error: e.message || String(e) };
         }
     }
 
@@ -293,13 +302,13 @@
     // 개별 파일 수정
     document.getElementById('repairFileBtn').onclick = () => {
         if (files.length === 0) return;
-        const success = repairFile(currentIdx);
+        const result = repairFile(currentIdx);
         const statusEl = document.getElementById('status');
-        if (success) {
-            statusEl.textContent = `✓ ${files[currentIdx].name} 수정 완료`;
+        if (result.success) {
+            statusEl.textContent = `✓ ${files[currentIdx].name} 수정 및 저장 완료 → ${files[currentIdx].transPath}`;
             statusEl.className = 'status-ok';
         } else {
-            statusEl.textContent = `❌ 수정 실패`;
+            statusEl.textContent = `❌ 수정 실패: ${result.error || '알 수 없는 오류'}`;
             statusEl.className = 'status-error';
         }
         renderSummary();
@@ -312,21 +321,24 @@
     document.getElementById('repairAllBtn').onclick = () => {
         let repaired = 0;
         let failed = 0;
+        let lastError = '';
         for (let i = 0; i < files.length; i++) {
             if (files[i].issues.length > 0) {
-                if (repairFile(i)) {
+                const result = repairFile(i);
+                if (result.success) {
                     repaired++;
                 } else {
                     failed++;
+                    lastError = result.error || '';
                 }
             }
         }
         const statusEl = document.getElementById('status');
         if (failed === 0) {
-            statusEl.textContent = `✓ ${repaired}개 파일 수정 완료`;
+            statusEl.textContent = `✓ ${repaired}개 파일 수정 및 저장 완료`;
             statusEl.className = 'status-ok';
         } else {
-            statusEl.textContent = `${repaired}개 수정 완료, ${failed}개 실패`;
+            statusEl.textContent = `${repaired}개 수정 완료, ${failed}개 실패${lastError ? ': ' + lastError : ''}`;
             statusEl.className = 'status-error';
         }
         renderSummary();
