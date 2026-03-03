@@ -11,3 +11,8 @@ dist-main/
 debug_crash.log
 audit_report.html
 .store-key
+
+# tsc output (generated from .ts)
+/main.js
+/src/**/*.js
+/vitest.config.js

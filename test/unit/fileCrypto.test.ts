@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { Encrypt, Decrypt, EncryptedExtensions, DecryptedExtensions } from '../../src/js/libs/rpgencrypt';
+import { Encrypt, Decrypt, EncryptedExtensions, DecryptedExtensions } from '../../src/ts/libs/rpgencrypt';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';

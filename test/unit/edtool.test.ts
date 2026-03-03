@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { read, write, exists } from '../../src/js/rpgmv/edtool';
+import { read, write, exists } from '../../src/ts/rpgmv/edtool';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';

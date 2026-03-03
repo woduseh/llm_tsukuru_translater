@@ -1,8 +1,8 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import open from 'open';
-import * as prjc from '../js/rpgmv/projectConvert';
-import { createGeminiTranslator } from '../js/libs/geminiTranslator';
+import * as prjc from '../ts/rpgmv/projectConvert';
+import { createGeminiTranslator } from '../ts/libs/geminiTranslator';
 import { loadRoute } from './viteHelper';
 import { AppContext } from '../appContext';
 import { PROJECT_ROOT } from '../projectRoot';

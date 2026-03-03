@@ -1,4 +1,4 @@
-import { VerifyIssue } from "./src/js/rpgmv/verify"
+import { VerifyIssue } from "./src/ts/rpgmv/verify"
 
 export declare global {
     interface Window {

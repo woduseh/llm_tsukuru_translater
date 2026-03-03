@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { AppSettings } from './types/settings';
-import { ExtractedFileData } from './js/rpgmv/types';
+import { ExtractedFileData } from './ts/rpgmv/types';
 
 export class AppContext {
   mainWindow: BrowserWindow | null = null;

@@ -1,7 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
-import * as edTool from '../js/rpgmv/edtool.js';
-import Themes from '../js/rpgmv/styles'
+import * as edTool from '../ts/rpgmv/edtool.js';
+import Themes from '../ts/rpgmv/styles'
 import { sendError, worked, getSettings, storage } from './shared';
 import { loadRoute } from './viteHelper';
 import { AppContext } from '../appContext';

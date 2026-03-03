@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { readTextFile, readJsonFile, writeTextFile, writeJsonFile, rmBom, FileIOError } from '../../src/js/libs/fileIO';
+import { readTextFile, readJsonFile, writeTextFile, writeJsonFile, rmBom, FileIOError } from '../../src/ts/libs/fileIO';
 
 describe('fileIO', () => {
     let tmpDir: string;

@@ -1,8 +1,8 @@
 import { app, BrowserWindow, ipcMain, dialog, globalShortcut } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import tools from '../js/libs/projectTools'
-import Themes from '../js/rpgmv/styles'
+import tools from '../ts/libs/projectTools'
+import Themes from '../ts/rpgmv/styles'
 import { loadSettings, setOPath, defaultHeight, storage } from './shared';
 import { loadRoute } from './viteHelper';
 import { AppContext } from '../appContext';

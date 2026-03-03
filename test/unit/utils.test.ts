@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
-import { rmBom } from '../../src/js/libs/fileIO';
+import { rmBom } from '../../src/ts/libs/fileIO';
 import { getAllFileInDir, decodeEncoding } from '../../src/utils';
 import { appCtx } from '../../src/appContext';
 

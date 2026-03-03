@@ -1,16 +1,16 @@
 import { ipcMain } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import * as ExtTool from '../js/rpgmv/extract/index.js';
-import * as edTool from '../js/rpgmv/edtool.js';
-import * as dataBaseO from '../js/rpgmv/datas.js';
-import { checkIsMapFile, sleep } from '../js/rpgmv/globalutils.js';
+import * as ExtTool from '../ts/rpgmv/extract/index.js';
+import * as edTool from '../ts/rpgmv/edtool.js';
+import * as dataBaseO from '../ts/rpgmv/datas.js';
+import { checkIsMapFile, sleep } from '../ts/rpgmv/globalutils.js';
 import * as yaml from 'js-yaml';
 import { sendError, worked } from './shared';
 import log from '../logger';
 import { AppContext } from '../appContext';
 
-import { ExtractArg } from '../js/rpgmv/types';
+import { ExtractArg } from '../ts/rpgmv/types';
 
 export function registerExtractHandlers(ctx: AppContext) {
   const ErrorAlert = (msg: string) => sendError(ctx, msg)
@@ -125,7 +125,7 @@ export function registerExtractHandlers(ctx: AppContext) {
         }
         else if (Object.keys(onebyone).includes(fileName)){
           file = fs.readFileSync(dir + '/' + fileName, 'utf8')
-          await ExtTool.format_extracted(await ExtTool.extract(file, conf, (onebyone as Record<string, string>)[fileName] as import('../js/rpgmv/types').ExtractFileType, ctx), 0, ctx)
+          await ExtTool.format_extracted(await ExtTool.extract(file, conf, (onebyone as Record<string, string>)[fileName] as import('../ts/rpgmv/types').ExtractFileType, ctx), 0, ctx)
         }
         else if (arg.exJson){
           if(!dataBaseO.ignores.includes(fileName)){

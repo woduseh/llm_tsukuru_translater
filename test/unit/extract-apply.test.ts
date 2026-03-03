@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { extract, format_extracted, setObj, getVal } from '../../src/js/rpgmv/extract/index';
-import { settings as defaultSettings } from '../../src/js/rpgmv/datas';
+import { extract, format_extracted, setObj, getVal } from '../../src/ts/rpgmv/extract/index';
+import { settings as defaultSettings } from '../../src/ts/rpgmv/datas';
 import { appCtx } from '../../src/appContext';
 import fs from 'fs';
 import path from 'path';

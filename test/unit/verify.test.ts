@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { verifyJsonIntegrity, repairJson } from '../../src/js/rpgmv/verify';
+import { verifyJsonIntegrity, repairJson } from '../../src/ts/rpgmv/verify';
 
 describe('verifyJsonIntegrity', () => {
   it('returns no issues for identical objects', () => {
@@ -304,7 +304,7 @@ describe('repairJson', () => {
   });
 });
 
-import { getAtPath, setAtPath } from '../../src/js/rpgmv/verify';
+import { getAtPath, setAtPath } from '../../src/ts/rpgmv/verify';
 
 describe('getAtPath / setAtPath', () => {
 
