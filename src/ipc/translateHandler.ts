@@ -20,7 +20,7 @@ ipcMain.on('openLLMSettings', (ev, arg) => {
   }
   llmSettingsWindow = new BrowserWindow({
     width: 550,
-    height: 300,
+    height: 420,
     resizable: true,
     show: false,
     autoHideMenuBar: true,

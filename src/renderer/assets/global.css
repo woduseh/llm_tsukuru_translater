@@ -45,6 +45,33 @@ body {
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
 
+/* ── SweetAlert2 Dark Theme ── */
+.swal2-popup {
+  background: var(--Highlight1, #2a2b3d) !important;
+  color: var(--mainColor, #f8f8f2) !important;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px !important;
+}
+.swal2-title { color: var(--mainColor, #f8f8f2) !important; }
+.swal2-html-container { color: var(--mainColor, #f8f8f2) !important; opacity: 0.85; }
+.swal2-confirm {
+  background: linear-gradient(135deg, var(--accent, #7c6fdb), #6c5ce7) !important;
+  border: none !important; border-radius: 8px !important;
+  font-family: var(--font), sans-serif !important;
+}
+.swal2-deny, .swal2-cancel {
+  background: rgba(255,255,255,0.08) !important;
+  color: var(--mainColor, #f8f8f2) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+  font-family: var(--font), sans-serif !important;
+}
+.swal2-input {
+  background: var(--Highlight2, #191a24) !important;
+  color: var(--mainColor, #f8f8f2) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+}
+
 /* ── Section / Layout ── */
 .app-content {
   flex: 1;

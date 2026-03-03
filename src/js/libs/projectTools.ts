@@ -11,7 +11,9 @@ interface PTools{
 
 function INIT(){
     pTools = {
-        send: globalThis.mwindow.webContents.send,
+        send: (channel: string, ...args: unknown[]) => {
+            globalThis.mwindow.webContents.send(channel, ...args);
+        },
         sendError: (txt:string) => {
             globalThis.mwindow.webContents.send('alert', {icon: 'error',  message: txt});
         },
