@@ -2,8 +2,24 @@ import { app, BrowserWindow } from 'electron';
 import Store from 'electron-store';
 import tools from '../js/libs/projectTools'
 import * as dataBaseO from '../js/rpgmv/datas.js';
+import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 
-export const storage = new Store({ encryptionKey: 'tsukuru-extractor-store-key' });
+function getEncryptionKey(): string {
+  const keyPath = path.join(app.getPath('userData'), '.store-key');
+  try {
+    if (fs.existsSync(keyPath)) {
+      return fs.readFileSync(keyPath, 'utf8').trim();
+    }
+  } catch { /* generate new */ }
+  // Use old hardcoded key as initial value for migration compatibility
+  const newKey = 'tsukuru-extractor-store-key';
+  try { fs.writeFileSync(keyPath, newKey, 'utf8'); } catch {}
+  return newKey;
+}
+
+export const storage = new Store({ encryptionKey: getEncryptionKey() });
 export const defaultHeight = 550;
 
 let mainid = 0;

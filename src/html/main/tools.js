@@ -1,9 +1,11 @@
-import { state, Swal } from './state.js';
-
-export function initTools() {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.initTools = initTools;
+const state_1 = require("./state");
+function initTools() {
     document.getElementById('eztrans').onclick = async () => {
-        if (state.running) {
-            Swal.fire({
+        if (state_1.state.running) {
+            state_1.Swal.fire({
                 icon: 'error',
                 text: '이미 다른 작업이 시행중입니다!',
             });
@@ -12,34 +14,31 @@ export function initTools() {
         const dir = document.getElementById('folder_input').value.replaceAll('\\', '/');
         window.api.send('openLLMSettings', { dir: dir, game: 'mv' });
     };
-
     document.getElementById('llmCompare').onclick = () => {
         const dir = document.getElementById('folder_input').value.replaceAll('\\', '/');
         if (!dir) {
-            Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' });
+            state_1.Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' });
             return;
         }
         window.api.send('openLLMCompare', dir);
     };
-
     document.getElementById('jsonVerify').onclick = () => {
         const dir = document.getElementById('folder_input').value.replaceAll('\\', '/');
         if (!dir) {
-            Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' });
+            state_1.Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' });
             return;
         }
         window.api.send('openJsonVerify', dir);
     };
-
     document.getElementById('toProject').onclick = () => {
-        if (state.running) {
-            Swal.fire({
+        if (state_1.state.running) {
+            state_1.Swal.fire({
                 icon: 'error',
                 text: '이미 다른 작업이 시행중입니다!',
             });
             return;
         }
-        Swal.fire({
+        state_1.Swal.fire({
             icon: 'warning',
             text: '변환기를 사용하시겠습니까?',
             confirmButtonText: '예',
@@ -47,32 +46,31 @@ export function initTools() {
             denyButtonText: `아니오`,
         }).then(async (result) => {
             if (result.isConfirmed) {
-                await Swal.fire({
+                await state_1.Swal.fire({
                     icon: "info",
                     text: "프로젝트를 저장할 위치를 선택해주세요"
                 });
-                state.running = true;
+                state_1.state.running = true;
                 window.api.send('projectConvert', document.getElementById('folder_input').value);
             }
         });
     };
-
     document.getElementById('versionUp').onclick = async () => {
-        if (state.running) {
-            Swal.fire({
+        if (state_1.state.running) {
+            state_1.Swal.fire({
                 icon: 'error',
                 text: '이미 다른 작업이 시행중입니다!',
             });
             return;
         }
-        if (state.mode !== 0) {
-            Swal.fire({
+        if (state_1.state.mode !== 0) {
+            state_1.Swal.fire({
                 icon: 'error',
                 text: '추출 모드 상태이여야 합니다!',
             });
             return;
         }
-        const { isConfirmed: isConfirmed } = await Swal.fire({
+        const { isConfirmed: isConfirmed } = await state_1.Swal.fire({
             title: '버전 업 툴 주의사항',
             icon: 'warning',
             text: "버전 업 툴 사용 시 추출 모드의 설정 및 옵션이 그대로 적용됩니다. 구버전 번역본의 추출된 데이터를 기반으로 이식되며, 추출된 데이터가 많을 수록 더 많은 데이터가 이식됩니다.만약 구버전 번역본을 추출하였을 때랑 다른 설정 및 옵션을 사용할 시, 예기치 못한 문제가 발생할 수 있습니다.",
@@ -82,7 +80,7 @@ export function initTools() {
         if (!isConfirmed) {
             return;
         }
-        const { value: formValues } = await Swal.fire({
+        const { value: formValues } = await state_1.Swal.fire({
             title: '버전 업 툴',
             html: '<div id="swi1" class="cfolder" placeholder="구버전 번역 data 폴더">구버전 번역본 폴더</div>' +
                 '<div id="swi3" class="cfolder" placeholder="구버전 미번역 data 폴더">구버전 미번역 폴더</div>' +
@@ -103,46 +101,44 @@ export function initTools() {
                 ];
             }
         });
-
         if (formValues) {
             if (!(formValues[0] === '' || formValues[1] === '' || formValues[2] === '')) {
                 if (formValues[0] === formValues[1] || formValues[1] === formValues[2] || formValues[0] === formValues[2]) {
-                    Swal.fire({ icon: 'error', text: '같은 폴더입니다!' });
+                    state_1.Swal.fire({ icon: 'error', text: '같은 폴더입니다!' });
                 }
                 else {
                     const kas = formValues[0];
                     const kas2 = formValues[1];
                     const kas3 = formValues[2];
                     const a = {
-                        dir1: { dir: window.nodeBuffer.toBase64(kas.replace('\\', '/')) , ...state.config},
-                        dir2: { dir: window.nodeBuffer.toBase64(kas2.replace('\\', '/')) , ...state.config},
-                        dir3: { dir: window.nodeBuffer.toBase64(kas3.replace('\\', '/')) , ...state.config},
+                        dir1: { ...{ dir: window.nodeBuffer.toBase64(kas.replace('\\', '/')) }, ...state_1.state.config },
+                        dir2: { ...{ dir: window.nodeBuffer.toBase64(kas2.replace('\\', '/')) }, ...state_1.state.config },
+                        dir3: { ...{ dir: window.nodeBuffer.toBase64(kas3.replace('\\', '/')) }, ...state_1.state.config },
                         dir1_base: kas,
                         dir2_base: kas2,
                         dir3_base: kas3,
-                        config: state.config
+                        config: state_1.state.config
                     };
-                    state.running = true;
+                    state_1.state.running = true;
                     window.api.send('updateVersion', a);
                 }
             }
         }
     };
-
     document.getElementById('fontConfig').onclick = async () => {
-        if (state.running) {
-            Swal.fire({
+        if (state_1.state.running) {
+            state_1.Swal.fire({
                 icon: 'error',
                 text: '이미 다른 작업이 시행중입니다!',
             });
             return;
         }
-        await Swal.fire({
+        await state_1.Swal.fire({
             title: '주의사항',
             icon: 'warning',
             text: '폰트 변경/크기 변경은 게임 내 폰트를 즉시 변경합니다.'
         });
-        let result = await Swal.fire({
+        let result = await state_1.Swal.fire({
             title: '무엇을 하시겠습니까?',
             icon: 'info',
             showDenyButton: true,
@@ -152,11 +148,11 @@ export function initTools() {
             cancelButtonText: '취소'
         });
         if (result.isConfirmed) {
-            state.running = true;
+            state_1.state.running = true;
             window.api.send('selFont', document.getElementById('folder_input').value);
         }
         else if (result.isDenied) {
-            let { value: result2 } = await Swal.fire({
+            let { value: result2 } = await state_1.Swal.fire({
                 title: '폰트 크기 입력',
                 input: 'text',
                 inputValue: 24,
@@ -171,7 +167,7 @@ export function initTools() {
                 }
             });
             if (result2) {
-                state.running = true;
+                state_1.state.running = true;
                 window.api.send('changeFontSize', [document.getElementById('folder_input').value, parseInt(result2)]);
             }
         }

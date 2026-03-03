@@ -4,6 +4,7 @@ import path from 'path';
 import tools from '../js/libs/projectTools'
 import Themes from '../js/rpgmv/styles'
 import { getMainWindow, sendAlert, sendError, worked, loadSettings, setOPath, defaultHeight, setMainId } from './shared';
+import { loadRoute } from './viteHelper';
 
 export function createWindow() {
   loadSettings()
@@ -24,8 +25,14 @@ export function createWindow() {
   })
   
   mainWindow.setMenu(null)
-  mainWindow.loadFile('./src/html/simple/index.html')
+  loadRoute(mainWindow, '/')
   mainWindow.webContents.on('did-finish-load', function () {
+    const initialPaths = [
+      app.getPath('userData'),
+      app.getAppPath(),
+      path.join(app.getAppPath(), 'res'),
+    ];
+    mainWindow.webContents.send('set-allowed-paths', initialPaths);
     mainWindow.show();
     getMainWindow().webContents.send('is_version', app.getVersion());
     globalThis.settings.themeData = (Themes as Record<string, Record<string, string>>)[globalThis.settings.theme]
@@ -60,7 +67,13 @@ ipcMain.on('license', () => {
 })
 
 ipcMain.on('changeURL', (ev, arg) => {
-  globalThis.mwindow.loadFile(arg)
+  // Legacy: map old HTML paths to Vue routes
+  const routeMap: Record<string, string> = {
+    './src/html/main/index.html': '/mvmz',
+    './src/html/wolf/index.html': '/wolf',
+  };
+  const route = routeMap[arg] || arg;
+  loadRoute(globalThis.mwindow, route);
 })
 
 ipcMain.on('minimize', () => {

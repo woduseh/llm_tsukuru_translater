@@ -7,9 +7,12 @@
     "codepage": "chcp 65001",
     "start2": "electron . start",
     "start": "npm-run-all --parallel codepage start2",
+    "dev:renderer": "vite --config vite.renderer.config.ts",
+    "dev:electron": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron . start",
+    "dev": "npm-run-all --parallel dev:renderer dev:electron",
     "build:ts": "tsc",
-    "build:renderer": "esbuild src/html/main/renderer.js --bundle --outfile=src/html/main/renderer.bundle.js --format=iife --platform=browser",
-    "prebuild": "tsc",
+    "build:renderer": "vite build --config vite.renderer.config.ts",
+    "prebuild": "npm run build:renderer && tsc",
     "prestart": "npm run build:renderer",
     "build": "electron-builder --windows portable nsis:x64",
     "build2": "electron-builder --windows portable",
@@ -29,7 +32,9 @@
     "@types/lodash": "^4.17.24",
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
+    "@vitejs/plugin-vue": "^6.0.4",
     "@vitest/coverage-v8": "^4.0.18",
+    "cross-env": "^10.1.0",
     "electron": "^40.6.1",
     "electron-builder": "^26.8.1",
     "eslint": "^10.0.2",
@@ -52,7 +57,10 @@
     "js-yaml": "^4.1.0",
     "jsdom": "^28.1.0",
     "lodash": "^4.17.21",
-    "open": "^8.4.0"
+    "open": "^8.4.0",
+    "sweetalert2": "^11.26.21",
+    "vue": "^3.5.29",
+    "vue-router": "^5.0.3"
   },
   "build": {
     "productName": "Tsukuru Extractor",
@@ -60,11 +68,13 @@
     "asar": true,
     "files": [
       "**/*",
+      "dist-renderer/**",
       "!test/*",
       "!dist/*",
       "!addon/*",
       "!**/*.ts",
-      "!**/*.d.ts"
+      "!**/*.d.ts",
+      "!src/renderer/**"
     ],
     "extraResources": [],
     "protocols": {

@@ -10,6 +10,7 @@ const path_1 = __importDefault(require("path"));
 const projectTools_1 = __importDefault(require("../js/libs/projectTools"));
 const styles_1 = __importDefault(require("../js/rpgmv/styles"));
 const shared_1 = require("./shared");
+const viteHelper_1 = require("./viteHelper");
 function createWindow() {
     (0, shared_1.loadSettings)();
     (0, shared_1.setOPath)();
@@ -28,8 +29,14 @@ function createWindow() {
         icon: path_1.default.join(__dirname, '../../res/icon.png')
     });
     mainWindow.setMenu(null);
-    mainWindow.loadFile('./src/html/simple/index.html');
+    (0, viteHelper_1.loadRoute)(mainWindow, '/');
     mainWindow.webContents.on('did-finish-load', function () {
+        const initialPaths = [
+            electron_1.app.getPath('userData'),
+            electron_1.app.getAppPath(),
+            path_1.default.join(electron_1.app.getAppPath(), 'res'),
+        ];
+        mainWindow.webContents.send('set-allowed-paths', initialPaths);
         mainWindow.show();
         (0, shared_1.getMainWindow)().webContents.send('is_version', electron_1.app.getVersion());
         globalThis.settings.themeData = styles_1.default[globalThis.settings.theme];
@@ -62,7 +69,13 @@ electron_1.ipcMain.on('license', () => {
     licenseWindow.show();
 });
 electron_1.ipcMain.on('changeURL', (ev, arg) => {
-    globalThis.mwindow.loadFile(arg);
+    // Legacy: map old HTML paths to Vue routes
+    const routeMap = {
+        './src/html/main/index.html': '/mvmz',
+        './src/html/wolf/index.html': '/wolf',
+    };
+    const route = routeMap[arg] || arg;
+    (0, viteHelper_1.loadRoute)(globalThis.mwindow, route);
 });
 electron_1.ipcMain.on('minimize', () => {
     (0, shared_1.getMainWindow)().minimize();

@@ -1,3 +1,4 @@
+"use strict";
 let gsettings = {};
 const CheckboxValues = [
     'ExtractAddLine',
@@ -15,9 +16,9 @@ window.api.on("settings", (arg) => {
     var _a, _b, _c;
     try {
         gsettings = arg;
-        const ess2 = arg.extractSomeScript2;
-        const extractPlus = arg.extractPlus;
-        if (arg.language === 'en') {
+        const ess2 = gsettings.extractSomeScript2;
+        const extractPlus = gsettings.extractPlus;
+        if (gsettings.language === 'en') {
             globalThis.loadEn();
         }
         document.getElementById('extractSomeScript2').value += ess2.join('\n');

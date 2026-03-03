@@ -1,7 +1,10 @@
-import { state } from './state.js';
-
-export function reloadUI() {
-    if (state.mode == 0) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.reloadUI = reloadUI;
+exports.initTabManager = initTabManager;
+const state_1 = require("./state");
+function reloadUI() {
+    if (state_1.state.mode == 0) {
         document.getElementById('ext').style.backgroundColor = 'var(--Selected)';
         document.getElementById('ext').style.opacity = '1';
         document.getElementById('ext').style.color = '#fff';
@@ -15,7 +18,7 @@ export function reloadUI() {
             document.getElementById('c-app').classList.add("hiddenc");
         }
     }
-    else if (state.mode == 1) {
+    else if (state_1.state.mode == 1) {
         document.getElementById('ext').style.backgroundColor = '';
         document.getElementById('ext').style.opacity = '';
         document.getElementById('ext').style.color = '';
@@ -39,7 +42,7 @@ export function reloadUI() {
     }
     const DomList = ['ext_plugin', 'ext_note', 'ext_src', 'autoline', 'instantapply', 'exJson', 'decryptImg', 'decryptAudio', 'ext_javascript'];
     for (const i in DomList) {
-        if (state.config[DomList[i]]) {
+        if (state_1.state.config[DomList[i]]) {
             document.getElementById(DomList[i]).style.backgroundColor = 'var(--Selected)';
             document.getElementById(DomList[i]).style.color = '#fff';
         }
@@ -49,9 +52,8 @@ export function reloadUI() {
         }
     }
 }
-
-export function initTabManager() {
-    document.getElementById('ext').onclick = () => { state.mode = 0; reloadUI(); };
-    document.getElementById('apply').onclick = () => { state.mode = 1; reloadUI(); };
+function initTabManager() {
+    document.getElementById('ext').onclick = () => { state_1.state.mode = 0; reloadUI(); };
+    document.getElementById('apply').onclick = () => { state_1.state.mode = 1; reloadUI(); };
     reloadUI();
 }

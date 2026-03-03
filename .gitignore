@@ -3,6 +3,7 @@ data/
 out/
 /electron-builder.yml
 dist/
+dist-renderer/
 *.txt
 *.js.map
 *.css.map

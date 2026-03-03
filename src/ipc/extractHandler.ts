@@ -7,6 +7,7 @@ import * as dataBaseO from '../js/rpgmv/datas.js';
 import { checkIsMapFile, sleep } from '../js/rpgmv/globalutils.js';
 import * as yaml from 'js-yaml';
 import { getMainWindow, sendError, worked } from './shared';
+import log from '../logger';
 
 import { ExtractArg } from '../js/rpgmv/types';
 
@@ -118,7 +119,7 @@ export async function extractor(arg: ExtractArg){
       let runBackup = async () => {
         try {
           fs.copyFileSync(dir + '/' + fileName, dir + '/Backup/' + fileName) 
-        } catch (error) { console.error('Backup failed for', fileName, error) }
+        } catch (error) { log.error('Backup failed for', fileName, error) }
       }
       runBackup()
       if (checkIsMapFile(fileName)){
@@ -183,6 +184,7 @@ export async function extractor(arg: ExtractArg){
       getMainWindow().webContents.send('alert2'); 
     }
   } catch (err) {
+    log.error('Extraction failed:', err);
     getMainWindow().webContents.send('alert', {icon: 'error', message: JSON.stringify(err, Object.getOwnPropertyNames(err))}); 
   }
 }
@@ -262,6 +264,7 @@ ipcMain.on('updateVersion', async (ev, arg) => {
     getMainWindow().webContents.send('alert', '완료되었습니다')
     endThis()
   } catch (err) {
+    log.error('Version update failed:', err);
     getMainWindow().webContents.send('alert', {icon: 'error', message: JSON.stringify(err, Object.getOwnPropertyNames(err))}); 
     endThis()
   }

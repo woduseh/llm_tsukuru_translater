@@ -1,10 +1,11 @@
-import { state, Swal, ETA_WINDOW } from './state.js';
-import { initTabManager } from './tabManager.js';
-import { initSettingsPanel } from './settingsPanel.js';
-import { initModals } from './modals.js';
-import { initTools } from './tools.js';
-import { isRecord, isString, getString } from '../../types/guards.js';
-
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const state_1 = require("./state");
+const tabManager_1 = require("./tabManager");
+const settingsPanel_1 = require("./settingsPanel");
+const modals_1 = require("./modals");
+const tools_1 = require("./tools");
+const guards_1 = require("../../types/guards");
 function toHHMMSS(num) {
     const sec_num = Math.max(0, Math.round(num));
     const hours = Math.floor(sec_num / 3600);
@@ -18,7 +19,6 @@ function toHHMMSS(num) {
     timeString += `${seconds}초`;
     return timeString;
 }
-
 // Window controls
 document.getElementById('icon1').onclick = () => { window.api.send('close'); };
 document.getElementById('icon2').onclick = () => { window.api.send('minimize'); };
@@ -26,94 +26,88 @@ document.getElementById('fold').onclick = () => { window.api.send("openFolder", 
 document.querySelector('#sel').addEventListener('click', () => {
     window.api.send('select_folder', 'folder_input');
 });
-
 window.api.send('setheight', 550);
-
 window.api.on('set_path', (tt) => {
-    if (!isRecord(tt)) return;
-    const type = getString(tt, 'type');
-    const dir = getString(tt, 'dir');
+    if (!(0, guards_1.isRecord)(tt))
+        return;
+    const type = (0, guards_1.getString)(tt, 'type');
+    const dir = (0, guards_1.getString)(tt, 'dir');
     document.getElementById(type).value = dir;
     if (type !== 'folder_input') {
         document.getElementById(type).innerText = dir;
     }
 });
-
 // Loading bar
 window.api.on('loadingTag', (tt) => {
-    if (!isString(tt)) return;
-    state.loadingTag = tt;
+    if (!(0, guards_1.isString)(tt))
+        return;
+    state_1.state.loadingTag = tt;
 });
-
 window.api.on('loading', (tt) => {
     document.getElementById('border_r').style.width = `${tt}vw`;
     let ds = Math.floor(new Date().getTime() / 1000);
-    if (tt > 0 && state.globalSettings.loadingText) {
-        if (state.LastTime != ds) {
-            const ChangedTime = ds - state.LastTime;
-            state.LastTime = ds;
-            let OldPercent = state.LastPercent;
-            state.LastPercent = Number(tt);
-            const movedPercent = (state.LastPercent - OldPercent) / ChangedTime;
+    if (tt > 0 && state_1.state.globalSettings.loadingText) {
+        if (state_1.state.LastTime != ds) {
+            const ChangedTime = ds - state_1.state.LastTime;
+            state_1.state.LastTime = ds;
+            let OldPercent = state_1.state.LastPercent;
+            state_1.state.LastPercent = Number(tt);
+            const movedPercent = (state_1.state.LastPercent - OldPercent) / ChangedTime;
             if (movedPercent > 0) {
-                state.speedSamples.push(movedPercent);
-                if (state.speedSamples.length > ETA_WINDOW)
-                    state.speedSamples.shift();
+                state_1.state.speedSamples.push(movedPercent);
+                if (state_1.state.speedSamples.length > state_1.ETA_WINDOW)
+                    state_1.state.speedSamples.shift();
             }
-            if (state.speedSamples.length > 0) {
-                const avgSpeed = state.speedSamples.reduce((a, b) => a + b, 0) / state.speedSamples.length;
-                let TimeLeftSec = (100 - state.LastPercent) / avgSpeed;
-                state.estimatedTime = `${toHHMMSS(TimeLeftSec)} 남음`;
+            if (state_1.state.speedSamples.length > 0) {
+                const avgSpeed = state_1.state.speedSamples.reduce((a, b) => a + b, 0) / state_1.state.speedSamples.length;
+                let TimeLeftSec = (100 - state_1.state.LastPercent) / avgSpeed;
+                state_1.state.estimatedTime = `${toHHMMSS(TimeLeftSec)} 남음`;
             }
         }
-        document.getElementById('loading-text').innerText = `${state.loadingTag}${state.loadingTag ? ' · ' : ''}${Number(tt).toFixed(1)}% ${state.estimatedTime}`;
+        document.getElementById('loading-text').innerText = `${state_1.state.loadingTag}${state_1.state.loadingTag ? ' · ' : ''}${Number(tt).toFixed(1)}% ${state_1.state.estimatedTime}`;
         document.getElementById('loading-text').style.visibility = 'visible';
     }
     else {
-        state.speedSamples = [];
-        state.estimatedTime = '';
-        state.LastTime = ds;
-        state.LastPercent = -1.0;
+        state_1.state.speedSamples = [];
+        state_1.state.estimatedTime = '';
+        state_1.state.LastTime = ds;
+        state_1.state.LastPercent = -1.0;
         document.getElementById('loading-text').style.visibility = 'hidden';
-        state.loadingTag = '';
+        state_1.state.loadingTag = '';
     }
 });
-
-window.api.on('worked', () => { state.running = false; });
-
+window.api.on('worked', () => { state_1.state.running = false; });
 // Wolf RPG page
 document.getElementById('WolfBtn').onclick = () => {
     window.api.send('changeURL', './src/html/wolf/index.html');
 };
-
 // Run button
 document.getElementById('run').onclick = () => {
-    if (state.running) {
-        Swal.fire({
+    if (state_1.state.running) {
+        state_1.Swal.fire({
             icon: 'error',
             text: '이미 다른 작업이 시행중입니다!',
         });
         return;
     }
     const kas = document.getElementById('folder_input').value;
-    if (state.mode == 0) {
+    if (state_1.state.mode == 0) {
         const a = {
             dir: window.nodeBuffer.toBase64(kas.replace('\\', '/'))
         };
-        state.running = true;
-        window.api.send('extract', {...a, ...state.config});
+        state_1.state.running = true;
+        window.api.send('extract', { ...a, ...state_1.state.config });
     }
-    else if (state.mode == 1) {
+    else if (state_1.state.mode == 1) {
         const a = {
             dir: window.nodeBuffer.toBase64(kas.replace('\\', '/'))
         };
-        state.running = true;
-        window.api.send('apply', {...a, ...state.config});
+        state_1.state.running = true;
+        window.api.send('apply', { ...a, ...state_1.state.config });
     }
 };
-
 // Initialize modules
-initTabManager();
-initSettingsPanel();
-initModals();
-initTools();
+(0, tabManager_1.initTabManager)();
+(0, settingsPanel_1.initSettingsPanel)();
+(0, modals_1.initModals)();
+(0, tools_1.initTools)();
