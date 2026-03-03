@@ -1,7 +1,7 @@
 import axios from "axios";
 import crypto from "crypto";
 import { app, ipcMain } from "electron";
-import { existsSync, mkdir, mkdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { sleep } from "../rpgmv/globalutils";
 import { AppContext } from '../../appContext';

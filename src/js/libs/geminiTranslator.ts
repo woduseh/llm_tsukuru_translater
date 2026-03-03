@@ -7,7 +7,7 @@ import {
     RATE_LIMIT_DELAY_MS, DEFAULT_API_TIMEOUT_SEC
 } from './constants';
 
-const SEPARATOR_REGEX = /^--- 101 ---$/;
+const SEPARATOR_REGEX = /^---\s*\d+\s*---$/;
 
 export interface BlockValidation {
     index: number;

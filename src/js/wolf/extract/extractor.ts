@@ -1,18 +1,16 @@
 import path from 'path'
 import fs from 'fs'
 import { extractEvent } from './ext_events.js'
-import { wolfExtractCommon, wolfExtractMap } from '../parser/Map.js';
+import { wolfExtractMap } from '../parser/Map.js';
 import { getAllFileInDir } from '../../../utils.js';
 import { sleep } from '../../rpgmv/globalutils.js';
 import Tools from '../../libs/projectTools';
-import { wolfDecrypt } from './decrypter.js';
 import { wolfExtractMapPattern } from '../parser/patternBased.js';
 import { AppContext } from '../../../appContext';
 
 export async function extractWolfFolder(DataDir:string, conf:{[key:string]:boolean}, ctx: AppContext){
 
     const maps = (getAllFileInDir(DataDir, '.mps'))
-    const commonEvent = (path.join(DataDir, 'BasicData','CommonEvent.dat'))
     ctx.WolfCache = {}
     let patternMode = conf.extPattern
     let i = 0;

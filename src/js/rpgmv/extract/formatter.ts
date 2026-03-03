@@ -4,10 +4,10 @@ import type { ExtractConf, ExtractDictEntry, ExtractedDataEntry } from '../types
 import { AppContext } from '../../../appContext';
 
 function obNullSafe(c: unknown){
-    return (typeof c === 'object' && c !== undefined && c !== null)
+    return (typeof c === 'object' && c !== null)
 }
 
-function jpathIsMap(jpath: string){
+export function jpathIsMap(jpath: string){
     const name = path.parse(jpath).name
     return (name.length === 6 && name.substring(0,3) === 'Map' && !isNaN(Number(name.substring(3))))
 }

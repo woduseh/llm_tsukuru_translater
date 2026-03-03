@@ -1,7 +1,6 @@
 import { ipcMain, dialog } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import { JSDOM } from "jsdom";
 import Tools from '../libs/projectTools';
 import { readTextFile } from '../libs/fileIO';
 

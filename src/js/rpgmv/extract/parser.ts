@@ -102,11 +102,11 @@ export const setObj = addto
 export const getVal = returnVal
 
 function obNullSafe(c: unknown){
-    return (typeof c === 'object' && c !== undefined && c !== null)
+    return (typeof c === 'object' && c !== null)
 }
 
 function strNullSafe(d: unknown){
-    return (typeof d === 'string' && d !== undefined && d !== null)
+    return (typeof d === 'string')
 }
 
 function Extreturnit(dat_obj: DatObj, Path='', nas: unknown=null){
@@ -235,7 +235,7 @@ export const extract = async (filedata: string, conf: ExtractConf, ftype: Extrac
     const dirf = dir + fileName + '\\'
     ctx.gb[fileName] = {data: {}}
     if (filedata.charCodeAt(0) === 0xFEFF) {
-        filedata = filedata.substr(1);
+        filedata = filedata.substring(1);
         ctx.gb[fileName].isbom = true
     }
     else{
