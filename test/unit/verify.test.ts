@@ -104,7 +104,7 @@ describe('repairJson', () => {
   it('repairs event command by preserving code and indent', () => {
     const orig = { code: 401, indent: 0, parameters: ['Hello'] };
     const trans = { code: 999, indent: 5, parameters: ['Translated'] };
-    const result = repairJson(orig, trans);
+    const result = repairJson(orig, trans) as Record<string, any>;
     expect(result.code).toBe(401);
     expect(result.indent).toBe(0);
     // code 401 params are translatable so translated value is kept

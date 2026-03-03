@@ -1,4 +1,4 @@
-let gsettings:{[key:string]:any} = {}
+let gsettings: Record<string, any> = {}
 const CheckboxValues = [
   'ExtractAddLine',
   'onefile_src',
@@ -12,12 +12,12 @@ const CheckboxValues = [
   'formatNice'
 ]
 
-window.api.on("settings", (arg: any) => {
+window.api.on("settings", (arg: unknown) => {
   try{
-    gsettings = arg
-    const ess2 = arg.extractSomeScript2
-    const extractPlus = arg.extractPlus
-    if(arg.language === 'en'){
+    gsettings = arg as Record<string, any>
+    const ess2 = gsettings.extractSomeScript2 as string[]
+    const extractPlus = gsettings.extractPlus as number[]
+    if(gsettings.language === 'en'){
       globalThis.loadEn()
     }
   

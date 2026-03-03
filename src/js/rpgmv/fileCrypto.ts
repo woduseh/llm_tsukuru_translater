@@ -6,6 +6,7 @@ import * as rpgencrypt from "../libs/rpgencrypt";
 import yaml from 'js-yaml';
 import fsx from 'fs-extra'
 import { sleep } from './globalutils';
+import Tools from '../libs/projectTools';
 
 function reader(dir:string){
     if(fs.existsSync(dir+'.yaml')){
@@ -39,8 +40,8 @@ function getFilesRecursively(directory:string, dita:null|string = null):string[]
 };
 
 export async function DecryptDir (DataDir:string, type:string):Promise<void> {
-    globalThis.mwindow.webContents.send('loading', 0);
-    globalThis.mwindow.webContents.send('loadingTag', `${type} 복호화 중`);
+    Tools.send('loading', 0);
+    Tools.send('loadingTag', `${type} 복호화 중`);
     const SysFile = reader(path.join(DataDir, "System.json"))
     const Key = SysFile.encryptionKey
     const ExtractImgDir = path.join(DataDir, `Extract_${type}`)
@@ -52,8 +53,8 @@ export async function DecryptDir (DataDir:string, type:string):Promise<void> {
     const imgDir = path.join(path.dirname(DataDir), type)
     const files:string[] = getFilesRecursively(imgDir)
     for(let i=0;i<files.length;i++){
-        globalThis.mwindow.webContents.send('loadingTag', `${type} 복호화 중 : `);
-        globalThis.mwindow.webContents.send('loading', ((i/files.length)*100))
+        Tools.send('loadingTag', `${type} 복호화 중 : `);
+        Tools.send('loading', ((i/files.length)*100))
         const loc = path.join(imgDir,files[i])
         let tlan = path.dirname(files[i])
         if(tlan.startsWith('/')){
@@ -67,11 +68,11 @@ export async function DecryptDir (DataDir:string, type:string):Promise<void> {
         await sleep(1)
     }
 
-    globalThis.mwindow.webContents.send('loading', 0);
+    Tools.send('loading', 0);
 }
 
 
-export async function EncryptDir (DataDir:string, type:string, instantapply:boolean) {
+export async function EncryptDir(DataDir:string, type:string, instantapply:boolean) {
     const SysFile = reader(path.join(DataDir, "System.json"))
     const Key = SysFile.encryptionKey
     const ExtractImgDirReal = path.join(DataDir, `Extract_${type}`)
@@ -93,8 +94,8 @@ export async function EncryptDir (DataDir:string, type:string, instantapply:bool
     let MVMode = (wwwDir.endsWith('www\\') || wwwDir.endsWith('www/') || wwwDir.endsWith('www'))
 
     for(let i=0;i<files.length;i++){
-        globalThis.mwindow.webContents.send('loadingTag', `${type} 암호화 중 : `);
-        globalThis.mwindow.webContents.send('loading', ((i/files.length)*100))
+        Tools.send('loadingTag', `${type} 암호화 중 : `);
+        Tools.send('loading', ((i/files.length)*100))
         const loc = path.join(ExtractImgDir,files[i])
         let tlan = path.dirname(files[i])
         if(tlan.startsWith('/')){
@@ -108,5 +109,5 @@ export async function EncryptDir (DataDir:string, type:string, instantapply:bool
         await sleep(1)
     }
 
-    globalThis.mwindow.webContents.send('loading', 0);
+    Tools.send('loading', 0);
 }

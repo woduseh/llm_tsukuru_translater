@@ -42,7 +42,7 @@ export async function loadSettings(){
   let givensettings = {}
 
   if(storage.has('settings')){
-    givensettings = JSON.parse(storage.get('settings') as any)
+    givensettings = JSON.parse(storage.get('settings') as string)
   }
 
   globalThis.settings = dataBaseO.settings

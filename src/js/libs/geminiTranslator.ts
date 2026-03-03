@@ -51,7 +51,7 @@ interface GeminiConfig {
     timeout: number;
 }
 
-function splitIntoBlocks(content: string): { separator: string; lines: string[] }[] {
+export function splitIntoBlocks(content: string): { separator: string; lines: string[] }[] {
     const allLines = content.split('\n');
     const blocks: { separator: string; lines: string[] }[] = [];
     let currentSep = '';
@@ -74,7 +74,7 @@ function splitIntoBlocks(content: string): { separator: string; lines: string[] 
     return blocks;
 }
 
-function reassembleBlocks(blocks: { separator: string; lines: string[] }[]): string {
+export function reassembleBlocks(blocks: { separator: string; lines: string[] }[]): string {
     const parts: string[] = [];
     for (const block of blocks) {
         if (block.separator) {
@@ -157,7 +157,7 @@ function buildUserMessage(text: string): string {
     return `<Source_Text>\n${text}\n</Source_Text>`;
 }
 
-function validateChunk(
+export function validateChunk(
     originalBlocks: { separator: string; lines: string[] }[],
     translatedText: string
 ): { validatedBlocks: { separator: string; lines: string[] }[]; blockValidations: BlockValidation[] } {
@@ -209,17 +209,17 @@ function validateChunk(
 }
 
 // Check if an error is permanent (safety block, timeout — retrying won't help)
-function isPermanentApiError(error: any): boolean {
+export function isPermanentApiError(error: unknown): boolean {
     if (!error) return false;
-    const msg = String(error.message || error).toLowerCase();
-    const code = String(error.code || '').toLowerCase();
+    const msg = String((error as Record<string, unknown>).message || error).toLowerCase();
+    const code = String((error as Record<string, unknown>).code || '').toLowerCase();
     return msg.includes('blocked') || msg.includes('timeout') || code === 'econnaborted';
 }
 
 // Check if an error is a retryable API error (rate limit, server error, transient)
-function isRetryableApiError(error: any): boolean {
+export function isRetryableApiError(error: unknown): boolean {
     if (!error) return false;
-    const msg = String(error.message || error).toLowerCase();
+    const msg = String((error as Record<string, unknown>).message || error).toLowerCase();
     return msg.includes('429') || msg.includes('503') || msg.includes('resource_exhausted')
         || msg.includes('rate limit') || msg.includes('quota') || msg.includes('overloaded')
         || msg.includes('internal') || msg.includes('unavailable') || msg.includes('deadline')
@@ -444,7 +444,7 @@ export class GeminiTranslator {
     }
 }
 
-export function createGeminiTranslator(settings: any, sourceLang: string, targetLang = 'ko'): GeminiTranslator {
+export function createGeminiTranslator(settings: Record<string, any>, sourceLang: string, targetLang = 'ko'): GeminiTranslator {
     return new GeminiTranslator({
         apiKey: settings.llmApiKey,
         model: settings.llmModel,

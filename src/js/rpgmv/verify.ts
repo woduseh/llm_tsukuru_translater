@@ -9,8 +9,8 @@ export interface VerifyIssue {
     type: 'array_length' | 'type_mismatch' | 'keys_added' | 'keys_removed' | 'value_changed' | 'string_changed' | 'control_char_mismatch' | 'text_shift';
     severity: 'error' | 'warning';
     message: string;
-    origValue?: any;
-    transValue?: any;
+    origValue?: unknown;
+    transValue?: unknown;
 }
 
 export interface VerifyResult {
@@ -53,18 +53,18 @@ const PLACEHOLDER_RE = /^---\s*\d+\s*---$/;
 const NAME_BRACKET_FULL_RE = /^【.+】$/;
 const NAME_BRACKET_PARTIAL_RE = /【.*】/;
 
-function getType(v: any): string {
+function getType(v: unknown): string {
     if (v === null || v === undefined) return 'null';
     if (Array.isArray(v)) return 'array';
     return typeof v;
 }
 
-function isEventCommand(obj: any): boolean {
+function isEventCommand(obj: unknown): boolean {
     return typeof obj === 'object' && obj !== null &&
         !Array.isArray(obj) &&
-        typeof obj.code === 'number' &&
-        typeof obj.indent === 'number' &&
-        Array.isArray(obj.parameters);
+        typeof (obj as Record<string, unknown>).code === 'number' &&
+        typeof (obj as Record<string, unknown>).indent === 'number' &&
+        Array.isArray((obj as Record<string, unknown>).parameters);
 }
 
 function truncate(s: string, len: number = 40): string {
@@ -206,7 +206,7 @@ function checkTextShift(origStr: string, transStr: string, path: string, issues:
 }
 
 // 필드 이름에 따른 문자열 정책 결정 (null = 부모 정책 상속)
-function getFieldPolicy(key: string, parentObj: any): StringPolicy | null {
+function getFieldPolicy(key: string, parentObj: Record<string, unknown>): StringPolicy | null {
     if (key === 'note') return 'warn';
     if (TRANSLATABLE_FIELDS.has(key)) {
         if (key === 'name') {
@@ -229,7 +229,7 @@ function getFieldPolicy(key: string, parentObj: any): StringPolicy | null {
     return null;
 }
 
-function verifyEventCommand(orig: any, trans: any, path: string, issues: VerifyIssue[]): void {
+function verifyEventCommand(orig: Record<string, unknown>, trans: Record<string, unknown>, path: string, issues: VerifyIssue[]): void {
     // code는 100% 일치해야 함
     if (orig.code !== trans.code) {
         issues.push({
@@ -266,7 +266,7 @@ function verifyEventCommand(orig: any, trans: any, path: string, issues: VerifyI
                 transValue: transParams.length
             });
         }
-        const code = orig.code;
+        const code = orig.code as number;
         const minLen = Math.min(origParams.length, transParams.length);
         for (let i = 0; i < minLen; i++) {
             if (issues.length >= MAX_ISSUES) break;
@@ -275,7 +275,7 @@ function verifyEventCommand(orig: any, trans: any, path: string, issues: VerifyI
             // 번역 허용 코드(401, 405)의 문자열 파라미터에 대해 줄밀림 검사
             if ((code === 401 || code === 405) && policy === 'allow' &&
                 typeof origParams[i] === 'string' && typeof transParams[i] === 'string') {
-                checkTextShift(origParams[i], transParams[i], `${path}.parameters[${i}]`, issues);
+                checkTextShift(origParams[i] as string, transParams[i] as string, `${path}.parameters[${i}]`, issues);
             }
         }
     }
@@ -290,7 +290,7 @@ function verifyEventCommand(orig: any, trans: any, path: string, issues: VerifyI
 }
 
 export function verifyJsonIntegrity(
-    orig: any, trans: any,
+    orig: unknown, trans: unknown,
     path: string = '$',
     issues?: VerifyIssue[],
     stringPolicy: StringPolicy = 'deny'
@@ -317,22 +317,22 @@ export function verifyJsonIntegrity(
 
     // ── 문자열: 정책에 따라 판단 ──
     if (origType === 'string') {
-        if (orig !== trans) {
+        if ((orig as string) !== (trans as string)) {
             if (stringPolicy === 'deny') {
                 issues.push({
                     path,
                     type: 'string_changed',
                     severity: 'error',
-                    message: `번역 불가 위치의 문자열 변경: "${truncate(orig)}" → "${truncate(trans)}"`,
+                    message: `번역 불가 위치의 문자열 변경: "${truncate(orig as string)}" → "${truncate(trans as string)}"`,
                     origValue: orig,
                     transValue: trans
                 });
             } else if (stringPolicy === 'warn') {
                 // warn 정책: 번역이 의도적일 수 있으므로 제어문자만 검사
-                checkControlChars(orig, trans, path, issues);
+                checkControlChars(orig as string, trans as string, path, issues);
             } else {
                 // allow: 번역 허용, 제어문자만 검사
-                checkControlChars(orig, trans, path, issues);
+                checkControlChars(orig as string, trans as string, path, issues);
             }
         }
         return issues;
@@ -355,34 +355,36 @@ export function verifyJsonIntegrity(
 
     // ── 배열 ──
     if (origType === 'array') {
-        if (orig.length !== trans.length) {
+        if ((orig as unknown[]).length !== (trans as unknown[]).length) {
             issues.push({
                 path,
                 type: 'array_length',
                 severity: 'error',
-                message: `배열 길이 불일치: 원본=${orig.length}개, 번역=${trans.length}개`,
-                origValue: orig.length,
-                transValue: trans.length
+                message: `배열 길이 불일치: 원본=${(orig as unknown[]).length}개, 번역=${(trans as unknown[]).length}개`,
+                origValue: (orig as unknown[]).length,
+                transValue: (trans as unknown[]).length
             });
         }
-        const minLen = Math.min(orig.length, trans.length);
+        const minLen = Math.min((orig as unknown[]).length, (trans as unknown[]).length);
         for (let i = 0; i < minLen; i++) {
             if (issues.length >= MAX_ISSUES) break;
-            verifyJsonIntegrity(orig[i], trans[i], `${path}[${i}]`, issues, stringPolicy);
+            verifyJsonIntegrity((orig as unknown[])[i], (trans as unknown[])[i], `${path}[${i}]`, issues, stringPolicy);
         }
         return issues;
     }
 
     // ── 오브젝트 ──
     if (origType === 'object') {
+        const origObj = orig as Record<string, unknown>;
+        const transObj = trans as Record<string, unknown>;
         // 이벤트 커맨드 감지 → 코드별 전용 검증
         if (isEventCommand(orig) && isEventCommand(trans)) {
-            verifyEventCommand(orig, trans, path, issues);
+            verifyEventCommand(origObj, transObj, path, issues);
             return issues;
         }
 
-        const origKeys = Object.keys(orig).filter(k => !COMMENT_KEY_RE.test(k));
-        const transKeys = Object.keys(trans).filter(k => !COMMENT_KEY_RE.test(k));
+        const origKeys = Object.keys(origObj).filter(k => !COMMENT_KEY_RE.test(k));
+        const transKeys = Object.keys(transObj).filter(k => !COMMENT_KEY_RE.test(k));
         const origSet = new Set(origKeys);
         const transSet = new Set(transKeys);
 
@@ -411,19 +413,19 @@ export function verifyJsonIntegrity(
         for (const key of origKeys) {
             if (issues.length >= MAX_ISSUES) break;
             if (transSet.has(key)) {
-                const specificPolicy = getFieldPolicy(key, orig);
+                const specificPolicy = getFieldPolicy(key, origObj);
                 const childPolicy = specificPolicy !== null ? specificPolicy : stringPolicy;
-                verifyJsonIntegrity(orig[key], trans[key], `${path}.${key}`, issues, childPolicy);
+                verifyJsonIntegrity(origObj[key], transObj[key], `${path}.${key}`, issues, childPolicy);
             }
         }
 
         // comment_ 딕셔너리 줄밀림 검사 (MVT 등 번역 툴이 추가한 키)
-        const origCommentKeys = Object.keys(orig).filter(k => COMMENT_KEY_RE.test(k));
+        const origCommentKeys = Object.keys(origObj).filter(k => COMMENT_KEY_RE.test(k));
         if (origCommentKeys.length > 0) {
             for (const key of origCommentKeys) {
                 if (issues.length >= MAX_ISSUES) break;
-                if (key in trans && typeof orig[key] === 'string' && typeof trans[key] === 'string') {
-                    checkTextShift(orig[key], trans[key], `${path}.${key}`, issues);
+                if (key in transObj && typeof origObj[key] === 'string' && typeof transObj[key] === 'string') {
+                    checkTextShift(origObj[key] as string, transObj[key] as string, `${path}.${key}`, issues);
                 }
             }
         }
@@ -438,21 +440,21 @@ export function verifyJsonIntegrity(
 // Repair: 원본 구조 기반으로 번역 문자열만 유지하여 복원
 // ═══════════════════════════════════════════
 
-function repairEventCommand(orig: any, trans: any): any {
-    const result: any = {};
+function repairEventCommand(orig: Record<string, unknown>, trans: Record<string, unknown>): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
     result.code = orig.code;
     result.indent = orig.indent;
 
     if (Array.isArray(orig.parameters)) {
         result.parameters = [];
-        const code = orig.code;
+        const code = orig.code as number;
         const transParams = Array.isArray(trans.parameters) ? trans.parameters : [];
         for (let i = 0; i < orig.parameters.length; i++) {
             if (i < transParams.length) {
                 const policy = getParamPolicy(code, i);
-                result.parameters.push(repairJson(orig.parameters[i], transParams[i], policy));
+                (result.parameters as unknown[]).push(repairJson(orig.parameters[i], transParams[i], policy));
             } else {
-                result.parameters.push(JSON.parse(JSON.stringify(orig.parameters[i])));
+                (result.parameters as unknown[]).push(JSON.parse(JSON.stringify(orig.parameters[i])));
             }
         }
     }
@@ -464,7 +466,7 @@ function repairEventCommand(orig: any, trans: any): any {
     return result;
 }
 
-export function repairJson(orig: any, trans: any, stringPolicy: StringPolicy = 'deny'): any {
+export function repairJson(orig: unknown, trans: unknown, stringPolicy: StringPolicy = 'deny'): unknown {
     const origType = getType(orig);
     const transType = getType(trans);
 
@@ -484,29 +486,31 @@ export function repairJson(orig: any, trans: any, stringPolicy: StringPolicy = '
 
     if (origType === 'array') {
         const result = [];
-        for (let i = 0; i < orig.length; i++) {
-            if (i < trans.length) {
-                result.push(repairJson(orig[i], trans[i], stringPolicy));
+        for (let i = 0; i < (orig as unknown[]).length; i++) {
+            if (i < (trans as unknown[]).length) {
+                result.push(repairJson((orig as unknown[])[i], (trans as unknown[])[i], stringPolicy));
             } else {
-                result.push(JSON.parse(JSON.stringify(orig[i])));
+                result.push(JSON.parse(JSON.stringify((orig as unknown[])[i])));
             }
         }
         return result;
     }
 
     if (origType === 'object') {
+        const origObj = orig as Record<string, unknown>;
+        const transObj = trans as Record<string, unknown>;
         if (isEventCommand(orig)) {
-            return repairEventCommand(orig, trans);
+            return repairEventCommand(origObj, transObj);
         }
 
-        const result: any = {};
-        for (const key of Object.keys(orig)) {
-            if (key in trans) {
-                const specificPolicy = getFieldPolicy(key, orig);
+        const result: Record<string, unknown> = {};
+        for (const key of Object.keys(origObj)) {
+            if (key in transObj) {
+                const specificPolicy = getFieldPolicy(key, origObj);
                 const childPolicy = specificPolicy !== null ? specificPolicy : stringPolicy;
-                result[key] = repairJson(orig[key], trans[key], childPolicy);
+                result[key] = repairJson(origObj[key], transObj[key], childPolicy);
             } else {
-                result[key] = JSON.parse(JSON.stringify(orig[key]));
+                result[key] = JSON.parse(JSON.stringify(origObj[key]));
             }
         }
         return result;

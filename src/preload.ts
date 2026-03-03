@@ -3,7 +3,7 @@ const path = require('path');
 
 let allowedBasePaths: string[] = [];
 
-ipcRenderer.on('set-allowed-paths', (_event: any, paths: string[]) => {
+ipcRenderer.on('set-allowed-paths', (_event: unknown, paths: string[]) => {
   allowedBasePaths = paths.map((p: string) => path.resolve(p));
 });
 
@@ -34,21 +34,21 @@ const RECEIVE_CHANNELS = [
 ];
 
 contextBridge.exposeInMainWorld('api', {
-  send: (channel: string, ...args: any[]) => {
+  send: (channel: string, ...args: unknown[]) => {
     if (SEND_CHANNELS.includes(channel)) {
       ipcRenderer.send(channel, ...args);
     }
   },
   on: (channel: string, callback: (...args: any[]) => void) => {
     if (RECEIVE_CHANNELS.includes(channel)) {
-      const subscription = (_event: any, ...args: any[]) => callback(...args);
-      ipcRenderer.on(channel, subscription);
+      const subscription = (_event: unknown, ...args: unknown[]) => callback(...args);
+      ipcRenderer.on(channel, subscription as (...args: unknown[]) => void);
       return subscription;
     }
   },
   once: (channel: string, callback: (...args: any[]) => void) => {
     if (RECEIVE_CHANNELS.includes(channel)) {
-      ipcRenderer.once(channel, (_event: any, ...args: any[]) => callback(...args));
+      ipcRenderer.once(channel, (_event: unknown, ...args: unknown[]) => callback(...args));
     }
   },
   removeAllListeners: (channel: string) => {
@@ -56,7 +56,7 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.removeAllListeners(channel);
     }
   },
-  invoke: (channel: string, ...args: any[]) => {
+  invoke: (channel: string, ...args: unknown[]) => {
     if (SEND_CHANNELS.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args);
     }
@@ -94,11 +94,11 @@ contextBridge.exposeInMainWorld('nodePath', {
 });
 
 contextBridge.exposeInMainWorld('verify', {
-  verifyJsonIntegrity: (orig: any, trans: any) => {
+  verifyJsonIntegrity: (orig: unknown, trans: unknown) => {
     const { verifyJsonIntegrity } = require('./js/rpgmv/verify.js');
     return verifyJsonIntegrity(orig, trans);
   },
-  repairJson: (orig: any, trans: any) => {
+  repairJson: (orig: unknown, trans: unknown) => {
     const { repairJson } = require('./js/rpgmv/verify.js');
     return repairJson(orig, trans);
   }

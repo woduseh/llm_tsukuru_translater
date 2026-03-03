@@ -1,12 +1,13 @@
 import { BrowserWindow } from 'electron';
 import { AppSettings } from './types/settings';
+import { ExtractedFileData } from './js/rpgmv/types';
 
 export interface AppContextType {
   mainWindow: BrowserWindow | null;
   settingsWindow: BrowserWindow | null;
   settings: AppSettings;
-  gb: Record<string, any>;
-  externMsg: Record<string, any>;
+  gb: Record<string, ExtractedFileData>;
+  externMsg: Record<string, string>;
   useExternMsg: boolean;
   externMsgKeys: string[];
   llmAbort: boolean;
@@ -15,10 +16,11 @@ export interface AppContextType {
   iconPath: string;
   keyvalue: CryptoKey | undefined;
   loadEn: (() => void) | null;
-  WolfExtData: any[];
+  WolfExtData: extData[];  // extData from globals.d.ts
   WolfEncoding: 'utf8' | 'shift-jis';
   WolfCache: Record<string, Buffer>;
   WolfMetadata: { ver: 2 | 3 | -1 };
+  [key: string]: unknown;
 }
 
 export const appCtx: AppContextType = {
@@ -43,7 +45,7 @@ export const appCtx: AppContextType = {
 
 // Backward compat: sync globalThis with appCtx for gradual migration
 function syncToGlobal() {
-  const g = globalThis as any;
+  const g = globalThis as Record<string, unknown>;
   const propertyMap: Record<string, keyof AppContextType> = {
     mwindow: 'mainWindow',
     settingsWindow: 'settingsWindow',
@@ -65,8 +67,8 @@ function syncToGlobal() {
   };
   for (const [globalName, ctxName] of Object.entries(propertyMap)) {
     Object.defineProperty(g, globalName, {
-      get: () => (appCtx as any)[ctxName],
-      set: (v: any) => { (appCtx as any)[ctxName] = v; },
+      get: () => (appCtx as Record<string, unknown>)[ctxName],
+      set: (v: unknown) => { (appCtx as Record<string, unknown>)[ctxName] = v; },
       configurable: true
     });
   }

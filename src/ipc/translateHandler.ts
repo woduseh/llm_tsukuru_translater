@@ -6,7 +6,7 @@ import { getMainWindow, storage } from './shared';
 import { getLLMCompareWindow } from './toolsHandler';
 
 let llmSettingsWindow: Electron.BrowserWindow | null = null;
-let llmPendingArg: any = null;
+let llmPendingArg: { dir: string; game: string } | null = null;
 
 ipcMain.on('eztrans', eztrans.trans)
 
@@ -97,10 +97,10 @@ ipcMain.on('retranslateFile', async (_ev, data: { dir: string; fileName: string 
     if (lcw && !lcw.isDestroyed()) {
       lcw.webContents.send('retranslateFileDone', result);
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     const lcw = getLLMCompareWindow();
     if (lcw && !lcw.isDestroyed()) {
-      lcw.webContents.send('retranslateFileDone', { success: false, error: err.message || String(err) });
+      lcw.webContents.send('retranslateFileDone', { success: false, error: (err as Error).message || String(err) });
     }
   }
 })
@@ -128,10 +128,10 @@ ipcMain.on('retranslateBlocks', async (_ev, data: { dir: string; fileName: strin
     if (lcw && !lcw.isDestroyed()) {
       lcw.webContents.send('retranslateBlocksDone', result);
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     const lcw = getLLMCompareWindow();
     if (lcw && !lcw.isDestroyed()) {
-      lcw.webContents.send('retranslateBlocksDone', { success: false, error: err.message || String(err) });
+      lcw.webContents.send('retranslateBlocksDone', { success: false, error: (err as Error).message || String(err) });
     }
   }
 })

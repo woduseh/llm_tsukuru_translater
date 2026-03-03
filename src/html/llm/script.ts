@@ -1,8 +1,8 @@
 (() => {
-    let settings: { [key: string]: any } = {};
+    let settings: Record<string, any> = {};
 
-    window.api.on('llmSettings', (arg: any) => {
-        settings = arg;
+    window.api.on('llmSettings', (arg: unknown) => {
+        settings = arg as Record<string, any>;
         (document.getElementById('sortOrder') as HTMLSelectElement).value = settings.llmSortOrder || 'name-asc';
 
         if (settings.themeData) {
