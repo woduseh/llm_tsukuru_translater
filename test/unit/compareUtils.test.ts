@@ -241,15 +241,16 @@ describe('removeDuplicateHeaders', () => {
     ])
   })
 
-  it('merges content when both blocks have content', () => {
+  it('does not merge when both blocks have content', () => {
     const blocks: Block[] = [
       { sep: '--- 1 ---', lines: ['a'] },
       { sep: '--- 1 ---', lines: ['b'] }
     ]
     const removed = removeDuplicateHeaders(blocks)
-    expect(removed).toBe(1)
+    expect(removed).toBe(0)
     expect(blocks).toEqual([
-      { sep: '--- 1 ---', lines: ['a', 'b'] }
+      { sep: '--- 1 ---', lines: ['a'] },
+      { sep: '--- 1 ---', lines: ['b'] }
     ])
   })
 
@@ -281,6 +282,49 @@ describe('removeDuplicateHeaders', () => {
     expect(removed).toBe(2)
     expect(blocks).toEqual([
       { sep: '--- 1 ---', lines: ['content'] }
+    ])
+  })
+
+  it('does not cascade-merge after removing empty duplicate between content blocks', () => {
+    const blocks: Block[] = [
+      { sep: '--- 1 ---', lines: ['a'] },
+      { sep: '--- 1 ---', lines: [] },
+      { sep: '--- 1 ---', lines: ['b'] }
+    ]
+    const removed = removeDuplicateHeaders(blocks)
+    expect(removed).toBe(1)
+    expect(blocks).toEqual([
+      { sep: '--- 1 ---', lines: ['a'] },
+      { sep: '--- 1 ---', lines: ['b'] }
+    ])
+  })
+
+  it('end-to-end: removes one header from back-to-back duplicates', () => {
+    const lines = ['--- 101 ---', '--- 101 ---', '[이름]', '대사']
+    const blocks = splitBlocks(lines)
+    expect(blocks).toEqual([
+      { sep: '--- 101 ---', lines: [] },
+      { sep: '--- 101 ---', lines: ['[이름]', '대사'] }
+    ])
+    const removed = removeDuplicateHeaders(blocks)
+    expect(removed).toBe(1)
+    expect(blocksToLines(blocks)).toEqual(['--- 101 ---', '[이름]', '대사'])
+  })
+
+  it('removes multiple different duplicate headers in one pass', () => {
+    const blocks: Block[] = [
+      { sep: '--- 100 ---', lines: ['t1'] },
+      { sep: '--- 101 ---', lines: [] },
+      { sep: '--- 101 ---', lines: ['t2'] },
+      { sep: '--- 102 ---', lines: [] },
+      { sep: '--- 102 ---', lines: ['t3'] }
+    ]
+    const removed = removeDuplicateHeaders(blocks)
+    expect(removed).toBe(2)
+    expect(blocks).toEqual([
+      { sep: '--- 100 ---', lines: ['t1'] },
+      { sep: '--- 101 ---', lines: ['t2'] },
+      { sep: '--- 102 ---', lines: ['t3'] }
     ])
   })
 })
