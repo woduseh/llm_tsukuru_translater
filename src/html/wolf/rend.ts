@@ -27,7 +27,7 @@
     //@ts-ignore
     const Swal = window.Swal
     
-    ipcRenderer.on('getGlobalSettings', (evn, tt) => {
+    ipcRenderer.on('getGlobalSettings', (evn: any, tt: any) => {
         globalSettings = tt
         if(tt.language === 'en'){
             globalThis.loadEn()
@@ -39,7 +39,7 @@
         }
     })
 
-    ipcRenderer.on('alertExten', async (ev, arg) => {
+    ipcRenderer.on('alertExten', async (ev: any, arg: any) => {
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
@@ -67,41 +67,41 @@
         }
     }
     
-    document.getElementById('icon1').onclick = () => {ipcRenderer.send('close')}
-    document.getElementById('icon2').onclick = () => {ipcRenderer.send('minimize')}
-    document.getElementById('sel').addEventListener('click', () => {
+    document.getElementById('icon1')!.onclick = () => {ipcRenderer.send('close')}
+    document.getElementById('icon2')!.onclick = () => {ipcRenderer.send('minimize')}
+    document.getElementById('sel')!.addEventListener('click', () => {
         ipcRenderer.send('select_folder', 'folder_input');
     });
-    ipcRenderer.on('set_path', (evn, tt) => {
+    ipcRenderer.on('set_path', (evn: any, tt: any) => {
         (document.getElementById(tt.type) as HTMLInputElement).value = tt.dir
         if(tt.type !== 'folder_input'){
-            document.getElementById(tt.type).innerText = tt.dir
+            document.getElementById(tt.type)!.innerText = tt.dir
         }
     });
-    document.getElementById('WolfBtn').onclick = () => {
+    document.getElementById('WolfBtn')!.onclick = () => {
         ipcRenderer.send('changeURL', './src/html/main/index.html')
     }
     changeMenu('simple')
     {
-        document.getElementById('marTrans').onclick = () => {
-            document.getElementById('handTrans').removeAttribute('selected')
-            document.getElementById('marTrans').setAttribute('selected', '')
-            document.getElementById('marCont').style.display = 'block'
-            document.getElementById('handCont').style.display = 'none'
+        document.getElementById('marTrans')!.onclick = () => {
+            document.getElementById('handTrans')!.removeAttribute('selected')
+            document.getElementById('marTrans')!.setAttribute('selected', '')
+            document.getElementById('marCont')!.style.display = 'block'
+            document.getElementById('handCont')!.style.display = 'none'
             if(globalSettings.HideExtractAll){
-                document.getElementById('ext-all').style.display = 'none'
+                document.getElementById('ext-all')!.style.display = 'none'
             }
             else{
-                document.getElementById('ext-all').style.display = 'block'
+                document.getElementById('ext-all')!.style.display = 'block'
             }
         }
-        document.getElementById('handTrans').onclick = () => {
-            document.getElementById('marTrans').removeAttribute('selected')
-            document.getElementById('handTrans').setAttribute('selected', '')
-            document.getElementById('handCont').style.display = 'block'
-            document.getElementById('marCont').style.display = 'none'
+        document.getElementById('handTrans')!.onclick = () => {
+            document.getElementById('marTrans')!.removeAttribute('selected')
+            document.getElementById('handTrans')!.setAttribute('selected', '')
+            document.getElementById('handCont')!.style.display = 'block'
+            document.getElementById('marCont')!.style.display = 'none'
         }
-        document.getElementById('runbtn').onclick = () => {
+        document.getElementById('runbtn')!.onclick = () => {
             if(running){
                 Swal.fire({
                     icon: 'error',
@@ -113,7 +113,7 @@
             const folder = (document.getElementById('folder_input') as HTMLInputElement).value
             ipcRenderer.send('wolf_ext', {folder:folder,config:config})
         }
-        document.getElementById('runbtn2').onclick = () => {
+        document.getElementById('runbtn2')!.onclick = () => {
             if(running){
                 Swal.fire({
                     icon: 'error',
@@ -126,7 +126,7 @@
             ipcRenderer.send('wolf_apply', {folder:folder,config:config})
         }
 
-        document.getElementById('fold').onclick = () => {ipcRenderer.send("openFolder", (document.getElementById('folder_input') as HTMLInputElement).value)}
+        document.getElementById('fold')!.onclick = () => {ipcRenderer.send("openFolder", (document.getElementById('folder_input') as HTMLInputElement).value)}
 
     }
     {
@@ -141,12 +141,12 @@
                 else{
                     dom.setAttribute('btn-active', '')
                 }
-                config[da] = dom.hasAttribute('btn-active')
+                config[da!] = dom.hasAttribute('btn-active')
             })
         }
     }
 
-    ipcRenderer.on('alert', (evn, tt) => {
+    ipcRenderer.on('alert', (evn: any, tt: any) => {
         if (typeof tt === 'string') {
             Swal.fire({
                 icon: 'success',
@@ -161,12 +161,12 @@
         }
     });
 
-    ipcRenderer.on('loadingTag', (evn, tt) => {
+    ipcRenderer.on('loadingTag', (evn: any, tt: any) => {
         loadingTag = tt
     })
 
-    ipcRenderer.on('loading', (evn, tt) => {
-        document.getElementById('border_r').style.width = `${tt}vw`
+    ipcRenderer.on('loading', (evn: any, tt: any) => {
+        document.getElementById('border_r')!.style.width = `${tt}vw`
         let ds = Math.floor(new Date().getTime()/1000)
         if(tt > 0 && globalSettings.loadingText){
             if(LastTime != ds){
@@ -185,20 +185,20 @@
                     estimatedTime = `${toHHMMSS(TimeLeftSec)} 남음`
                 }
             }
-            document.getElementById('loading-text').innerText = `${loadingTag}${loadingTag ? ' · ' : ''}${Number.parseFloat(tt).toFixed(1)}% ${estimatedTime}`
-            document.getElementById('loading-text').style.visibility = 'visible'
+            document.getElementById('loading-text')!.innerText = `${loadingTag}${loadingTag ? ' · ' : ''}${Number.parseFloat(tt).toFixed(1)}% ${estimatedTime}`
+            document.getElementById('loading-text')!.style.visibility = 'visible'
         }
         else{
             speedSamples = []
             estimatedTime = ''
             LastTime = ds
             LastPercent = -1.0
-            document.getElementById('loading-text').style.visibility = 'hidden'
+            document.getElementById('loading-text')!.style.visibility = 'hidden'
             loadingTag = ''
         }
     });
 
-    ipcRenderer.on('alert2', async (evn, tt) => {
+    ipcRenderer.on('alert2', async (evn: any, tt: any) => {
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
@@ -211,7 +211,7 @@
         }
     });
 
-    document.getElementById('eztrans').onclick = async () => {
+    document.getElementById('eztrans')!.onclick = async () => {
         if(running){
             Swal.fire({
                 icon: 'error',
@@ -223,7 +223,7 @@
         ipcRenderer.send('openLLMSettings', { dir: dir, game: 'wolf' });
     }
 
-    document.getElementById('llmCompare').onclick = () => {
+    document.getElementById('llmCompare')!.onclick = () => {
         const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
         if (!dir) {
             Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' })
@@ -235,12 +235,12 @@
     // LLM translation abort button
     let llmTranslating = false;
 
-    ipcRenderer.on('llmTranslating', (ev, val) => {
+    ipcRenderer.on('llmTranslating', (ev: any, val: any) => {
         llmTranslating = val;
-        document.getElementById('abort-llm-btn').style.display = val ? 'block' : 'none';
+        document.getElementById('abort-llm-btn')!.style.display = val ? 'block' : 'none';
     })
 
-    document.getElementById('abort-llm-btn').onclick = async () => {
+    document.getElementById('abort-llm-btn')!.onclick = async () => {
         const result = await Swal.fire({
             icon: 'warning',
             text: '번역을 중단하시겠습니까?\n현재까지의 진행 상태는 저장됩니다.',
@@ -272,7 +272,7 @@
         running = false
     })
 
-    document.getElementById('settings').onclick = () => {
+    document.getElementById('settings')!.onclick = () => {
         if(running){
             Swal.fire({
                 icon: 'error',

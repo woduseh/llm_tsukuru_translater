@@ -40,7 +40,7 @@
         dirty = {};
 
         if (!fs.existsSync(extractDir) || !fs.existsSync(backupDir)) {
-            document.getElementById('summary').innerHTML =
+            document.getElementById('summary')!.innerHTML =
                 '<span class="summary-error">Extract 또는 Extract_backup 폴더가 없습니다.</span>';
             return;
         }
@@ -101,7 +101,7 @@
     }
 
     function renderSummary() {
-        const el = document.getElementById('summary');
+        const el = document.getElementById('summary')!;
         const mismatchCount = files.filter(f => f.mismatch).length;
         const untranslatedCount = files.filter(f => f.untranslated).length;
         if (files.length === 0) {
@@ -138,11 +138,11 @@
     }
 
     function renderFileList() {
-        const list = document.getElementById('file-list');
+        const list = document.getElementById('file-list')!;
         list.innerHTML = '';
         const filtered = getFilteredFiles();
 
-        document.getElementById('file-count').textContent = `${filtered.length}/${files.length}`;
+        document.getElementById('file-count')!.textContent = `${filtered.length}/${files.length}`;
 
         for (const { file, realIdx } of filtered) {
             const item = document.createElement('div');
@@ -190,8 +190,8 @@
     }
 
     function syncBlockHeights() {
-        const origContainer = document.getElementById('original-blocks');
-        const transContainer = document.getElementById('translated-blocks');
+        const origContainer = document.getElementById('original-blocks')!;
+        const transContainer = document.getElementById('translated-blocks')!;
         const origBlocks = origContainer.querySelectorAll(':scope > .block') as NodeListOf<HTMLElement>;
         const transBlocks = transContainer.querySelectorAll(':scope > .block') as NodeListOf<HTMLElement>;
         const len = Math.min(origBlocks.length, transBlocks.length);
@@ -211,8 +211,8 @@
     }
 
     function renderBlocks() {
-        const origContainer = document.getElementById('original-blocks');
-        const transContainer = document.getElementById('translated-blocks');
+        const origContainer = document.getElementById('original-blocks')!;
+        const transContainer = document.getElementById('translated-blocks')!;
         origContainer.innerHTML = '';
         transContainer.innerHTML = '';
         selectedBlocks = new Set();
@@ -294,7 +294,7 @@
                 textarea.addEventListener('input', () => {
                     dirty[f.name] = true;
                     (document.getElementById('saveBtn') as HTMLButtonElement).disabled = false;
-                    document.getElementById('save-status').textContent = '';
+                    document.getElementById('save-status')!.textContent = '';
                     const newLineCount = textarea.value.split('\n').length;
                     const countEl = transEl.querySelector('.line-count') as HTMLElement;
                     if (countEl) countEl.textContent = `${newLineCount}줄`;
@@ -359,7 +359,7 @@
 
     function updateSelectionUI() {
         const count = selectedBlocks.size;
-        const countEl = document.getElementById('selection-count');
+        const countEl = document.getElementById('selection-count')!;
         const selBtn = document.getElementById('retranslateSelBtn') as HTMLButtonElement;
         if (count > 0) {
             countEl.textContent = `${count}개 블록 선택`;
@@ -379,7 +379,7 @@
         // Collect edited blocks from textareas
         const textareas = document.querySelectorAll('#translated-blocks .block-editor') as NodeListOf<HTMLTextAreaElement>;
         for (const ta of textareas) {
-            const idx = parseInt(ta.dataset.blockIdx, 10);
+            const idx = parseInt(ta.dataset.blockIdx!, 10);
             if (idx < transBlocks.length) {
                 transBlocks[idx].lines = ta.value.split('\n');
             }
@@ -401,7 +401,7 @@
         dirty[f.name] = false;
 
         (document.getElementById('saveBtn') as HTMLButtonElement).disabled = true;
-        document.getElementById('save-status').textContent = '저장됨 ✓';
+        document.getElementById('save-status')!.textContent = '저장됨 ✓';
         renderSummary();
         renderFileList();
         renderBlocks();
@@ -413,7 +413,7 @@
     });
 
     ipcRenderer.on('retranslateProgress', (_ev: any, msg: string) => {
-        document.getElementById('save-status').textContent = `🔄 ${msg}`;
+        document.getElementById('save-status')!.textContent = `🔄 ${msg}`;
     });
 
     ipcRenderer.on('retranslateFileDone', (_ev: any, result: { success: boolean; error?: string }) => {
@@ -421,7 +421,7 @@
         btn.disabled = false;
         btn.textContent = '전체 재번역';
         if (result.success) {
-            document.getElementById('save-status').textContent = '재번역 완료 ✓';
+            document.getElementById('save-status')!.textContent = '재번역 완료 ✓';
             const f = files[currentIdx];
             const origContent = fs.readFileSync(f.origPath, 'utf-8');
             const transContent = fs.readFileSync(f.transPath, 'utf-8');
@@ -434,7 +434,7 @@
             renderFileList();
             renderBlocks();
         } else {
-            document.getElementById('save-status').textContent = `❌ ${result.error || '번역 실패'}`;
+            document.getElementById('save-status')!.textContent = `❌ ${result.error || '번역 실패'}`;
         }
     });
 
@@ -443,7 +443,7 @@
         btn.disabled = false;
         btn.textContent = '선택 블록 재번역';
         if (result.success) {
-            document.getElementById('save-status').textContent = `${selectedBlocks.size}개 블록 재번역 완료 ✓`;
+            document.getElementById('save-status')!.textContent = `${selectedBlocks.size}개 블록 재번역 완료 ✓`;
             const f = files[currentIdx];
             const origContent = fs.readFileSync(f.origPath, 'utf-8');
             const transContent = fs.readFileSync(f.transPath, 'utf-8');
@@ -456,14 +456,14 @@
             renderFileList();
             renderBlocks();
         } else {
-            document.getElementById('save-status').textContent = `❌ ${result.error || '번역 실패'}`;
+            document.getElementById('save-status')!.textContent = `❌ ${result.error || '번역 실패'}`;
         }
     });
 
     // Search & filter events
-    document.getElementById('file-search').addEventListener('input', () => renderFileList());
-    document.getElementById('filter-mismatch').addEventListener('change', () => renderFileList());
-    document.getElementById('filter-untranslated').addEventListener('change', () => renderFileList());
+    document.getElementById('file-search')!.addEventListener('input', () => renderFileList());
+    document.getElementById('filter-mismatch')!.addEventListener('change', () => renderFileList());
+    document.getElementById('filter-untranslated')!.addEventListener('change', () => renderFileList());
 
     // ── Navigation: next/prev mismatch/untranslated file ──
     function navigateToFile(direction: 1 | -1) {
@@ -481,12 +481,12 @@
         }
     }
 
-    document.getElementById('prevMismatchFileBtn').onclick = () => navigateToFile(-1);
-    document.getElementById('nextMismatchFileBtn').onclick = () => navigateToFile(1);
+    document.getElementById('prevMismatchFileBtn')!.onclick = () => navigateToFile(-1);
+    document.getElementById('nextMismatchFileBtn')!.onclick = () => navigateToFile(1);
 
     // ── Navigation: next/prev mismatch block within current file ──
     function navigateToBlock(direction: 1 | -1) {
-        const origContainer = document.getElementById('original-blocks');
+        const origContainer = document.getElementById('original-blocks')!;
         const blocks = origContainer.querySelectorAll('.block') as NodeListOf<HTMLElement>;
         if (blocks.length === 0) return;
 
@@ -530,7 +530,7 @@
             origContainer.scrollTo({ top: centered, behavior: 'smooth' });
 
             // Also scroll translated side in sync
-            const transContainer = document.getElementById('translated-blocks');
+            const transContainer = document.getElementById('translated-blocks')!;
             const transBlocks = transContainer.querySelectorAll('.block') as NodeListOf<HTMLElement>;
             if (transBlocks[target]) {
                 const tTop = transBlocks[target].offsetTop - transContainer.offsetTop;
@@ -544,33 +544,33 @@
         }
     }
 
-    document.getElementById('prevMismatchBlockBtn').onclick = () => navigateToBlock(-1);
-    document.getElementById('nextMismatchBlockBtn').onclick = () => navigateToBlock(1);
+    document.getElementById('prevMismatchBlockBtn')!.onclick = () => navigateToBlock(-1);
+    document.getElementById('nextMismatchBlockBtn')!.onclick = () => navigateToBlock(1);
 
-    document.getElementById('saveBtn').onclick = () => saveCurrentFile();
+    document.getElementById('saveBtn')!.onclick = () => saveCurrentFile();
 
-    document.getElementById('retranslateBtn').onclick = () => {
+    document.getElementById('retranslateBtn')!.onclick = () => {
         if (files.length === 0 || !dataDir) return;
         const f = files[currentIdx];
         const btn = document.getElementById('retranslateBtn') as HTMLButtonElement;
         btn.disabled = true;
         btn.textContent = '번역 중...';
-        document.getElementById('save-status').textContent = '🔄 준비 중...';
+        document.getElementById('save-status')!.textContent = '🔄 준비 중...';
         ipcRenderer.send('retranslateFile', { dir: dataDir, fileName: f.name });
     };
 
-    document.getElementById('retranslateSelBtn').onclick = () => {
+    document.getElementById('retranslateSelBtn')!.onclick = () => {
         if (files.length === 0 || !dataDir || selectedBlocks.size === 0) return;
         const f = files[currentIdx];
         const btn = document.getElementById('retranslateSelBtn') as HTMLButtonElement;
         btn.disabled = true;
         btn.textContent = '번역 중...';
-        document.getElementById('save-status').textContent = '🔄 준비 중...';
+        document.getElementById('save-status')!.textContent = '🔄 준비 중...';
         const indices = Array.from(selectedBlocks).sort((a, b) => a - b);
         ipcRenderer.send('retranslateBlocks', { dir: dataDir, fileName: f.name, blockIndices: indices });
     };
 
-    document.getElementById('closeBtn').onclick = () => {
+    document.getElementById('closeBtn')!.onclick = () => {
         window.close();
     };
 

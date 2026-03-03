@@ -68,7 +68,7 @@ function writeTranslationLog(edir: string, log: TranslationLog) {
     return logFile;
 }
 
-export const trans = async (ev, arg) => {
+export const trans = async (ev: any, arg: any) => {
     globalThis.mwindow.webContents.send('llmTranslating', true);
     try {
         const dir = Buffer.from(arg.dir, "base64").toString('utf8');

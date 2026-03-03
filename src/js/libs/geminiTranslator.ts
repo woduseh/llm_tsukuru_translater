@@ -286,13 +286,14 @@ export class GeminiTranslator {
         const allValidations: BlockValidation[] = [];
         const allTranslatedBlocks: { separator: string; lines: string[] }[] = [];
 
-        const logData: Partial<TranslationLogEntry> = {
+        const logData = {
             totalBlocks: allBlocks.length,
             translatedBlocks: 0,
             skippedBlocks: 0,
             errorBlocks: 0,
             retries: 0,
-            errors: []
+            errors: [] as string[],
+            durationMs: 0
         };
 
         const chunks: { separator: string; lines: string[] }[][] = [];

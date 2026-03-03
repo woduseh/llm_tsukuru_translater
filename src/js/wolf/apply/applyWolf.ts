@@ -1,11 +1,9 @@
 import fs from 'fs'
 import path from 'path'
 import { sleep } from '../../rpgmv/globalutils'
+import Tools from '../../libs/projectTools'
 import WolfExtDataParser from '../extract/wolfExtData'
 
-function setProgressBar(now:number, max:number, multipl=100){
-    globalThis.mwindow.webContents.send('loading', (now/max) * multipl);
-}
 export async function wolfAppyier() {
     let totalOffset:{[key:string]:number} = {}
     let sourceDic:{[key:string]:Buffer} = {}
@@ -13,7 +11,7 @@ export async function wolfAppyier() {
     const extTextDir = path.join(globalThis.sourceDir, '_Extract')
     WolfExtDataParser.read(path.join(extTextDir, '.extracteddata'))
     for(let i=0;i<globalThis.WolfExtData.length;i++){
-        setProgressBar(i, globalThis.WolfExtData.length)
+        Tools.setProgress(i, globalThis.WolfExtData.length)
         const dat = (globalThis.WolfExtData[i])
         if(!Object.keys(extractedTextDic).includes(dat.extractFile)){
             extractedTextDic[dat.extractFile] = fs.readFileSync(path.join(extTextDir, 'Texts',`${dat.extractFile}.txt`),'utf-8').split('\n')
@@ -54,5 +52,5 @@ export async function wolfAppyier() {
     for(const key in sourceDic){
         fs.writeFileSync(key,sourceDic[key])
     }
-    setProgressBar(0,1)
+    Tools.setProgress(0,1)
 }

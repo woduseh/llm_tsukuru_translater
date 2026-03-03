@@ -9,7 +9,7 @@ let eventID = 0
 let hadComment = false
 let hadMemoComment = false
 
-function addtodic(pa, obj, usePath='', conf = undefined, spliter=false){
+function addtodic(pa: any, obj: any, usePath='', conf: any = undefined, spliter=false){
     const Path = pa
     if(pa === '%comment%'){
         const id = `comment_${(Object.keys(obj.main)).length}`
@@ -44,11 +44,11 @@ function addtodic(pa, obj, usePath='', conf = undefined, spliter=false){
     return obj
 }
 
-function addtodicSpliter(pa, obj, usePath='', conf = undefined){
+function addtodicSpliter(pa: any, obj: any, usePath='', conf: any = undefined){
     return addtodic(pa, obj, usePath, conf, true)
 }
 
-function addComment(obj, comment:string, usePath='', force:'force'|'nonforce'= 'nonforce'){
+function addComment(obj: any, comment:string, usePath='', force:'force'|'nonforce'= 'nonforce'){
     if(force === 'force'){
         hadComment = false
     }
@@ -59,7 +59,7 @@ function addComment(obj, comment:string, usePath='', force:'force'|'nonforce'= '
     return obj
 }
 
-const addto = (key, val,temppp) => { 
+const addto = (key: any, val: any, temppp: any) => { 
     let Keys = key.split('.');
     const fkey = Keys[0]
     if(temppp === undefined){
@@ -78,7 +78,7 @@ const addto = (key, val,temppp) => {
     return temppp
 }
 
-const returnVal = (key, temppp) => { 
+const returnVal = (key: any, temppp: any) => { 
     let Keys = key.split('.');
     const fkey = Keys[0]
     if(temppp === undefined){
@@ -98,17 +98,17 @@ const returnVal = (key, temppp) => {
 
 export const setObj = addto
 
-function obNullSafe(c){
+function obNullSafe(c: any){
     return (typeof c === 'object' && c !== undefined && c !== null)
 }
 
-function strNullSafe(d){
+function strNullSafe(d: any){
     return (typeof d === 'string' && d !== undefined && d !== null)
 }
 
-export const init_extract = (arg) => {
+export const init_extract = (arg: any) => {
     hadComment = false
-    function c(fileName){
+    function c(fileName: any){
         globalThis.gb[fileName] = {data: {}}
         globalThis.gb[fileName].outputText = ''
         globalThis.gb[fileName].isbom = false 
@@ -128,7 +128,7 @@ export const init_extract = (arg) => {
     }
 }
 
-function Extreturnit(dat_obj, Path='', nas=null){
+function Extreturnit(dat_obj: any, Path='', nas: any=null){
     if(typeof(nas) === 'object' && nas !== null){
         const keys = Object.keys(nas)
         for(let i=0;i<keys.length;i++){
@@ -147,12 +147,12 @@ function Extreturnit(dat_obj, Path='', nas=null){
 }
 
 
-export const parse_externMsg = (dir, useI) => {
+export const parse_externMsg = (dir: any, useI: any) => {
     return new Promise((resolve, reject) => {
-        let a = {}
+        let a: Record<string, any> = {}
         csv.parseFile(dir, {encoding: "binary"})
         .on('data', (row) => {
-            function Convert(txt){
+            function Convert(txt: any){
                 if(txt === undefined || txt === null){
                     return ''
                 }
@@ -173,7 +173,7 @@ export const parse_externMsg = (dir, useI) => {
     })
 }
 
-export const pack_externMsg = (dir:string, data) => {
+export const pack_externMsg = (dir:string, data: any) => {
     return new Promise<void>((resolve, reject) => {
         let rows = []
         for(const i in data){
@@ -185,7 +185,7 @@ export const pack_externMsg = (dir:string, data) => {
     })
 }
 
-export const extract = async (filedata, conf, ftype) => {
+export const extract = async (filedata: any, conf: any, ftype: any) => {
     const extended = conf.extended
     const fileName = conf.fileName
     const dir = conf.dir
@@ -398,7 +398,7 @@ export const extract = async (filedata, conf, ftype) => {
     }
 }
 
-function isIncludeAble(sc){
+function isIncludeAble(sc: any){
     const ess = globalThis.settings.extractSomeScript2
     let able = false
     if(sc === null || sc === undefined){
@@ -416,7 +416,7 @@ function isIncludeAble(sc){
     return able
 }
 
-function forEvent(d, dat_obj, conf, Path){
+function forEvent(d: any, dat_obj: any, conf: any, Path: any){
     const extended = conf.extended
     const fileName = conf.fileName
     const dir = conf.dir
@@ -451,7 +451,7 @@ function forEvent(d, dat_obj, conf, Path){
                 }
                 acceptable.concat(globalThis.settings.extractPlus)
                 eventID += 1
-                function checker(dat_obj, da, ca){
+                function checker(dat_obj: any, da: any, ca: any){
                     if(typeof da === 'object'){
                         for(let i3 in da){
                             dat_obj = checker(dat_obj, da[i3], ca + `.${i3}`)
@@ -485,7 +485,7 @@ function forEvent(d, dat_obj, conf, Path){
                                 messageHasFace = (d.list[i].parameters[0] !== '')
                                 break
                         }   
-                    } catch (error) {}
+                    } catch (error) { /* non-critical: event metadata parse can fail silently */ }
                 }
             }
         }
@@ -493,13 +493,13 @@ function forEvent(d, dat_obj, conf, Path){
     return dat_obj
 }
 
-function jpathIsMap(jpath){
+function jpathIsMap(jpath: any){
     const name = path.parse(jpath).name
     return (name.length === 6 && name.substring(0,3) === 'Map' && !isNaN(Number(name.substring(3))))
 }
 
 
-export const format_extracted = async(dats, typ = 0) => {
+export const format_extracted = async(dats: any, typ = 0) => {
     const datobj = dats.datobj
     const conf = dats.conf
     const extended = conf.extended
@@ -507,9 +507,9 @@ export const format_extracted = async(dats, typ = 0) => {
     const dir = conf.dir
     if(typ == 0){
         const Keys = Object.keys(datobj)
-        let LenMemory = {}
-        let LenKeys = []
-        let usedEid = []
+        let LenMemory: Record<string, any> = {}
+        let LenKeys: any[] = []
+        let usedEid: any[] = []
         globalThis.gb[fileName].outputText = ''
         for(const d of Keys){
             let jpath = fileName

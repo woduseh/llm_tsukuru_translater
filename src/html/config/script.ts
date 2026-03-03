@@ -14,7 +14,7 @@ const CheckboxValues = [
   'formatNice'
 ]
 
-ipcRenderer.on("settings", (evt, arg) => {
+ipcRenderer.on("settings", (evt: any, arg: any) => {
   try{
     gsettings = arg
     const ess2 = arg.extractSomeScript2
@@ -42,7 +42,7 @@ ipcRenderer.on("settings", (evt, arg) => {
     (document.getElementById('llmCustomPrompt') as HTMLTextAreaElement).value = gsettings.llmCustomPrompt || '';
     updateChunkSizeVisibility()
 
-    document.getElementById('license').onclick = () => {ipcRenderer.send('license')}
+    document.getElementById('license')!.onclick = () => {ipcRenderer.send('license')}
     _reload()
   }
   catch(e){
@@ -52,10 +52,10 @@ ipcRenderer.on("settings", (evt, arg) => {
 
 function _reload(){
   if(gsettings.extractSomeScript){
-    document.getElementById('extractSomeScript2').className = ''
+    document.getElementById('extractSomeScript2')!.className = ''
   }
   else{
-    document.getElementById('extractSomeScript2').className = 'invisible'
+    document.getElementById('extractSomeScript2')!.className = 'invisible'
   }
 }
 
@@ -64,14 +64,14 @@ function updateChunkSizeVisibility(){
   (document.getElementById('chunkSizeGroup') as HTMLElement).style.display = unit === 'file' ? 'none' : '';
 }
 
-document.getElementById('llmTranslationUnit').addEventListener('change', updateChunkSizeVisibility)
+document.getElementById('llmTranslationUnit')!.addEventListener('change', updateChunkSizeVisibility)
 
-document.getElementById('extractSomeScript').addEventListener('change', (event) => {
+document.getElementById('extractSomeScript')!.addEventListener('change', (event) => {
   gsettings.extractSomeScript = (document.getElementById('extractSomeScript') as HTMLInputElement).checked
   _reload()
 })
 
-document.getElementById('apply').onclick = () => {
+document.getElementById('apply')!.onclick = () => {
   CheckboxValues.forEach((val) => {
     gsettings[val] = (document.getElementById(val) as HTMLInputElement).checked
   })
@@ -103,6 +103,6 @@ document.getElementById('apply').onclick = () => {
   ipcRenderer.send('applysettings', gsettings);
 }
 
-document.getElementById('close').onclick = () => {
+document.getElementById('close')!.onclick = () => {
   ipcRenderer.send('closesettings', gsettings);
 }

@@ -2,11 +2,12 @@ import fs from 'fs'
 import path from 'path'
 import { decodeEncoding } from '../../../utils'
 import { sleep } from '../../rpgmv/globalutils';
+import Tools from '../../libs/projectTools';
 import WolfExtDataParser from './wolfExtData'
 
 
 function setProgressBar(now:number, max:number, multipl=50){
-    globalThis.mwindow.webContents.send('loading', 50 + ((now/max) * multipl));
+    Tools.send('loading', 50 + ((now/max) * multipl));
 }
 
 export default async function makeText(){

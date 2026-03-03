@@ -2,12 +2,9 @@ import { exec } from "child_process";
 import { removeSync } from "fs-extra";
 import path from "path";
 import { checkExtention, ExtentionPath } from "../../libs/extentions";
+import Tools from '../../libs/projectTools';
 
 const Decrypter = path.join(ExtentionPath, 'wolfdec.exe')
-
-function setProgressBar(now:number, max:number, multipl=100){
-    globalThis.mwindow.webContents.send('loading', (now/max) * multipl);
-}
 
 function DecryptFile(file:string) {
     return new Promise<void>((resolve) => {
@@ -25,7 +22,7 @@ export async function wolfDecrypt(files:string[]) {
         globalThis.mwindow.webContents.send('loadingTag', `복호화 중`);
         let i=0;
         for(const file of files){
-            setProgressBar(i, files.length)
+            Tools.setProgress(i, files.length)
             await DecryptFile(file)
             i+=1
         }

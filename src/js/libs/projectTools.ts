@@ -44,6 +44,9 @@ const Tools = {
     sendError: (txt: string) => {pTools.sendError(txt)},
     sendAlert: (txt: string) => {pTools.sendAlert(txt)},
     worked: () => {pTools.worked()},
+    setProgress: (now: number, max: number, multiplier: number = 100) => {
+        pTools.send('loading', (now / max) * multiplier);
+    },
     init: INIT,
     rmBom: (txt:string) => {
         if (txt.charCodeAt(0) === 0xFEFF) {

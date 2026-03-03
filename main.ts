@@ -21,7 +21,7 @@ import { wolfInit } from './src/js/wolf/main.js';
 import { initFontIPC } from './src/js/rpgmv/fonts';
 import { initExtentions } from './src/js/libs/extentions';
 
-const ErrorAlert = (msg) => sendError(msg)
+const ErrorAlert = (msg: any) => sendError(msg)
 
 
 export function worked(){
@@ -79,7 +79,7 @@ function createWindow() {
   mainWindow.webContents.on('did-finish-load', function () {
     mainWindow.show();
     getMainWindow().webContents.send('is_version', app.getVersion());
-    globalThis.settings.themeData = Themes[globalThis.settings.theme]
+    globalThis.settings.themeData = (Themes as Record<string, any>)[globalThis.settings.theme]
     getMainWindow().webContents.send('getGlobalSettings', globalThis.settings);
     if(!tools.packed){
       globalShortcut.register('Control+Shift+I', () => {
@@ -97,16 +97,16 @@ function createWindow() {
   // Open the DevTools.
 }
 
-const getMainWindow = () => {
+const getMainWindow = (): BrowserWindow => {
   const ID = mainid * 1;
-  return BrowserWindow.fromId(ID)
+  return BrowserWindow.fromId(ID)!;
 }
 
-function sendAlert(txt){
+function sendAlert(txt: string){
   getMainWindow().webContents.send('alert', txt);
 }
 
-function sendError(txt){
+function sendError(txt: string){
   getMainWindow().webContents.send('alert', {icon: 'error',  message: txt});
 }
 
@@ -208,7 +208,7 @@ ipcMain.on('applysettings', async (ev, arg) => {
   globalThis.settings = {...globalThis.settings, ...arg}
   storage.set('settings', JSON.stringify(globalThis.settings))
   globalThis.settingsWindow.close()
-  globalThis.settings.themeData = Themes[globalThis.settings.theme]
+  globalThis.settings.themeData = (Themes as Record<string, any>)[globalThis.settings.theme]
   getMainWindow().webContents.send('getGlobalSettings', globalThis.settings);
   worked()
 })
@@ -252,7 +252,7 @@ ipcMain.on('select_folder', async (ev, typeo) => {
   }
 });
 
-async function extractor(arg){
+async function extractor(arg: any){
   try {
     globalThis.gb = {}
     let file
@@ -304,7 +304,7 @@ async function extractor(arg){
     globalThis.externMsg = {}
     globalThis.useExternMsg = false
     if(fs.existsSync(dir + '/ExternMessage.csv') && arg.exJson && globalThis.settings.ExternMsgJson){
-      const Emsg = await ExtTool.parse_externMsg(dir + '/ExternMessage.csv', !globalThis.settings.ExternMsgJson)
+      const Emsg = await ExtTool.parse_externMsg(dir + '/ExternMessage.csv', !globalThis.settings.ExternMsgJson) as any
       globalThis.externMsg = Emsg
       if(globalThis.settings.ExternMsgJson){
         fs.writeFileSync(dir + '/ExternMsgcsv.json', JSON.stringify(Emsg, null, 4), 'utf-8')
@@ -358,7 +358,7 @@ async function extractor(arg){
       let runBackup = async () => {
         try {
           fs.copyFileSync(dir + '/' + fileName, dir + '/Backup/' + fileName) 
-        } catch (error) {}
+        } catch (error) { console.error('Backup failed for', fileName, error) }
       }
       runBackup()
       if (checkIsMapFile(fileName)){
@@ -367,7 +367,7 @@ async function extractor(arg){
       }
       else if (Object.keys(onebyone).includes(fileName)){
         file = fs.readFileSync(dir + '/' + fileName, 'utf8')
-        await ExtTool.format_extracted(await ExtTool.extract(file, conf, onebyone[fileName]))
+        await ExtTool.format_extracted(await ExtTool.extract(file, conf, (onebyone as Record<string, string>)[fileName]))
       }
       else if (arg.exJson){
         if(!dataBaseO.ignores.includes(fileName)){
@@ -446,7 +446,7 @@ function setOPath(){
 ipcMain.on('eztrans', eztrans.trans)
 
 // LLM Settings Window
-let llmSettingsWindow: Electron.BrowserWindow = null;
+let llmSettingsWindow: Electron.BrowserWindow | null = null;
 let llmPendingArg: any = null;
 
 ipcMain.on('openLLMSettings', (ev, arg) => {
@@ -470,8 +470,8 @@ ipcMain.on('openLLMSettings', (ev, arg) => {
   llmSettingsWindow.setMenu(null);
   llmSettingsWindow.loadFile('src/html/llm/index.html');
   llmSettingsWindow.webContents.on('did-finish-load', () => {
-    llmSettingsWindow.show();
-    llmSettingsWindow.webContents.send('llmSettings', globalThis.settings);
+    llmSettingsWindow!.show();
+    llmSettingsWindow!.webContents.send('llmSettings', globalThis.settings);
   });
   llmSettingsWindow.on('closed', () => {
     llmSettingsWindow = null;
@@ -516,7 +516,7 @@ ipcMain.on('llmSettingsClose', () => {
 })
 
 // LLM Compare Viewer
-let llmCompareWindow: Electron.BrowserWindow = null;
+let llmCompareWindow: Electron.BrowserWindow | null = null;
 
 ipcMain.on('openLLMCompare', (ev, dir: string) => {
   if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
@@ -539,8 +539,8 @@ ipcMain.on('openLLMCompare', (ev, dir: string) => {
   llmCompareWindow.setMenu(null);
   llmCompareWindow.loadFile('src/html/llm-compare/index.html');
   llmCompareWindow.webContents.on('did-finish-load', () => {
-    llmCompareWindow.show();
-    llmCompareWindow.webContents.send('initCompare', dir);
+    llmCompareWindow!.show();
+    llmCompareWindow!.webContents.send('initCompare', dir);
   });
   llmCompareWindow.on('closed', () => {
     llmCompareWindow = null;
@@ -554,7 +554,7 @@ ipcMain.on('llmCompareClose', () => {
 })
 
 // JSON Structure Verify Window
-let jsonVerifyWindow: Electron.BrowserWindow = null;
+let jsonVerifyWindow: Electron.BrowserWindow | null = null;
 
 ipcMain.on('openJsonVerify', (ev, dir: string) => {
   if (jsonVerifyWindow && !jsonVerifyWindow.isDestroyed()) {
@@ -577,9 +577,9 @@ ipcMain.on('openJsonVerify', (ev, dir: string) => {
   jsonVerifyWindow.setMenu(null);
   jsonVerifyWindow.loadFile('src/html/json-verify/index.html');
   jsonVerifyWindow.webContents.on('did-finish-load', () => {
-    jsonVerifyWindow.show();
-    jsonVerifyWindow.webContents.send('verifySettings', globalThis.settings);
-    jsonVerifyWindow.webContents.send('initVerify', dir);
+    jsonVerifyWindow!.show();
+    jsonVerifyWindow!.webContents.send('verifySettings', globalThis.settings);
+    jsonVerifyWindow!.webContents.send('initVerify', dir);
   });
   jsonVerifyWindow.on('closed', () => {
     jsonVerifyWindow = null;
@@ -689,7 +689,7 @@ ipcMain.on('updateVersion', async (ev, arg) => {
     for(let i in (fileList1)){
       const parsed = path.parse(fileList1[i])
       const file = parsed.name.concat(parsed.ext)
-      let TransDict = {}
+      let TransDict: Record<string, string> = {}
       const dat1 = fs.readFileSync(path.join(OldDir, file), 'utf-8').split('\n')
       if(!((fs.existsSync(path.join(TranslatedDir, file))))){
         ErrorAlert('구버전의 번역본 파일과 미번역본 파일이 서로 통하지 않습니다. ')
@@ -699,7 +699,7 @@ ipcMain.on('updateVersion', async (ev, arg) => {
       const dat0 = fs.readFileSync(path.join(TranslatedDir, file), 'utf-8').split('\n')
       let dat2 = fs.readFileSync(path.join(NewDir, file), 'utf-8')
       let dat2_dat = dat2.split('\n')
-      function UpReplacer(data, source, to, all=false){
+      function UpReplacer(data: any, source: any, to: any, all=false){
         for(let i =0;i<data.length;i++){
           if(data[i] === source){
             data[i] = to;
@@ -715,7 +715,7 @@ ipcMain.on('updateVersion', async (ev, arg) => {
         dat2_dat = UpReplacer(dat2_dat, dat1[i2], dat0[i2], false)
       }
       for(let i2 in TransDict){
-        dat2_dat = UpReplacer(dat2_dat, dat1[i2], dat0[i2], true)
+        dat2_dat = UpReplacer(dat2_dat, (dat1 as any)[i2], (dat0 as any)[i2], true)
       }
       dat2 = dat2_dat.join('\n')
       fs.writeFileSync(path.join(NewDir, file), dat2, 'utf-8')
