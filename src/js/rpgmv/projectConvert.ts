@@ -139,5 +139,6 @@ export async function ConvertProject(dir:string){
         clearTemp()
     } catch (err) {
         tools.sendError(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+        tools.worked()
     }
 }

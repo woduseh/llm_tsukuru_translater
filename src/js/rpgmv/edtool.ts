@@ -7,10 +7,11 @@ export function read(dir: string){
     const readF = fs.readFileSync(dir + '/.extracteddata')
     let data:any
     data = JSON.parse(iconv.decode(zlib.inflateSync(readF), 'utf8'))
-    if(data.main === undefined){
-        while(data.main === undefined){
-            data = data.dat
+    while(data.main === undefined){
+        if(data.dat === undefined){
+            throw new Error('Invalid .extracteddata: missing "main" property')
         }
+        data = data.dat
     }
     return data
 }
