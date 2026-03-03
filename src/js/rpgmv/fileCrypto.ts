@@ -7,17 +7,14 @@ import yaml from 'js-yaml';
 import fsx from 'fs-extra'
 import { sleep } from './globalutils';
 import Tools from '../libs/projectTools';
+import { readTextFile } from '../libs/fileIO';
 
 function reader(dir:string){
     if(fs.existsSync(dir+'.yaml')){
-        let data = fs.readFileSync(dir+'.yaml', "utf-8")
+        const data = readTextFile(dir+'.yaml');
         return yaml.load(data)
     }
-    let data = fs.readFileSync(dir, "utf-8")
-    if (data.charCodeAt(0) === 0xFEFF) {
-        data = data.substring(1);
-    }
-    return JSON.parse(data)
+    return JSON.parse(readTextFile(dir))
 }
 
 function getFilesRecursively(directory:string, dita:null|string = null):string[] {

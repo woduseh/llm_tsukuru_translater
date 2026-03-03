@@ -1,6 +1,7 @@
 import path from 'path'
 import fs from 'fs'
 import iconv from 'iconv-lite'
+export { rmBom } from './js/libs/fileIO'
 
 export function decodeEncoding(buffer:Uint8Array){
     if(globalThis.WolfMetadata.ver === 2){
@@ -37,11 +38,4 @@ export function getAllFileInDir(Directory:string, ext:null|string = null) {
 
     ThroughDirectory(Directory);
     return Files
-}
-
-export function rmBom(text: string): string {
-    if (text.charCodeAt(0) === 0xFEFF) {
-        return text.substring(1);
-    }
-    return text;
 }

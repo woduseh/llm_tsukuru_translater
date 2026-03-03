@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { JSDOM } from "jsdom";
 import Tools from '../libs/projectTools';
+import { readTextFile } from '../libs/fileIO';
 
 export function initFontIPC(){
   ipcMain.on('selFont', async (ev, dir) => {
@@ -55,7 +56,7 @@ ipcMain.on('changeFontSize', async (ev, arg) => {
         return
     }
     const windowJSpath = path.join(path.dirname(dir), 'js', 'rpg_windows.js')
-    let f = fs.readFileSync(windowJSpath, 'utf-8')
+    let f = readTextFile(windowJSpath)
     const a = `Window_Base.prototype.standardFontSize = function() {return ${num}}`
     if ((/Window_Base.prototype.standardFontSize = function\(\) {return [0-9]+}/).test(f)){
       f = f.replace(/Window_Base.prototype.standardFontSize = function\(\) {return [0-9]+}/, a)
