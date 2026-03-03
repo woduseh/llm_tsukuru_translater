@@ -2,7 +2,7 @@
   "name": "gemini-tsukuru-extractor",
   "version": "3.0.0",
   "description": "Tsukuru Extractor",
-  "main": "main.js",
+  "main": "dist-main/main.js",
   "scripts": {
     "codepage": "chcp 65001",
     "start2": "electron . start",
@@ -10,10 +10,10 @@
     "dev:renderer": "vite --config vite.renderer.config.ts",
     "dev:electron": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron . start",
     "dev": "npm-run-all --parallel dev:renderer dev:electron",
-    "build:ts": "tsc",
+    "build:ts": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build --config vite.renderer.config.ts",
-    "prebuild": "npm run build:renderer && tsc",
-    "prestart": "npm run build:renderer && tsc",
+    "prebuild": "npm run build:renderer && npm run build:ts",
+    "prestart": "npm run build:renderer && npm run build:ts",
     "build": "electron-builder --windows portable nsis:x64",
     "build2": "electron-builder --windows portable",
     "lint": "eslint \"src/**/*.ts\" \"main.ts\"",
@@ -22,7 +22,7 @@
     "test:watch": "vitest"
   },
   "author": "Jackdu",
-  "license": "MIT",
+  "license": "GPL-3.0",
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",
     "@types/aes-js": "^3.1.4",
@@ -67,14 +67,15 @@
     "appId": "net.electron.MVExtractor",
     "asar": true,
     "files": [
-      "**/*",
+      "dist-main/**",
       "dist-renderer/**",
-      "!test/*",
-      "!dist/*",
-      "!addon/*",
+      "res/**",
+      "package.json",
       "!**/*.ts",
       "!**/*.d.ts",
-      "!src/renderer/**"
+      "!**/*.ts.map",
+      "!test/**",
+      "!src/**"
     ],
     "extraResources": [],
     "protocols": {

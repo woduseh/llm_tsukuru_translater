@@ -3,7 +3,7 @@ import fsa from 'fs-extra'
 import {app, dialog} from 'electron'
 import path from 'path'
 import tools from '../libs/projectTools'
-import { getMainWindow } from '../../ipc/shared'
+import { AppContext } from '../../appContext'
 import fg from 'fast-glob'
 import * as rpgencrypt from '../libs/rpgencrypt'
 import { readTextFile, readJsonFile } from '../libs/fileIO'
@@ -14,7 +14,7 @@ async function clearTemp() {
 }
 
 
-export async function ConvertProject(dir:string){
+export async function ConvertProject(dir:string, ctx: AppContext){
     try {
         if(!fs.existsSync(dir)){
             tools.sendError("경로가 올바르지 않습니다")
@@ -30,7 +30,7 @@ export async function ConvertProject(dir:string){
             }
         }
     
-        const fd = await dialog.showOpenDialog(getMainWindow()!, {
+        const fd = await dialog.showOpenDialog(ctx.mainWindow!, {
             title: "프로젝트 저장 위치 선택",
             properties: ['openDirectory']
         })

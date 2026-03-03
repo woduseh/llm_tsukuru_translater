@@ -1,4 +1,12 @@
 import { lenStr } from "../../../../globals"
+import {
+    EVENT_START_MARKER, EVENT_SENTINEL, EVENT_END_MARKER,
+    PAGE_START_MARKER, PAGE_END_MARKER,
+    COMMON_EVENT_START, COMMON_EVENT_MAGIC, MAX_STRUCTURE_BYTES,
+    COMMON_EVENT_SECTION_A, COMMON_EVENT_SECTION_B,
+    COMMON_EVENT_SECTION_C, COMMON_EVENT_SECTION_D,
+    CPO_VAR_NAMES_COUNT
+} from './constants'
 
 export class WolfParserIo{
     data:Buffer
@@ -23,12 +31,13 @@ export class WolfParserIo{
     }
     findByteArray(equals:number[]){
         const byt =  new Uint8Array(equals)
-        while(true){
+        while(this.pointer + byt.length <= this.byteLen){
             if(this.byteCompare(byt)){
                 return this.pointer
             }
             this.pointer += 1
         }
+        throw new Error('Pattern not found in buffer')
     }
     readU4le(){
         const bytes = 4
@@ -62,11 +71,11 @@ export class WolfParserIo{
     }
     readMapEvent():WolfMapEvent{
         const check1 = this.readU1();
-        if (!(check1 === 111)) {
+        if (!(check1 === EVENT_START_MARKER)) {
           throw new Error('ValidationNotEqualError')
         }
         const check2 = this.readU4le();
-        if (!(check2 === 12345)) {
+        if (!(check2 === EVENT_SENTINEL)) {
           throw new Error('ValidationNotEqualError')
         }
         const eventId = this.readU4le();
@@ -81,7 +90,7 @@ export class WolfParserIo{
           pages.push(this.readEventPage());
         }
         const check3 = this.readU1();
-        if (!(check3 == 112)) {
+        if (!(check3 == EVENT_END_MARKER)) {
           throw new Error('ValidationNotEqualError')
         }
         return {
@@ -171,7 +180,7 @@ export class WolfParserIo{
 
     readEventPage():WolfPage{
         const check = this.readU1();
-        if (!(check === 121)) {
+        if (!(check === PAGE_START_MARKER)) {
           throw new Error('ValidationNotEqualError')
         }
         const graphic = this.readEventGraphic()
@@ -185,7 +194,7 @@ export class WolfParserIo{
         const unkLen = this.readU4le();
         const unk = this.readBytes(unkLen);
         const check2 = this.readU1();
-        if (!(check2 === 122)) {
+        if (!(check2 === PAGE_END_MARKER)) {
           throw new Error('ValidationNotEqualError')
         }
         return {
@@ -228,13 +237,13 @@ export class WolfParserIo{
 
     readCEvent(){
         const checka = this.readU1();
-        if (!(checka === 142)) {
+        if (!(checka === COMMON_EVENT_START)) {
           throw new Error(`ValidationNotEqualError ${checka} 1 `)
         }
         const id = this.readU4le();
         const runCond = this.readU1();
         const c = this.readU4le();
-        if (!(c === 2000000)) {
+        if (!(c === COMMON_EVENT_MAGIC)) {
             return false
             // throw `ValidationNotEqualError ${c} 2 `
         }
@@ -265,9 +274,9 @@ export class WolfParserIo{
           const note = this.readLenStr();
         }
         const check = this.readU1();
-        if (!( ((check === 142) || (check === 143) || (check === 144)) )) {
+        if (!( ((check === COMMON_EVENT_START) || (check === COMMON_EVENT_SECTION_A) || (check === COMMON_EVENT_SECTION_B)) )) {
         }
-        if (check !== 142) {
+        if (check !== COMMON_EVENT_START) {
           const hmm = this.readHmm()
         }
         return {events: ins}
@@ -296,7 +305,7 @@ export class WolfParserIo{
         }
         if (l4 >= 1) {
           const l6 = this.readU4le();
-          if (l6 <= 65536) {
+          if (l6 <= MAX_STRUCTURE_BYTES) {
             const l7 = this.readKuku()
           }
         }
@@ -339,10 +348,10 @@ export class WolfParserIo{
         argDefault.push(this.readU4le());
       }
       const check = this.readU1();
-      if (!( ((check == 143) || (check == 144)) )) {
+      if (!( ((check == COMMON_EVENT_SECTION_A) || (check == COMMON_EVENT_SECTION_B)) )) {
         throw new Error('ValidationNotAnyOfError')
       }
-      if (check === 144) {
+      if (check === COMMON_EVENT_SECTION_B) {
         const po = this.readCpo()
       }
     }
@@ -367,14 +376,14 @@ export class WolfParserIo{
     readCpo(){
       const color = this.readU4le();
       let varNames:lenStr[] = [];
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < CPO_VAR_NAMES_COUNT; i++) {
         varNames.push(this.readLenStr());
       }
       const check = this.readU1();
-      if (!( ((check == 144) || (check == 145)) )) {
-        throw new Error(`ValidationNotAnyOfError ${check} [144|145]`)
+      if (!( ((check == COMMON_EVENT_SECTION_B) || (check == COMMON_EVENT_SECTION_C)) )) {
+        throw new Error(`ValidationNotAnyOfError ${check} [${COMMON_EVENT_SECTION_B}|${COMMON_EVENT_SECTION_C}]`)
       }
-      if (check == 145) {
+      if (check == COMMON_EVENT_SECTION_C) {
         const wm = this.readWm()
       }
     }
@@ -382,10 +391,10 @@ export class WolfParserIo{
     readWm(){
       const a = this.readLenStr()
       const check = this.readU1();
-      if (!( ((check == 145) || (check == 146)) )) {
-        throw new Error(`ValidationNotAnyOfError ${check} [145|146]`)
+      if (!( ((check == COMMON_EVENT_SECTION_C) || (check == COMMON_EVENT_SECTION_D)) )) {
+        throw new Error(`ValidationNotAnyOfError ${check} [${COMMON_EVENT_SECTION_C}|${COMMON_EVENT_SECTION_D}]`)
       }
-      if (check == 146) {
+      if (check == COMMON_EVENT_SECTION_D) {
         const returner = this.readWmReturn()
       }
     }
@@ -394,8 +403,8 @@ export class WolfParserIo{
       const name =this.readLenStr()
       const valueId = this.readU4le();
       const check = this.readU1();
-      if (!(check == 146)) {
-        throw new Error(`ValidationNotEqualError ${check} [146]`)
+      if (!(check == COMMON_EVENT_SECTION_D)) {
+        throw new Error(`ValidationNotEqualError ${check} [${COMMON_EVENT_SECTION_D}]`)
       }
     }
 }

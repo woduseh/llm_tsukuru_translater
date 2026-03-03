@@ -1,5 +1,7 @@
 import type { ExtractConf, ExtractFileType, ExtractEntryConf, ExtractDictEntry } from '../types';
-import { appCtx } from '../../../appContext';
+import { AppContext } from '../../../appContext';
+
+let _ctx: AppContext;
 let eventID = 0
 
 let hadComment = false
@@ -33,7 +35,7 @@ function addtodic(pa: string, obj: DatObj, usePath='', conf: ExtractEntryConf | 
             }
         }
     }
-    if(val !== undefined && val !== null && typeof(val) === 'string' && (val.length > 0 || appCtx.settings.ExtractAddLine)){
+    if(val !== undefined && val !== null && typeof(val) === 'string' && (val.length > 0 || _ctx.settings.ExtractAddLine)){
         const id = Path
         if(usePath === 'note' || spliter){
             obj = addtodic('%comment%', obj, usePath, {comment:'-----'}) 
@@ -126,7 +128,7 @@ function Extreturnit(dat_obj: DatObj, Path='', nas: unknown=null){
 }
 
 function isIncludeAble(sc: unknown){
-    const ess = appCtx.settings.extractSomeScript2
+    const ess = _ctx.settings.extractSomeScript2
     let able = false
     if(sc === null || sc === undefined){
         return false
@@ -149,7 +151,7 @@ function forEvent(d: Record<string, unknown>, dat_obj: DatObj, conf: ExtractConf
     const dir = conf.dir
     if(obNullSafe(d)){
         if(conf.note){
-            if(appCtx.settings.extractSomeScript){
+            if(_ctx.settings.extractSomeScript){
                 if(isIncludeAble(d.note)){
                     dat_obj = addtodic(Path + '.note', dat_obj, 'note')
                 }
@@ -174,10 +176,10 @@ function forEvent(d: Record<string, unknown>, dat_obj: DatObj, conf: ExtractConf
                 if(conf.note){
                     acceptable = acceptable.concat([408, 108])
                 }
-                if([356,355,108,408,357].includes(list[i].code as number) && appCtx.settings.extractSomeScript){
+                if([356,355,108,408,357].includes(list[i].code as number) && _ctx.settings.extractSomeScript){
                     ischeckable = true
                 }
-                acceptable = acceptable.concat(appCtx.settings.extractPlus)
+                acceptable = acceptable.concat(_ctx.settings.extractPlus)
                 eventID += 1
                 function checker(dat_obj: DatObj, da: unknown, ca: string){
                     if(typeof da === 'object'){
@@ -225,18 +227,19 @@ export { hadComment }
 
 export const resetHadComment = () => { hadComment = false }
 
-export const extract = async (filedata: string, conf: ExtractConf, ftype: ExtractFileType) => {
+export const extract = async (filedata: string, conf: ExtractConf, ftype: ExtractFileType, ctx: AppContext) => {
+    _ctx = ctx;
     const extended = conf.extended
     const fileName = conf.fileName
     const dir = conf.dir
     const dirf = dir + fileName + '\\'
-    appCtx.gb[fileName] = {data: {}}
+    ctx.gb[fileName] = {data: {}}
     if (filedata.charCodeAt(0) === 0xFEFF) {
         filedata = filedata.substr(1);
-        appCtx.gb[fileName].isbom = true
+        ctx.gb[fileName].isbom = true
     }
     else{
-        appCtx.gb[fileName].isbom = false 
+        ctx.gb[fileName].isbom = false 
     }
     let data
     try{
@@ -254,7 +257,7 @@ export const extract = async (filedata: string, conf: ExtractConf, ftype: Extrac
         edited: data
     }
     if(ftype == 'map'){
-        if(appCtx.settings.oneMapFile){
+        if(_ctx.settings.oneMapFile){
             dat_obj = addComment(dat_obj, '------- MAP -------')
         }
 
@@ -262,7 +265,7 @@ export const extract = async (filedata: string, conf: ExtractConf, ftype: Extrac
             dat_obj = addtodic(`displayName`, dat_obj)
         }
         if(conf.note){
-            if(appCtx.settings.extractSomeScript){
+            if(_ctx.settings.extractSomeScript){
                 if(isIncludeAble(data.note)){
                     dat_obj = addtodic('note', dat_obj, 'note')
                 }
@@ -275,7 +278,7 @@ export const extract = async (filedata: string, conf: ExtractConf, ftype: Extrac
             for(let i =0;i<(data.events.length);i++){
                 if(obNullSafe(data.events[i]) && obNullSafe(data.events[i].pages)){
                     if(conf.note){
-                        if(appCtx.settings.extractSomeScript){
+                        if(_ctx.settings.extractSomeScript){
                             if(isIncludeAble(data.events[i].note)){
                                 dat_obj = addtodic(`events.${i}.note`, dat_obj, 'note')
                             }
@@ -419,7 +422,7 @@ export const extract = async (filedata: string, conf: ExtractConf, ftype: Extrac
                 }
                 else{
                     if(conf.note){
-                        if(appCtx.settings.extractSomeScript){
+                        if(_ctx.settings.extractSomeScript){
                             if(isIncludeAble(d.note)){
                                 dat_obj = addtodic(Path + '.note', dat_obj, 'note')
                             }

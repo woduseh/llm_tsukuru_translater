@@ -1,16 +1,17 @@
 import { lenStr } from '../../../../globals'
-import { appCtx } from '../../../appContext';
+import { AppContext } from '../../../appContext';
 
 interface Commands{
     numArg:number[]
     strArg:lenStr[]
 }
 
+let _ctx: AppContext;
 let idIndex = 0
 function addString(str:lenStr, sourceFile:string, targetFile:string, codeStr:string = ''){
     const id = idIndex;
     idIndex += 1;
-    appCtx.WolfExtData.push({
+    _ctx.WolfExtData.push({
         str: {
             pos1: str.pos1,
             pos2: str.pos2,
@@ -26,7 +27,8 @@ function addString(str:lenStr, sourceFile:string, targetFile:string, codeStr:str
     })
 }
 
-export function extractEvent(cmds:Commands[], file:string, conf:{[key:string]:boolean}, conf2:{[key:string]:boolean} = {}){
+export function extractEvent(cmds:Commands[], file:string, conf:{[key:string]:boolean}, ctx: AppContext, conf2:{[key:string]:boolean} = {}){
+    _ctx = ctx;
     for(const cmd of cmds){
         const type = (cmd.numArg[0]) //Type
         switch (type){

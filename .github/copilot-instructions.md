@@ -12,7 +12,7 @@ npm start                  # builds renderer (Vite), then launches Electron
 npm run dev                # Vite dev server + Electron with HMR (parallel)
 npm run build              # production build (Windows x64 portable + NSIS installer)
 npm run build:renderer     # Vite build only → dist-renderer/
-npm test                   # vitest run (all 136 tests)
+npm test                   # vitest run (all ~165 tests)
 npx vitest run test/unit/edtool.test.ts          # single test file
 npx vitest run -t "round-trip"                   # tests matching name pattern
 npm run test:watch         # vitest in watch mode
@@ -25,11 +25,20 @@ npx tsc --noEmit           # type-check without emitting
 
 ### Dual-file Convention (`.ts` + `.js`) — CRITICAL
 
-Main-process TypeScript files (`main.ts`, `src/ipc/*.ts`, `src/js/**/*.ts`, `src/utils.ts`, `src/appContext.ts`, `src/preload.ts`) each have a **committed `.js` companion** that is the actual file Electron runs. There is no automatic `tsc` build step at runtime.
+Main-process TypeScript files (`main.ts`, `src/ipc/*.ts`, `src/js/**/*.ts`, `src/utils.ts`, `src/appContext.ts`, `src/preload.ts`) each have a **committed `.js` companion** that is the actual file Electron runs.
 
-**When editing any main-process `.ts` file, you MUST update the corresponding `.js` file in sync.** The `.js` files for several paths are gitignored (`/main.js`, `/src/ipc/**/*.js`, `/src/js/**/*.js`, `/src/preload.js`, etc.) — use `git add -f` to stage them.
+The `prestart` and `prebuild` npm scripts automatically run `tsc`, which compiles `.ts` → `.js`. However, **the `.js` files are also committed to git** so that production builds work without a compile step.
+
+**When editing any main-process `.ts` file, you MUST also update or regenerate the corresponding `.js` file.** Run `npx tsc` to regenerate all `.js` files, then use `git add -f` to stage them (they are gitignored by default: `/main.js`, `/src/ipc/**/*.js`, `/src/js/**/*.js`, `/src/preload.js`, etc.).
+
+Main-process imports reference the `.js` extension explicitly (e.g., `import * as applyjs from "./src/js/rpgmv/apply.js"`).
 
 This convention does NOT apply to renderer code (`src/renderer/**`) — those are Vue SFCs compiled by Vite.
+
+### Two TypeScript Configs
+
+- `tsconfig.json` — Main process (CommonJS, `target: ES2018`, `strict: true`). Excludes `src/renderer/`, `test/`, `dist-renderer/`.
+- `tsconfig.renderer.json` — Renderer/Vite. Used by `vite.renderer.config.ts` for Vue SFC compilation.
 
 ### Process Model
 
@@ -56,12 +65,16 @@ src/renderer/ (Vue 3 SPA, built by Vite → dist-renderer/)
 src/preload.ts — contextBridge with channel whitelists (SEND_CHANNELS, RECEIVE_CHANNELS)
 ```
 
+### Renderer IPC Pattern
+
+Vue components use the `useIpcOn(channel, callback)` composable from `src/renderer/composables/useIpc.ts`, which auto-removes listeners on component unmount. For one-shot sends, use `api.send()` from the same module.
+
 ### IPC Communication Pattern
 
 - Renderer → Main: `window.api.send(channel, ...args)` — channels must be in `SEND_CHANNELS` whitelist in `src/preload.ts`
 - Main → Renderer: `webContents.send(channel, ...args)` — channels must be in `RECEIVE_CHANNELS` whitelist
 - **When adding a new IPC channel**, update both `SEND_CHANNELS`/`RECEIVE_CHANNELS` in `src/preload.ts` AND `src/preload.js`
-- Main-process IPC bridge: `src/js/libs/projectTools.ts` wraps `globalThis.mwindow.webContents.send()` — all backend-to-renderer messaging goes through `Tools.send()`, `Tools.sendAlert()`, `Tools.sendError()`, `Tools.worked()`
+- Main-process IPC bridge: `src/js/libs/projectTools.ts` wraps `appCtx.mainWindow.webContents.send()` — all backend-to-renderer messaging goes through `Tools.send()`, `Tools.sendAlert()`, `Tools.sendError()`, `Tools.worked()`
 
 ### Sub-window Ready-signal Pattern
 
@@ -103,7 +116,11 @@ Parallel pipeline with binary parser for `.wolf` data files, separate extract/ap
 
 ### Global State
 
-`globalThis` is used extensively: `gb` (extraction data), `settings` (user prefs via electron-store), `mwindow` (main BrowserWindow), `WolfExtData`/`WolfEncoding`/`WolfMetadata`/`WolfCache` (Wolf RPG state). Types declared in `globals.d.ts`.
+`src/appContext.ts` exports the `appCtx` singleton — the centralized state for the main process: `mainWindow`, `settingsWindow`, `settings`, `gb` (extraction data), `oPath`, `sourceDir`, `llmAbort`, Wolf RPG state (`WolfExtData`, `WolfCache`, `WolfMetadata`). Types declared in `globals.d.ts` and `src/types/settings.ts`.
+
+### Logging
+
+Main process uses `electron-log` (`src/logger.ts`). Import `log` from `'./src/logger'` — writes to file (info+) and console (debug+), 5 MB rotation.
 
 ## Key Conventions
 

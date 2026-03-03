@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { extract, format_extracted, setObj, getVal } from '../../src/js/rpgmv/extract/index';
 import { settings as defaultSettings } from '../../src/js/rpgmv/datas';
+import { appCtx } from '../../src/appContext';
 import fs from 'fs';
 import path from 'path';
 
@@ -20,12 +21,12 @@ function makeConf(fileName: string, overrides: Record<string, any> = {}) {
 
 describe('extract-apply round-trip', () => {
   beforeEach(() => {
-    globalThis.gb = {};
-    globalThis.settings = { ...defaultSettings, formatNice: false, oneMapFile: false, onefile_src: false, onefile_note: false };
-    globalThis.mwindow = { webContents: { send: () => {} } } as any;
-    globalThis.useExternMsg = false;
-    globalThis.externMsgKeys = [];
-    globalThis.externMsg = {};
+    appCtx.gb = {};
+    appCtx.settings = { ...defaultSettings, formatNice: false, oneMapFile: false, onefile_src: false, onefile_note: false } as any;
+    appCtx.mainWindow = { webContents: { send: () => {} } } as any;
+    appCtx.useExternMsg = false;
+    appCtx.externMsgKeys = [];
+    appCtx.externMsg = {};
   });
 
   describe('setObj and getVal utilities', () => {
@@ -54,7 +55,7 @@ describe('extract-apply round-trip', () => {
     it('extracts actor name from Actors.json', async () => {
       const filedata = fs.readFileSync(path.join(fixturesDir, 'Actors.json'), 'utf8');
       const conf = makeConf('Actors.json');
-      const result = await extract(filedata, conf, 'actor');
+      const result = await extract(filedata, conf, 'actor', appCtx);
 
       expect(result.datobj).toBeDefined();
       expect(result.edited).toBeDefined();
@@ -68,20 +69,20 @@ describe('extract-apply round-trip', () => {
     });
 
     it('extracts actor nickname (even empty when ExtractAddLine is true)', async () => {
-      globalThis.settings.ExtractAddLine = true;
+      appCtx.settings.ExtractAddLine = true;
       const filedata = fs.readFileSync(path.join(fixturesDir, 'Actors.json'), 'utf8');
       const conf = makeConf('Actors.json');
-      const result = await extract(filedata, conf, 'actor');
+      const result = await extract(filedata, conf, 'actor', appCtx);
 
       const nicknameEntry = Object.entries(result.datobj).find(([k]) => k.endsWith('.nickname'));
       expect(nicknameEntry).toBeDefined();
     });
 
     it('skips empty string values when ExtractAddLine is false', async () => {
-      globalThis.settings.ExtractAddLine = false;
+      appCtx.settings.ExtractAddLine = false;
       const filedata = fs.readFileSync(path.join(fixturesDir, 'Actors.json'), 'utf8');
       const conf = makeConf('Actors.json');
-      const result = await extract(filedata, conf, 'actor');
+      const result = await extract(filedata, conf, 'actor', appCtx);
 
       const nicknameEntry = Object.entries(result.datobj).find(([k]) => k.endsWith('.nickname'));
       expect(nicknameEntry).toBeUndefined();
@@ -92,10 +93,10 @@ describe('extract-apply round-trip', () => {
     it('produces correct text output with line numbering metadata', async () => {
       const filedata = fs.readFileSync(path.join(fixturesDir, 'Actors.json'), 'utf8');
       const conf = makeConf('Actors.json');
-      const result = await extract(filedata, conf, 'actor');
-      await format_extracted(result);
+      const result = await extract(filedata, conf, 'actor', appCtx);
+      await format_extracted(result, 0, appCtx);
 
-      const gb = globalThis.gb['Actors.json'];
+      const gb = appCtx.gb['Actors.json'];
       expect(gb.outputText).toBeDefined();
       expect(gb.outputText)!.toContain('Harold');
 
@@ -112,10 +113,10 @@ describe('extract-apply round-trip', () => {
     it('metadata origin matches the source file', async () => {
       const filedata = fs.readFileSync(path.join(fixturesDir, 'Actors.json'), 'utf8');
       const conf = makeConf('Actors.json');
-      const result = await extract(filedata, conf, 'actor');
-      await format_extracted(result);
+      const result = await extract(filedata, conf, 'actor', appCtx);
+      await format_extracted(result, 0, appCtx);
 
-      const gb = globalThis.gb['Actors.json'];
+      const gb = appCtx.gb['Actors.json'];
       for (const entry of Object.values(gb.data) as any[]) {
         expect(entry.origin).toBe('Actors.json');
       }
@@ -126,10 +127,10 @@ describe('extract-apply round-trip', () => {
     it('preserves JSON structure after round-trip with modified text', async () => {
       const filedata = fs.readFileSync(path.join(fixturesDir, 'Actors.json'), 'utf8');
       const conf = makeConf('Actors.json');
-      const result = await extract(filedata, conf, 'actor');
-      await format_extracted(result);
+      const result = await extract(filedata, conf, 'actor', appCtx);
+      await format_extracted(result, 0, appCtx);
 
-      const gb = globalThis.gb['Actors.json'];
+      const gb = appCtx.gb['Actors.json'];
       const textLines = gb.outputText!.split('\n');
 
       // Simulate translation: replace text in the lines
@@ -164,10 +165,10 @@ describe('extract-apply round-trip', () => {
       const filedata = fs.readFileSync(path.join(fixturesDir, 'Actors.json'), 'utf8');
       const original = JSON.parse(filedata);
       const conf = makeConf('Actors.json');
-      const result = await extract(filedata, conf, 'actor');
-      await format_extracted(result);
+      const result = await extract(filedata, conf, 'actor', appCtx);
+      await format_extracted(result, 0, appCtx);
 
-      const gb = globalThis.gb['Actors.json'];
+      const gb = appCtx.gb['Actors.json'];
       const textLines = gb.outputText!.split('\n');
 
       // Apply without modification
@@ -191,7 +192,7 @@ describe('extract-apply round-trip', () => {
     it('extracts event dialogue text from map', async () => {
       const filedata = fs.readFileSync(path.join(fixturesDir, 'Map001.json'), 'utf8');
       const conf = makeConf('Map001.json');
-      const result = await extract(filedata, conf, 'map');
+      const result = await extract(filedata, conf, 'map', appCtx);
 
       const keys = Object.keys(result.datobj);
       expect(keys.length).toBeGreaterThan(0);
@@ -206,7 +207,7 @@ describe('extract-apply round-trip', () => {
     it('extracted path points to correct event parameter location', async () => {
       const filedata = fs.readFileSync(path.join(fixturesDir, 'Map001.json'), 'utf8');
       const conf = makeConf('Map001.json');
-      const result = await extract(filedata, conf, 'map');
+      const result = await extract(filedata, conf, 'map', appCtx);
 
       const dialogueEntry = Object.entries(result.datobj).find(
         ([, v]: [string, any]) => v.var === 'Hello World'
@@ -220,10 +221,10 @@ describe('extract-apply round-trip', () => {
     it('round-trip works for map extraction', async () => {
       const filedata = fs.readFileSync(path.join(fixturesDir, 'Map001.json'), 'utf8');
       const conf = makeConf('Map001.json');
-      const result = await extract(filedata, conf, 'map');
-      await format_extracted(result);
+      const result = await extract(filedata, conf, 'map', appCtx);
+      await format_extracted(result, 0, appCtx);
 
-      const gb = globalThis.gb['Map001.json'];
+      const gb = appCtx.gb['Map001.json'];
       const textLines = gb.outputText!.split('\n');
 
       // Modify text
@@ -258,7 +259,7 @@ describe('extract-apply round-trip', () => {
     it('extracts system terms messages', async () => {
       const filedata = fs.readFileSync(path.join(fixturesDir, 'System.json'), 'utf8');
       const conf = makeConf('System.json');
-      const result = await extract(filedata, conf, 'sys');
+      const result = await extract(filedata, conf, 'sys', appCtx);
 
       const entries = Object.entries(result.datobj);
       expect(entries.length).toBeGreaterThan(0);
@@ -275,7 +276,7 @@ describe('extract-apply round-trip', () => {
     it('handles empty events array in map', async () => {
       const filedata = JSON.stringify({ events: [] });
       const conf = makeConf('Map002.json');
-      const result = await extract(filedata, conf, 'map');
+      const result = await extract(filedata, conf, 'map', appCtx);
 
       expect(result.datobj).toBeDefined();
       expect(Object.keys(result.datobj).length).toBe(0);
@@ -286,7 +287,7 @@ describe('extract-apply round-trip', () => {
         events: [null, null, null],
       });
       const conf = makeConf('Map003.json');
-      const result = await extract(filedata, conf, 'map');
+      const result = await extract(filedata, conf, 'map', appCtx);
 
       expect(result.datobj).toBeDefined();
       expect(Object.keys(result.datobj).length).toBe(0);
@@ -311,10 +312,10 @@ describe('extract-apply round-trip', () => {
         ],
       });
       const conf = makeConf('Map004.json');
-      const result = await extract(filedata, conf, 'map');
-      await format_extracted(result);
+      const result = await extract(filedata, conf, 'map', appCtx);
+      await format_extracted(result, 0, appCtx);
 
-      const gb = globalThis.gb['Map004.json'];
+      const gb = appCtx.gb['Map004.json'];
       // Multi-line text should appear in the output
       expect(gb.outputText)!.toContain('Line1\nLine2\nLine3');
 
@@ -327,7 +328,7 @@ describe('extract-apply round-trip', () => {
     it('handles invalid JSON gracefully', async () => {
       const filedata = 'not valid json {{{';
       const conf = makeConf('Bad.json');
-      const result = await extract(filedata, conf, 'actor');
+      const result = await extract(filedata, conf, 'actor', appCtx);
 
       expect(result.datobj).toEqual({});
       expect(result.edited).toEqual({});
@@ -337,9 +338,9 @@ describe('extract-apply round-trip', () => {
       const bom = '\uFEFF';
       const filedata = bom + JSON.stringify([null, { id: 1, name: 'BomTest', nickname: '', profile: '' }]);
       const conf = makeConf('BomActors.json');
-      const result = await extract(filedata, conf, 'actor');
+      const result = await extract(filedata, conf, 'actor', appCtx);
 
-      expect(globalThis.gb['BomActors.json'].isbom).toBe(true);
+      expect(appCtx.gb['BomActors.json'].isbom).toBe(true);
       const nameEntry = Object.entries(result.datobj).find(([k]) => k.endsWith('.name'));
       expect(nameEntry).toBeDefined();
       expect((nameEntry![1] as any).var).toBe('BomTest');
@@ -348,7 +349,7 @@ describe('extract-apply round-trip', () => {
     it('actors array with only null entry produces no extraction', async () => {
       const filedata = JSON.stringify([null]);
       const conf = makeConf('EmptyActors.json');
-      const result = await extract(filedata, conf, 'actor');
+      const result = await extract(filedata, conf, 'actor', appCtx);
 
       expect(Object.keys(result.datobj).length).toBe(0);
     });

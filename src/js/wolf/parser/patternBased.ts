@@ -1,24 +1,25 @@
 import { lenStr } from "../../../../globals"
 import { WolfCmd, WolfMapEvent, WolfParserIo } from "./io"
-import { appCtx } from '../../../appContext';
+import { AppContext } from '../../../appContext';
+import { MAX_ARG_COUNT, MAX_COMMAND_ID } from './constants'
 
-export function wolfExtractMapPattern(data:Buffer){
+export function wolfExtractMapPattern(data:Buffer, ctx: AppContext){
     const io = new WolfParserIo(data)
     const magic = io.readBytes(20)
     if (!io.byteArrayCompare(magic, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 87, 79, 76, 70, 77, 0, 85, 0, 0, 0])){
         if(io.byteArrayCompare(magic,[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 87, 79, 76, 70,77, 0, 0,  0,  0,  0])){
-            appCtx.WolfMetadata.ver = 2
+            ctx.WolfMetadata.ver = 2
         }
         else{
             throw new Error('Unvalid 1')
         }
     }
     else{
-        appCtx.WolfMetadata.ver = 3
+        ctx.WolfMetadata.ver = 3
     }
     const len = io.readU4le()
     const check = io.readU1()
-    if(appCtx.WolfMetadata.ver === 2){
+    if(ctx.WolfMetadata.ver === 2){
         if (!(check == 101)) {
             throw new Error('Unvalid 2')
         }
@@ -43,7 +44,7 @@ export function wolfExtractMapPattern(data:Buffer){
     let currentPoint = io.pointer
     let events:WolfCmd[] = [];
     const blen = data.length
-    while(true){
+    while(currentPoint < blen){
         try {
             io.pointer = currentPoint
             const numArgLen = io.readU1();
@@ -51,13 +52,13 @@ export function wolfExtractMapPattern(data:Buffer){
             if(numArgLen <= 0){
                 throw new Error('nein')
             }
-            if(numArgLen >= 300){
+            if(numArgLen >= MAX_ARG_COUNT){
                 throw new Error('nein')
             }
             for (let i = 0; i < numArgLen; i++) {
               numArg.push(io.readU4le());
             }
-            if((numArg[0] >= 1000) || (numArg[0] < 0) ){
+            if((numArg[0] >= MAX_COMMAND_ID) || (numArg[0] < 0) ){
                 throw new Error('nein')
             }
             const indent = io.readU1();
@@ -65,7 +66,7 @@ export function wolfExtractMapPattern(data:Buffer){
             if(strArgLen <= 0){
                 throw new Error('nein')
             }
-            if(strArgLen >= 300){
+            if(strArgLen >= MAX_ARG_COUNT){
                 throw new Error('nein')
             }
             let strArg:lenStr[] = [];

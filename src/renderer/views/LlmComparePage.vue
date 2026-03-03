@@ -32,10 +32,26 @@
           <button @click="navigateBlock(-1)" title="이전 불일치 블록">◀ 블록</button>
           <button @click="navigateBlock(1)" title="다음 불일치 블록">블록 ▶</button>
         </div>
-        <div class="action-buttons">
-          <span class="selection-count">{{ selectedBlocks.size > 0 ? `${selectedBlocks.size}개 블록 선택` : '' }}</span>
+        <div class="toolbar-separator"></div>
+        <div class="action-group">
+          <span class="group-label">자동 수정</span>
+          <span class="selection-count">{{ selectedBlocks.size > 0 ? `${selectedBlocks.size}개 선택` : '' }}</span>
+          <button :disabled="selectedBlocks.size === 0" @click="autoFixSelected"
+            title="선택 블록 자동 수정: 빈줄 추가/제거, 구분자 수정">선택 블록 자동 수정</button>
+          <button :disabled="files.length === 0" @click="autoFixAll"
+            title="전체 불일치 블록 자동 수정: 빈줄 추가/제거, 구분자 수정">전체 불일치 자동 수정</button>
+        </div>
+        <div class="toolbar-separator"></div>
+        <div class="action-group">
+          <span class="group-label">재번역</span>
           <button :disabled="selectedBlocks.size === 0 || retranslating" @click="retranslateSelected">선택 블록 재번역</button>
-          <button :disabled="files.length === 0 || retranslating" @click="retranslateFile">전체 재번역</button>
+          <button :disabled="!hasUntranslatedBlocks || retranslating" @click="retranslateUntranslated"
+            title="현재 파일의 미번역 블록만 재번역">미번역 블록 재번역</button>
+          <button :disabled="files.length === 0 || retranslating" @click="retranslateFile">전체 파일 재번역</button>
+        </div>
+        <div class="toolbar-separator"></div>
+        <div class="action-group">
+          <span class="group-label">저장</span>
           <button :disabled="!isDirty" @click="saveFile">저장</button>
           <span class="save-status">{{ saveStatus }}</span>
         </div>
@@ -45,26 +61,33 @@
         <div class="blocks-col" ref="origBlocksEl" @scroll="syncScroll('orig')">
           <div class="col-header">원문</div>
           <div v-for="(block, i) in origBlocks" :key="i"
-            class="block" :class="blockStatus(i)"
+            class="block" :class="blockClass(i)"
             :ref="el => setOrigBlockRef(i, el as HTMLElement)">
             <div class="select-indicator" @click.stop="toggleSelection(i)">
               <input type="checkbox" :checked="selectedBlocks.has(i)" tabindex="-1" @click.prevent>
             </div>
             <div v-if="block.sep" class="sep-label">{{ block.sep }}</div>
             <pre>{{ block.lines.join('\n') }}</pre>
-            <span class="line-count">{{ block.lines.length }}줄</span>
+            <div class="block-badges">
+              <span v-if="untranslatedBlocks.has(i)" class="badge badge-untranslated-block">미번역</span>
+              <span class="line-count">{{ block.lines.length }}줄</span>
+            </div>
           </div>
         </div>
         <div class="blocks-col" ref="transBlocksEl" @scroll="syncScroll('trans')">
           <div class="col-header">번역</div>
           <div v-for="(block, i) in transBlocks" :key="i"
-            class="block" :class="[blockStatus(i), selectedBlocks.has(i) ? 'selected' : '']"
-            :data-block-idx="i">
+            class="block" :class="[blockClass(i), selectedBlocks.has(i) ? 'selected' : '']"
+            :data-block-idx="i"
+            :ref="el => setTransBlockRef(i, el as HTMLElement)">
             <div v-if="block.sep" class="sep-label">{{ block.sep }}</div>
             <textarea class="block-editor" :value="block.lines.join('\n')"
               :rows="Math.max(origBlocks[i]?.lines.length || block.lines.length, 1)"
               @input="onBlockEdit(i, $event)"></textarea>
-            <span class="line-count">{{ editedTransLines[i] || block.lines.length }}줄</span>
+            <div class="block-badges">
+              <span v-if="untranslatedBlocks.has(i)" class="badge badge-untranslated-block">미번역</span>
+              <span class="line-count">{{ editedTransLines[i] || block.lines.length }}줄</span>
+            </div>
           </div>
         </div>
       </div>
@@ -75,14 +98,13 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { api } from '../composables/useIpc'
-
-const SEP_RE = /^---\s*\d+\s*---$/
+import { splitBlocks, checkMismatch, autoFixBlock, isBlockUntranslated } from '../compareUtils'
+import type { Block } from '../compareUtils'
 
 interface FileEntry {
   name: string; origPath: string; transPath: string;
   mismatch: boolean; untranslated: boolean;
 }
-interface Block { sep: string; lines: string[] }
 
 const files = ref<FileEntry[]>([])
 const currentIdx = ref(0)
@@ -95,6 +117,7 @@ const filteredFiles = ref<{ file: FileEntry; realIdx: number }[]>([])
 const origBlocks = ref<Block[]>([])
 const transBlocks = ref<Block[]>([])
 const editedTransLines = reactive<Record<number, number>>({})
+const untranslatedBlocks = ref<Set<number>>(new Set())
 const saveStatus = ref('')
 const retranslating = ref(false)
 const isDirty = ref(false)
@@ -104,10 +127,16 @@ let dataDir = ''
 const origBlocksEl = ref<HTMLElement | null>(null)
 const transBlocksEl = ref<HTMLElement | null>(null)
 const origBlockRefs: Record<number, HTMLElement> = {}
+const transBlockRefs: Record<number, HTMLElement> = {}
 
 function setOrigBlockRef(i: number, el: HTMLElement | null) {
   if (el) origBlockRefs[i] = el
 }
+function setTransBlockRef(i: number, el: HTMLElement | null) {
+  if (el) transBlockRefs[i] = el
+}
+
+const hasUntranslatedBlocks = computed(() => untranslatedBlocks.value.size > 0)
 
 const summaryHtml = computed(() => {
   if (loading.value) return '<span class="summary-loading">⏳ 파일 비교 중...</span>'
@@ -121,24 +150,14 @@ const summaryHtml = computed(() => {
   return parts.join(' \u00A0 ') + ` <span class="summary-total">(전체 ${files.value.length}개)</span>`
 })
 
-function splitBlocks(lines: string[]): Block[] {
-  const blocks: Block[] = []
-  let curSep = '', curLines: string[] = []
-  for (const line of lines) {
-    if (SEP_RE.test(line.trim())) {
-      if (curSep || curLines.length > 0) blocks.push({ sep: curSep, lines: [...curLines] })
-      curSep = line; curLines = []
-    } else { curLines.push(line) }
-  }
-  if (curSep || curLines.length > 0) blocks.push({ sep: curSep, lines: curLines })
-  return blocks
-}
-
-function checkMismatch(origLines: string[], transLines: string[]): boolean {
-  const ob = splitBlocks(origLines), tb = splitBlocks(transLines)
-  if (ob.length !== tb.length) return true
-  for (let i = 0; i < ob.length; i++) {
-    if (ob[i].sep !== tb[i].sep || ob[i].lines.length !== tb[i].lines.length) return true
+/** Detect untranslated status considering per-block untranslation. */
+function checkFileUntranslated(origContent: string, transContent: string): boolean {
+  if (origContent === transContent) return true
+  const ob = splitBlocks(origContent.split('\n'))
+  const tb = splitBlocks(transContent.split('\n'))
+  const len = Math.min(ob.length, tb.length)
+  for (let i = 0; i < len; i++) {
+    if (isBlockUntranslated(ob[i], tb[i])) return true
   }
   return false
 }
@@ -167,7 +186,7 @@ function loadFiles(dir: string) {
     const origContent = window.nodeFs.readFileSync(origPath, 'utf-8')
     const transContent = window.nodeFs.readFileSync(transPath, 'utf-8')
     const mismatch = checkMismatch(origContent.split('\n'), transContent.split('\n'))
-    files.value.push({ name, origPath, transPath, mismatch, untranslated: origContent === transContent })
+    files.value.push({ name, origPath, transPath, mismatch, untranslated: checkFileUntranslated(origContent, transContent) })
   }
   currentIdx.value = 0
   selectedBlocks.value = new Set()
@@ -202,14 +221,26 @@ function renderBlocks() {
   isDirty.value = false
   saveStatus.value = ''
   for (const k in editedTransLines) delete editedTransLines[k]
+  updateUntranslatedBlocks()
+  nextTick(syncBlockHeights)
 }
 
-function blockStatus(i: number): string {
+function updateUntranslatedBlocks() {
+  const set = new Set<number>()
+  const len = Math.min(origBlocks.value.length, transBlocks.value.length)
+  for (let i = 0; i < len; i++) {
+    if (isBlockUntranslated(origBlocks.value[i], transBlocks.value[i])) set.add(i)
+  }
+  untranslatedBlocks.value = set
+}
+
+function blockClass(i: number): string {
   const ob = origBlocks.value[i], tb = transBlocks.value[i]
   if (!ob || !tb) return 'missing'
   if (ob.sep !== tb.sep) return 'error-sep'
   const tLines = editedTransLines[i] ?? tb.lines.length
   if (ob.lines.length !== tLines) return 'error-lines'
+  if (untranslatedBlocks.value.has(i)) return 'untranslated'
   return 'ok'
 }
 
@@ -221,6 +252,7 @@ function onBlockEdit(i: number, event: Event) {
   isDirty.value = true
   dirty[files.value[currentIdx.value].name] = true
   saveStatus.value = ''
+  updateUntranslatedBlocks()
 }
 
 function toggleSelection(i: number) {
@@ -229,9 +261,59 @@ function toggleSelection(i: number) {
   selectedBlocks.value = s
 }
 
+function autoFixSelected() {
+  const fixes: string[] = []
+  for (const i of selectedBlocks.value) {
+    const result = autoFixBlock(origBlocks.value[i], transBlocks.value[i])
+    if (result) {
+      editedTransLines[i] = transBlocks.value[i].lines.length
+      fixes.push(result)
+    }
+  }
+  if (fixes.length > 0) {
+    isDirty.value = true
+    dirty[files.value[currentIdx.value].name] = true
+    saveStatus.value = `${fixes.length}개 블록 수정됨`
+    nextTick(syncBlockHeights)
+  }
+}
+
+function autoFixAll() {
+  let count = 0
+  for (let i = 0; i < origBlocks.value.length; i++) {
+    if (autoFixBlock(origBlocks.value[i], transBlocks.value[i])) {
+      editedTransLines[i] = transBlocks.value[i].lines.length
+      count++
+    }
+  }
+  if (count > 0) {
+    isDirty.value = true
+    dirty[files.value[currentIdx.value].name] = true
+    saveStatus.value = `${count}개 블록 자동 수정됨`
+    nextTick(syncBlockHeights)
+  }
+}
+
+/** Synchronize block heights between orig and trans columns. */
+function syncBlockHeights() {
+  const len = Math.min(origBlocks.value.length, transBlocks.value.length)
+  for (let i = 0; i < len; i++) {
+    const origEl = origBlockRefs[i]
+    const transEl = transBlockRefs[i]
+    if (!origEl || !transEl) continue
+    // Reset to auto to get natural height
+    origEl.style.minHeight = ''
+    transEl.style.minHeight = ''
+    const maxH = Math.max(origEl.offsetHeight, transEl.offsetHeight)
+    if (origEl.offsetHeight < maxH) origEl.style.minHeight = maxH + 'px'
+    if (transEl.offsetHeight < maxH) transEl.style.minHeight = maxH + 'px'
+  }
+}
+
 let syncing = false
+let programmaticScroll = false
 function syncScroll(source: 'orig' | 'trans') {
-  if (syncing) return
+  if (syncing || programmaticScroll) return
   syncing = true
   if (source === 'orig' && origBlocksEl.value && transBlocksEl.value) {
     transBlocksEl.value.scrollTop = origBlocksEl.value.scrollTop
@@ -250,7 +332,7 @@ function saveFile() {
   const origContent = window.nodeFs.readFileSync(f.origPath, 'utf-8')
   const transContent = window.nodeFs.readFileSync(f.transPath, 'utf-8')
   f.mismatch = checkMismatch(origContent.split('\n'), transContent.split('\n'))
-  f.untranslated = origContent === transContent
+  f.untranslated = checkFileUntranslated(origContent, transContent)
   dirty[f.name] = false
   isDirty.value = false
   saveStatus.value = '저장됨 ✓'
@@ -273,6 +355,14 @@ function retranslateSelected() {
   api.send('retranslateBlocks', { dir: dataDir, fileName: files.value[currentIdx.value].name, blockIndices: indices })
 }
 
+function retranslateUntranslated() {
+  if (files.value.length === 0 || !dataDir || untranslatedBlocks.value.size === 0) return
+  retranslating.value = true
+  saveStatus.value = '🔄 준비 중...'
+  const indices = Array.from(untranslatedBlocks.value).sort((a, b) => a - b)
+  api.send('retranslateBlocks', { dir: dataDir, fileName: files.value[currentIdx.value].name, blockIndices: indices })
+}
+
 function navigateFile(dir: 1 | -1) {
   if (files.value.length === 0) return
   const start = currentIdx.value + dir
@@ -285,63 +375,56 @@ function navigateFile(dir: 1 | -1) {
 }
 
 function navigateBlock(dir: 1 | -1) {
-  if (!origBlocksEl.value) return
-  const blocks = origBlocksEl.value.querySelectorAll('.block') as NodeListOf<HTMLElement>
-  const mismatchIdx: number[] = []
-  blocks.forEach((b, i) => {
-    if (b.classList.contains('error-lines') || b.classList.contains('error-sep') || b.classList.contains('missing'))
-      mismatchIdx.push(i)
-  })
-  if (mismatchIdx.length === 0) return
-  const scrollTop = origBlocksEl.value.scrollTop
-  let cur = 0
-  blocks.forEach((b, i) => { if (b.offsetTop <= scrollTop + 10) cur = i })
+  if (!origBlocksEl.value || !transBlocksEl.value) return
+  const problemIdx: number[] = []
+  for (let i = 0; i < origBlocks.value.length; i++) {
+    const cls = blockClass(i)
+    if (cls !== 'ok') problemIdx.push(i)
+  }
+  if (problemIdx.length === 0) return
+
+  const currentSelected = selectedBlocks.value.size > 0 ? Math.min(...selectedBlocks.value) : -1
   let target = -1
   if (dir === 1) {
-    target = mismatchIdx.find(i => i > cur) ?? mismatchIdx[0]
+    target = problemIdx.find(i => i > currentSelected) ?? problemIdx[0]
   } else {
-    for (let j = mismatchIdx.length - 1; j >= 0; j--) {
-      if (mismatchIdx[j] < cur) { target = mismatchIdx[j]; break }
+    for (let j = problemIdx.length - 1; j >= 0; j--) {
+      if (problemIdx[j] < currentSelected) { target = problemIdx[j]; break }
     }
-    if (target === -1) target = mismatchIdx[mismatchIdx.length - 1]
+    if (target === -1) target = problemIdx[problemIdx.length - 1]
   }
-  if (target >= 0 && blocks[target]) {
-    const tTop = blocks[target].offsetTop - origBlocksEl.value.offsetTop
-    origBlocksEl.value.scrollTo({ top: tTop - origBlocksEl.value.clientHeight / 2, behavior: 'smooth' })
-    blocks[target].style.outline = '2px solid #ff79c6'
-    setTimeout(() => { blocks[target].style.outline = '' }, 1500)
-  }
+  if (target < 0) return
+
+  selectedBlocks.value = new Set([target])
+
+  nextTick(() => {
+    programmaticScroll = true
+    const origBlock = origBlocksEl.value?.querySelectorAll('.block')[target] as HTMLElement | undefined
+    const transBlock = transBlocksEl.value?.querySelectorAll('.block')[target] as HTMLElement | undefined
+    origBlock?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    transBlock?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => { programmaticScroll = false }, 500)
+  })
+}
+
+function onRetranslateResult(result: { success: boolean; error?: string }) {
+  retranslating.value = false
+  if (result.success) {
+    saveStatus.value = '재번역 완료 ✓'
+    const f = files.value[currentIdx.value]
+    const origContent = window.nodeFs.readFileSync(f.origPath, 'utf-8')
+    const transContent = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+    f.mismatch = checkMismatch(origContent.split('\n'), transContent.split('\n'))
+    f.untranslated = checkFileUntranslated(origContent, transContent)
+    updateFilteredFiles(); renderBlocks()
+  } else { saveStatus.value = `❌ ${result.error || '번역 실패'}` }
 }
 
 onMounted(() => {
   api.on('initCompare', (dir: string) => loadFiles(dir))
   api.on('retranslateProgress', (msg: string) => { saveStatus.value = `🔄 ${msg}` })
-  api.on('retranslateFileDone', (result: { success: boolean; error?: string }) => {
-    retranslating.value = false
-    if (result.success) {
-      saveStatus.value = '재번역 완료 ✓'
-      const f = files.value[currentIdx.value]
-      f.mismatch = checkMismatch(
-        window.nodeFs.readFileSync(f.origPath, 'utf-8').split('\n'),
-        window.nodeFs.readFileSync(f.transPath, 'utf-8').split('\n')
-      )
-      f.untranslated = window.nodeFs.readFileSync(f.origPath, 'utf-8') === window.nodeFs.readFileSync(f.transPath, 'utf-8')
-      updateFilteredFiles(); renderBlocks()
-    } else { saveStatus.value = `❌ ${result.error || '번역 실패'}` }
-  })
-  api.on('retranslateBlocksDone', (result: { success: boolean; error?: string }) => {
-    retranslating.value = false
-    if (result.success) {
-      saveStatus.value = `${selectedBlocks.value.size}개 블록 재번역 완료 ✓`
-      const f = files.value[currentIdx.value]
-      f.mismatch = checkMismatch(
-        window.nodeFs.readFileSync(f.origPath, 'utf-8').split('\n'),
-        window.nodeFs.readFileSync(f.transPath, 'utf-8').split('\n')
-      )
-      f.untranslated = window.nodeFs.readFileSync(f.origPath, 'utf-8') === window.nodeFs.readFileSync(f.transPath, 'utf-8')
-      updateFilteredFiles(); renderBlocks()
-    } else { saveStatus.value = `❌ ${result.error || '번역 실패'}` }
-  })
+  api.on('retranslateFileDone', onRetranslateResult)
+  api.on('retranslateBlocksDone', onRetranslateResult)
 
   document.addEventListener('keydown', onKeydown)
   api.send('compareReady')
@@ -384,19 +467,22 @@ function onKeydown(e: KeyboardEvent) {
 
 .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .toolbar {
-  padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
 .summary { font-size: 12px; }
-.nav-buttons, .action-buttons { display: flex; gap: 4px; align-items: center; }
-.nav-buttons button, .action-buttons button {
-  padding: 4px 10px; font-size: 11px; background: var(--Highlight1);
+.toolbar-separator { width: 1px; height: 20px; background: rgba(255,255,255,0.1); flex-shrink: 0; }
+.nav-buttons { display: flex; gap: 3px; align-items: center; }
+.action-group { display: flex; gap: 3px; align-items: center; }
+.group-label { font-size: 9px; opacity: 0.35; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.nav-buttons button, .action-group button {
+  padding: 3px 8px; font-size: 11px; background: var(--Highlight1);
   border: var(--border); border-radius: 4px; color: var(--mainColor);
-  cursor: pointer; font-family: inherit; transition: var(--transition);
+  cursor: pointer; font-family: inherit; transition: var(--transition); white-space: nowrap;
 }
-.nav-buttons button:hover, .action-buttons button:hover { background: rgba(255,255,255,0.08); }
-.nav-buttons button:disabled, .action-buttons button:disabled { opacity: 0.3; cursor: default; }
-.selection-count { font-size: 11px; opacity: 0.5; }
+.nav-buttons button:hover, .action-group button:hover { background: rgba(255,255,255,0.08); }
+.nav-buttons button:disabled, .action-group button:disabled { opacity: 0.3; cursor: default; }
+.selection-count { font-size: 10px; opacity: 0.5; }
 .save-status { font-size: 11px; opacity: 0.6; }
 
 .blocks-container { flex: 1; display: flex; overflow: hidden; }
@@ -408,11 +494,13 @@ function onKeydown(e: KeyboardEvent) {
 .block {
   margin-bottom: 4px; padding: 8px 10px; border-radius: 6px; position: relative;
   background: var(--Highlight1); border: 1px solid transparent; font-size: 12px;
+  box-sizing: border-box;
 }
 .blocks-col:first-child .block { padding-left: 40px; }
 .block.ok { border-color: rgba(80,250,123,0.1); }
 .block.error-lines, .block.error-sep { border-color: rgba(255,85,85,0.3); background: rgba(255,85,85,0.05); }
 .block.missing { border-color: rgba(255,184,108,0.3); background: rgba(255,184,108,0.05); }
+.block.untranslated { border-color: rgba(139,233,253,0.25); background: rgba(139,233,253,0.04); }
 .block.selected { border-color: rgba(124,111,219,0.5); background: rgba(124,111,219,0.08); }
 .select-indicator {
   position: absolute; top: 0; left: 0; width: 32px; height: 100%;
@@ -425,7 +513,9 @@ function onKeydown(e: KeyboardEvent) {
   width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent);
 }
 .sep-label { font-size: 10px; opacity: 0.3; margin-bottom: 4px; }
-.line-count { position: absolute; bottom: 4px; right: 8px; font-size: 9px; opacity: 0.3; }
+.block-badges { position: absolute; bottom: 4px; right: 8px; display: flex; gap: 6px; align-items: center; }
+.badge-untranslated-block { font-size: 8px; padding: 1px 4px; border-radius: 3px; background: rgba(139,233,253,0.15); color: #8be9fd; }
+.line-count { font-size: 9px; opacity: 0.3; }
 pre { margin: 0; white-space: pre-wrap; word-break: break-all; font-size: 12px; font-family: inherit; }
 .block-editor {
   width: 100%; background: transparent; border: none; color: var(--mainColor);

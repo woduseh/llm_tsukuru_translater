@@ -1,12 +1,11 @@
 import path from 'path'
 import fs from 'fs'
-import iconv from 'iconv-lite'
-import { appCtx } from './appContext'
-export { rmBom } from './js/libs/fileIO'
 
-export function decodeEncoding(buffer:Uint8Array){
-    if(appCtx.WolfMetadata.ver === 2){
-        return iconv.decode(Buffer.from(buffer), "Shift_JIS")
+const shiftJisDecoder = new TextDecoder('shift_jis');
+
+export function decodeEncoding(buffer:Uint8Array, wolfMetadata: { ver: 2 | 3 | -1 }){
+    if(wolfMetadata.ver === 2){
+        return shiftJisDecoder.decode(buffer)
     }
     else{
         return Buffer.from(buffer).toString('utf-8')

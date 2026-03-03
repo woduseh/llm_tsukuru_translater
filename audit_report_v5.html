@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>프로덕션 준비 상태 코드 감사 보고서 v5</title>
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #1c2333; --border: #30363d;
+    --text: #c9d1d9; --text2: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --orange: #d29922; --cyan: #39d2c0;
+    --purple: #bc8cff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Segoe UI', sans-serif; line-height: 1.6; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; color: #fff; }
+  h2 { font-size: 17px; font-weight: 600; margin: 28px 0 12px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  h3 { font-size: 14px; font-weight: 600; margin: 16px 0 8px; color: var(--text); }
+  .subtitle { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+  .card-header { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .grade-card { background: var(--bg3); border: 2px solid var(--accent); border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 16px; }
+  .grade-letter { font-size: 64px; font-weight: 800; color: var(--accent); line-height: 1; }
+  .grade-score { font-size: 28px; font-weight: 700; color: #fff; margin-top: 4px; }
+  .grade-label { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
+  th { text-align: left; padding: 8px 10px; background: var(--bg3); color: var(--text2); font-weight: 600; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 10px; border-bottom: 1px solid rgba(48,54,61,0.5); vertical-align: top; }
+  tr:hover td { background: rgba(56,62,77,0.2); }
+  .score-cell { font-weight: 700; font-size: 15px; text-align: center; }
+  .score-high { color: var(--green); }
+  .score-mid { color: var(--orange); }
+  .score-low { color: var(--red); }
+  .weight-cell { text-align: center; color: var(--text2); }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .tag-quick { background: rgba(63,185,80,0.15); color: var(--green); }
+  .tag-hardening { background: rgba(210,153,34,0.15); color: var(--orange); }
+  .tag-strategic { background: rgba(188,140,255,0.15); color: var(--purple); }
+
+  .finding { margin-bottom: 10px; padding-left: 12px; border-left: 3px solid var(--border); }
+  .finding.positive { border-left-color: var(--green); }
+  .finding.negative { border-left-color: var(--red); }
+  .finding.neutral { border-left-color: var(--orange); }
+  .finding-title { font-weight: 600; font-size: 13px; }
+  .finding-detail { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .file-ref { color: var(--cyan); font-family: 'Consolas', monospace; font-size: 11px; }
+
+  .tech-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+  .tech-item { background: var(--bg3); padding: 8px 12px; border-radius: 6px; font-size: 12px; }
+  .tech-label { color: var(--text2); font-size: 11px; }
+  .tech-value { color: #fff; font-weight: 600; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+  .stat-box { background: var(--bg3); border-radius: 8px; padding: 12px; text-align: center; }
+  .stat-num { font-size: 24px; font-weight: 700; color: #fff; }
+  .stat-label { font-size: 11px; color: var(--text2); }
+
+  .summary-zone { background: linear-gradient(135deg, #1a1f35, #161b22); border: 2px solid var(--accent); border-radius: 12px; padding: 24px; margin-top: 32px; }
+  .summary-zone h2 { color: #fff; border-bottom-color: rgba(88,166,255,0.3); }
+  .verdict-text { font-size: 14px; line-height: 1.8; }
+  .verdict-ruling { font-size: 15px; font-weight: 700; margin-top: 12px; padding: 10px 16px; background: rgba(88,166,255,0.08); border-radius: 8px; text-align: center; }
+  .scores-inline { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+  .score-inline-item { background: var(--bg3); padding: 8px 14px; border-radius: 6px; font-size: 12px; text-align: center; min-width: 120px; }
+  .score-inline-num { font-size: 20px; font-weight: 700; }
+  .score-inline-label { color: var(--text2); font-size: 11px; }
+  .builder-tagline { font-style: italic; color: var(--purple); font-size: 14px; margin-bottom: 12px; padding: 8px 12px; background: rgba(188,140,255,0.06); border-radius: 6px; }
+  .action-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid rgba(48,54,61,0.4); font-size: 13px; }
+  .action-num { min-width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; background: var(--bg3); border-radius: 50%; font-size: 11px; font-weight: 700; color: var(--accent); flex-shrink: 0; }
+  .action-text { flex: 1; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🔍 프로덕션 준비 상태 코드 감사 보고서</h1>
+<p class="subtitle">v5 — 2026-03-03 · 전체 코드베이스 정밀 검토</p>
+
+<!-- ==================== DETAIL ZONE ==================== -->
+
+<h2>A. 개요 및 기술 스택</h2>
+
+<div class="stat-grid">
+  <div class="stat-box"><div class="stat-num">8,862</div><div class="stat-label">소스 LOC (.ts/.vue/.mjs)</div></div>
+  <div class="stat-box"><div class="stat-num">190</div><div class="stat-label">테스트 (10개 파일)</div></div>
+  <div class="stat-box"><div class="stat-num">129</div><div class="stat-label">커밋 (3명 기여자)</div></div>
+  <div class="stat-box"><div class="stat-num">73</div><div class="stat-label">소스 파일 (.ts 64 + .vue 9)</div></div>
+</div>
+
+<p style="font-size:13px; margin-bottom:12px;">RPG Maker MV/MZ 및 Wolf RPG Editor 게임의 텍스트를 추출·번역·적용하는 Electron 데스크톱 도구. Gemini LLM API를 이용한 자동 번역, 번역 비교·검증 UI, 암호화 에셋 처리, Wolf 바이너리 파싱을 지원한다. Windows 전용 단일 사용자 도구.</p>
+
+<div class="tech-grid">
+  <div class="tech-item"><div class="tech-label">프레임워크</div><div class="tech-value">Electron 40.6 + Vue 3.5</div></div>
+  <div class="tech-item"><div class="tech-label">언어</div><div class="tech-value">TypeScript 5.9 (strict)</div></div>
+  <div class="tech-item"><div class="tech-label">빌더</div><div class="tech-value">Vite + electron-builder 26</div></div>
+  <div class="tech-item"><div class="tech-label">테스트</div><div class="tech-value">Vitest 4.0 (V8 coverage)</div></div>
+  <div class="tech-item"><div class="tech-label">린트</div><div class="tech-value">ESLint 10 + @typescript-eslint</div></div>
+  <div class="tech-item"><div class="tech-label">CI/CD</div><div class="tech-value">GitHub Actions (Windows)</div></div>
+  <div class="tech-item"><div class="tech-label">LLM</div><div class="tech-value">Gemini API (axios)</div></div>
+  <div class="tech-item"><div class="tech-label">데이터</div><div class="tech-value">electron-store + msgpack + zlib</div></div>
+</div>
+<p style="font-size:11px; color:var(--text2); margin-top:6px;">LOC: Get-Content *.ts/*.vue/*.mjs 합산 (node_modules/dist 제외, .d.ts 제외). 테스트: vitest run 출력. 커밋: git log --oneline 카운트.</p>
+
+<!-- SCORES TABLE -->
+<h2>B. 점수 테이블</h2>
+
+<table>
+  <thead>
+    <tr><th>카테고리</th><th class="weight-cell">가중치</th><th>점수</th><th>가중 점수</th><th>요약</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>1. 지속 가능성</strong></td>
+      <td class="weight-cell">30%</td>
+      <td class="score-cell score-mid">6.5</td>
+      <td class="score-cell">1.95</td>
+      <td>모듈 분리 양호, 전역 가변 상태·이중 파일 컨벤션이 유지보수 부담</td>
+    </tr>
+    <tr>
+      <td><strong>2. 엔지니어링 재현성</strong></td>
+      <td class="weight-cell">25%</td>
+      <td class="score-cell score-high">7.5</td>
+      <td class="score-cell">1.88</td>
+      <td>CI·lockfile·190개 테스트 완비, 이중 파일 빌드 규칙 암묵적</td>
+    </tr>
+    <tr>
+      <td><strong>3. 기술 현대성 및 보안</strong></td>
+      <td class="weight-cell">20%</td>
+      <td class="score-cell score-mid">5.5</td>
+      <td class="score-cell">1.10</td>
+      <td>최신 스택이나 LLM 안전 필터 전면 해제·SHA-256 미적용 등 취약점 존재</td>
+    </tr>
+    <tr>
+      <td><strong>4. 코드 품질 및 구조 위험</strong></td>
+      <td class="weight-cell">25%</td>
+      <td class="score-cell score-mid">6.0</td>
+      <td class="score-cell">1.50</td>
+      <td>핵심 로직 테스트 양호, Wolf 파서 무한 루프·매직 넘버 산재</td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr style="background:var(--bg3);">
+      <td colspan="3" style="text-align:right; font-weight:700;">가중 총점</td>
+      <td class="score-cell" style="font-size:18px; color:var(--accent);">6.43</td>
+      <td style="color:var(--text2);">/10.00</td>
+    </tr>
+  </tfoot>
+</table>
+<p style="font-size:11px; color:var(--text2);">가중치 근거: Windows 전용 단일 사용자 데스크톱 도구이므로 지속 가능성(30%)과 코드 품질(25%)이 가장 중요하고, 서버가 아닌 로컬 앱이므로 보안 가중치는 20%로 조정. 재현성은 팀 합류 가능성을 고려해 25%.</p>
+
+<!-- KEY FINDINGS -->
+<h2>C. 핵심 발견 사항</h2>
+
+<h3>1. 지속 가능성 (6.5/10)</h3>
+
+<div class="finding positive">
+  <div class="finding-title">✅ 체계적 모듈 분리</div>
+  <div class="finding-detail"><span class="file-ref">main.ts</span> 40줄로 축소, 6개 IPC 핸들러 모듈 분리, 추출 파이프라인 4파일 분할. <span class="file-ref">compareUtils.ts</span>에 순수 로직 분리는 테스트 용이성을 크게 높임.</div>
+</div>
+<div class="finding negative">
+  <div class="finding-title">⚠️ 이중 파일 컨벤션 (.ts + .js)</div>
+  <div class="finding-detail">메인 프로세스 .ts 파일마다 커밋된 .js 컴패니언 46개를 수동 동기화해야 함. <span class="file-ref">vitest.config.ts</span>에서 resolve.extensions 순서를 바꿔야 .ts가 우선 로드되는 등, 새 개발자가 빠지기 쉬운 함정. 의도적 트레이드오프지만 onboarding 비용이 높다.</div>
+</div>
+<div class="finding negative">
+  <div class="finding-title">⚠️ 전역 가변 상태 의존</div>
+  <div class="finding-detail"><span class="file-ref">appContext.ts</span>의 <code>appCtx</code> 싱글톤에 mainWindow, settings, gb, WolfCache 등 앱 전체 상태가 집중. 크기 제한 없는 <code>gb</code>·<code>WolfCache</code>는 대형 게임에서 메모리 문제 가능. <code>globalThis</code> → <code>appCtx</code> 마이그레이션은 긍정적이나, 여전히 전역 뮤터블 객체.</div>
+</div>
+
+<h3>2. 엔지니어링 재현성 (7.5/10)</h3>
+
+<div class="finding positive">
+  <div class="finding-title">✅ 완전한 CI 파이프라인 + 190개 테스트</div>
+  <div class="finding-detail"><span class="file-ref">.github/workflows/ci.yml</span>: tsc → lint → test:coverage → electron-builder 검증. 10개 테스트 파일에서 190개 테스트 모두 통과. <span class="file-ref">package-lock.json</span> 커밋, <code>npm ci</code> 사용.</div>
+</div>
+<div class="finding positive">
+  <div class="finding-title">✅ README 한국어 문서화</div>
+  <div class="finding-detail"><span class="file-ref">readme.md</span>에 설치·실행·빌드·테스트 명령어와 프로젝트 구조가 명시됨. CHANGELOG.md에 3.0.0 변경 내역 정리.</div>
+</div>
+<div class="finding neutral">
+  <div class="finding-title">⚠ 이중 파일 빌드 규칙 미문서화</div>
+  <div class="finding-detail">.ts/.js 이중 파일 컨벤션, <code>git add -f</code> 필요성, vitest resolve.extensions 설정의 이유가 <span class="file-ref">readme.md</span>에 없음. <span class="file-ref">.github/copilot-instructions.md</span>에만 기록되어 있어 새 개발자가 인지하기 어렵다.</div>
+</div>
+
+<h3>3. 기술 현대성 및 보안 (5.5/10)</h3>
+
+<div class="finding positive">
+  <div class="finding-title">✅ 최신 스택 + preload 보안 모델</div>
+  <div class="finding-detail">Electron 40, Vue 3.5, TypeScript 5.9 strict, Vite, Vitest 4 — 모두 현역 최신 버전. contextIsolation + preload 화이트리스트(<span class="file-ref">preload.ts</span>) 적용, <code>path.resolve()</code> + <code>path.sep</code> 기반 경로 검증으로 경로 탈출 방지.</div>
+</div>
+<div class="finding negative">
+  <div class="finding-title">🔴 LLM 안전 필터 전면 해제</div>
+  <div class="finding-detail"><span class="file-ref">geminiTranslator.ts:256-261</span> — 4개 유해 콘텐츠 카테고리를 모두 <code>BLOCK_NONE</code>으로 설정. 게임 번역이라는 맥락에서 의도적이지만, 사용자가 임의 텍스트를 번역할 수 있으므로 유해 출력 위험 존재. 트레이드오프: 필터 활성화 시 게임 전투·폭력 대사가 차단될 수 있음.</div>
+</div>
+<div class="finding negative">
+  <div class="finding-title">🔴 SHA-256 검증 비활성화 + 라이선스 불일치</div>
+  <div class="finding-detail"><span class="file-ref">extentions.ts:10</span> — <code>WOLFDEC_SHA256 = ''</code>로 외부 바이너리 다운로드 검증이 사실상 비활성화. <span class="file-ref">package.json</span>은 MIT, <span class="file-ref">LICENSE</span> 파일은 GPL-3.0 — 법적 모순.</div>
+</div>
+
+<h3>4. 코드 품질 및 구조 위험 (6.0/10)</h3>
+
+<div class="finding positive">
+  <div class="finding-title">✅ 핵심 파이프라인 테스트 커버리지</div>
+  <div class="finding-detail">추출-적용 라운드트립(<span class="file-ref">extract-apply.test.ts</span>), 번역 블록 검증(<span class="file-ref">translator.test.ts</span> 37개), JSON 구조 검증(<span class="file-ref">verify.test.ts</span> 37개), 비교 유틸(<span class="file-ref">compareUtils.test.ts</span> 25개)에 대한 충실한 테스트.</div>
+</div>
+<div class="finding negative">
+  <div class="finding-title">🔴 Wolf 바이너리 파서 무한 루프 위험</div>
+  <div class="finding-detail"><span class="file-ref">wolf/parser/io.ts:26-31</span> — <code>findByteArray()</code>가 바이트 시퀀스를 찾지 못하면 <code>while(true)</code>로 무한 루프. <span class="file-ref">patternBased.ts:46</span>의 이벤트 파싱 루프도 동일한 위험. 손상된 Wolf 파일 입력 시 앱이 100% CPU를 소비하며 행(hang).</div>
+</div>
+<div class="finding negative">
+  <div class="finding-title">⚠️ apply.ts 경로 오타 — 잠재적 데이터 손실</div>
+  <div class="finding-detail"><span class="file-ref">apply.ts:31-35</span> — <code>.Completed</code> 존재 시 <code>/Completed</code>(점 없음)를 삭제 시도. 서로 다른 디렉토리를 참조하므로 <code>.Completed</code>가 이미 존재하면 기존 <code>Completed</code> 폴더가 삭제되지만 새 <code>.Completed</code>는 생성되지 않아 완료 상태가 유실될 수 있음.</div>
+</div>
+<div class="finding neutral">
+  <div class="finding-title">⚠ 매직 넘버·한국어 하드코딩 산재</div>
+  <div class="finding-detail">이벤트 코드 401/108/355/655, 자동줄바꿈 임계값 80/60, 정렬 모드 문자열 등이 상수 정의 없이 사용. UI 메시지는 전부 한국어 리터럴로, 국제화 가능성 없음. 단일 사용자 한국어 도구라는 맥락에서 의도적이나 유지보수 시 파편화 위험.</div>
+</div>
+
+<!-- ACTION PLAN -->
+<h2>D. 조치 계획</h2>
+
+<div class="action-item">
+  <div class="action-num">1</div>
+  <div class="action-text">
+    <strong>라이선스 불일치 해결</strong> <span class="tag tag-quick">Quick Win</span><br>
+    <span style="color:var(--text2); font-size:12px;"><span class="file-ref">package.json</span>의 "license": "MIT"와 <span class="file-ref">LICENSE</span> 파일(GPL-3.0)의 모순 해소. 배포 전 반드시 하나로 통일.</span>
+  </div>
+</div>
+<div class="action-item">
+  <div class="action-num">2</div>
+  <div class="action-text">
+    <strong>Wolf 파서 무한 루프 방지</strong> <span class="tag tag-hardening">Hardening</span><br>
+    <span style="color:var(--text2); font-size:12px;"><span class="file-ref">wolf/parser/io.ts</span>의 <code>findByteArray()</code>와 <span class="file-ref">patternBased.ts</span>의 이벤트 파싱 루프에 버퍼 길이 기반 bounds check 추가. 최대 반복 횟수 또는 포인터 범위 체크.</span>
+  </div>
+</div>
+<div class="action-item">
+  <div class="action-num">3</div>
+  <div class="action-text">
+    <strong>apply.ts 경로 오타 수정</strong> <span class="tag tag-quick">Quick Win</span><br>
+    <span style="color:var(--text2); font-size:12px;"><span class="file-ref">apply.ts:32</span>의 <code>'/Completed'</code>를 <code>'/.Completed'</code>로 수정하여 디렉토리 이름 일관성 확보.</span>
+  </div>
+</div>
+<div class="action-item">
+  <div class="action-num">4</div>
+  <div class="action-text">
+    <strong>WolfDec SHA-256 검증 활성화</strong> <span class="tag tag-hardening">Hardening</span><br>
+    <span style="color:var(--text2); font-size:12px;"><span class="file-ref">extentions.ts:10</span>의 빈 해시를 실제 SHA-256 값으로 채우거나, 해시 검증을 사용자에게 경고하는 UI 피드백 추가.</span>
+  </div>
+</div>
+<div class="action-item">
+  <div class="action-num">5</div>
+  <div class="action-text">
+    <strong>이중 파일 컨벤션 문서화 또는 자동화</strong> <span class="tag tag-strategic">Strategic</span><br>
+    <span style="color:var(--text2); font-size:12px;"><span class="file-ref">readme.md</span>에 .ts/.js 이중 파일 규칙 명시하고, prestart/prebuild의 tsc 스텝이 이를 자동 동기화함을 설명. 장기적으로는 <code>preload.ts</code>를 번들러(esbuild)로 처리하여 .js 컴패니언 제거 검토.</span>
+  </div>
+</div>
+<div class="action-item">
+  <div class="action-num">6</div>
+  <div class="action-text">
+    <strong>vitest.config.js 중복 파일 제거</strong> <span class="tag tag-quick">Quick Win</span><br>
+    <span style="color:var(--text2); font-size:12px;"><span class="file-ref">vitest.config.js</span>는 <span class="file-ref">vitest.config.ts</span>의 tsc 컴파일 산출물. .gitignore에 추가하거나 삭제하여 혼란 방지.</span>
+  </div>
+</div>
+<div class="action-item">
+  <div class="action-num">7</div>
+  <div class="action-text">
+    <strong>매직 넘버 상수화</strong> <span class="tag tag-strategic">Strategic</span><br>
+    <span style="color:var(--text2); font-size:12px;"><span class="file-ref">parser.ts</span>·<span class="file-ref">apply.ts</span>의 이벤트 코드(401, 108, 355 등), 자동줄바꿈 임계값(80, 60)을 <span class="file-ref">datas.ts</span>에 명명된 상수로 정의.</span>
+  </div>
+</div>
+
+<!-- ==================== SUMMARY ZONE ==================== -->
+
+<div class="summary-zone">
+  <h2 style="margin-top:0;">E. 빌더 태그라인</h2>
+  <div class="builder-tagline">"레거시 코드를 현대 스택 위에 체계적으로 재구축하되, 바이너리 파서와 전역 상태는 아직 리팩토링의 손길이 닿지 않은 실용주의 엔지니어."</div>
+
+  <h2>F. 최종 평가</h2>
+
+  <div class="grade-card">
+    <div class="grade-letter">B</div>
+    <div class="grade-score">6.43 / 10</div>
+    <div class="grade-label">HARDENING NEEDED — 강화 필요</div>
+  </div>
+
+  <div class="scores-inline">
+    <div class="score-inline-item"><div class="score-inline-num score-mid">6.5</div><div class="score-inline-label">지속 가능성</div><div style="font-size:11px; color:var(--text2);">모듈화 우수, 이중 파일 부담</div></div>
+    <div class="score-inline-item"><div class="score-inline-num score-high">7.5</div><div class="score-inline-label">재현성</div><div style="font-size:11px; color:var(--text2);">CI + 190 테스트 완비</div></div>
+    <div class="score-inline-item"><div class="score-inline-num score-mid">5.5</div><div class="score-inline-label">기술/보안</div><div style="font-size:11px; color:var(--text2);">최신 스택, 검증 미비</div></div>
+    <div class="score-inline-item"><div class="score-inline-num score-mid">6.0</div><div class="score-inline-label">코드 품질</div><div style="font-size:11px; color:var(--text2);">핵심 테스트 양호, 파서 취약</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">프로젝트 설명</div>
+    <p style="font-size:13px;">게임 엔진 리소스에서 텍스트를 추출하고, LLM API로 자동 번역한 뒤, 원본 데이터에 재적용하는 Windows 데스크톱 도구. 추출-번역-적용 파이프라인에 번역 비교·구조 검증·블록 단위 편집 기능을 제공한다.</p>
+    <p style="font-size:13px; margin-top:6px;"><strong>스택:</strong> Electron · Vue 3 · TypeScript · Vite · Vitest · Gemini API</p>
+  </div>
+
+  <div class="verdict-text" style="margin-top:16px;">
+    <p>750줄짜리 모놀리식 메인 파일을 37줄 + 6개 모듈로 분리하고, 190개 유닛 테스트와 CI를 구축한 것은 코드베이스 현대화의 확실한 성과다. 추출-적용 라운드트립 테스트, 블록 검증 로직의 순수 함수 분리, preload 경로 화이트리스트 등 핵심 영역의 엔지니어링은 견실하다. 반면, Wolf 바이너리 파서의 bounds check 부재(<code>while(true)</code> 무한 루프), apply.ts의 디렉토리명 오타로 인한 잠재적 데이터 손실, 외부 바이너리 SHA-256 미검증은 실사용에서 문제를 일으킬 수 있는 실질적 결함이다. 이중 파일 컨벤션(.ts와 커밋된 .js 46쌍)은 이 프로젝트 고유의 부채로, 빌드 규칙을 모르는 개발자가 .ts만 수정하고 .js 동기화를 빠뜨리면 런타임과 소스가 분리되는 위험이 상존한다. 라이선스 파일(GPL-3.0)과 package.json(MIT)의 모순은 배포 전 반드시 해결해야 한다.</p>
+  </div>
+
+  <div class="verdict-ruling">
+    🟡 제한적 프로덕션 준비 완료 — 파서 안전성 보강, 라이선스 통일, 경로 오타 수정 후 배포 가능
+  </div>
+</div>
+
+</div>
+</body>
+</html>

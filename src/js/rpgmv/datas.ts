@@ -1,6 +1,5 @@
 import { AppSettings } from '../../types/settings'
-
-const styles = require('./styles').default
+import styles from './styles'
 
 export const settings: AppSettings = {
     extractJs: false,
@@ -89,15 +88,7 @@ export const translateable = [
     '<shop_mes:',
 ]
 
-export const translateableOne = [
-    "<namePop:"
-]
-
-export const note2able = [
-    '選択肢ヘルプ',
-]
-
-export const hanguls = /[ㄱ-ㅎㅏ-ㅣ가-힣]/;
+export const hanguls= /[ㄱ-ㅎㅏ-ㅣ가-힣]/;
 
 export const beautifyCodes = [
     108

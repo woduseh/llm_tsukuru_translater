@@ -1,20 +1,22 @@
-import { app, BrowserWindow } from 'electron';
+import { app } from 'electron';
 import Store from 'electron-store';
+import crypto from 'crypto';
 import tools from '../js/libs/projectTools'
 import * as dataBaseO from '../js/rpgmv/datas.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import { appCtx } from '../appContext';
+import { AppContext } from '../appContext';
+import { PROJECT_ROOT } from '../projectRoot';
 
 function getEncryptionKey(): string {
   const keyPath = path.join(app.getPath('userData'), '.store-key');
   try {
     if (fs.existsSync(keyPath)) {
-      return fs.readFileSync(keyPath, 'utf8').trim();
+      const key = fs.readFileSync(keyPath, 'utf8').trim();
+      if (key) return key;
     }
   } catch { /* generate new */ }
-  // Use old hardcoded key as initial value for migration compatibility
-  const newKey = 'tsukuru-extractor-store-key';
+  const newKey = crypto.randomBytes(32).toString('hex');
   try { fs.writeFileSync(keyPath, newKey, 'utf8'); } catch {}
   return newKey;
 }
@@ -22,58 +24,43 @@ function getEncryptionKey(): string {
 export const storage = new Store({ encryptionKey: getEncryptionKey() });
 export const defaultHeight = 550;
 
-let mainid = 0;
-
-export function getMainId(): number {
-  return mainid;
+export function sendAlert(ctx: AppContext, txt: string){
+  ctx.mainWindow!.webContents.send('alert', txt);
 }
 
-export function setMainId(id: number): void {
-  mainid = id;
+export function sendError(ctx: AppContext, txt: string){
+  ctx.mainWindow!.webContents.send('alert', {icon: 'error',  message: txt});
 }
 
-export const getMainWindow = (): BrowserWindow => {
-  const ID = mainid * 1;
-  return BrowserWindow.fromId(ID)!;
+export function worked(ctx: AppContext){
+  ctx.mainWindow!.webContents.send('worked', 0);
+  ctx.mainWindow!.webContents.send('loading', 0);
 }
 
-export function sendAlert(txt: string){
-  getMainWindow().webContents.send('alert', txt);
+export function getSettings(ctx: AppContext){
+  return ctx.settings
 }
 
-export function sendError(txt: string){
-  getMainWindow().webContents.send('alert', {icon: 'error',  message: txt});
-}
-
-export function worked(){
-  getMainWindow().webContents.send('worked', 0);
-  getMainWindow().webContents.send('loading', 0);
-}
-
-export function getSettings(){
-  return appCtx.settings
-}
-
-export async function loadSettings(){
+export async function loadSettings(ctx: AppContext){
   let givensettings = {}
 
   if(storage.has('settings')){
     givensettings = JSON.parse(storage.get('settings') as string)
   }
 
-  appCtx.settings = dataBaseO.settings
+  ctx.settings = dataBaseO.settings
 
 
-  appCtx.settings = {...appCtx.settings, ...givensettings}
-  appCtx.settings.version = app.getVersion()
-  storage.set('settings', JSON.stringify(appCtx.settings))
+  ctx.settings = {...ctx.settings, ...givensettings}
+  ctx.settings.version = app.getVersion()
+  storage.set('settings', JSON.stringify(ctx.settings))
 }
 
-export function setOPath(){
+export function setOPath(ctx: AppContext){
   if(tools.packed){
-    appCtx.oPath = process.resourcesPath
+    ctx.oPath = process.resourcesPath
   }
   else{
-    appCtx.oPath = __dirname.replace(/[/\\]src[/\\]ipc$/, '')
+    ctx.oPath = PROJECT_ROOT
   }
 }

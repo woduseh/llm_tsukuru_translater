@@ -4,26 +4,26 @@ import { writeToPath } from '@fast-csv/format';
 import { DecryptDir as DecryptDirs, EncryptDir as EncryptDirs } from '../fileCrypto';
 import type { ExtractArg } from '../types';
 import { resetHadComment } from './parser';
-import { appCtx } from '../../../appContext';
+import { AppContext } from '../../../appContext';
 
-export const init_extract = (arg: ExtractArg) => {
+export const init_extract = (arg: ExtractArg, ctx: AppContext) => {
     resetHadComment()
     function c(fileName: string){
-        appCtx.gb[fileName] = {data: {}}
-        appCtx.gb[fileName].outputText = ''
-        appCtx.gb[fileName].isbom = false 
+        ctx.gb[fileName] = {data: {}}
+        ctx.gb[fileName].outputText = ''
+        ctx.gb[fileName].isbom = false 
     }
-    if(appCtx.settings.onefile_src && arg.ext_src){
+    if(ctx.settings.onefile_src && arg.ext_src){
         c('ext_scripts.json')
     }
-    if(appCtx.settings.onefile_src && arg.ext_javascript){
+    if(ctx.settings.onefile_src && arg.ext_javascript){
         c('ext_javascript.json')
     }
-    if(appCtx.settings.onefile_note && arg.ext_note){
+    if(ctx.settings.onefile_note && arg.ext_note){
         c('ext_note.json')
         c('ext_note2.json')
     }
-    if(appCtx.settings.oneMapFile){
+    if(ctx.settings.oneMapFile){
         c('Maps.json')
     }
 }

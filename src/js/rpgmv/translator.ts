@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import { createGeminiTranslator, TranslationLog, TranslationLogEntry, contentHash } from '../libs/geminiTranslator';
 import Tools from '../libs/projectTools';
-import { appCtx } from '../../appContext';
+import { AppContext } from '../../appContext';
 
 const PROGRESS_FILE = '.llm_progress.json';
 const CACHE_FILE = '.llm_cache.json';
@@ -79,7 +79,7 @@ interface TransArg {
     translationMode?: string;
 }
 
-export const trans = async (ev: unknown, arg: TransArg) => {
+export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
     Tools.send('llmTranslating', true);
     try {
         const dir = Buffer.from(arg.dir, "base64").toString('utf8');
@@ -90,15 +90,15 @@ export const trans = async (ev: unknown, arg: TransArg) => {
             Tools.worked();
             return;
         }
-        if (!appCtx.settings.llmApiKey) {
+        if (!ctx.settings.llmApiKey) {
             Tools.sendError('Gemini API 키가 설정되지 않았습니다');
             Tools.send('llmTranslating', false);
             Tools.worked();
             return;
         }
 
-        const targetLang = appCtx.settings.llmTargetLang || 'ko';
-        const gemini = createGeminiTranslator(appCtx.settings, arg.langu || 'ja', targetLang);
+        const targetLang = ctx.settings.llmTargetLang || 'ko';
+        const gemini = createGeminiTranslator(ctx.settings, arg.langu || 'ja', targetLang, () => ctx.llmAbort);
         const fileList = fs.readdirSync(edir).filter(f => f.endsWith('.txt'));
 
         if (fileList.length === 0) {
@@ -156,7 +156,7 @@ export const trans = async (ev: unknown, arg: TransArg) => {
                             if (fileContent === backupContent) {
                                 // Untranslated file — invalidate its cache entry
                                 const hash = contentHash(backupContent);
-                                const cacheKey = `${hash}_${appCtx.settings.llmModel}_${targetLang}`;
+                                const cacheKey = `${hash}_${ctx.settings.llmModel}_${targetLang}`;
                                 if (cache[cacheKey]) {
                                     delete cache[cacheKey];
                                     cacheModified = true;
@@ -178,7 +178,7 @@ export const trans = async (ev: unknown, arg: TransArg) => {
 
         // Cache
         const cache = loadCache(edir);
-        const model = appCtx.settings.llmModel;
+        const model = ctx.settings.llmModel;
 
         // Log
         const translationLog: TranslationLog = {
@@ -199,7 +199,7 @@ export const trans = async (ev: unknown, arg: TransArg) => {
         const failedFiles: string[] = [];
 
         for (const fileName of fileList) {
-            if (appCtx.llmAbort) break;
+            if (ctx.llmAbort) break;
             const filePath = path.join(edir, fileName);
             const originalContent = fs.readFileSync(filePath, 'utf-8');
 
@@ -283,8 +283,7 @@ export const trans = async (ev: unknown, arg: TransArg) => {
                 failedFiles.push(fileName);
             }
 
-            const hasError = validation.some(b => !b.lineCountMatch || !b.separatorMatch);
-            if (hasError) totalErrors += validation.filter(b => !b.lineCountMatch || !b.separatorMatch).length;
+            totalErrors += validation.filter(b => !b.lineCountMatch || !b.separatorMatch).length;
             totalBlocks += validation.length;
 
             const fullLogEntry: TranslationLogEntry = {
@@ -298,7 +297,7 @@ export const trans = async (ev: unknown, arg: TransArg) => {
         }
 
         // Finalize
-        const aborted = !!appCtx.llmAbort;
+        const aborted = !!ctx.llmAbort;
         if (!aborted) clearProgress(edir);
         translationLog.endTime = new Date().toISOString();
         translationLog.totalDurationMs = Date.now() - startTime;
@@ -337,6 +336,7 @@ export async function retranslateFile(
     fileName: string,
     sourceLang: string,
     targetLang: string,
+    ctx: AppContext,
     onProgress?: (msg: string) => void
 ): Promise<{ success: boolean; error?: string }> {
     const backupDir = edir + BACKUP_SUFFIX;
@@ -348,8 +348,8 @@ export async function retranslateFile(
     }
 
     const originalContent = fs.readFileSync(backupPath, 'utf-8');
-    const gemini = createGeminiTranslator(appCtx.settings, sourceLang, targetLang);
-    const model = appCtx.settings.llmModel;
+    const gemini = createGeminiTranslator(ctx.settings, sourceLang, targetLang, () => ctx.llmAbort);
+    const model = ctx.settings.llmModel;
 
     // Invalidate cache for this file's original content and persist immediately
     const cache = loadCache(edir);
@@ -395,6 +395,7 @@ export async function retranslateBlocks(
     blockIndices: number[],
     sourceLang: string,
     targetLang: string,
+    ctx: AppContext,
     onProgress?: (msg: string) => void
 ): Promise<{ success: boolean; error?: string }> {
     const backupDir = edir + BACKUP_SUFFIX;
@@ -407,7 +408,7 @@ export async function retranslateBlocks(
 
     const originalContent = fs.readFileSync(backupPath, 'utf-8');
     const transContent = fs.readFileSync(filePath, 'utf-8');
-    const gemini = createGeminiTranslator(appCtx.settings, sourceLang, targetLang);
+    const gemini = createGeminiTranslator(ctx.settings, sourceLang, targetLang, () => ctx.llmAbort);
 
     // Split both files into blocks
     const origLines = originalContent.split('\n');
@@ -446,11 +447,15 @@ export async function retranslateBlocks(
         // Split translated result back into blocks
         const translatedBlocks = splitFileBlocks(translated.split('\n'));
 
-        // Replace only the selected blocks in the translated file
+        // Replace or insert the selected blocks in the translated file
         for (let i = 0; i < blockIndices.length; i++) {
             const idx = blockIndices[i];
-            if (idx < transBlocks.length && i < translatedBlocks.length) {
+            if (i >= translatedBlocks.length) break;
+            if (idx < transBlocks.length) {
                 transBlocks[idx] = translatedBlocks[i];
+            } else {
+                // Block missing in translation — insert at the end
+                transBlocks.push(translatedBlocks[i]);
             }
         }
 
@@ -465,7 +470,7 @@ export async function retranslateBlocks(
         // Invalidate cache
         const cache = loadCache(edir);
         const hash = contentHash(originalContent);
-        const model = appCtx.settings.llmModel;
+        const model = ctx.settings.llmModel;
         const cacheKey = `${hash}_${model}_${targetLang}`;
         delete cache[cacheKey];
         saveCache(edir, cache);

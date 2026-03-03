@@ -1,29 +1,35 @@
-import { initAppContext } from './src/appContext';
-initAppContext();
-
 import log from './src/logger';
 
 import { app, BrowserWindow, ipcMain } from 'electron';
-import * as applyjs from "./src/js/rpgmv/apply.js";
-import { createWindow } from './src/ipc/windowManager';
-import './src/ipc/extractHandler';
-import './src/ipc/settingsHandler';
-import './src/ipc/translateHandler';
-import './src/ipc/toolsHandler';
-import { wolfInit } from './src/js/wolf/main.js';
+import { apply } from "./src/js/rpgmv/apply";
+import { createWindow, registerWindowHandlers } from './src/ipc/windowManager';
+import { registerExtractHandlers } from './src/ipc/extractHandler';
+import { registerSettingsHandlers } from './src/ipc/settingsHandler';
+import { registerTranslateHandlers } from './src/ipc/translateHandler';
+import { registerToolsHandlers } from './src/ipc/toolsHandler';
+import { registerWolfHandlers } from './src/js/wolf/main';
 import { initFontIPC } from './src/js/rpgmv/fonts';
 import { initExtentions } from './src/js/libs/extentions';
+import { AppContext } from './src/appContext';
 
-export { worked } from './src/ipc/shared';
+const ctx = new AppContext();
 
-ipcMain.on('apply', applyjs.apply)
+registerWindowHandlers(ctx);
+registerExtractHandlers(ctx);
+registerSettingsHandlers(ctx);
+registerTranslateHandlers(ctx);
+registerToolsHandlers(ctx);
+registerWolfHandlers(ctx);
+initFontIPC();
+
+ipcMain.on('apply', (ev, arg) => apply(ev, arg, ctx));
 
 app.whenReady().then(() => {
-  createWindow()
-  initExtentions()
+  createWindow(ctx)
+  initExtentions(ctx)
 
   app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) createWindow(ctx)
   })
 })
 
@@ -38,6 +44,3 @@ process.on('uncaughtException', function (err) {
 process.on('unhandledRejection', (reason) => {
   log.error('Unhandled rejection:', reason);
 })
-
-wolfInit()
-initFontIPC()
