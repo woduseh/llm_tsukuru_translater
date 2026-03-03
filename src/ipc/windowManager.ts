@@ -28,7 +28,8 @@ export function createWindow() {
     mainWindow.show();
     getMainWindow().webContents.send('is_version', app.getVersion());
     globalThis.settings.themeData = (Themes as Record<string, any>)[globalThis.settings.theme]
-    getMainWindow().webContents.send('getGlobalSettings', globalThis.settings);
+    const { llmApiKey, ...safeSettings } = globalThis.settings;
+    getMainWindow().webContents.send('getGlobalSettings', safeSettings);
     if(!tools.packed){
       globalShortcut.register('Control+Shift+I', () => {
         mainWindow.webContents.openDevTools()

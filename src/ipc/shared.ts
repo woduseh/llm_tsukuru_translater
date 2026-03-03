@@ -3,7 +3,7 @@ import Store from 'electron-store';
 import tools from '../js/libs/projectTools'
 import * as dataBaseO from '../js/rpgmv/datas.js';
 
-export const storage = new Store();
+export const storage = new Store({ encryptionKey: 'tsukuru-extractor-store-key' });
 export const defaultHeight = 550;
 
 let mainid = 0;

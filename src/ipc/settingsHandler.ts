@@ -34,7 +34,8 @@ ipcMain.on('applysettings', async (ev, arg) => {
   storage.set('settings', JSON.stringify(globalThis.settings))
   globalThis.settingsWindow.close()
   globalThis.settings.themeData = (Themes as Record<string, any>)[globalThis.settings.theme]
-  getMainWindow().webContents.send('getGlobalSettings', globalThis.settings);
+  const { llmApiKey, ...safeSettings } = globalThis.settings;
+  getMainWindow().webContents.send('getGlobalSettings', safeSettings);
   worked()
 })
 

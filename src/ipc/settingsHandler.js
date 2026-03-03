@@ -70,7 +70,8 @@ electron_1.ipcMain.on('applysettings', async (ev, arg) => {
     shared_1.storage.set('settings', JSON.stringify(globalThis.settings));
     globalThis.settingsWindow.close();
     globalThis.settings.themeData = styles_1.default[globalThis.settings.theme];
-    (0, shared_1.getMainWindow)().webContents.send('getGlobalSettings', globalThis.settings);
+    const { llmApiKey, ...safeSettings } = globalThis.settings;
+    (0, shared_1.getMainWindow)().webContents.send('getGlobalSettings', safeSettings);
     (0, shared_1.worked)();
 });
 electron_1.ipcMain.on('closesettings', async (ev, arg) => {

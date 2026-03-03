@@ -32,7 +32,8 @@ function createWindow() {
         mainWindow.show();
         (0, shared_1.getMainWindow)().webContents.send('is_version', electron_1.app.getVersion());
         globalThis.settings.themeData = styles_1.default[globalThis.settings.theme];
-        (0, shared_1.getMainWindow)().webContents.send('getGlobalSettings', globalThis.settings);
+        const { llmApiKey, ...safeSettings } = globalThis.settings;
+        (0, shared_1.getMainWindow)().webContents.send('getGlobalSettings', safeSettings);
         if (!projectTools_1.default.packed) {
             electron_1.globalShortcut.register('Control+Shift+I', () => {
                 mainWindow.webContents.openDevTools();
