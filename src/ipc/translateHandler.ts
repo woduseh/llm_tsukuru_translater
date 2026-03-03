@@ -4,6 +4,8 @@ import path from 'path';
 import * as eztrans from '../js/rpgmv/translator.js';
 import { getMainWindow, storage } from './shared';
 import { getLLMCompareWindow } from './toolsHandler';
+import { loadRoute } from './viteHelper';
+import log from '../logger';
 
 let llmSettingsWindow: Electron.BrowserWindow | null = null;
 let llmPendingArg: { dir: string; game: string } | null = null;
@@ -30,7 +32,7 @@ ipcMain.on('openLLMSettings', (ev, arg) => {
     icon: path.join(__dirname, '../../res/icon.png'),
   });
   llmSettingsWindow.setMenu(null);
-  llmSettingsWindow.loadFile('src/html/llm/index.html');
+  loadRoute(llmSettingsWindow, '/llm-settings');
   llmSettingsWindow.webContents.on('did-finish-load', () => {
     llmSettingsWindow!.show();
     llmSettingsWindow!.webContents.send('llmSettings', globalThis.settings);
@@ -98,6 +100,7 @@ ipcMain.on('retranslateFile', async (_ev, data: { dir: string; fileName: string 
       lcw.webContents.send('retranslateFileDone', result);
     }
   } catch (err: unknown) {
+    log.error('Retranslate file failed:', err);
     const lcw = getLLMCompareWindow();
     if (lcw && !lcw.isDestroyed()) {
       lcw.webContents.send('retranslateFileDone', { success: false, error: (err as Error).message || String(err) });
@@ -129,6 +132,7 @@ ipcMain.on('retranslateBlocks', async (_ev, data: { dir: string; fileName: strin
       lcw.webContents.send('retranslateBlocksDone', result);
     }
   } catch (err: unknown) {
+    log.error('Retranslate blocks failed:', err);
     const lcw = getLLMCompareWindow();
     if (lcw && !lcw.isDestroyed()) {
       lcw.webContents.send('retranslateBlocksDone', { success: false, error: (err as Error).message || String(err) });

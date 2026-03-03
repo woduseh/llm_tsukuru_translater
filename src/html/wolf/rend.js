@@ -1,3 +1,4 @@
+"use strict";
 (() => {
     const bottomMenu = document.querySelector('.smalmar');
     const mainMenu = document.querySelector('#mainMenu');
@@ -18,8 +19,7 @@
     function isBoolean(val) {
         return typeof val === 'boolean';
     }
-    function getString(obj, key, fallback) {
-        if (fallback === undefined) fallback = '';
+    function getString(obj, key, fallback = '') {
         const v = obj[key];
         return typeof v === 'string' ? v : fallback;
     }
@@ -37,9 +37,11 @@
         return timeString;
     }
     window.api.send('setheight', 550);
+    //@ts-ignore
     const Swal = window.Swal;
     window.api.on('getGlobalSettings', (tt) => {
-        if (!isRecord(tt)) return;
+        if (!isRecord(tt))
+            return;
         globalSettings = tt;
         if (getString(tt, 'language') === 'en') {
             globalThis.loadEn();
@@ -51,7 +53,8 @@
         }
     });
     window.api.on('alertExten', async (arg) => {
-        if (!Array.isArray(arg)) return;
+        if (!Array.isArray(arg))
+            return;
         const { isDenied } = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
@@ -82,7 +85,8 @@
         window.api.send('select_folder', 'folder_input');
     });
     window.api.on('set_path', (tt) => {
-        if (!isRecord(tt)) return;
+        if (!isRecord(tt))
+            return;
         const type = getString(tt, 'type');
         const dir = getString(tt, 'dir');
         document.getElementById(type).value = dir;
@@ -170,7 +174,8 @@
         }
     });
     window.api.on('loadingTag', (tt) => {
-        if (!isString(tt)) return;
+        if (!isString(tt))
+            return;
         loadingTag = tt;
     });
     window.api.on('loading', (tt) => {
@@ -239,7 +244,8 @@
     // LLM translation abort button
     let llmTranslating = false;
     window.api.on('llmTranslating', (val) => {
-        if (!isBoolean(val)) return;
+        if (!isBoolean(val))
+            return;
         llmTranslating = val;
         document.getElementById('abort-llm-btn').style.display = val ? 'block' : 'none';
     });

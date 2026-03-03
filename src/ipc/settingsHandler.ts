@@ -3,6 +3,7 @@ import path from 'path';
 import * as edTool from '../js/rpgmv/edtool.js';
 import Themes from '../js/rpgmv/styles'
 import { getMainWindow, sendError, worked, getSettings, storage } from './shared';
+import { loadRoute } from './viteHelper';
 
 ipcMain.on('settings', () => {
   globalThis.settingsWindow = new BrowserWindow({
@@ -19,7 +20,7 @@ ipcMain.on('settings', () => {
     icon: path.join(__dirname, '../../res/icon.png'),
   })
   globalThis.settingsWindow.setMenu(null)
-  globalThis.settingsWindow.loadFile('src/html/config/settings.html')
+  loadRoute(globalThis.settingsWindow, '/settings')
   globalThis.settingsWindow.webContents.on('did-finish-load', function () {
     globalThis.settingsWindow.show();
     globalThis.settingsWindow.webContents.send('settings', getSettings());
@@ -71,7 +72,7 @@ ipcMain.on('gamePatcher', (ev, dir) => {
     icon: path.join(__dirname, '../../res/icon.png'),
   })
   globalThis.settingsWindow.setMenu(null)
-  globalThis.settingsWindow.loadFile('src/html/patcher/index.html')
+  loadRoute(globalThis.settingsWindow, '/game-patcher')
   globalThis.settingsWindow.webContents.on('did-finish-load', function () {
     globalThis.settingsWindow.show();
     globalThis.settingsWindow.webContents.send('settings', getSettings());

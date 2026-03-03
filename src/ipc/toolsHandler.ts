@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import open from 'open';
 import * as prjc from '../js/rpgmv/projectConvert';
+import { loadRoute } from './viteHelper';
 
 let llmCompareWindow: Electron.BrowserWindow | null = null;
 let jsonVerifyWindow: Electron.BrowserWindow | null = null;
@@ -30,7 +31,7 @@ ipcMain.on('openLLMCompare', (ev, dir: string) => {
     icon: path.join(__dirname, '../../res/icon.png'),
   });
   llmCompareWindow.setMenu(null);
-  llmCompareWindow.loadFile('src/html/llm-compare/index.html');
+  loadRoute(llmCompareWindow, '/llm-compare');
   llmCompareWindow.webContents.on('did-finish-load', () => {
     llmCompareWindow!.show();
     llmCompareWindow!.webContents.send('initCompare', dir);
@@ -66,7 +67,7 @@ ipcMain.on('openJsonVerify', (ev, dir: string) => {
     icon: path.join(__dirname, '../../res/icon.png'),
   });
   jsonVerifyWindow.setMenu(null);
-  jsonVerifyWindow.loadFile('src/html/json-verify/index.html');
+  loadRoute(jsonVerifyWindow, '/json-verify');
   jsonVerifyWindow.webContents.on('did-finish-load', () => {
     jsonVerifyWindow!.show();
     jsonVerifyWindow!.webContents.send('verifySettings', globalThis.settings);

@@ -1,4 +1,7 @@
-export const state = {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Swal = exports.ETA_WINDOW = exports.state = void 0;
+exports.state = {
     running: false,
     config: {
         ext_plugin: false,
@@ -21,7 +24,6 @@ export const state = {
     speedSamples: [],
     llmTranslating: false
 };
-
-export const ETA_WINDOW = 10;
-
-export const Swal = window.Swal;
+exports.ETA_WINDOW = 10;
+//@ts-ignore
+exports.Swal = window.Swal;

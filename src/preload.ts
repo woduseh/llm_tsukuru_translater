@@ -4,11 +4,12 @@ const path = require('path');
 let allowedBasePaths: string[] = [];
 
 ipcRenderer.on('set-allowed-paths', (_event: unknown, paths: string[]) => {
-  allowedBasePaths = paths.map((p: string) => path.resolve(p));
+  const resolved = paths.map((p: string) => path.resolve(p));
+  allowedBasePaths = [...new Set([...allowedBasePaths, ...resolved])];
 });
 
 function isPathAllowed(filePath: string): boolean {
-  if (allowedBasePaths.length === 0) return true;
+  if (allowedBasePaths.length === 0) return false;
   const resolved = path.resolve(filePath);
   return allowedBasePaths.some((base: string) => resolved === base || resolved.startsWith(base + path.sep));
 }

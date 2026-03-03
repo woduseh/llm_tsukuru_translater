@@ -5,6 +5,7 @@ import * as edTool from './edtool.js';
 import yaml from 'js-yaml';
 import { sleep } from './globalutils';
 import Tools from '../libs/projectTools';
+import log from '../../logger';
 
 import type { ApplyArg } from './types';
 
@@ -47,7 +48,7 @@ export const apply = async (ev: unknown, arg: ApplyArg) => {
           }
           try {
             OutputData[i] = JSON.parse(filedata)  
-          } catch (error) { console.warn('Failed to parse backup file:', i, error) }
+          } catch (error) { log.warn('Failed to parse backup file:', i, error) }
         }
       }
       for(const i of Object.keys(ext_dat)){
@@ -98,7 +99,7 @@ export const apply = async (ev: unknown, arg: ApplyArg) => {
                 }
               }
               OutputData[originFile] = ExtTool.setObj(ext_dat[i].data[q].val, output, OutputData[originFile]) 
-            } catch (error) { console.warn('Failed to set value for:', ext_dat[i].data[q].val, error) }
+            } catch (error) { log.warn('Failed to set value for:', ext_dat[i].data[q].val, error) }
           }
         }
         Tools.send('loading', worked_files/max_files*100);
@@ -145,6 +146,7 @@ export const apply = async (ev: unknown, arg: ApplyArg) => {
       Tools.send('alert2');
       Tools.send('loading', 0);
     } catch (err) {
+      log.error('Apply failed:', err);
       Tools.sendError(JSON.stringify(err, Object.getOwnPropertyNames(err)));
     }
     Tools.worked();

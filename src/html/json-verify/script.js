@@ -1,5 +1,6 @@
+"use strict";
 (() => {
-        let dataDir = '';
+    let dataDir = '';
     let origDir = '';
     let transDir = '';
     let files = [];
@@ -7,12 +8,14 @@
     function detectDirs(dir) {
         const completedDir = window.nodePath.join(dir, 'Completed', 'data');
         const backupDir = window.nodePath.join(dir, 'Backup');
+        // Completed/data 존재 → Backup(원본) vs Completed/data(번역)
         if (window.nodeFs.existsSync(completedDir)) {
             if (window.nodeFs.existsSync(backupDir)) {
                 return { origDir: backupDir, transDir: completedDir };
             }
             return { origDir: dir, transDir: completedDir };
         }
+        // Backup만 존재 (즉시 적용 모드) → Backup(원본) vs data(번역)
         if (window.nodeFs.existsSync(backupDir)) {
             return { origDir: backupDir, transDir: dir };
         }
@@ -228,6 +231,7 @@
         document.getElementById('repairFileBtn').disabled = !currentHasIssues;
     }
     function repairFile(idx) {
+        var _a;
         const f = files[idx];
         if (f.issues.length === 0)
             return { success: false, error: '문제가 없는 파일입니다' };
@@ -241,14 +245,18 @@
             const orig = JSON.parse(origData);
             const trans = JSON.parse(transData);
             const repaired = window.verify.repairJson(orig, trans);
-            const indent = 4 * Number(globalThis.settings?.JsonChangeLine || 0);
+            const indent = 4 * Number(((_a = globalThis.settings) === null || _a === void 0 ? void 0 : _a.JsonChangeLine) || 0);
             const output = JSON.stringify(repaired, null, indent);
+            // 실제 저장
             window.nodeFs.writeFileSync(f.transPath, output, 'utf-8');
+            // 저장 확인: 파일이 실제로 기록되었는지 검증
             const written = window.nodeFs.readFileSync(f.transPath, 'utf-8');
             if (written !== output) {
                 return { success: false, error: '파일 저장 후 검증 실패: 기록된 내용이 일치하지 않습니다' };
             }
+            // Re-verify
             const newIssues = window.verify.verifyJsonIntegrity(orig, repaired);
+            // 수정 후에는 의도적으로 보존된 warn 레벨 문자열 변경 경고를 제외
             const filteredIssues = newIssues.filter(i => !(i.type === 'string_changed' && i.severity === 'warning'));
             f.issues = filteredIssues;
             f.errorCount = filteredIssues.filter(i => i.severity === 'error').length;
@@ -261,14 +269,17 @@
             return { success: false, error: e.message || String(e) };
         }
     }
+    // IPC: 초기화
     window.api.on('initVerify', (dir) => {
         loadFiles(dir);
     });
     window.api.on('verifySettings', (settings) => {
         globalThis.settings = settings;
     });
+    // 검색 / 필터
     document.getElementById('file-search').addEventListener('input', () => renderFileList());
     document.getElementById('filter-issues').addEventListener('change', () => renderFileList());
+    // 개별 파일 수정
     document.getElementById('repairFileBtn').onclick = () => {
         if (files.length === 0)
             return;
@@ -287,6 +298,7 @@
         renderIssues();
         updateButtons();
     };
+    // 전체 수정
     document.getElementById('repairAllBtn').onclick = () => {
         let repaired = 0;
         let failed = 0;
@@ -317,6 +329,7 @@
         renderIssues();
         updateButtons();
     };
+    // 닫기
     document.getElementById('closeBtn').onclick = () => {
         window.close();
     };

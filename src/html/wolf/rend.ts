@@ -10,6 +10,20 @@
     let estimatedTime = ''
     let loadingTag = ''
 
+    function isRecord(val: unknown): val is Record<string, unknown> {
+        return val !== null && typeof val === 'object' && !Array.isArray(val);
+    }
+    function isString(val: unknown): val is string {
+        return typeof val === 'string';
+    }
+    function isBoolean(val: unknown): val is boolean {
+        return typeof val === 'boolean';
+    }
+    function getString(obj: Record<string, unknown>, key: string, fallback = ''): string {
+        const v = obj[key];
+        return typeof v === 'string' ? v : fallback;
+    }
+
     function toHHMMSS(num:number) {
         const sec_num = Math.max(0, Math.round(num))
         const hours = Math.floor(sec_num / 3600)
@@ -27,8 +41,9 @@
     const Swal = window.Swal
     
     window.api.on('getGlobalSettings', (tt: unknown) => {
-        globalSettings = tt as Record<string, unknown>
-        if((tt as Record<string, unknown>).language === 'en'){
+        if (!isRecord(tt)) return;
+        globalSettings = tt
+        if(getString(tt, 'language') === 'en'){
             globalThis.loadEn()
         }
         const tData = (globalSettings.themeData) as Record<string, string>
@@ -39,15 +54,15 @@
     })
 
     window.api.on('alertExten', async (arg: unknown) => {
-        const extArg = arg as string[];
+        if (!Array.isArray(arg)) return;
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
             denyButtonText: "아니요",
-            title: extArg[0],
+            title: String(arg[0]),
         })
         if(!isDenied){
-            window.api.send("getextention", extArg[1])
+            window.api.send("getextention", String(arg[1]))
         }
         else{
             window.api.send("getextention", 'none')
@@ -73,10 +88,12 @@
         window.api.send('select_folder', 'folder_input');
     });
     window.api.on('set_path', (tt: unknown) => {
-        const payload = tt as {type: string; dir: string};
-        (document.getElementById(payload.type) as HTMLInputElement).value = payload.dir
-        if(payload.type !== 'folder_input'){
-            document.getElementById(payload.type)!.innerText = payload.dir
+        if (!isRecord(tt)) return;
+        const type = getString(tt, 'type');
+        const dir = getString(tt, 'dir');
+        (document.getElementById(type) as HTMLInputElement).value = dir
+        if(type !== 'folder_input'){
+            document.getElementById(type)!.innerText = dir
         }
     });
     document.getElementById('WolfBtn')!.onclick = () => {
@@ -148,22 +165,23 @@
     }
 
     window.api.on('alert', (tt: unknown) => {
-        if (typeof tt === 'string') {
+        if (isString(tt)) {
             Swal.fire({
                 icon: 'success',
                 title: tt,
             })
         }
-        else{
+        else if (isRecord(tt)) {
             Swal.fire({
-                icon: (tt as Record<string, unknown>).icon,
-                title: (tt as Record<string, unknown>).message,
+                icon: getString(tt, 'icon', 'info') as any,
+                title: getString(tt, 'message'),
             })
         }
     });
 
     window.api.on('loadingTag', (tt: unknown) => {
-        loadingTag = tt as string
+        if (!isString(tt)) return;
+        loadingTag = tt
     })
 
     window.api.on('loading', (tt: number) => {
@@ -237,7 +255,8 @@
     let llmTranslating = false;
 
     window.api.on('llmTranslating', (val: unknown) => {
-        llmTranslating = val as boolean;
+        if (!isBoolean(val)) return;
+        llmTranslating = val;
         document.getElementById('abort-llm-btn')!.style.display = val ? 'block' : 'none';
     })
 

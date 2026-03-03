@@ -1,6 +1,8 @@
 import { initAppContext } from './src/appContext';
 initAppContext();
 
+import log from './src/logger';
+
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as applyjs from "./src/js/rpgmv/apply.js";
 import { createWindow } from './src/ipc/windowManager';
@@ -30,7 +32,11 @@ app.on('window-all-closed', function () {
 })
 
 process.on('uncaughtException', function (err) {
-  console.log(err);
+  log.error('Uncaught exception:', err);
+})
+
+process.on('unhandledRejection', (reason) => {
+  log.error('Unhandled rejection:', reason);
 })
 
 wolfInit()

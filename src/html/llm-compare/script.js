@@ -1,5 +1,6 @@
+"use strict";
 (() => {
-        const SEP_RE = /^---\s*\d+\s*---$/;
+    const SEP_RE = /^---\s*\d+\s*---$/;
     let dataDir = '';
     let files = [];
     let currentIdx = 0;

@@ -1,4 +1,4 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { removeSync } from "fs-extra";
 import path from "path";
 import { checkExtention, ExtentionPath } from "../../libs/extentions";
@@ -8,7 +8,7 @@ const Decrypter = path.join(ExtentionPath, 'wolfdec.exe')
 
 function DecryptFile(file:string) {
     return new Promise<void>((resolve) => {
-        const d = exec(`${Decrypter} ${file}`, {cwd: path.dirname(file)})
+        const d = execFile(Decrypter, [file], {cwd: path.dirname(file)})
         d.on('exit', () => {
             removeSync(file)
             resolve()

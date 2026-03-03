@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>프로덕션 준비도 감사 보고서 v3</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;line-height:1.6;padding:20px;max-width:1200px;margin:0 auto}
+  h1{color:#58a6ff;font-size:1.6rem;border-bottom:2px solid #30363d;padding-bottom:12px;margin-bottom:20px}
+  h2{color:#79c0ff;font-size:1.2rem;margin:24px 0 12px;padding:8px 12px;background:#161b22;border-left:3px solid #58a6ff;border-radius:4px}
+  h3{color:#d2a8ff;font-size:1rem;margin:16px 0 8px}
+  p{margin:6px 0;font-size:.9rem}
+  .zone{border:1px solid #30363d;border-radius:8px;padding:20px;margin:16px 0}
+  .detail-zone{background:#0d1117}
+  .summary-zone{background:linear-gradient(135deg,#161b22 0%,#1c2333 100%);border-color:#58a6ff}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:.85rem}
+  th{background:#21262d;color:#79c0ff;text-align:left;padding:10px 12px;border:1px solid #30363d;font-weight:600}
+  td{padding:8px 12px;border:1px solid #30363d;vertical-align:top}
+  tr:nth-child(even){background:#161b22}
+  .score-table td:nth-child(3),.score-table td:nth-child(4){text-align:center;font-weight:700}
+  .total-row{background:#1f2937!important;font-size:1rem}
+  .total-row td{border-top:2px solid #58a6ff;padding:12px;color:#fff}
+  .grade-badge{display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:12px;font-size:2rem;font-weight:900;margin:8px;vertical-align:middle}
+  .grade-B{background:linear-gradient(135deg,#1a6b3c,#238636);color:#3fb950;border:2px solid #3fb950}
+  .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.75rem;font-weight:600;margin:2px}
+  .tag-quick{background:#1f3d1f;color:#3fb950;border:1px solid #3fb950}
+  .tag-harden{background:#3d2f1f;color:#d29922;border:1px solid #d29922}
+  .tag-strat{background:#2d1f3d;color:#bc8cff;border:1px solid #bc8cff}
+  .metric{display:inline-block;background:#21262d;border:1px solid #30363d;border-radius:6px;padding:6px 14px;margin:4px;text-align:center}
+  .metric .val{font-size:1.5rem;font-weight:700;color:#58a6ff;display:block}
+  .metric .lbl{font-size:.7rem;color:#8b949e}
+  .finding{margin:8px 0;padding:8px 12px;background:#161b22;border-radius:4px;border-left:3px solid #30363d}
+  .finding.neg{border-left-color:#f85149}
+  .finding.pos{border-left-color:#3fb950}
+  .finding.neu{border-left-color:#d29922}
+  .file-ref{color:#d2a8ff;font-family:'Cascadia Code',Consolas,monospace;font-size:.82rem}
+  .verdict-box{background:#161b22;border:2px solid #58a6ff;border-radius:12px;padding:24px;margin:16px 0;text-align:center}
+  .verdict-score{font-size:3rem;font-weight:900;color:#58a6ff}
+  .verdict-label{font-size:1rem;color:#8b949e;margin-top:4px}
+  .builder-tag{font-style:italic;color:#d29922;font-size:.95rem;padding:10px;background:#1f1d16;border-radius:6px;border:1px solid #d29922;margin:12px 0}
+  .stack-chip{display:inline-block;background:#21262d;color:#79c0ff;padding:2px 8px;border-radius:12px;font-size:.78rem;margin:2px;border:1px solid #30363d}
+  .progress-bar{background:#21262d;border-radius:4px;height:8px;margin:4px 0;overflow:hidden}
+  .progress-fill{height:100%;border-radius:4px;transition:width .3s}
+  .sep{border-top:1px solid #30363d;margin:20px 0}
+  ul{margin:6px 0 6px 20px;font-size:.88rem}
+  li{margin:3px 0}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:768px){.two-col{grid-template-columns:1fr}.metric{min-width:80px}}
+  .inline-score{font-weight:700;font-size:1.1rem}
+  .s-high{color:#3fb950}.s-mid{color:#d29922}.s-low{color:#f85149}
+</style>
+</head>
+<body>
+
+<h1>🔍 프로덕션 준비도 감사 보고서 <span style="float:right;font-size:.8rem;color:#8b949e">v3 — 2026-03-03</span></h1>
+
+<!-- ===== DETAIL ZONE ===== -->
+<div class="zone detail-zone">
+
+<h2>A. 프로젝트 개요 &amp; 기술 스택</h2>
+<p>RPG Maker MV/MZ 및 Wolf RPG Editor 게임의 텍스트를 추출·번역·적용하는 Electron 데스크톱 애플리케이션이다. Gemini LLM API를 활용한 자동 번역, JSON/CSV 추출, 이미지·오디오 복호화, 버전 업그레이드 도구를 제공하며, 주 대상은 Windows 환경의 한국어 사용자이다.</p>
+
+<div style="display:flex;flex-wrap:wrap;margin:12px 0">
+  <div class="metric"><span class="val">7,377</span><span class="lbl">TS 소스 라인</span></div>
+  <div class="metric"><span class="val">53</span><span class="lbl">.ts 파일 (src+root)</span></div>
+  <div class="metric"><span class="val">136</span><span class="lbl">테스트 (8 스위트)</span></div>
+  <div class="metric"><span class="val">113</span><span class="lbl">커밋</span></div>
+  <div class="metric"><span class="val">0</span><span class="lbl">취약점 (npm audit)</span></div>
+  <div class="metric"><span class="val">0</span><span class="lbl">tsc 에러</span></div>
+</div>
+
+<table>
+<tr><th>기술</th><th>버전</th><th>용도</th></tr>
+<tr><td>Electron</td><td>40.6.1</td><td>데스크톱 런타임</td></tr>
+<tr><td>TypeScript</td><td>5.9.3</td><td>strict 모드, 정적 타입</td></tr>
+<tr><td>Node.js</td><td>20 (CI)</td><td>런타임 타겟</td></tr>
+<tr><td>Vitest</td><td>4.0.18</td><td>유닛 테스트</td></tr>
+<tr><td>ESLint + @typescript-eslint</td><td>10.0 / 8.56</td><td>린팅</td></tr>
+<tr><td>electron-builder</td><td>26.8.1</td><td>Windows NSIS/portable 빌드</td></tr>
+<tr><td>electron-store</td><td>8.2.0</td><td>암호화 설정 저장</td></tr>
+<tr><td>axios</td><td>1.13.6</td><td>Gemini API HTTP 클라이언트</td></tr>
+<tr><td>GitHub Actions</td><td>-</td><td>CI (tsc + lint + test)</td></tr>
+</table>
+
+<p style="font-size:.82rem;color:#8b949e">측정 방법: LOC = <code>Get-Content *.ts | Measure-Object -Sum</code>, 테스트 = <code>vitest run</code> 실행 결과, 커밋 = <code>git log --oneline | wc -l</code>, 취약점 = <code>npm audit</code></p>
+
+<!-- SCORES TABLE -->
+<h2>B. 점수 요약</h2>
+
+<table class="score-table">
+<tr><th>카테고리</th><th>가중치</th><th>점수</th><th>가중 점수</th><th>한줄 요약</th></tr>
+<tr>
+  <td><strong>지속가능성</strong></td><td>30%</td>
+  <td class="s-mid">7.0</td><td>2.10</td>
+  <td>모듈 분리 완료, AppContext 싱글톤 도입, 타입 체계 구축 — globalThis 잔여 의존성과 로깅 부재가 약점</td>
+</tr>
+<tr>
+  <td><strong>재현성</strong></td><td>25%</td>
+  <td class="s-mid">7.5</td><td>1.88</td>
+  <td>CI 파이프라인·lockfile·136개 테스트 — README 불충분, 커버리지 미계측, 빌드 단계 CI 미포함</td>
+</tr>
+<tr>
+  <td><strong>보안</strong></td><td>25%</td>
+  <td class="s-mid">6.5</td><td>1.63</td>
+  <td>contextIsolation·preload 화이트리스트·API키 헤더 전송 — 암호화 키 하드코딩, exec() 미세정, 빈 화이트리스트 허용</td>
+</tr>
+<tr>
+  <td><strong>코드 품질</strong></td><td>20%</td>
+  <td class="s-mid">7.0</td><td>1.40</td>
+  <td>any 82% 감소, extract/renderer 분할, 타입 인터페이스 — 빈 catch 1건 잔존, unknown 캐스팅 검증 누락</td>
+</tr>
+<tr class="total-row">
+  <td colspan="3"><strong>가중 총점</strong></td>
+  <td><span style="font-size:1.4rem;color:#58a6ff">7.01</span> / 10</td>
+  <td><span class="grade-badge grade-B">B</span> 하드닝 필요 단계</td>
+</tr>
+</table>
+
+<p style="font-size:.82rem;color:#8b949e"><strong>가중치 근거:</strong> 로컬 전용 데스크톱 도구로 네트워크 공격면이 제한적이나, LLM API 키를 다루므로 보안 가중치 유지. 솔로 도구 특성상 지속가능성(유지보수 인수)과 재현성(빌드 재현)이 핵심.</p>
+
+<!-- KEY FINDINGS -->
+<h2>C. 주요 발견 사항</h2>
+
+<h3>1. 지속가능성 (7.0/10)</h3>
+
+<div class="finding pos">
+  <strong>✅ 모듈 분리 완수:</strong> <span class="file-ref">main.ts</span> 750→37줄, <span class="file-ref">extract.ts</span> 577줄→4파일 분할(<span class="file-ref">extract/parser.ts</span>, <span class="file-ref">formatter.ts</span>, <span class="file-ref">io.ts</span>, <span class="file-ref">index.ts</span>), <span class="file-ref">renderer.ts</span> 618줄→6파일 분할. IPC 핸들러 6개 모듈로 체계화. <em>의도적 구조 개선 — 각 모듈이 단일 책임을 가짐.</em>
+</div>
+
+<div class="finding pos">
+  <strong>✅ 타입 체계 구축:</strong> <span class="file-ref">src/types/settings.ts</span>에 AppSettings(27필드), <span class="file-ref">src/js/rpgmv/types.ts</span>에 RPG Maker 타입 20+ 인터페이스 정의. any 113→20건(-82%), ESLint 경고 248→131건(-47%). <em>명시적 타입이 코드 이해도를 높임.</em>
+</div>
+
+<div class="finding neg">
+  <strong>⚠️ 구조적 로깅 부재:</strong> 전체 코드베이스가 <code>console.log/warn/error</code>에 의존. <span class="file-ref">main.ts:32</span>의 <code>uncaughtException</code> 핸들러가 console.log만 호출 — 프로덕션 크래시 디버깅 불가. Winston/Pino 같은 구조적 로깅 없음. <em>의도적 간소화가 아닌 누락 — 크래시 로그 파일(<span class="file-ref">debug_crash.log</span>) 존재가 필요성을 반증.</em>
+</div>
+
+<h3>2. 재현성 (7.5/10)</h3>
+
+<div class="finding pos">
+  <strong>✅ 테스트 인프라 견고:</strong> 136개 테스트(8 스위트) — 추출↔적용 라운드트립(21), 번역기 블록 로직(37), 암복호화(11), AppContext 동기화(21), 유틸리티(17), JSON 무결성(18). <code>vitest run</code> 332ms 완주. 엣지 케이스(빈 맵, null 이벤트, 멀티라인, BOM) 포함.
+</div>
+
+<div class="finding pos">
+  <strong>✅ CI 파이프라인:</strong> <span class="file-ref">.github/workflows/ci.yml</span> — Windows runner, Node 20, <code>npm ci → tsc → lint → test</code>. <code>package-lock.json</code> 커밋, 의존성 핀 완료.
+</div>
+
+<div class="finding neu">
+  <strong>⚠️ README 문서 부족:</strong> <span class="file-ref">readme.md</span>는 4줄 분량으로 설치·설정·개발 가이드 없음. 위키 참조만 존재하나 로컬 문서 미포함. <code>.env.example</code>, CHANGELOG 부재. <em>오픈소스 데스크톱 도구로서 최소한의 설치 가이드 필요.</em>
+</div>
+
+<h3>3. 보안 (6.5/10)</h3>
+
+<div class="finding pos">
+  <strong>✅ Electron 보안 모델 적용:</strong> <code>contextIsolation: true</code>, preload 스크립트의 채널 화이트리스트(21 send, 15 receive), API 키 <code>x-goog-api-key</code> 헤더 전송, <code>electron-store</code> 암호화. innerHTML 0건 달성(15건→0건). nodeFs에 경로 화이트리스트 도입(<span class="file-ref">preload.ts:10-14</span>).
+</div>
+
+<div class="finding neg">
+  <strong>⚠️ 경로 화이트리스트 기본값 허용:</strong> <span class="file-ref">preload.ts:11</span> — <code>if (allowedBasePaths.length === 0) return true</code>. 앱 시작 직후 또는 폴더 미선택 상태에서 모든 경로 접근 가능. <em>기능 호환성을 위한 트레이드오프이나, 기본 거부가 안전한 디폴트.</em>
+</div>
+
+<div class="finding neg">
+  <strong>⚠️ 하드코딩된 암호화 키:</strong> <span class="file-ref">src/ipc/shared.ts:6</span> — <code>encryptionKey: 'tsukuru-extractor-store-key'</code>가 소스에 노출. 또한 <span class="file-ref">decrypter.ts:11</span>에서 <code>exec()</code>를 사용한 외부 바이너리 실행 — <code>execFile()</code>이 안전. <em>exec()는 shell injection 가능성이 있으나, 경로가 내부 생성이므로 실질 위험은 낮음.</em>
+</div>
+
+<h3>4. 코드 품질 (7.0/10)</h3>
+
+<div class="finding pos">
+  <strong>✅ globalThis.mwindow 완전 마이그레이션:</strong> 대상 모듈(apply, translator, fileCrypto, projectConvert)에서 47건 제거 완료. Tools.send() 추상화 일관 적용. 잔여 6건은 인프라 모듈(windowManager, settingsHandler)에서의 정당한 사용.
+</div>
+
+<div class="finding pos">
+  <strong>✅ 타입 안전성 대폭 향상:</strong> strict 모드 하에서 any 20건만 잔존(대부분 IPC 콜백의 <code>...args: any[]</code>와 서드파티 Swal 타입). <span class="file-ref">src/js/rpgmv/types.ts</span>(253줄)에 RPG Maker 전체 데이터 구조 타입화.
+</div>
+
+<div class="finding neg">
+  <strong>⚠️ unknown 캐스팅 검증 부재:</strong> 렌더러 전반에서 IPC 수신 데이터를 <code>(tt as Record&lt;string, unknown&gt;)</code>로 캐스팅하나 런타임 검증 없음. 형상 불일치 시 런타임 크래시 가능. <span class="file-ref">apply.ts:97</span>에 빈 catch 블록 1건 잔존. <em>빈 catch는 JSON.parse 실패 시 기존 데이터 유지 의도로 보이나 명시적 주석 없음.</em>
+</div>
+
+<!-- ACTION PLAN -->
+<h2>D. 개선 로드맵</h2>
+
+<table>
+<tr><th>#</th><th>항목</th><th>분류</th><th>영향</th></tr>
+<tr>
+  <td>1</td>
+  <td><strong>preload 기본 거부 정책:</strong> <code>allowedBasePaths</code> 빈 상태에서 <code>return false</code>로 변경. 메인 프로세스에서 앱 초기화 시 즉시 허용 경로 전송.</td>
+  <td><span class="tag tag-quick">Quick Win</span></td>
+  <td>보안 +0.5</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><strong>exec() → execFile() 교체:</strong> <span class="file-ref">decrypter.ts</span>의 shell 실행을 직접 실행으로 전환. 쉘 인젝션 벡터 제거.</td>
+  <td><span class="tag tag-quick">Quick Win</span></td>
+  <td>보안 +0.3</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><strong>구조적 로깅 도입:</strong> 파일 기반 로그 라이브러리(electron-log 등) 적용. uncaughtException 핸들러 강화. 프로덕션 디버깅 가능성 확보.</td>
+  <td><span class="tag tag-harden">Hardening</span></td>
+  <td>지속가능성 +0.5</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><strong>README 및 개발자 문서:</strong> 설치→설정→실행→테스트 시퀀스, .env.example, 아키텍처 다이어그램 추가. CHANGELOG 시작.</td>
+  <td><span class="tag tag-harden">Hardening</span></td>
+  <td>재현성 +0.5</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><strong>IPC 페이로드 런타임 검증:</strong> Zod 또는 수동 가드로 unknown 캐스팅 전 형상 확인. 타입 단언을 타입 가드로 교체.</td>
+  <td><span class="tag tag-harden">Hardening</span></td>
+  <td>코드품질 +0.5</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><strong>CI 빌드 단계 추가:</strong> <code>electron-builder</code> dry-run을 CI에 포함. 테스트 커버리지 리포팅(vitest coverage) 도입.</td>
+  <td><span class="tag tag-strat">Strategic</span></td>
+  <td>재현성 +0.3</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><strong>암호화 키 외부화:</strong> electron-store 암호화 키를 머신별 고유값(DPAPI 또는 Keytar)으로 교체. 소스 코드에서 시크릿 완전 제거.</td>
+  <td><span class="tag tag-strat">Strategic</span></td>
+  <td>보안 +0.3</td>
+</tr>
+</table>
+
+</div><!-- /detail-zone -->
+
+<!-- ===== SUMMARY ZONE ===== -->
+<div class="zone summary-zone">
+
+<h2 style="border-left-color:#3fb950">E. 빌더 태그라인</h2>
+<div class="builder-tag">
+  "실용주의 리팩터러 — 거대한 단일 파일을 모듈로 쪼개고 타입을 입히는 데 집중하며, 인프라(로깅·문서)보다 구조적 코드 품질을 우선시하는 엔지니어."
+</div>
+
+<h2 style="border-left-color:#3fb950">F. 최종 판정</h2>
+
+<div class="verdict-box">
+  <div class="verdict-score">7.01 <span style="font-size:1rem;color:#8b949e">/ 10</span></div>
+  <div class="grade-badge grade-B" style="font-size:2.5rem;width:80px;height:80px;margin:12px auto;display:flex">B</div>
+  <div class="verdict-label">하드닝 필요 (Hardening Needed)</div>
+</div>
+
+<p><strong>프로젝트 요약:</strong> 일본 게임 엔진의 텍스트 데이터를 파싱·번역·재적용하는 데스크톱 도구. LLM API 연동 자동 번역, 바이너리 암복호화, 버전 간 데이터 마이그레이션 등 복합 파이프라인을 제공한다.</p>
+
+<p><strong>스택:</strong>
+  <span class="stack-chip">Electron</span>
+  <span class="stack-chip">TypeScript</span>
+  <span class="stack-chip">Node.js</span>
+  <span class="stack-chip">Vitest</span>
+  <span class="stack-chip">ESLint</span>
+  <span class="stack-chip">GitHub Actions</span>
+</p>
+
+<table style="margin:16px 0">
+<tr><th>카테고리</th><th>점수</th><th>코멘트</th></tr>
+<tr><td>지속가능성</td><td class="inline-score s-mid">7.0</td><td>모듈화 완료, 로깅 부재</td></tr>
+<tr><td>재현성</td><td class="inline-score s-mid">7.5</td><td>CI·테스트 견고, 문서 빈약</td></tr>
+<tr><td>보안</td><td class="inline-score s-mid">6.5</td><td>기본 모델 수립, 디폴트 정책 미흡</td></tr>
+<tr><td>코드 품질</td><td class="inline-score s-mid">7.0</td><td>타입 체계 구축, 런타임 검증 부족</td></tr>
+<tr><td colspan="2" style="text-align:right"><strong>가중 총점</strong></td><td><strong style="color:#58a6ff;font-size:1.2rem">7.01</strong></td></tr>
+</table>
+
+<div style="background:#0d1117;border-radius:8px;padding:16px;margin:16px 0;border:1px solid #30363d">
+  <p style="font-size:.95rem;line-height:1.8">
+    이 프로젝트는 적극적인 구조 개선을 거쳐 프로토타입 수준에서 생산 임계점까지 올라왔다. 750줄짜리 진입점을 37줄로 줄이고, 500줄 이상 파일 두 개를 분할하고, 전역 상태 47건을 추상화 레이어로 교체한 것은 의미 있는 엔지니어링 투자다. 136개 테스트가 핵심 파이프라인(추출→적용 라운드트립, 암복호화, 블록 분할)을 실질적으로 커버하고, 332ms에 전량 통과하는 것은 회귀 방지 기반이 잘 잡혀 있음을 보여준다. 그러나 보안 모델은 "구현은 했으나 디폴트가 안전하지 않은" 상태(빈 화이트리스트=전체 허용, 하드코딩 키)이고, 프로덕션 디버깅을 위한 구조적 로깅이 전무하며, IPC 데이터의 런타임 형상 검증 없이 타입 단언에만 의존하는 점은 B등급 상한을 가로막는 실질적 약점이다. 문서화가 위키 외부 의존에 머물러 있어, 새 기여자의 온보딩은 코드 직접 읽기에 의존할 수밖에 없다.
+  </p>
+  <p style="margin-top:12px;font-weight:700;color:#d29922;font-size:.95rem">
+    🏷️ 판정: 핵심 기능은 안정적이고 구조는 합리적이나, 보안 디폴트·로깅·문서 3개 축의 하드닝 없이는 프로덕션 게이트를 통과할 수 없다.
+  </p>
+</div>
+
+</div><!-- /summary-zone -->
+
+<p style="text-align:center;color:#484f58;font-size:.75rem;margin-top:24px">
+  생성: 2026-03-03 | 감사 버전: v3 | Phase 1–10 완료 후 | 이전: v2 5.70/C → v3 7.01/B (+23%)
+</p>
+
+</body>
+</html>

@@ -1,3 +1,4 @@
+"use strict";
 (() => {
     let settings = {};
     window.api.on('llmSettings', (arg) => {

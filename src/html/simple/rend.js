@@ -1,3 +1,4 @@
+"use strict";
 (() => {
     const mainMenu = document.querySelector('#mainMenu');
     let globalSettings;
@@ -23,9 +24,10 @@
     document.getElementById('lang-en').onclick = () => { window.api.send('changeLang', 'en'); };
     document.getElementById('lang-ko').onclick = () => { window.api.send('changeLang', 'ko'); };
     window.api.on('set_path', (tt) => {
-        document.getElementById(tt.type).value = tt.dir;
-        if (tt.type !== 'folder_input') {
-            document.getElementById(tt.type).innerText = tt.dir;
+        const payload = tt;
+        document.getElementById(payload.type).value = payload.dir;
+        if (payload.type !== 'folder_input') {
+            document.getElementById(payload.type).innerText = payload.dir;
         }
     });
     mainMenu.style.display = 'block';
