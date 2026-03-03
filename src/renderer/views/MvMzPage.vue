@@ -209,10 +209,33 @@ async function openVersionUp() {
   }
 }
 
-function openFontConfig() {
+async function openFontConfig() {
   if (guardRunning()) return
-  api.send('selFont', folderPath.value)
-  running.value = true
+  if (!folderPath.value) {
+    Swal.fire({ icon: 'warning', title: '프로젝트 폴더를 먼저 선택하세요', background: 'var(--Highlight1)', color: 'var(--mainColor)' })
+    return
+  }
+  const { value: fontSize } = await Swal.fire({
+    title: '폰트 사이즈 변경',
+    input: 'number',
+    inputLabel: '변경할 폰트 사이즈를 입력하세요 (기본값: 28)',
+    inputPlaceholder: '28',
+    inputAttributes: { min: '8', max: '100', step: '1' },
+    showCancelButton: true,
+    confirmButtonText: '변경',
+    cancelButtonText: '취소',
+    background: 'var(--Highlight1)',
+    color: 'var(--mainColor)',
+    inputValidator: (value) => {
+      if (!value) return '폰트 사이즈를 입력하세요'
+      const n = Number(value)
+      if (isNaN(n) || n < 8 || n > 100) return '8~100 사이의 숫자를 입력하세요'
+      return null
+    },
+  })
+  if (fontSize) {
+    api.send('changeFontSize', [folderPath.value, Number(fontSize)])
+  }
 }
 
 function convertProject() {
