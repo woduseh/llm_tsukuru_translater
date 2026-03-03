@@ -8,7 +8,7 @@ const HEADER_MV:string[] = ["52", "50", "47", "4D", "56", "00", "00", "00", "00"
 
 function splitString(str:string, p:number){
     let chunks = [];
-    for (var i = 0, charsLength = str.length; i < charsLength; i += p) {
+    for (let i = 0, charsLength = str.length; i < charsLength; i += p) {
         chunks.push(str.substring(i, i + p));
     }
     return chunks
@@ -20,7 +20,7 @@ function hexToByte(hex:string){
 
 function VerifyFakeHeader(filePath:string){
     if(!fs.existsSync(filePath)){
-        throw "file dosen't exist"
+        throw new Error("file doesn't exist")
     }
     const file = (fs.readFileSync(filePath))
     for (let index = 0; index < HEADER_MV.length; index++)
@@ -36,7 +36,7 @@ function VerifyFakeHeader(filePath:string){
 
 export async function Encrypt(filePath:string, saveDir:string, key:string, MVMode=true){
     if(!fs.existsSync(filePath)){
-        throw "file dosen't exist"
+        throw new Error("file doesn't exist")
     }
     const extension = path.parse(filePath).ext.toLowerCase()
     if (!DecryptedExtensions.includes(extension))
@@ -63,7 +63,7 @@ export async function Encrypt(filePath:string, saveDir:string, key:string, MVMod
 
 export async function Decrypt(filePath:string, saveDir:string, key:string){
     if(!fs.existsSync(filePath)){
-        throw "file dosen't exist"
+        throw new Error("file doesn't exist")
     }
     const extension = path.parse(filePath).ext.toLowerCase()
     if (!EncryptedExtensions.includes(extension))

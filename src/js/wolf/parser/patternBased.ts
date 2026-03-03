@@ -10,7 +10,7 @@ export function wolfExtractMapPattern(data:Buffer){
             appCtx.WolfMetadata.ver = 2
         }
         else{
-            throw 'Unvalid 1'
+            throw new Error('Unvalid 1')
         }
     }
     else{
@@ -20,12 +20,12 @@ export function wolfExtractMapPattern(data:Buffer){
     const check = io.readU1()
     if(appCtx.WolfMetadata.ver === 2){
         if (!(check == 101)) {
-            throw 'Unvalid 2'
+            throw new Error('Unvalid 2')
         }
     }
     else{
         if (!(check == 102)) {
-            throw 'Unvalid 2'
+            throw new Error('Unvalid 2')
         }
     }
     const unk = io.readLenStr()
@@ -49,24 +49,24 @@ export function wolfExtractMapPattern(data:Buffer){
             const numArgLen = io.readU1();
             let numArg:number[] = [];
             if(numArgLen <= 0){
-                throw 'nein'
+                throw new Error('nein')
             }
             if(numArgLen >= 300){
-                throw 'nein'
+                throw new Error('nein')
             }
             for (let i = 0; i < numArgLen; i++) {
               numArg.push(io.readU4le());
             }
             if((numArg[0] >= 1000) || (numArg[0] < 0) ){
-                throw 'nein'
+                throw new Error('nein')
             }
             const indent = io.readU1();
             const strArgLen = io.readU1();
             if(strArgLen <= 0){
-                throw 'nein'
+                throw new Error('nein')
             }
             if(strArgLen >= 300){
-                throw 'nein'
+                throw new Error('nein')
             }
             let strArg:lenStr[] = [];
             for (let i = 0; i < strArgLen; i++) {
@@ -75,12 +75,12 @@ export function wolfExtractMapPattern(data:Buffer){
                     strArg.push(str)
                 }
                 else{
-                    throw 'nein2'
+                    throw new Error('nein2')
                 }
             }
             const hasMoveRoute = io.readU1();
             if (!( ((hasMoveRoute == 0) || (hasMoveRoute == 1)) )) {
-              throw "ValidationNotAnyOfError"
+              throw new Error("ValidationNotAnyOfError")
             }
             events.push({
                 numArg: numArg,

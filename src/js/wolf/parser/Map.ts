@@ -9,7 +9,7 @@ export function wolfExtractMap(data:Buffer){
             appCtx.WolfMetadata.ver = 2
         }
         else{
-            throw 'Unvalid 1'
+            throw new Error('Unvalid 1')
         }
     }
     else{
@@ -19,12 +19,12 @@ export function wolfExtractMap(data:Buffer){
     const check = io.readU1()
     if(appCtx.WolfMetadata.ver === 2){
         if (!(check == 101)) {
-            throw 'Unvalid 2'
+            throw new Error('Unvalid 2')
         }
     }
     else{
         if (!(check == 102)) {
-            throw 'Unvalid 2'
+            throw new Error('Unvalid 2')
         }
     }
     const unk = io.readLenStr()
@@ -42,7 +42,7 @@ export function wolfExtractMap(data:Buffer){
     }
     const check3 = io.readU1();
     if (!(check3 == 102)) {
-        throw 'ValidationNotEqualError'
+        throw new Error('ValidationNotEqualError')
     }
     return {
         events: events

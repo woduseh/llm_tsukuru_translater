@@ -48,6 +48,7 @@ export const parse_externMsg = (dir: string, useI: boolean) => {
                 a[Convert(row[0])] = Convert(row[1])
             }
         })
+        .on('error', (err) => reject(err))
         .on('end', () => {
             resolve(a)
         })

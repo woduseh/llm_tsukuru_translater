@@ -47,7 +47,7 @@ export class WolfParserIo{
         const len = this.readU4le();
         const pos2 = (this.pointer);
         if(len > (this.byteLen - this.pointer)){
-            throw 'Overflow Pointer Error'
+            throw new Error('Overflow Pointer Error')
         }
 
         const str = this.readBytes(len);
@@ -63,11 +63,11 @@ export class WolfParserIo{
     readMapEvent():WolfMapEvent{
         const check1 = this.readU1();
         if (!(check1 === 111)) {
-          throw 'ValidationNotEqualError'
+          throw new Error('ValidationNotEqualError')
         }
         const check2 = this.readU4le();
         if (!(check2 === 12345)) {
-          throw 'ValidationNotEqualError'
+          throw new Error('ValidationNotEqualError')
         }
         const eventId = this.readU4le();
         const name = this.readLenStr()
@@ -82,7 +82,7 @@ export class WolfParserIo{
         }
         const check3 = this.readU1();
         if (!(check3 == 112)) {
-          throw 'ValidationNotEqualError'
+          throw new Error('ValidationNotEqualError')
         }
         return {
             eventId: eventId,
@@ -107,7 +107,7 @@ export class WolfParserIo{
         }
         const hasMoveRoute = this.readU1();
         if (!( ((hasMoveRoute == 0) || (hasMoveRoute == 1)) )) {
-          throw "ValidationNotAnyOfError"
+          throw new Error("ValidationNotAnyOfError")
         }
         if (hasMoveRoute >= 1) {
             const moveRoute = this.readMoveRoute()
@@ -172,7 +172,7 @@ export class WolfParserIo{
     readEventPage():WolfPage{
         const check = this.readU1();
         if (!(check === 121)) {
-          throw 'ValidationNotEqualError'
+          throw new Error('ValidationNotEqualError')
         }
         const graphic = this.readEventGraphic()
         const cond = this.readEventCond()
@@ -186,7 +186,7 @@ export class WolfParserIo{
         const unk = this.readBytes(unkLen);
         const check2 = this.readU1();
         if (!(check2 === 122)) {
-          throw 'ValidationNotEqualError'
+          throw new Error('ValidationNotEqualError')
         }
         return {
             cmd: cmd,
@@ -229,7 +229,7 @@ export class WolfParserIo{
     readCEvent(){
         const checka = this.readU1();
         if (!(checka === 142)) {
-          throw `ValidationNotEqualError ${checka} 1 `
+          throw new Error(`ValidationNotEqualError ${checka} 1 `)
         }
         const id = this.readU4le();
         const runCond = this.readU1();
@@ -340,7 +340,7 @@ export class WolfParserIo{
       }
       const check = this.readU1();
       if (!( ((check == 143) || (check == 144)) )) {
-        throw 'ValidationNotAnyOfError'
+        throw new Error('ValidationNotAnyOfError')
       }
       if (check === 144) {
         const po = this.readCpo()
@@ -367,12 +367,12 @@ export class WolfParserIo{
     readCpo(){
       const color = this.readU4le();
       let varNames:lenStr[] = [];
-      for (var i = 0; i < 100; i++) {
+      for (let i = 0; i < 100; i++) {
         varNames.push(this.readLenStr());
       }
       const check = this.readU1();
       if (!( ((check == 144) || (check == 145)) )) {
-        throw `ValidationNotAnyOfError ${check} [144|145]`
+        throw new Error(`ValidationNotAnyOfError ${check} [144|145]`)
       }
       if (check == 145) {
         const wm = this.readWm()
@@ -383,7 +383,7 @@ export class WolfParserIo{
       const a = this.readLenStr()
       const check = this.readU1();
       if (!( ((check == 145) || (check == 146)) )) {
-        throw `ValidationNotAnyOfError ${check} [145|146]`
+        throw new Error(`ValidationNotAnyOfError ${check} [145|146]`)
       }
       if (check == 146) {
         const returner = this.readWmReturn()
@@ -395,7 +395,7 @@ export class WolfParserIo{
       const valueId = this.readU4le();
       const check = this.readU1();
       if (!(check == 146)) {
-        throw `ValidationNotEqualError ${check} [146]`
+        throw new Error(`ValidationNotEqualError ${check} [146]`)
       }
     }
 }
