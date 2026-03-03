@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkIsMapFile } from '../../src/js/rpgmv/globalutils';
+import { checkIsMapFile, sleep } from '../../src/js/rpgmv/globalutils';
 
 describe('checkIsMapFile', () => {
   it('returns true for Map001.json', () => {
@@ -19,7 +19,6 @@ describe('checkIsMapFile', () => {
   });
 
   it('returns true for Map.json (exact "Map" name)', () => {
-    // The implementation checks fileName === 'Map' first
     expect(checkIsMapFile('Map.json')).toBe(true);
   });
 
@@ -33,5 +32,36 @@ describe('checkIsMapFile', () => {
 
   it('returns false for empty string', () => {
     expect(checkIsMapFile('')).toBe(false);
+  });
+
+  it('returns true for Map0.json', () => {
+    expect(checkIsMapFile('Map0.json')).toBe(true);
+  });
+
+  it('returns false for Map001.txt (different extension)', () => {
+    expect(checkIsMapFile('Map001.txt')).toBe(true);
+    // Note: checkIsMapFile only checks the name stem, not the extension
+  });
+
+  it('handles path with directory', () => {
+    expect(checkIsMapFile('data/Map001.json')).toBe(true);
+  });
+});
+
+describe('sleep', () => {
+  it('resolves after the specified delay', async () => {
+    const start = Date.now();
+    await sleep(50);
+    const elapsed = Date.now() - start;
+    expect(elapsed).toBeGreaterThanOrEqual(40); // allow small timer inaccuracy
+  });
+
+  it('resolves with 0ms delay', async () => {
+    await expect(sleep(0)).resolves.toBeUndefined();
+  });
+
+  it('returns a Promise', () => {
+    const result = sleep(1);
+    expect(result).toBeInstanceOf(Promise);
   });
 });

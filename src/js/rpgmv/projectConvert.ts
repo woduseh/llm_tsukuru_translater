@@ -6,7 +6,7 @@ import tools from '../libs/projectTools'
 import { AppContext } from '../../appContext'
 import fg from 'fast-glob'
 import * as rpgencrypt from '../libs/rpgencrypt'
-import { readTextFile, readJsonFile } from '../libs/fileIO'
+import { readTextFile } from '../libs/fileIO'
 
 async function clearTemp() {
     const qTemp = path.join(app.getPath('temp'), 'Extractorpp')

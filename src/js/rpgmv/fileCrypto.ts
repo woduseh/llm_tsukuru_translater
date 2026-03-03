@@ -1,7 +1,7 @@
 "use strict";
 
 import path, { dirname } from 'path';
-import fs, { readdirSync } from 'fs';
+import fs from 'fs';
 import * as rpgencrypt from "../libs/rpgencrypt";
 import yaml from 'js-yaml';
 import fsx from 'fs-extra'
@@ -72,15 +72,14 @@ export async function DecryptDir (DataDir:string, type:string):Promise<void> {
 export async function EncryptDir(DataDir:string, type:string, instantapply:boolean) {
     const SysFile = reader(path.join(DataDir, "System.json"))
     const Key = SysFile.encryptionKey
-    const ExtractImgDirReal = path.join(DataDir, `Extract_${type}`)
-    const ExtractImgDir = ExtractImgDirReal
+    const ExtractImgDir = path.join(DataDir, `Extract_${type}`)
     const CompleteDir = (()=>{
         if(instantapply){
             return path.join(path.dirname(DataDir), type)
         }
         return path.join(DataDir, 'Completed', type)
     })()
-    if(!fs.existsSync(ExtractImgDirReal)){
+    if(!fs.existsSync(ExtractImgDir)){
         return
     }
     if(!fs.existsSync(CompleteDir)){

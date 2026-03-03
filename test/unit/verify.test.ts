@@ -115,6 +115,55 @@ describe('verifyJsonIntegrity', () => {
     const issues = verifyJsonIntegrity(orig, trans);
     expect(issues.filter(i => i.type === 'text_shift')).toEqual([]);
   });
+
+  it('detects boolean value change', () => {
+    const issues = verifyJsonIntegrity(true, false);
+    expect(issues.length).toBe(1);
+    expect(issues[0].type).toBe('value_changed');
+  });
+
+  it('handles undefined vs null type mismatch', () => {
+    const issues = verifyJsonIntegrity(undefined, null);
+    // Both map to 'null' type via getType
+    expect(issues).toEqual([]);
+  });
+
+  it('detects control character mismatch in allow policy', () => {
+    const issues = verifyJsonIntegrity(
+      'Test \\V[1] message',
+      'Test message',  // missing \\V[1]
+      '$', undefined, 'allow'
+    );
+    expect(issues.some(i => i.type === 'control_char_mismatch')).toBe(true);
+  });
+
+  it('verifies event command indent mismatch', () => {
+    const orig = { code: 401, indent: 0, parameters: ['Hello'] };
+    const trans = { code: 401, indent: 2, parameters: ['Hello'] };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.some(i => i.type === 'value_changed' && i.path.includes('indent'))).toBe(true);
+  });
+
+  it('verifies event command parameter array length mismatch', () => {
+    const orig = { code: 401, indent: 0, parameters: ['Hello', 'World'] };
+    const trans = { code: 401, indent: 0, parameters: ['안녕'] };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.some(i => i.type === 'array_length')).toBe(true);
+  });
+
+  it('detects symbol-only line text shift', () => {
+    const orig = { code: 401, indent: 0, parameters: ['........'] };
+    const trans = { code: 401, indent: 0, parameters: ['실제 대사가 밀려옴'] };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.some(i => i.type === 'text_shift')).toBe(true);
+  });
+
+  it('allows translatable field displayName to change', () => {
+    const orig = { displayName: '東の洞窟', autoplayBgm: true };
+    const trans = { displayName: '동쪽 동굴', autoplayBgm: true };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.filter(i => i.severity === 'error')).toEqual([]);
+  });
 });
 
 describe('repairJson', () => {
@@ -199,6 +248,32 @@ describe('repairJson', () => {
     expect(result.comment_0).toBe('--- 5 ---');
     expect(result.comment_1).toBe('번역된 대화');
   });
+
+  it('repairs nested object preserving original keys when trans has missing keys', () => {
+    const orig = { a: 1, b: { c: 2, d: 3 } };
+    const trans = { a: 1, b: { c: 2 } };
+    const result = repairJson(orig, trans) as Record<string, any>;
+    expect(result.b.d).toBe(3);
+  });
+
+  it('handles deeply nested arrays', () => {
+    const orig = [[1, 2], [3, 4]];
+    const trans = [[1], [3, 4]];
+    const result = repairJson(orig, trans) as number[][];
+    expect(result).toEqual([[1, 2], [3, 4]]);
+  });
+
+  it('preserves translated displayName field', () => {
+    const orig = { id: 1, displayName: '東の洞窟' };
+    const trans = { id: 1, displayName: '동쪽 동굴' };
+    const result = repairJson(orig, trans) as Record<string, any>;
+    expect(result.displayName).toBe('동쪽 동굴');
+  });
+
+  it('preserves original boolean value even when trans changes it', () => {
+    expect(repairJson(true, false)).toBe(true);
+    expect(repairJson(false, true)).toBe(false);
+  });
 });
 
 import { getAtPath, setAtPath } from '../../src/js/rpgmv/verify';
@@ -224,6 +299,24 @@ describe('getAtPath / setAtPath', () => {
     expect(getAtPath({ a: 1 }, '$.b.c')).toBeUndefined();
   });
 
+  it('handles root path $', () => {
+    const obj = { a: 1 };
+    expect(getAtPath(obj, '$')).toEqual({ a: 1 });
+  });
+
+  it('handles empty path after $', () => {
+    const obj = { a: 1 };
+    expect(getAtPath(obj, '$.')).toEqual({ a: 1 });
+  });
+
+  it('returns undefined when navigating through null', () => {
+    expect(getAtPath({ a: null }, '$.a.b')).toBeUndefined();
+  });
+
+  it('returns undefined when navigating through primitive', () => {
+    expect(getAtPath({ a: 42 }, '$.a.b')).toBeUndefined();
+  });
+
   it('sets value at dot path', () => {
     const obj = { a: { b: 'old' } };
     expect(setAtPath(obj, '$.a.b', 'new')).toBe(true);
@@ -238,5 +331,17 @@ describe('getAtPath / setAtPath', () => {
 
   it('returns false for invalid paths', () => {
     expect(setAtPath({ a: 1 }, '$.b.c', 'x')).toBe(false);
+  });
+
+  it('returns false for empty path', () => {
+    expect(setAtPath({ a: 1 }, '$', 'x')).toBe(false);
+  });
+
+  it('returns false when intermediate is null', () => {
+    expect(setAtPath({ a: null }, '$.a.b', 'x')).toBe(false);
+  });
+
+  it('returns false when intermediate is primitive', () => {
+    expect(setAtPath({ a: 42 }, '$.a.b', 'x')).toBe(false);
   });
 });

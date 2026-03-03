@@ -77,3 +77,58 @@ export function autoFixBlock(origBlock: Block, transBlock: Block): string | null
 
   return fix
 }
+
+/**
+ * Remove duplicate consecutive separators from a block array.
+ * When two adjacent blocks share the same separator, the empty one is removed.
+ * If both have content, the earlier (empty-lined or shorter) block is removed and
+ * its lines are prepended to the next block.
+ * Mutates the array in-place. Returns the number of removed blocks.
+ */
+export function removeDuplicateHeaders(blocks: Block[]): number {
+  let removed = 0
+  for (let i = blocks.length - 1; i > 0; i--) {
+    const prev = blocks[i - 1], cur = blocks[i]
+    if (!prev.sep || prev.sep !== cur.sep) continue
+    // Duplicate separator found — keep the block with content
+    if (prev.lines.length === 0 || prev.lines.every(l => l === '')) {
+      blocks.splice(i - 1, 1)
+    } else if (cur.lines.length === 0 || cur.lines.every(l => l === '')) {
+      blocks.splice(i, 1)
+    } else {
+      // Both have content — merge into the later block
+      cur.lines = [...prev.lines, ...cur.lines]
+      blocks.splice(i - 1, 1)
+    }
+    removed++
+  }
+  return removed
+}
+
+/** Reconstruct flat lines from blocks. */
+export function blocksToLines(blocks: Block[]): string[] {
+  const parts: string[] = []
+  for (const block of blocks) {
+    if (block.sep) parts.push(block.sep)
+    parts.push(...block.lines)
+  }
+  return parts
+}
+
+/** Check mismatch from pre-split blocks (avoids redundant splitting). */
+export function checkMismatchBlocks(origBlocks: Block[], transBlocks: Block[]): boolean {
+  if (origBlocks.length !== transBlocks.length) return true
+  for (let i = 0; i < origBlocks.length; i++) {
+    if (origBlocks[i].sep !== transBlocks[i].sep || origBlocks[i].lines.length !== transBlocks[i].lines.length) return true
+  }
+  return false
+}
+
+/** Check if any block pair is untranslated from pre-split blocks. */
+export function hasAnyUntranslatedBlock(origBlocks: Block[], transBlocks: Block[]): boolean {
+  const len = Math.min(origBlocks.length, transBlocks.length)
+  for (let i = 0; i < len; i++) {
+    if (isBlockUntranslated(origBlocks[i], transBlocks[i])) return true
+  }
+  return false
+}

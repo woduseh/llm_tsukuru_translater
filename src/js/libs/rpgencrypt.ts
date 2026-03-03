@@ -18,21 +18,6 @@ function hexToByte(hex:string){
     return Buffer.from(hex, "hex")[0]
 }
 
-function VerifyFakeHeader(filePath:string){
-    if(!fs.existsSync(filePath)){
-        throw new Error("file doesn't exist")
-    }
-    const file = (fs.readFileSync(filePath))
-    for (let index = 0; index < HEADER_MV.length; index++)
-    {
-        if (file[index] != hexToByte(HEADER_MV[index]))
-        {
-            return false;
-        }
-    }
-    return true
-}
-
 
 export async function Encrypt(filePath:string, saveDir:string, key:string, MVMode=true){
     if(!fs.existsSync(filePath)){

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitBlocks, checkMismatch, autoFixBlock, isBlockUntranslated } from '../../src/renderer/compareUtils'
+import { splitBlocks, checkMismatch, autoFixBlock, isBlockUntranslated, removeDuplicateHeaders, blocksToLines, checkMismatchBlocks, hasAnyUntranslatedBlock } from '../../src/renderer/compareUtils'
 import type { Block } from '../../src/renderer/compareUtils'
 
 describe('splitBlocks', () => {
@@ -209,5 +209,158 @@ describe('autoFixBlock', () => {
     const orig: Block = { sep: '--- 1 ---', lines: ['a'] }
     const trans: Block = { sep: '', lines: ['x'] }
     expect(autoFixBlock(orig, trans)).toBeNull()
+  })
+})
+
+describe('removeDuplicateHeaders', () => {
+  it('removes empty block when duplicate separator exists', () => {
+    const blocks: Block[] = [
+      { sep: '--- 1 ---', lines: [] },
+      { sep: '--- 1 ---', lines: ['hello'] },
+      { sep: '--- 2 ---', lines: ['world'] }
+    ]
+    const removed = removeDuplicateHeaders(blocks)
+    expect(removed).toBe(1)
+    expect(blocks).toEqual([
+      { sep: '--- 1 ---', lines: ['hello'] },
+      { sep: '--- 2 ---', lines: ['world'] }
+    ])
+  })
+
+  it('removes later empty block when first has content', () => {
+    const blocks: Block[] = [
+      { sep: '--- 1 ---', lines: ['hello'] },
+      { sep: '--- 1 ---', lines: [] },
+      { sep: '--- 2 ---', lines: ['world'] }
+    ]
+    const removed = removeDuplicateHeaders(blocks)
+    expect(removed).toBe(1)
+    expect(blocks).toEqual([
+      { sep: '--- 1 ---', lines: ['hello'] },
+      { sep: '--- 2 ---', lines: ['world'] }
+    ])
+  })
+
+  it('merges content when both blocks have content', () => {
+    const blocks: Block[] = [
+      { sep: '--- 1 ---', lines: ['a'] },
+      { sep: '--- 1 ---', lines: ['b'] }
+    ]
+    const removed = removeDuplicateHeaders(blocks)
+    expect(removed).toBe(1)
+    expect(blocks).toEqual([
+      { sep: '--- 1 ---', lines: ['a', 'b'] }
+    ])
+  })
+
+  it('returns 0 when no duplicates', () => {
+    const blocks: Block[] = [
+      { sep: '--- 1 ---', lines: ['a'] },
+      { sep: '--- 2 ---', lines: ['b'] }
+    ]
+    expect(removeDuplicateHeaders(blocks)).toBe(0)
+    expect(blocks.length).toBe(2)
+  })
+
+  it('handles blocks without separators', () => {
+    const blocks: Block[] = [
+      { sep: '', lines: ['a'] },
+      { sep: '', lines: ['b'] }
+    ]
+    // Empty strings are falsy, so no duplicate sep detected
+    expect(removeDuplicateHeaders(blocks)).toBe(0)
+  })
+
+  it('handles multiple consecutive duplicates', () => {
+    const blocks: Block[] = [
+      { sep: '--- 1 ---', lines: [] },
+      { sep: '--- 1 ---', lines: [] },
+      { sep: '--- 1 ---', lines: ['content'] }
+    ]
+    const removed = removeDuplicateHeaders(blocks)
+    expect(removed).toBe(2)
+    expect(blocks).toEqual([
+      { sep: '--- 1 ---', lines: ['content'] }
+    ])
+  })
+})
+
+describe('blocksToLines', () => {
+  it('reconstructs lines from blocks with separators', () => {
+    const blocks: Block[] = [
+      { sep: '--- 1 ---', lines: ['hello', 'world'] },
+      { sep: '--- 2 ---', lines: ['foo'] }
+    ]
+    expect(blocksToLines(blocks)).toEqual(['--- 1 ---', 'hello', 'world', '--- 2 ---', 'foo'])
+  })
+
+  it('handles blocks without separators', () => {
+    const blocks: Block[] = [{ sep: '', lines: ['a', 'b'] }]
+    expect(blocksToLines(blocks)).toEqual(['a', 'b'])
+  })
+
+  it('handles empty blocks array', () => {
+    expect(blocksToLines([])).toEqual([])
+  })
+
+  it('handles blocks with empty lines', () => {
+    const blocks: Block[] = [{ sep: '--- 1 ---', lines: [] }]
+    expect(blocksToLines(blocks)).toEqual(['--- 1 ---'])
+  })
+})
+
+describe('checkMismatchBlocks', () => {
+  it('returns false for matching blocks', () => {
+    const ob: Block[] = [{ sep: '--- 1 ---', lines: ['a'] }]
+    const tb: Block[] = [{ sep: '--- 1 ---', lines: ['x'] }]
+    expect(checkMismatchBlocks(ob, tb)).toBe(false)
+  })
+
+  it('returns true for different block count', () => {
+    const ob: Block[] = [{ sep: '--- 1 ---', lines: ['a'] }]
+    const tb: Block[] = []
+    expect(checkMismatchBlocks(ob, tb)).toBe(true)
+  })
+
+  it('returns true for different line count', () => {
+    const ob: Block[] = [{ sep: '--- 1 ---', lines: ['a', 'b'] }]
+    const tb: Block[] = [{ sep: '--- 1 ---', lines: ['x'] }]
+    expect(checkMismatchBlocks(ob, tb)).toBe(true)
+  })
+
+  it('returns true for different separator', () => {
+    const ob: Block[] = [{ sep: '--- 1 ---', lines: ['a'] }]
+    const tb: Block[] = [{ sep: '--- 2 ---', lines: ['x'] }]
+    expect(checkMismatchBlocks(ob, tb)).toBe(true)
+  })
+
+  it('is consistent with checkMismatch', () => {
+    const lines1 = ['--- 1 ---', 'a', '--- 2 ---', 'b']
+    const lines2 = ['--- 1 ---', 'x', '--- 2 ---', 'y']
+    expect(checkMismatchBlocks(splitBlocks(lines1), splitBlocks(lines2))).toBe(checkMismatch(lines1, lines2))
+  })
+})
+
+describe('hasAnyUntranslatedBlock', () => {
+  it('returns true when a block is untranslated', () => {
+    const ob: Block[] = [{ sep: '--- 1 ---', lines: ['hello'] }]
+    const tb: Block[] = [{ sep: '--- 1 ---', lines: ['hello'] }]
+    expect(hasAnyUntranslatedBlock(ob, tb)).toBe(true)
+  })
+
+  it('returns false when blocks are translated', () => {
+    const ob: Block[] = [{ sep: '--- 1 ---', lines: ['hello'] }]
+    const tb: Block[] = [{ sep: '--- 1 ---', lines: ['안녕'] }]
+    expect(hasAnyUntranslatedBlock(ob, tb)).toBe(false)
+  })
+
+  it('returns false for empty blocks', () => {
+    expect(hasAnyUntranslatedBlock([], [])).toBe(false)
+  })
+
+  it('returns false when content differs in line count', () => {
+    const ob: Block[] = [{ sep: '--- 1 ---', lines: ['hello'] }]
+    const tb: Block[] = [{ sep: '--- 1 ---', lines: ['hello', 'extra'] }]
+    expect(hasAnyUntranslatedBlock(ob, tb)).toBe(false)
   })
 })

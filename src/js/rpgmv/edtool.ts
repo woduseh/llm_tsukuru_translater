@@ -1,7 +1,6 @@
 import fs from 'fs';
 import zlib from 'zlib'
 import iconv from 'iconv-lite'
-import axios from 'axios';
 
 export function read(dir: string){ 
     const readF = fs.readFileSync(dir + '/.extracteddata')
@@ -16,7 +15,7 @@ export function read(dir: string){
     return data
 }
 
-export function write(dir: string, ext_data: Object, newVersion:boolean = true){
+export function write(dir: string, ext_data: Object){
     const d = iconv.encode(JSON.stringify({dat: ext_data}), 'utf8')
     fs.writeFileSync(dir + `/.extracteddata`, zlib.deflateSync(d))
 }
