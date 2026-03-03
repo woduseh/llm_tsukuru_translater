@@ -57,6 +57,7 @@ onMounted(() => {
       }
     }
   })
+  api.send('llmSettingsReady')
 })
 
 function start() {

@@ -24,12 +24,16 @@ ipcMain.on('settings', () => {
   loadRoute(globalThis.settingsWindow, '/settings')
   globalThis.settingsWindow.webContents.on('did-finish-load', function () {
     globalThis.settingsWindow.show();
-    globalThis.settingsWindow.webContents.send('settings', getSettings());
   });
   globalThis.settingsWindow.on('close', function() {
     worked()
   });
-  globalThis.settingsWindow.show()
+})
+
+ipcMain.on('settingsReady', () => {
+  if (globalThis.settingsWindow && !globalThis.settingsWindow.isDestroyed()) {
+    globalThis.settingsWindow.webContents.send('settings', getSettings());
+  }
 })
 
 ipcMain.on('applysettings', async (ev, arg) => {
@@ -45,12 +49,6 @@ ipcMain.on('applysettings', async (ev, arg) => {
 ipcMain.on('closesettings', async (ev, arg) => {
   globalThis.settingsWindow.close()
   worked()
-})
-
-ipcMain.on('changeLang', (ev, arg) => {
-  globalThis.settings.language = arg
-  storage.set('settings', JSON.stringify(globalThis.settings))
-  globalThis.mwindow.reload()
 })
 
 ipcMain.on('gamePatcher', (ev, dir) => {

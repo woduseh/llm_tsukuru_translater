@@ -61,12 +61,15 @@ electron_1.ipcMain.on('settings', () => {
     (0, viteHelper_1.loadRoute)(globalThis.settingsWindow, '/settings');
     globalThis.settingsWindow.webContents.on('did-finish-load', function () {
         globalThis.settingsWindow.show();
-        globalThis.settingsWindow.webContents.send('settings', (0, shared_1.getSettings)());
     });
     globalThis.settingsWindow.on('close', function () {
         (0, shared_1.worked)();
     });
-    globalThis.settingsWindow.show();
+});
+electron_1.ipcMain.on('settingsReady', () => {
+    if (globalThis.settingsWindow && !globalThis.settingsWindow.isDestroyed()) {
+        globalThis.settingsWindow.webContents.send('settings', (0, shared_1.getSettings)());
+    }
 });
 electron_1.ipcMain.on('applysettings', async (ev, arg) => {
     globalThis.settings = { ...globalThis.settings, ...arg };
@@ -81,12 +84,7 @@ electron_1.ipcMain.on('closesettings', async (ev, arg) => {
     globalThis.settingsWindow.close();
     (0, shared_1.worked)();
 });
-electron_1.ipcMain.on('changeLang', (ev, arg) => {
-    globalThis.settings.language = arg;
-    shared_1.storage.set('settings', JSON.stringify(globalThis.settings));
-    globalThis.mwindow.reload();
-});
-electron_1.ipcMain.on('gamePatcher', (ev, dir) => {
+electron_1.ipcMain.on('gamePatcher',(ev, dir) => {
     if (!edTool.exists(dir)) {
         (0, shared_1.sendError)('추출된 파일이 없습니다');
         (0, shared_1.worked)();

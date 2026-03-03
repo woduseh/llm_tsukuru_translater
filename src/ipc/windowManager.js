@@ -39,10 +39,6 @@ function createWindow() {
         ];
         mainWindow.webContents.send('set-allowed-paths', initialPaths);
         mainWindow.show();
-        (0, shared_1.getMainWindow)().webContents.send('is_version', electron_1.app.getVersion());
-        globalThis.settings.themeData = styles_1.default[globalThis.settings.theme];
-        const { llmApiKey, ...safeSettings } = globalThis.settings;
-        (0, shared_1.getMainWindow)().webContents.send('getGlobalSettings', safeSettings);
         if (!projectTools_1.default.packed) {
             electron_1.globalShortcut.register('Control+Shift+I', () => {
                 mainWindow.webContents.openDevTools();
@@ -57,6 +53,11 @@ function createWindow() {
     });
     projectTools_1.default.init();
 }
+electron_1.ipcMain.on('mainReady', () => {
+    globalThis.settings.themeData = styles_1.default[globalThis.settings.theme];
+    const { llmApiKey, ...safeSettings } = globalThis.settings;
+    (0, shared_1.getMainWindow)().webContents.send('getGlobalSettings', safeSettings);
+});
 electron_1.ipcMain.on('license', () => {
     const licenseWindow = new electron_1.BrowserWindow({
         width: 800,
@@ -70,13 +71,7 @@ electron_1.ipcMain.on('license', () => {
     licenseWindow.show();
 });
 electron_1.ipcMain.on('changeURL', (ev, arg) => {
-    // Legacy: map old HTML paths to Vue routes
-    const routeMap = {
-        './src/html/main/index.html': '/mvmz',
-        './src/html/wolf/index.html': '/wolf',
-    };
-    const route = routeMap[arg] || arg;
-    (0, viteHelper_1.loadRoute)(globalThis.mwindow, route);
+    (0, viteHelper_1.loadRoute)(globalThis.mwindow, arg);
 });
 electron_1.ipcMain.on('minimize', () => {
     (0, shared_1.getMainWindow)().minimize();

@@ -8,7 +8,7 @@ const Themes ={
         "--Selected": "#7c6fdb",
         "--Accent": "#7c6fdb",
         "--AccentHover": "#9d93e6",
-        "--Gap:": "0px",
+        "--Gap": "0px",
         "--font": "\"NotoSansKR\""
     },
     "Classic": {
@@ -20,7 +20,7 @@ const Themes ={
         "--Selected": "#7c6fdb",
         "--Accent": "#7c6fdb",
         "--AccentHover": "#9d93e6",
-        "--Gap:": "0px",
+        "--Gap": "0px",
         "--font": "\"NotoSansKR\""
     }
 }

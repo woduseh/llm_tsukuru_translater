@@ -35,10 +35,6 @@ export function createWindow() {
     ];
     mainWindow.webContents.send('set-allowed-paths', initialPaths);
     mainWindow.show();
-    getMainWindow().webContents.send('is_version', app.getVersion());
-    globalThis.settings.themeData = (Themes as Record<string, Record<string, string>>)[globalThis.settings.theme]
-    const { llmApiKey, ...safeSettings } = globalThis.settings;
-    getMainWindow().webContents.send('getGlobalSettings', safeSettings);
     if(!tools.packed){
       globalShortcut.register('Control+Shift+I', () => {
         mainWindow.webContents.openDevTools()
@@ -54,6 +50,12 @@ export function createWindow() {
   tools.init()
 }
 
+ipcMain.on('mainReady', () => {
+  globalThis.settings.themeData = (Themes as Record<string, Record<string, string>>)[globalThis.settings.theme]
+  const { llmApiKey, ...safeSettings } = globalThis.settings;
+  getMainWindow().webContents.send('getGlobalSettings', safeSettings);
+})
+
 ipcMain.on('license', () => {
   const licenseWindow = new BrowserWindow({
     width: 800,
@@ -68,13 +70,7 @@ ipcMain.on('license', () => {
 })
 
 ipcMain.on('changeURL', (ev, arg) => {
-  // Legacy: map old HTML paths to Vue routes
-  const routeMap: Record<string, string> = {
-    './src/html/main/index.html': '/mvmz',
-    './src/html/wolf/index.html': '/wolf',
-  };
-  const route = routeMap[arg] || arg;
-  loadRoute(globalThis.mwindow, route);
+  loadRoute(globalThis.mwindow, arg);
 })
 
 ipcMain.on('minimize', () => {

@@ -185,6 +185,7 @@ onMounted(() => {
       }
     }
   })
+  api.send('settingsReady')
 })
 </script>
 
