@@ -80,9 +80,9 @@ export function autoFixBlock(origBlock: Block, transBlock: Block): string | null
 
 /**
  * Remove duplicate consecutive separators from a block array.
- * When two adjacent blocks share the same separator, the empty one is removed.
- * If both have content, the earlier (empty-lined or shorter) block is removed and
- * its lines are prepended to the next block.
+ * When two adjacent blocks share the same separator AND one side is empty,
+ * the empty block is removed. If both have content, they are left intact
+ * (they are distinct blocks, not true header duplicates).
  * Mutates the array in-place. Returns the number of removed blocks.
  */
 export function removeDuplicateHeaders(blocks: Block[]): number {
@@ -90,17 +90,15 @@ export function removeDuplicateHeaders(blocks: Block[]): number {
   for (let i = blocks.length - 1; i > 0; i--) {
     const prev = blocks[i - 1], cur = blocks[i]
     if (!prev.sep || prev.sep !== cur.sep) continue
-    // Duplicate separator found — keep the block with content
+    // Duplicate separator found — only remove when one side is empty
     if (prev.lines.length === 0 || prev.lines.every(l => l === '')) {
       blocks.splice(i - 1, 1)
+      removed++
     } else if (cur.lines.length === 0 || cur.lines.every(l => l === '')) {
       blocks.splice(i, 1)
-    } else {
-      // Both have content — merge into the later block
-      cur.lines = [...prev.lines, ...cur.lines]
-      blocks.splice(i - 1, 1)
+      removed++
     }
-    removed++
+    // Both have content: skip (separate blocks, not true duplicates)
   }
   return removed
 }
