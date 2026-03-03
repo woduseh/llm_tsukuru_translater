@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { createGeminiTranslator, TranslationLog, TranslationLogEntry, contentHash } from '../libs/geminiTranslator';
+import Tools from '../libs/projectTools';
 
 const PROGRESS_FILE = '.llm_progress.json';
 const CACHE_FILE = '.llm_cache.json';
@@ -68,21 +69,30 @@ function writeTranslationLog(edir: string, log: TranslationLog) {
     return logFile;
 }
 
-export const trans = async (ev: any, arg: any) => {
-    globalThis.mwindow.webContents.send('llmTranslating', true);
+interface TransArg {
+    dir: string;
+    game?: string;
+    langu?: string;
+    sortOrder?: string;
+    resetProgress?: boolean;
+    translationMode?: string;
+}
+
+export const trans = async (ev: unknown, arg: TransArg) => {
+    Tools.send('llmTranslating', true);
     try {
         const dir = Buffer.from(arg.dir, "base64").toString('utf8');
         const edir = arg.game === 'wolf' ? path.join(dir, '_Extract', 'Texts') : path.join(dir, 'Extract');
         if (!fs.existsSync(edir)) {
-            globalThis.mwindow.webContents.send('alert', { icon: 'error', message: 'Extract 폴더가 존재하지 않습니다' });
-            globalThis.mwindow.webContents.send('llmTranslating', false);
-            globalThis.mwindow.webContents.send('worked', 0);
+            Tools.sendError('Extract 폴더가 존재하지 않습니다');
+            Tools.send('llmTranslating', false);
+            Tools.worked();
             return;
         }
         if (!globalThis.settings.llmApiKey) {
-            globalThis.mwindow.webContents.send('alert', { icon: 'error', message: 'Gemini API 키가 설정되지 않았습니다' });
-            globalThis.mwindow.webContents.send('llmTranslating', false);
-            globalThis.mwindow.webContents.send('worked', 0);
+            Tools.sendError('Gemini API 키가 설정되지 않았습니다');
+            Tools.send('llmTranslating', false);
+            Tools.worked();
             return;
         }
 
@@ -91,9 +101,9 @@ export const trans = async (ev: any, arg: any) => {
         const fileList = fs.readdirSync(edir).filter(f => f.endsWith('.txt'));
 
         if (fileList.length === 0) {
-            globalThis.mwindow.webContents.send('alert', { icon: 'error', message: 'Extract 폴더에 번역할 .txt 파일이 없습니다' });
-            globalThis.mwindow.webContents.send('llmTranslating', false);
-            globalThis.mwindow.webContents.send('worked', 0);
+            Tools.sendError('Extract 폴더에 번역할 .txt 파일이 없습니다');
+            Tools.send('llmTranslating', false);
+            Tools.worked();
             return;
         }
 
@@ -110,7 +120,7 @@ export const trans = async (ev: any, arg: any) => {
         }
 
         // Auto-backup
-        globalThis.mwindow.webContents.send('loadingTag', '백업 생성 중...');
+        Tools.send('loadingTag', '백업 생성 중...');
         const backupDir = edir + BACKUP_SUFFIX;
         const translationMode = arg.translationMode || 'untranslated';
 
@@ -196,8 +206,8 @@ export const trans = async (ev: any, arg: any) => {
             if (isResuming && completedFiles.has(fileName)) {
                 workedFiles++;
                 const pct = (workedFiles / fileList.length) * 100;
-                globalThis.mwindow.webContents.send('loading', pct);
-                globalThis.mwindow.webContents.send('loadingTag', `${fileName} (이전 번역 건너뜀)`);
+                Tools.send('loading', pct);
+                Tools.send('loadingTag', `${fileName} (이전 번역 건너뜀)`);
                 continue;
             }
 
@@ -211,8 +221,8 @@ export const trans = async (ev: any, arg: any) => {
                         saveProgress(edir, { completedFiles: [...completedFiles], timestamp: new Date().toISOString() });
                         workedFiles++;
                         const pct = (workedFiles / fileList.length) * 100;
-                        globalThis.mwindow.webContents.send('loading', pct);
-                        globalThis.mwindow.webContents.send('loadingTag', `${fileName} (번역됨, 건너뜀)`);
+                        Tools.send('loading', pct);
+                        Tools.send('loadingTag', `${fileName} (번역됨, 건너뜀)`);
                         continue;
                     }
                 }
@@ -234,20 +244,20 @@ export const trans = async (ev: any, arg: any) => {
                 translationLog.entries.push(logEntry);
                 workedFiles++;
                 const pct = (workedFiles / fileList.length) * 100;
-                globalThis.mwindow.webContents.send('loading', pct);
-                globalThis.mwindow.webContents.send('loadingTag', `${fileName} (캐시 사용)`);
+                Tools.send('loading', pct);
+                Tools.send('loadingTag', `${fileName} (캐시 사용)`);
                 continue;
             }
 
-            globalThis.mwindow.webContents.send('loadingTag', `[${workedFiles + 1}/${fileList.length}] ${fileName}`);
+            Tools.send('loadingTag', `[${workedFiles + 1}/${fileList.length}] ${fileName}`);
 
             const { translatedContent, validation, logEntry, aborted: fileAborted } = await gemini.translateFileContent(
                 originalContent,
                 (current, total, detail) => {
                     const fileProgress = (workedFiles / fileList.length) * 100;
                     const blockProgress = (current / total) * (100 / fileList.length);
-                    globalThis.mwindow.webContents.send('loading', fileProgress + blockProgress);
-                    globalThis.mwindow.webContents.send('loadingTag', `[${workedFiles + 1}/${fileList.length}] ${fileName} — ${detail} (${current}/${total} 블록)`);
+                    Tools.send('loading', fileProgress + blockProgress);
+                    Tools.send('loadingTag', `[${workedFiles + 1}/${fileList.length}] ${fileName} — ${detail} (${current}/${total} 블록)`);
                 }
             );
 
@@ -293,8 +303,8 @@ export const trans = async (ev: any, arg: any) => {
         translationLog.totalDurationMs = Date.now() - startTime;
         const logFile = writeTranslationLog(edir, translationLog);
 
-        globalThis.mwindow.webContents.send('loading', 0);
-        globalThis.mwindow.webContents.send('loadingTag', '');
+        Tools.send('loading', 0);
+        Tools.send('loadingTag', '');
 
         const durationSec = Math.round(translationLog.totalDurationMs / 1000);
         const cacheNote = translationLog.entries.filter(e => e.cached).length;
@@ -303,23 +313,22 @@ export const trans = async (ev: any, arg: any) => {
             ? `\n번역 실패: ${failedFiles.length}개 파일 (${failedFiles.slice(0, 5).join(', ')}${failedFiles.length > 5 ? ' ...' : ''})`
             : '';
         if (aborted) {
-            globalThis.mwindow.webContents.send('alert',
+            Tools.sendAlert(
                 `번역 중단 (${workedFiles}/${fileList.length} 파일 완료, ${durationSec}초 소요)${failMsg}`
             );
         } else {
             const resumeNote = isResuming ? `\n(이전 진행 상태에서 재개됨)` : '';
-            globalThis.mwindow.webContents.send('alert',
+            Tools.sendAlert(
                 `번역 완료! (${durationSec}초 소요)\n백업: ${backupDir}\n로그: ${path.basename(logFile)}${resumeNote}${cacheMsg}${failMsg}`
             );
         }
     } catch (err) {
-        globalThis.mwindow.webContents.send('alert', {
-            icon: 'error',
-            message: JSON.stringify(err, Object.getOwnPropertyNames(err))
-        });
+        Tools.sendError(
+            JSON.stringify(err, Object.getOwnPropertyNames(err))
+        );
     }
-    globalThis.mwindow.webContents.send('llmTranslating', false);
-    globalThis.mwindow.webContents.send('worked', 0);
+    Tools.send('llmTranslating', false);
+    Tools.worked();
 }
 
 export async function retranslateFile(
@@ -461,13 +470,13 @@ export async function retranslateBlocks(
         saveCache(edir, cache);
 
         return { success: true };
-    } catch (err: any) {
-        return { success: false, error: err.message || String(err) };
+    } catch (err: unknown) {
+        return { success: false, error: (err as Error).message || String(err) };
     }
 }
 
 // Local block splitter (same logic as geminiTranslator's splitIntoBlocks)
-function splitFileBlocks(lines: string[]): { separator: string; lines: string[] }[] {
+export function splitFileBlocks(lines: string[]): { separator: string; lines: string[] }[] {
     const SEP = /^---\s*\d+\s*---$/;
     const blocks: { separator: string; lines: string[] }[] = [];
     let curSep = '';

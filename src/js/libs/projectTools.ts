@@ -1,5 +1,5 @@
 interface PTools{
-    send: (channel: string, ...args: any[]) => void;
+    send: (channel: string, ...args: unknown[]) => void;
     packed?: boolean;
     sendError: (txt: string) => void;
     sendAlert: (txt: string) => void;
@@ -29,7 +29,7 @@ function INIT(){
 function callBeforeInit(){console.error('Ptools called before init')}
 
 let pTools:PTools = {
-    send: (channel: string, ...args: any[]) => {callBeforeInit()},
+    send: (channel: string, ...args: unknown[]) => {callBeforeInit()},
     sendError: (txt: string) => {callBeforeInit()},
     sendAlert: (txt: string) => {callBeforeInit()},
     worked: () => {callBeforeInit()},
@@ -39,7 +39,7 @@ let pTools:PTools = {
 
 
 const Tools = {
-    send: (channel: string, ...args: any[]) => {pTools.send(channel, ...args)},
+    send: (channel: string, ...args: unknown[]) => {pTools.send(channel, ...args)},
     packed: ((require.main && require.main.filename.indexOf('app.asar') !== -1) || (process.argv.filter(a => a.indexOf('app.asar') !== -1).length > 0)),
     sendError: (txt: string) => {pTools.sendError(txt)},
     sendAlert: (txt: string) => {pTools.sendAlert(txt)},

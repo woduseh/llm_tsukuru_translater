@@ -4,21 +4,24 @@ import path from 'path';
 import * as edTool from './edtool.js';
 import yaml from 'js-yaml';
 import { sleep } from './globalutils';
+import Tools from '../libs/projectTools';
 
-function getBinarySize(string: any) {
+import type { ApplyArg } from './types';
+
+function getBinarySize(string: string) {
     return Buffer.byteLength(string, 'utf8');
 }
-export const apply = async (ev: any, arg: any) => {
+export const apply = async (ev: unknown, arg: ApplyArg) => {
     try {
       const dir = (Buffer.from(arg.dir, "base64").toString('utf8'));
       if (! fs.existsSync(dir + '/Extract')){
-        globalThis.mwindow.webContents.send('alert', {icon: 'error', message: 'Extract 폴더가 존재하지 않습니다'}); 
-        globalThis.mwindow.webContents.send('worked', 0);
+        Tools.sendError('Extract 폴더가 존재하지 않습니다');
+        Tools.worked();
         return
       }
       if (!edTool.exists(dir)){
-        globalThis.mwindow.webContents.send('alert', {icon: 'error', message: '.extracteddata 파일이 존재하지 않습니다'}); 
-        globalThis.mwindow.webContents.send('worked', 0);
+        Tools.sendError('.extracteddata 파일이 존재하지 않습니다');
+        Tools.worked();
         return
       }
       if(!arg.instantapply){
@@ -98,7 +101,7 @@ export const apply = async (ev: any, arg: any) => {
             } catch (error) { console.warn('Failed to set value for:', ext_dat[i].data[q].val, error) }
           }
         }
-        globalThis.mwindow.webContents.send('loading', worked_files/max_files*100);
+        Tools.send('loading', worked_files/max_files*100);
         await sleep(0)
       }
 
@@ -136,13 +139,13 @@ export const apply = async (ev: any, arg: any) => {
         }
       }
       
-      await ExtTool.EncryptDir(dir, 'img', arg.instantapply)
-      await ExtTool.EncryptDir(dir, 'audio', arg.instantapply)
+      await ExtTool.EncryptDir(dir, 'img', !!arg.instantapply)
+      await ExtTool.EncryptDir(dir, 'audio', !!arg.instantapply)
 
-      globalThis.mwindow.webContents.send('alert2'); 
-      globalThis.mwindow.webContents.send('loading', 0);
+      Tools.send('alert2');
+      Tools.send('loading', 0);
     } catch (err) {
-      globalThis.mwindow.webContents.send('alert', {icon: 'error', message: JSON.stringify(err, Object.getOwnPropertyNames(err))}); 
+      Tools.sendError(JSON.stringify(err, Object.getOwnPropertyNames(err)));
     }
-    globalThis.mwindow.webContents.send('worked', 0);
+    Tools.worked();
 }

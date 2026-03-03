@@ -1,5 +1,7 @@
 import { BrowserWindow } from "electron"
 import { AppSettings } from "./src/types/settings"
+import { ExtractedFileData } from "./src/js/rpgmv/types"
+import { VerifyIssue } from "./src/js/rpgmv/verify"
 
 export declare global {
     var mwindow:BrowserWindow
@@ -9,8 +11,8 @@ export declare global {
     var oPath:string
     var sourceDir:string
     var iconPath:string
-    var gb:{[key:string]: any}
-    var externMsg:{[key:string]: any}
+    var gb:Record<string, ExtractedFileData>
+    var externMsg:Record<string, string>
     var useExternMsg:boolean
     var externMsgKeys:string[]
     var llmAbort:boolean
@@ -22,11 +24,11 @@ export declare global {
 
     interface Window {
         api: {
-            send: (channel: string, ...args: any[]) => void;
-            on: (channel: string, callback: (...args: any[]) => void) => any;
+            send: (channel: string, ...args: unknown[]) => void;
+            on: (channel: string, callback: (...args: any[]) => void) => unknown;
             once: (channel: string, callback: (...args: any[]) => void) => void;
             removeAllListeners: (channel: string) => void;
-            invoke: (channel: string, ...args: any[]) => Promise<any>;
+            invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
         };
         nodeBuffer: {
             toBase64: (str: string) => string;
@@ -43,27 +45,25 @@ export declare global {
             parse: (p: string) => { root: string; dir: string; base: string; ext: string; name: string };
             basename: (p: string) => string;
         };
-        Swal: any;
+        Swal: any;  // third-party SweetAlert2, no type defs
         verify: {
-            verifyJsonIntegrity: (orig: any, trans: any) => any[];
-            repairJson: (orig: any, trans: any) => any;
+            verifyJsonIntegrity: (orig: unknown, trans: unknown) => VerifyIssue[];
+            repairJson: (orig: unknown, trans: unknown) => unknown;
         };
     }
-}
 
-interface wolfMetadata{
-    ver:2|3|-1
-}
+    interface wolfMetadata{
+        ver:2|3|-1
+    }
 
-interface extData{
-    str:lenStr
-    sourceFile:string
-    extractFile:string
-    endsWithNull:boolean
-    textLineNumber:number[]
-    codeStr:string
-
-
+    interface extData{
+        str:lenStr
+        sourceFile:string
+        extractFile:string
+        endsWithNull:boolean
+        textLineNumber:number[]
+        codeStr:string
+    }
 }
 
 export interface lenStr{

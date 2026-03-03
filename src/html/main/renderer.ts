@@ -2,7 +2,7 @@
     let running = false
     let loadingTag = ''
     let menu_open = false
-    let globalSettings:{[key:string]:any} = {}
+    let globalSettings:{[key:string]:unknown} = {}
     let LastTime = -1
     let LastPercent = -1.0
     let estimatedTime = ''
@@ -48,33 +48,35 @@
     window.api.send('setheight', 550);
 
     
-    window.api.on('set_path', (tt: any) => {
-        (document.getElementById(tt.type) as HTMLInputElement).value = tt.dir
-        if(tt.type !== 'folder_input'){
-            document.getElementById(tt.type)!.innerText = tt.dir
+    window.api.on('set_path', (tt: unknown) => {
+        const payload = tt as {type: string; dir: string};
+        (document.getElementById(payload.type) as HTMLInputElement).value = payload.dir
+        if(payload.type !== 'folder_input'){
+            document.getElementById(payload.type)!.innerText = payload.dir
         }
     });
     
     
     
-    window.api.on('getGlobalSettings', (tt: any) => {
-        if(tt.language === 'en'){
+    window.api.on('getGlobalSettings', (tt: unknown) => {
+        const settings = tt as Record<string, unknown>;
+        if(settings.language === 'en'){
             
             globalThis.loadEn()
         }
-        globalSettings = tt
-        const tData = (globalSettings.themeData)
+        globalSettings = settings
+        const tData = (globalSettings.themeData) as Record<string, string>
         let root = document.documentElement;
         for(const i in tData){
             root.style.setProperty(i,tData[i]);
         }
     })
     
-    window.api.on('loadingTag', (tt: any) => {
-        loadingTag = tt
+    window.api.on('loadingTag', (tt: unknown) => {
+        loadingTag = tt as string
     })
     
-    window.api.on('loading', (tt: any) => {
+    window.api.on('loading', (tt: number) => {
         document.getElementById('border_r')!.style.width = `${tt}vw`
         let ds = Math.floor(new Date().getTime()/1000)
         if(tt > 0 && globalSettings.loadingText){
@@ -82,7 +84,7 @@
                 const ChangedTime = ds - LastTime
                 LastTime = ds
                 let OldPercent = LastPercent
-                LastPercent = parseFloat(tt)
+                LastPercent = Number(tt)
                 const movedPercent = (LastPercent - OldPercent) / ChangedTime
                 if(movedPercent > 0){
                     speedSamples.push(movedPercent)
@@ -94,7 +96,7 @@
                     estimatedTime = `${toHHMMSS(TimeLeftSec)} 남음`
                 }
             }
-            document.getElementById('loading-text')!.innerText = `${loadingTag}${loadingTag ? ' · ' : ''}${Number.parseFloat(tt).toFixed(1)}% ${estimatedTime}`
+            document.getElementById('loading-text')!.innerText = `${loadingTag}${loadingTag ? ' · ' : ''}${Number(tt).toFixed(1)}% ${estimatedTime}`
             document.getElementById('loading-text')!.style.visibility = 'visible'
         }
         else{
@@ -109,22 +111,23 @@
     
     window.api.on('worked', () => {running = false})
     
-    window.api.on('check_force', (arg: any) => {
+    window.api.on('check_force', (arg: unknown) => {
+        const extArg = arg as Record<string, unknown>;
         Swal.fire({
             icon: 'question',
             text: 'Extract 폴더가 존재합니다. \n덮어씌우겠습니까?',
             confirmButtonText: '예',
             showDenyButton: true,
             denyButtonText: `아니오`,
-        }).then((result: any) => {
+        }).then((result: Record<string, unknown>) => {
             if (result.isConfirmed) {
-                arg.force = true
-                window.api.send('extract', arg);
+                extArg.force = true
+                window.api.send('extract', extArg);
             }
         })
     });
     
-    window.api.on('alert', (tt: any) => {
+    window.api.on('alert', (tt: unknown) => {
         if (typeof tt === 'string') {
             Swal.fire({
                 icon: 'success',
@@ -133,17 +136,17 @@
         }
         else{
             Swal.fire({
-                icon: tt.icon,
-                title: tt.message,
+                icon: (tt as Record<string, unknown>).icon,
+                title: (tt as Record<string, unknown>).message,
             })
         }
     });
     
-    window.api.on('alert_free', (tt: any) => {
+    window.api.on('alert_free', (tt: unknown) => {
         Swal.fire(tt)
     });
     
-    window.api.on('alert2', async (tt: any) => {
+    window.api.on('alert2', async (tt: unknown) => {
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
@@ -206,8 +209,8 @@
         }
     }
     
-    window.api.on('is_version', (arg: any)=>{
-        (globalThis as any).version = arg
+    window.api.on('is_version', (arg: unknown)=>{
+        (globalThis as Record<string, unknown>).version = arg
     })
     
     document.getElementById('ext')!.onclick = () => {_mode=0;_reload()}
@@ -221,8 +224,8 @@
     // LLM translation abort button
     let llmTranslating = false;
 
-    window.api.on('llmTranslating', (val: any) => {
-        llmTranslating = val;
+    window.api.on('llmTranslating', (val: unknown) => {
+        llmTranslating = val as boolean;
         document.getElementById('abort-llm-btn')!.style.display = val ? 'block' : 'none';
     })
 
@@ -263,7 +266,7 @@
                 confirmButtonText: '예',
                 showDenyButton: true,
                 denyButtonText: `아니오`,
-            }).then((result: any) => {
+            }).then((result: Record<string, unknown>) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         icon: 'success',
@@ -291,7 +294,7 @@
                 confirmButtonText: '예',
                 showDenyButton: true,
                 denyButtonText: `아니오`,
-            }).then((result: any) => {
+            }).then((result: Record<string, unknown>) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         icon: 'success',
@@ -328,7 +331,7 @@
                 confirmButtonText: '예',
                 showDenyButton: true,
                 denyButtonText: `아니오`,
-            }).then((result: any) => {
+            }).then((result: Record<string, unknown>) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         icon: 'success',
@@ -353,7 +356,7 @@
                 confirmButtonText: '예',
                 showDenyButton: true,
                 denyButtonText: `아니오`,
-            }).then((result: any) => {
+            }).then((result: Record<string, unknown>) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         icon: 'success',
@@ -384,7 +387,7 @@
             confirmButtonText: '예',
             showDenyButton: true,
             denyButtonText: `아니오`,
-        }).then(async (result: any) => {
+        }).then(async (result: Record<string, unknown>) => {
             if (result.isConfirmed) {
                 await Swal.fire({
                     icon: "info",
@@ -404,7 +407,7 @@
                 confirmButtonText: '예',
                 showDenyButton: true,
                 denyButtonText: `아니오`,
-            }).then((result: any) => {
+            }).then((result: Record<string, unknown>) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         icon: 'success',
@@ -421,15 +424,16 @@
         }
     }
     
-    window.api.on('alertExten', async (arg: any) => {
+    window.api.on('alertExten', async (arg: unknown) => {
+        const extArg = arg as string[];
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
             denyButtonText: "아니요",
-            title: arg[0],
+            title: extArg[0],
         })
         if(!isDenied){
-            window.api.send("getextention", arg[1])
+            window.api.send("getextention", extArg[1])
         }
         else{
             window.api.send("getextention", 'none')
@@ -599,11 +603,11 @@
                 input: 'text',
                 inputValue: 24,
                 showCancelButton: true,
-                inputValidator: (value: any) => {
+                inputValidator: (value: string) => {
                   if (!value) {
                     return '무언가 입력해야 합니다!'
                   }
-                  if (isNaN(value)) {
+                  if (isNaN(Number(value))) {
                     return '숫자가 아닙니다!'
                   }
                 }

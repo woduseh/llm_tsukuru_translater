@@ -36,8 +36,12 @@
         dirty = {};
 
         if (!window.nodeFs.existsSync(extractDir) || !window.nodeFs.existsSync(backupDir)) {
-            document.getElementById('summary')!.innerHTML =
-                '<span class="summary-error">Extract 또는 Extract_backup 폴더가 없습니다.</span>';
+            const summaryEl = document.getElementById('summary')!;
+            summaryEl.replaceChildren();
+            const errSpan = document.createElement('span');
+            errSpan.className = 'summary-error';
+            errSpan.textContent = 'Extract 또는 Extract_backup 폴더가 없습니다.';
+            summaryEl.appendChild(errSpan);
             return;
         }
 
@@ -98,22 +102,43 @@
 
     function renderSummary() {
         const el = document.getElementById('summary')!;
+        el.replaceChildren();
         const mismatchCount = files.filter(f => f.mismatch).length;
         const untranslatedCount = files.filter(f => f.untranslated).length;
         if (files.length === 0) {
-            el.innerHTML = '<span class="summary-error">비교할 파일이 없습니다.</span>';
+            const span = document.createElement('span');
+            span.className = 'summary-error';
+            span.textContent = '비교할 파일이 없습니다.';
+            el.appendChild(span);
         } else {
-            const parts: string[] = [];
+            const spans: HTMLSpanElement[] = [];
             if (mismatchCount > 0) {
-                parts.push(`<span class="summary-error">⚠ ${mismatchCount}개 줄 수 불일치</span>`);
+                const span = document.createElement('span');
+                span.className = 'summary-error';
+                span.textContent = `⚠ ${mismatchCount}개 줄 수 불일치`;
+                spans.push(span);
             }
             if (untranslatedCount > 0) {
-                parts.push(`<span class="summary-warn">● ${untranslatedCount}개 미번역</span>`);
+                const span = document.createElement('span');
+                span.className = 'summary-warn';
+                span.textContent = `● ${untranslatedCount}개 미번역`;
+                spans.push(span);
             }
-            if (parts.length === 0) {
-                el.innerHTML = `<span class="summary-ok">✓ 모든 파일 번역 완료, 블록 구조 일치 (${files.length}개 파일)</span>`;
+            if (spans.length === 0) {
+                const span = document.createElement('span');
+                span.className = 'summary-ok';
+                span.textContent = `✓ 모든 파일 번역 완료, 블록 구조 일치 (${files.length}개 파일)`;
+                el.appendChild(span);
             } else {
-                el.innerHTML = `${parts.join(' &nbsp; ')} <span class="summary-total">(전체 ${files.length}개)</span>`;
+                spans.forEach((span, i) => {
+                    if (i > 0) el.append(' \u00A0 ');
+                    el.appendChild(span);
+                });
+                el.append(' ');
+                const totalSpan = document.createElement('span');
+                totalSpan.className = 'summary-total';
+                totalSpan.textContent = `(전체 ${files.length}개)`;
+                el.appendChild(totalSpan);
             }
         }
     }
@@ -135,7 +160,7 @@
 
     function renderFileList() {
         const list = document.getElementById('file-list')!;
-        list.innerHTML = '';
+        list.replaceChildren();
         const filtered = getFilteredFiles();
 
         document.getElementById('file-count')!.textContent = `${filtered.length}/${files.length}`;
@@ -209,8 +234,8 @@
     function renderBlocks() {
         const origContainer = document.getElementById('original-blocks')!;
         const transContainer = document.getElementById('translated-blocks')!;
-        origContainer.innerHTML = '';
-        transContainer.innerHTML = '';
+        origContainer.replaceChildren();
+        transContainer.replaceChildren();
         selectedBlocks = new Set();
         updateSelectionUI();
 

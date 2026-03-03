@@ -8,9 +8,11 @@ import { checkIsMapFile, sleep } from '../js/rpgmv/globalutils.js';
 import * as yaml from 'js-yaml';
 import { getMainWindow, sendError, worked } from './shared';
 
-const ErrorAlert = (msg: any) => sendError(msg)
+import { ExtractArg } from '../js/rpgmv/types';
 
-export async function extractor(arg: any){
+const ErrorAlert = (msg: string) => sendError(msg)
+
+export async function extractor(arg: ExtractArg){
   try {
     globalThis.gb = {}
     let file
@@ -62,7 +64,7 @@ export async function extractor(arg: any){
     globalThis.externMsg = {}
     globalThis.useExternMsg = false
     if(fs.existsSync(dir + '/ExternMessage.csv') && arg.exJson && globalThis.settings.ExternMsgJson){
-      const Emsg = await ExtTool.parse_externMsg(dir + '/ExternMessage.csv', !globalThis.settings.ExternMsgJson) as any
+      const Emsg = await ExtTool.parse_externMsg(dir + '/ExternMessage.csv', !globalThis.settings.ExternMsgJson) as Record<string, string>
       globalThis.externMsg = Emsg
       if(globalThis.settings.ExternMsgJson){
         fs.writeFileSync(dir + '/ExternMsgcsv.json', JSON.stringify(Emsg, null, 4), 'utf-8')
@@ -125,7 +127,7 @@ export async function extractor(arg: any){
       }
       else if (Object.keys(onebyone).includes(fileName)){
         file = fs.readFileSync(dir + '/' + fileName, 'utf8')
-        await ExtTool.format_extracted(await ExtTool.extract(file, conf, (onebyone as Record<string, string>)[fileName]))
+        await ExtTool.format_extracted(await ExtTool.extract(file, conf, (onebyone as Record<string, string>)[fileName] as import('../js/rpgmv/types').ExtractFileType))
       }
       else if (arg.exJson){
         if(!dataBaseO.ignores.includes(fileName)){
@@ -143,11 +145,11 @@ export async function extractor(arg: any){
         delete globalThis.gb[fileName]
       }
       else if(fileName === 'ext_javascript.json'){
-        fs.writeFileSync(dir + `/Extract/${path.parse(fileName).name}.js`, globalThis.gb[fileName].outputText,'utf-8')
+        fs.writeFileSync(dir + `/Extract/${path.parse(fileName).name}.js`, globalThis.gb[fileName].outputText!,'utf-8')
         delete globalThis.gb[fileName].outputText
       }
       else{
-        fs.writeFileSync(dir + `/Extract/${path.parse(fileName).name}.txt`, globalThis.gb[fileName].outputText,'utf-8')
+        fs.writeFileSync(dir + `/Extract/${path.parse(fileName).name}.txt`, globalThis.gb[fileName].outputText!,'utf-8')
         delete globalThis.gb[fileName].outputText
       }
     }
@@ -230,7 +232,7 @@ ipcMain.on('updateVersion', async (ev, arg) => {
       const dat0 = fs.readFileSync(path.join(TranslatedDir, file), 'utf-8').split('\n')
       let dat2 = fs.readFileSync(path.join(NewDir, file), 'utf-8')
       let dat2_dat = dat2.split('\n')
-      function UpReplacer(data: any, source: any, to: any, all=false){
+      function UpReplacer(data: string[], source: string, to: string, all=false){
         for(let i =0;i<data.length;i++){
           if(data[i] === source){
             data[i] = to;
@@ -246,7 +248,7 @@ ipcMain.on('updateVersion', async (ev, arg) => {
         dat2_dat = UpReplacer(dat2_dat, dat1[i2], dat0[i2], false)
       }
       for(let i2 in TransDict){
-        dat2_dat = UpReplacer(dat2_dat, (dat1 as any)[i2], (dat0 as any)[i2], true)
+        dat2_dat = UpReplacer(dat2_dat, dat1[Number(i2)], dat0[Number(i2)], true)
       }
       dat2 = dat2_dat.join('\n')
       fs.writeFileSync(path.join(NewDir, file), dat2, 'utf-8')

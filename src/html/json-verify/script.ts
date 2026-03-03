@@ -5,8 +5,8 @@
         type: string;
         severity: 'error' | 'warning';
         message: string;
-        origValue?: any;
-        transValue?: any;
+        origValue?: unknown;
+        transValue?: unknown;
     }
 
     interface FileEntry {
@@ -52,8 +52,12 @@
 
         const dirs = detectDirs(dir);
         if (!dirs) {
-            document.getElementById('summary')!.innerHTML =
-                '<span class="summary-error">Completed/data 또는 Backup 폴더가 없습니다. 적용(Apply)을 먼저 실행하세요.</span>';
+            const summaryEl = document.getElementById('summary')!;
+            summaryEl.replaceChildren();
+            const errSpan = document.createElement('span');
+            errSpan.className = 'summary-error';
+            errSpan.textContent = 'Completed/data 또는 Backup 폴더가 없습니다. 적용(Apply)을 먼저 실행하세요.';
+            summaryEl.appendChild(errSpan);
             return;
         }
 
@@ -83,7 +87,7 @@
             } catch (e) {
                 files.push({
                     name, origPath, transPath,
-                    issues: [{ path: '$', type: 'parse_error', severity: 'error', message: `JSON 파싱 오류: ${(e as any).message}` }],
+                    issues: [{ path: '$', type: 'parse_error', severity: 'error', message: `JSON 파싱 오류: ${(e as Error).message}` }],
                     errorCount: 1, warningCount: 0, repaired: false
                 });
             }
@@ -97,24 +101,43 @@
 
     function renderSummary() {
         const el = document.getElementById('summary')!;
+        el.replaceChildren();
         const errorFiles = files.filter(f => f.errorCount > 0).length;
         const warnFiles = files.filter(f => f.warningCount > 0 && f.errorCount === 0).length;
         const totalIssues = files.reduce((sum, f) => sum + f.issues.length, 0);
 
         if (files.length === 0) {
-            el.innerHTML = '<span class="summary-error">비교할 파일이 없습니다.</span>';
+            const span = document.createElement('span');
+            span.className = 'summary-error';
+            span.textContent = '비교할 파일이 없습니다.';
+            el.appendChild(span);
         } else if (totalIssues === 0) {
-            el.innerHTML = `<span class="summary-ok">✓ 모든 파일의 JSON 구조가 일치합니다 (${files.length}개 파일)</span>`;
+            const span = document.createElement('span');
+            span.className = 'summary-ok';
+            span.textContent = `✓ 모든 파일의 JSON 구조가 일치합니다 (${files.length}개 파일)`;
+            el.appendChild(span);
         } else {
-            const parts: string[] = [];
+            const spans: HTMLSpanElement[] = [];
             if (errorFiles > 0) {
-                parts.push(`<span class="summary-error">❌ ${errorFiles}개 파일에서 구조 오류 발견</span>`);
+                const span = document.createElement('span');
+                span.className = 'summary-error';
+                span.textContent = `❌ ${errorFiles}개 파일에서 구조 오류 발견`;
+                spans.push(span);
             }
             if (warnFiles > 0) {
-                parts.push(`<span class="summary-warn">⚠ ${warnFiles}개 파일에서 경고 발견</span>`);
+                const span = document.createElement('span');
+                span.className = 'summary-warn';
+                span.textContent = `⚠ ${warnFiles}개 파일에서 경고 발견`;
+                spans.push(span);
             }
-            parts.push(`<span class="summary-total">(전체 ${files.length}개 파일, ${totalIssues}개 문제)</span>`);
-            el.innerHTML = parts.join(' &nbsp; ');
+            const totalSpan = document.createElement('span');
+            totalSpan.className = 'summary-total';
+            totalSpan.textContent = `(전체 ${files.length}개 파일, ${totalIssues}개 문제)`;
+            spans.push(totalSpan);
+            spans.forEach((span, i) => {
+                if (i > 0) el.append(' \u00A0 ');
+                el.appendChild(span);
+            });
         }
     }
 
@@ -133,7 +156,7 @@
 
     function renderFileList() {
         const list = document.getElementById('file-list')!;
-        list.innerHTML = '';
+        list.replaceChildren();
         const filtered = getFilteredFiles();
         document.getElementById('file-count')!.textContent = `${filtered.length}/${files.length}`;
 
@@ -186,11 +209,14 @@
     function renderIssues() {
         const issuesList = document.getElementById('issues-list')!;
         const fileNameEl = document.getElementById('issues-file-name')!;
-        issuesList.innerHTML = '';
+        issuesList.replaceChildren();
 
         if (files.length === 0) {
             fileNameEl.textContent = '';
-            issuesList.innerHTML = '<div class="no-files">파일이 없습니다</div>';
+            const noFiles = document.createElement('div');
+            noFiles.className = 'no-files';
+            noFiles.textContent = '파일이 없습니다';
+            issuesList.appendChild(noFiles);
             return;
         }
 
@@ -198,7 +224,10 @@
         fileNameEl.textContent = f.name;
 
         if (f.issues.length === 0) {
-            issuesList.innerHTML = '<div class="no-issues">✓ 구조적 문제가 없습니다</div>';
+            const noIssues = document.createElement('div');
+            noIssues.className = 'no-issues';
+            noIssues.textContent = '✓ 구조적 문제가 없습니다';
+            issuesList.appendChild(noIssues);
             return;
         }
 
@@ -283,7 +312,7 @@
             return { success: true };
         } catch (e) {
             console.error('repairFile error:', e);
-            return { success: false, error: (e as any).message || String(e) };
+            return { success: false, error: (e as Error).message || String(e) };
         }
     }
 
@@ -292,8 +321,8 @@
         loadFiles(dir);
     });
 
-    window.api.on('verifySettings', (settings: any) => {
-        globalThis.settings = settings;
+    window.api.on('verifySettings', (settings: unknown) => {
+        globalThis.settings = settings as typeof globalThis.settings;
     });
 
     // 검색 / 필터

@@ -1,18 +1,18 @@
 (() => {
     const mainMenu = document.querySelector('#mainMenu') as HTMLDivElement
     
-    let globalSettings
+    let globalSettings: Record<string, unknown>
     
-    window.api.on('getGlobalSettings', (tt: any) => {
-        globalSettings = tt
-        if(tt.language === 'en'){
+    window.api.on('getGlobalSettings', (tt: unknown) => {
+        globalSettings = tt as Record<string, unknown>
+        if((tt as Record<string, unknown>).language === 'en'){
             document.getElementById('lang-en')!.classList.add('btxSel')            
             globalThis.loadEn()
         }
         else{
             document.getElementById('lang-ko')!.classList.add('btxSel')
         }
-        const tData = (globalSettings.themeData)
+        const tData = (globalSettings.themeData) as Record<string, string>
         let root = document.documentElement;
         for(const i in tData){
             root.style.setProperty(i,tData[i]);
@@ -26,10 +26,11 @@
     document.getElementById('lang-en')!.onclick = () => {window.api.send('changeLang', 'en')}
     document.getElementById('lang-ko')!.onclick = () => {window.api.send('changeLang', 'ko')}
 
-    window.api.on('set_path', (tt: any) => {
-        (document.getElementById(tt.type) as HTMLInputElement).value = tt.dir
-        if(tt.type !== 'folder_input'){
-            document.getElementById(tt.type)!.innerText = tt.dir
+    window.api.on('set_path', (tt: unknown) => {
+        const payload = tt as {type: string; dir: string};
+        (document.getElementById(payload.type) as HTMLInputElement).value = payload.dir
+        if(payload.type !== 'folder_input'){
+            document.getElementById(payload.type)!.innerText = payload.dir
         }
     });
     mainMenu.style.display = 'block'

@@ -3,7 +3,7 @@
     const mainMenu = document.querySelector('#mainMenu') as HTMLDivElement
     const simpleMenu = document.querySelector('#simpleMenu') as HTMLDivElement
     let running = false
-    let globalSettings:{[key:string]:any}
+    let globalSettings:{[key:string]:unknown}
     let LastPercent = -1.0
     let speedSamples:number[] = []
     const ETA_WINDOW = 10
@@ -26,27 +26,28 @@
     //@ts-ignore
     const Swal = window.Swal
     
-    window.api.on('getGlobalSettings', (tt: any) => {
-        globalSettings = tt
-        if(tt.language === 'en'){
+    window.api.on('getGlobalSettings', (tt: unknown) => {
+        globalSettings = tt as Record<string, unknown>
+        if((tt as Record<string, unknown>).language === 'en'){
             globalThis.loadEn()
         }
-        const tData = (globalSettings.themeData)
+        const tData = (globalSettings.themeData) as Record<string, string>
         let root = document.documentElement;
         for(const i in tData){
             root.style.setProperty(i,tData[i]);
         }
     })
 
-    window.api.on('alertExten', async (arg: any) => {
+    window.api.on('alertExten', async (arg: unknown) => {
+        const extArg = arg as string[];
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
             denyButtonText: "아니요",
-            title: arg[0],
+            title: extArg[0],
         })
         if(!isDenied){
-            window.api.send("getextention", arg[1])
+            window.api.send("getextention", extArg[1])
         }
         else{
             window.api.send("getextention", 'none')
@@ -71,10 +72,11 @@
     document.getElementById('sel')!.addEventListener('click', () => {
         window.api.send('select_folder', 'folder_input');
     });
-    window.api.on('set_path', (tt: any) => {
-        (document.getElementById(tt.type) as HTMLInputElement).value = tt.dir
-        if(tt.type !== 'folder_input'){
-            document.getElementById(tt.type)!.innerText = tt.dir
+    window.api.on('set_path', (tt: unknown) => {
+        const payload = tt as {type: string; dir: string};
+        (document.getElementById(payload.type) as HTMLInputElement).value = payload.dir
+        if(payload.type !== 'folder_input'){
+            document.getElementById(payload.type)!.innerText = payload.dir
         }
     });
     document.getElementById('WolfBtn')!.onclick = () => {
@@ -145,7 +147,7 @@
         }
     }
 
-    window.api.on('alert', (tt: any) => {
+    window.api.on('alert', (tt: unknown) => {
         if (typeof tt === 'string') {
             Swal.fire({
                 icon: 'success',
@@ -154,17 +156,17 @@
         }
         else{
             Swal.fire({
-                icon: tt.icon,
-                title: tt.message,
+                icon: (tt as Record<string, unknown>).icon,
+                title: (tt as Record<string, unknown>).message,
             })
         }
     });
 
-    window.api.on('loadingTag', (tt: any) => {
-        loadingTag = tt
+    window.api.on('loadingTag', (tt: unknown) => {
+        loadingTag = tt as string
     })
 
-    window.api.on('loading', (tt: any) => {
+    window.api.on('loading', (tt: number) => {
         document.getElementById('border_r')!.style.width = `${tt}vw`
         let ds = Math.floor(new Date().getTime()/1000)
         if(tt > 0 && globalSettings.loadingText){
@@ -172,7 +174,7 @@
                 const ChangedTime = ds - LastTime
                 LastTime = ds
                 let OldPercent = LastPercent
-                LastPercent = parseFloat(tt)
+                LastPercent = Number(tt)
                 const movedPercent = (LastPercent - OldPercent) / ChangedTime
                 if(movedPercent > 0){
                     speedSamples.push(movedPercent)
@@ -184,7 +186,7 @@
                     estimatedTime = `${toHHMMSS(TimeLeftSec)} 남음`
                 }
             }
-            document.getElementById('loading-text')!.innerText = `${loadingTag}${loadingTag ? ' · ' : ''}${Number.parseFloat(tt).toFixed(1)}% ${estimatedTime}`
+            document.getElementById('loading-text')!.innerText = `${loadingTag}${loadingTag ? ' · ' : ''}${Number(tt).toFixed(1)}% ${estimatedTime}`
             document.getElementById('loading-text')!.style.visibility = 'visible'
         }
         else{
@@ -197,7 +199,7 @@
         }
     });
 
-    window.api.on('alert2', async (tt: any) => {
+    window.api.on('alert2', async (tt: unknown) => {
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
@@ -234,8 +236,8 @@
     // LLM translation abort button
     let llmTranslating = false;
 
-    window.api.on('llmTranslating', (val: any) => {
-        llmTranslating = val;
+    window.api.on('llmTranslating', (val: unknown) => {
+        llmTranslating = val as boolean;
         document.getElementById('abort-llm-btn')!.style.display = val ? 'block' : 'none';
     })
 

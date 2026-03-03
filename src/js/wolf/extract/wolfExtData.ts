@@ -11,7 +11,7 @@ const WolfExtDataParser = {
         }))))
     },
     read:(dir:string) =>{
-        const ca =  decode(zlib.inflateSync(readFileSync(dir))) as any
+        const ca =  decode(zlib.inflateSync(readFileSync(dir))) as { ext: extData[]; meta: wolfMetadata; cache: Record<string, Buffer> }
         globalThis.WolfExtData = ca.ext
         globalThis.WolfMetadata = ca.meta
         globalThis.WolfCache = ca.cache

@@ -28,7 +28,7 @@ export function createWindow() {
   mainWindow.webContents.on('did-finish-load', function () {
     mainWindow.show();
     getMainWindow().webContents.send('is_version', app.getVersion());
-    globalThis.settings.themeData = (Themes as Record<string, any>)[globalThis.settings.theme]
+    globalThis.settings.themeData = (Themes as Record<string, Record<string, string>>)[globalThis.settings.theme]
     const { llmApiKey, ...safeSettings } = globalThis.settings;
     getMainWindow().webContents.send('getGlobalSettings', safeSettings);
     if(!tools.packed){
