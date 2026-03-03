@@ -2,91 +2,116 @@
 
 ## Project Overview
 
-Electron desktop app for extracting, translating, and applying text in RPG Maker MV/MZ and Wolf RPG Editor games. The primary UI language is Korean; code comments and variable names mix Korean, English, and Japanese.
+Electron 40 desktop app (Windows) for extracting, translating, and applying text in RPG Maker MV/MZ and Wolf RPG Editor games. UI is Vue 3 SPA rendered via Vite; primary UI language is Korean. Code comments and variable names mix Korean, English, and Japanese.
 
-## Build & Run
+## Build, Test, Lint
 
 ```bash
-# Install dependencies
 npm install
-
-# Run in development (sets codepage to UTF-8, then launches Electron)
-npm start
-
-# Build Windows portable/installer
-npm run build        # x64 only
-npm run build2       # all architectures
+npm start                  # builds renderer (Vite), then launches Electron
+npm run dev                # Vite dev server + Electron with HMR (parallel)
+npm run build              # production build (Windows x64 portable + NSIS installer)
+npm run build:renderer     # Vite build only → dist-renderer/
+npm test                   # vitest run (all 136 tests)
+npx vitest run test/unit/edtool.test.ts          # single test file
+npx vitest run -t "round-trip"                   # tests matching name pattern
+npm run test:watch         # vitest in watch mode
+npm run test:coverage      # vitest with v8 coverage
+npm run lint               # eslint on src/**/*.ts and main.ts
+npx tsc --noEmit           # type-check without emitting
 ```
-
-There is **no test suite or linter** configured. TypeScript is compiled implicitly by Electron at runtime — there is no separate `tsc` build step. The `.js` files alongside `.ts` files are the pre-compiled outputs checked into the repo.
 
 ## Architecture
 
-### Dual-file Convention (`.ts` + `.js`)
+### Dual-file Convention (`.ts` + `.js`) — CRITICAL
 
-Every TypeScript source file has a corresponding `.js` file committed alongside it. **When editing logic, modify the `.ts` file AND keep the `.js` file in sync.** The app's `main` entry point in `package.json` is `main.js` (compiled from `main.ts`).
+Main-process TypeScript files (`main.ts`, `src/ipc/*.ts`, `src/js/**/*.ts`, `src/utils.ts`, `src/appContext.ts`, `src/preload.ts`) each have a **committed `.js` companion** that is the actual file Electron runs. There is no automatic `tsc` build step at runtime.
+
+**When editing any main-process `.ts` file, you MUST update the corresponding `.js` file in sync.** The `.js` files for several paths are gitignored (`/main.js`, `/src/ipc/**/*.js`, `/src/js/**/*.js`, `/src/preload.js`, etc.) — use `git add -f` to stage them.
+
+This convention does NOT apply to renderer code (`src/renderer/**`) — those are Vue SFCs compiled by Vite.
 
 ### Process Model
 
-- **Main process**: `main.ts` — Electron entry point; registers all `ipcMain` handlers, creates windows, orchestrates extract/apply/translate flows.
-- **Renderer processes**: HTML pages in `src/html/` with inline `rend.ts`/`rend.js` scripts using `ipcRenderer`. `nodeIntegration: true`, no context isolation.
+```
+main.ts (Electron main)
+├── src/ipc/windowManager.ts    — BrowserWindow creation, loadRoute()
+├── src/ipc/extractHandler.ts   — extract/apply IPC handlers
+├── src/ipc/translateHandler.ts — LLM translate, settings, compare windows
+├── src/ipc/toolsHandler.ts     — LLM compare, JSON verify, project convert
+├── src/ipc/settingsHandler.ts  — settings window
+├── src/ipc/shared.ts           — shared IPC utilities
+└── src/ipc/viteHelper.ts       — loadRoute() for hash-based SPA routing
+
+src/renderer/ (Vue 3 SPA, built by Vite → dist-renderer/)
+├── router.ts                   — createWebHashHistory (required for file:// protocol)
+├── views/MvMzPage.vue          — main RPG Maker page
+├── views/WolfPage.vue          — Wolf RPG page
+├── views/SettingsPage.vue      — settings
+├── views/LlmSettingsPage.vue   — LLM translation config
+├── views/LlmComparePage.vue    — translation comparison (sub-window)
+├── views/JsonVerifyPage.vue    — JSON verification (sub-window)
+└── views/HomePage.vue          — landing/home page
+
+src/preload.ts — contextBridge with channel whitelists (SEND_CHANNELS, RECEIVE_CHANNELS)
+```
+
+### IPC Communication Pattern
+
+- Renderer → Main: `window.api.send(channel, ...args)` — channels must be in `SEND_CHANNELS` whitelist in `src/preload.ts`
+- Main → Renderer: `webContents.send(channel, ...args)` — channels must be in `RECEIVE_CHANNELS` whitelist
+- **When adding a new IPC channel**, update both `SEND_CHANNELS`/`RECEIVE_CHANNELS` in `src/preload.ts` AND `src/preload.js`
+- Main-process IPC bridge: `src/js/libs/projectTools.ts` wraps `globalThis.mwindow.webContents.send()` — all backend-to-renderer messaging goes through `Tools.send()`, `Tools.sendAlert()`, `Tools.sendError()`, `Tools.worked()`
+
+### Sub-window Ready-signal Pattern
+
+Sub-windows (LLM Compare, JSON Verify, LLM Settings) load the same Vue SPA at different hash routes. Because Vue Router lazy-loads route components, **`did-finish-load` fires before the Vue component mounts**. To avoid race conditions:
+
+1. Main process stores pending data and only shows the window on `did-finish-load`
+2. Vue component sends a ready signal (e.g., `api.send('compareReady')`) in `onMounted`
+3. Main process responds with the pending data on receiving the ready signal
+
+Follow this pattern for any new sub-window.
+
+### Electron 40 Specifics
+
+- `sandbox: false` is REQUIRED in all BrowserWindow `webPreferences` — Electron 40 defaults to `sandbox: true` when `contextIsolation: true`, which blocks Node.js modules in preload
+- `webContents.send` loses `this` binding when stored as a standalone reference — always wrap in an arrow function
 
 ### RPG Maker MV/MZ Pipeline (`src/js/rpgmv/`)
 
-The core workflow is **Extract → Translate → Apply**:
+Core workflow: **Extract → Translate → Apply**
 
-1. **Extract** (`extract.ts`): Reads JSON data files from the game's `data/` folder, walks the RPG Maker data structures (maps, events, actors, items, system, etc.), and produces:
-   - `.txt` files in `data/Extract/` — one per source JSON, containing extracted text line-by-line
-   - `.extracteddata` — a zlib-compressed JSON metadata file (via `edtool.ts`) that maps each line number in the `.txt` file back to its JSON path in the original data
+1. **Extract** (`extract/`): Reads game `data/*.json` → produces `.txt` files + `.extracteddata` (zlib-compressed JSON metadata via `edtool.ts`)
+2. **Translate** (`translator.ts` + `libs/geminiTranslator.ts`): Translates `.txt` via Gemini LLM API
+3. **Apply** (`apply.ts`): Reads translated `.txt` + `.extracteddata` → reconstructs JSON with translations
 
-2. **Translate** (`translator.ts` + `libs/geminiTranslator.ts`): Translates the `.txt` files using Gemini LLM API. Maintains backup, progress, and cache files in the Extract folder.
+### `.extracteddata` Structure
 
-3. **Apply** (`apply.ts`): Reads the (translated) `.txt` files and `.extracteddata` metadata, then reconstructs the original JSON files with translated values replacing originals. Outputs to `data/Completed/data/` or directly overwrites via "instant apply."
-
-### Key Data Structures in `.extracteddata`
-
-The metadata stores per-file entries keyed by **line number** (the starting line in the `.txt` file):
 ```
 data[lineNumber] = {
-  val: "dotted.json.path",   // path into the original JSON (e.g., "events.3.pages.0.list.5.parameters.0")
-  m: endLineNumber,          // exclusive end line — text spans lines [lineNumber, m)
-  origin: "SourceFile.json", // which JSON file this entry came from
-  conf: { type, code, ... }  // extraction config metadata
+  val: "dotted.json.path",   // e.g., "events.3.pages.0.list.5.parameters.0"
+  m: endLineNumber,          // exclusive end — text spans lines [lineNumber, m)
+  origin: "SourceFile.json",
+  conf: { type, code, ... }
 }
 ```
 
-The `.txt` line range `[lineNumber, m)` must have exactly the same number of lines in the translated file as in the original for apply to work correctly. Multi-line text entries (e.g., dialogue with `\n`) span multiple lines.
-
 ### Wolf RPG Editor Pipeline (`src/js/wolf/`)
 
-Separate but parallel pipeline:
-- **Parser** (`parser/`): Binary parser for Wolf RPG `.wolf` data files
-- **Extract** (`extract/`): Extracts strings from parsed data, produces text files in `_Extract/Texts/`
-- **Apply** (`apply/`): Reads translated text files and patches binary data back
-
-### Shared Utilities
-
-- `src/js/libs/projectTools.ts` — Singleton for sending IPC messages to renderer
-- `src/js/rpgmv/globalutils.ts` — `checkIsMapFile()`, `sleep()`
-- `src/js/rpgmv/datas.ts` — Constants: file-type mappings (`onebyone`), ignore lists, settings defaults, beautify codes
-- `src/js/rpgmv/edtool.ts` — Read/write `.extracteddata` (zlib + JSON)
-- `src/js/rpgmv/fileCrypto.ts` — RPG Maker asset encryption/decryption
-- `src/utils.ts` — Encoding helpers, directory traversal
-- `globals.d.ts` — Global type declarations for `globalThis` properties
+Parallel pipeline with binary parser for `.wolf` data files, separate extract/apply logic.
 
 ### Global State
 
-Extensive use of `globalThis` for shared state:
-- `globalThis.gb` — In-memory extraction data (populated during extract, consumed during format)
-- `globalThis.settings` — User settings (persisted via `electron-store`)
-- `globalThis.mwindow` — Main BrowserWindow reference
-- `globalThis.WolfExtData`, `WolfEncoding`, `WolfMetadata`, `WolfCache` — Wolf RPG state
+`globalThis` is used extensively: `gb` (extraction data), `settings` (user prefs via electron-store), `mwindow` (main BrowserWindow), `WolfExtData`/`WolfEncoding`/`WolfMetadata`/`WolfCache` (Wolf RPG state). Types declared in `globals.d.ts`.
 
 ## Key Conventions
 
-- **Line-number alignment is critical**: The extract/apply pipeline relies on `.txt` line numbers matching `.extracteddata` metadata exactly. Any off-by-one error causes text to shift to wrong dialogue entries.
-- **`setObj` / `returnVal`**: Dot-path based JSON accessors (e.g., `"events.3.pages.0.list.5.parameters.0"`) used to get/set deeply nested values in RPG Maker JSON.
-- **Map file detection**: Files matching `Map###.json` pattern are treated as map files with event extraction logic.
-- **BOM handling**: UTF-8 BOM (`0xFEFF`) is stripped on read in multiple places — be consistent.
-- **IPC pattern**: Main process registers `ipcMain.on(channel, handler)`, renderers communicate via `ipcRenderer.send(channel, data)` / `ipcRenderer.on(channel, callback)`.
-- **`onebyone` mapping** in `datas.ts` maps specific JSON filenames to their extraction type (actor, item, skill, etc.). Files not in this map and not map files go through generic `ex` extraction if enabled.
+- **Line-number alignment is critical**: Extract/apply pipeline relies on `.txt` line numbers matching `.extracteddata` metadata. Off-by-one errors shift text to wrong dialogue entries.
+- **`setObj` / `returnVal`**: Dot-path based JSON accessors for deeply nested RPG Maker data structures.
+- **Map file detection**: `Map###.json` pattern triggers event extraction logic.
+- **BOM handling**: UTF-8 BOM (`0xFEFF`) is stripped on read — maintain consistency.
+- **`onebyone` mapping** in `datas.ts`: Maps JSON filenames to extraction types. Files not mapped go through generic `ex` extraction.
+- **Hash-based routing**: Vue Router uses `createWebHashHistory` — required for Electron `file://` protocol. All window routes use `#/path` format.
+- **SweetAlert2 for dialogs**: Used throughout Vue components for user prompts. Dark theme CSS overrides are in `src/renderer/assets/global.css`.
+- **Test fixtures are fragile**: PowerShell `Set-Content` can corrupt JSON fixtures via encoding changes. If fixtures show up in `git diff` unexpectedly, restore them with `git checkout test/fixtures/`.
