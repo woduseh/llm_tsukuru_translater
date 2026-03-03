@@ -158,6 +158,27 @@ describe('verifyJsonIntegrity', () => {
     expect(issues.some(i => i.type === 'text_shift')).toBe(true);
   });
 
+  it('detects reverse text shift: marker leaks into dialogue position', () => {
+    const orig = { code: 401, indent: 0, parameters: ['こんにちは'] };
+    const trans = { code: 401, indent: 0, parameters: ['--- 102 ---'] };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.some(i => i.type === 'text_shift')).toBe(true);
+  });
+
+  it('detects reverse text shift: dashes-only marker in dialogue', () => {
+    const orig = { code: 401, indent: 0, parameters: ['Hello World'] };
+    const trans = { code: 401, indent: 0, parameters: ['------'] };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.some(i => i.type === 'text_shift')).toBe(true);
+  });
+
+  it('no false positive when both are markers', () => {
+    const orig = { code: 401, indent: 0, parameters: ['--- 101 ---'] };
+    const trans = { code: 401, indent: 0, parameters: ['--- 102 ---'] };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.filter(i => i.type === 'text_shift')).toEqual([]);
+  });
+
   it('allows translatable field displayName to change', () => {
     const orig = { displayName: '東の洞窟', autoplayBgm: true };
     const trans = { displayName: '동쪽 동굴', autoplayBgm: true };
@@ -218,6 +239,13 @@ describe('repairJson', () => {
     const trans = { code: 401, indent: 0, parameters: ['번역된 대사가 밀려옴'] };
     const result = repairJson(orig, trans) as Record<string, any>;
     expect(result.parameters[0]).toBe('--- 101 ---');
+  });
+
+  it('reverts when marker leaks into dialogue position (reverse text shift repair)', () => {
+    const orig = { code: 401, indent: 0, parameters: ['こんにちは'] };
+    const trans = { code: 401, indent: 0, parameters: ['--- 102 ---'] };
+    const result = repairJson(orig, trans) as Record<string, any>;
+    expect(result.parameters[0]).toBe('こんにちは');
   });
 
   it('reverts name bracket that got overwritten (text shift repair)', () => {

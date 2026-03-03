@@ -129,7 +129,7 @@ function getParamPolicy(code: number, paramIndex: number): StringPolicy {
 function checkTextShift(origStr: string, transStr: string, path: string, issues: VerifyIssue[]): void {
     if (origStr === transStr) return;
 
-    // 1. 플레이스홀더(--- 101 --- 등) 보존 검사
+    // 1a. 플레이스홀더(--- 101 --- 등) 보존 검사: 마커가 대사로 덮어씌워짐
     if (PLACEHOLDER_RE.test(origStr.trim())) {
         if (!PLACEHOLDER_RE.test(transStr.trim())) {
             issues.push({
@@ -142,6 +142,19 @@ function checkTextShift(origStr: string, transStr: string, path: string, issues:
             });
             return;
         }
+    }
+
+    // 1b. 역방향: 대사 자리에 마커가 밀려 들어옴
+    if (!PLACEHOLDER_RE.test(origStr.trim()) && PLACEHOLDER_RE.test(transStr.trim())) {
+        issues.push({
+            path,
+            type: 'text_shift',
+            severity: 'error',
+            message: `줄밀림 감지: 대사 위치에 마커가 밀려옴 "${truncate(origStr)}" → "${transStr.trim()}"`,
+            origValue: origStr,
+            transValue: transStr
+        });
+        return;
     }
 
     // 2. 이름 태그 괄호(【】 또는 []) 보존 검사
@@ -428,6 +441,8 @@ function isTextShifted(origStr: string, transStr: string): boolean {
     if (origStr === '' && transStr !== '') return true;
     // 플레이스홀더가 덮어씌워진 경우
     if (PLACEHOLDER_RE.test(origTrimmed) && !PLACEHOLDER_RE.test(transStr.trim())) return true;
+    // 대사 자리에 마커가 밀려 들어온 경우
+    if (!PLACEHOLDER_RE.test(origTrimmed) && PLACEHOLDER_RE.test(transStr.trim())) return true;
     // 이름표 괄호가 사라진 경우
     if (NAME_BRACKET_FULL_RE.test(origTrimmed) && !NAME_BRACKET_PARTIAL_RE.test(transStr)) return true;
     // 기호 전용 줄에 문자가 들어온 경우
