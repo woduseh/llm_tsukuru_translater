@@ -25,10 +25,7 @@ function countNewlines(str) {
 }
 const format_extracted = async (dats, typ = 0, ctx) => {
     const datobj = dats.datobj;
-    const conf = dats.conf;
-    const extended = conf.extended;
-    const fileName = conf.fileName;
-    const dir = conf.dir;
+    const fileName = dats.conf.fileName;
     if (typ == 0) {
         const Keys = Object.keys(datobj);
         let LenMemory = {};

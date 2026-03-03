@@ -6,13 +6,12 @@ let eventID = 0;
 let hadComment = false;
 exports.hadComment = hadComment;
 function addtodic(pa, obj, usePath = '', conf = undefined, spliter = false) {
-    const Path = pa;
     if (pa === '%comment%') {
         const id = `comment_${(Object.keys(obj.main)).length}`;
         obj.main[id] = { var: conf.comment, conf: { isComment: true }, qpath: usePath };
         return obj;
     }
-    let val = returnVal(Path, obj.edited);
+    let val = returnVal(pa, obj.edited);
     if (!strNullSafe(usePath)) {
         usePath = '';
     }
@@ -30,7 +29,7 @@ function addtodic(pa, obj, usePath = '', conf = undefined, spliter = false) {
         }
     }
     if (val !== undefined && val !== null && typeof (val) === 'string' && (val.length > 0 || _ctx.settings.ExtractAddLine)) {
-        const id = Path;
+        const id = pa;
         if (usePath === 'note' || spliter) {
             obj = addtodic('%comment%', obj, usePath, { comment: '-----' });
         }
@@ -120,9 +119,6 @@ function isIncludeAble(sc) {
     return able;
 }
 function forEvent(d, dat_obj, conf, Path) {
-    const extended = conf.extended;
-    const fileName = conf.fileName;
-    const dir = conf.dir;
     if (obNullSafe(d)) {
         if (conf.note) {
             if (_ctx.settings.extractSomeScript) {
@@ -178,7 +174,7 @@ function forEvent(d, dat_obj, conf, Path) {
                             dat_obj = checker(dat_obj, list[i].parameters[4], Path + `.list.${i}.parameters.${4}`);
                         }
                     }
-                    else if (![105].includes(list[i].code)) {
+                    else if (list[i].code !== 105) {
                         for (let i2 = 0; i2 < list[i].parameters.length; i2++) {
                             dat_obj = checker(dat_obj, list[i].parameters[i2], Path + `.list.${i}.parameters.${i2}`);
                         }
@@ -203,10 +199,7 @@ const resetHadComment = () => { exports.hadComment = hadComment = false; };
 exports.resetHadComment = resetHadComment;
 const extract = async (filedata, conf, ftype, ctx) => {
     _ctx = ctx;
-    const extended = conf.extended;
     const fileName = conf.fileName;
-    const dir = conf.dir;
-    const dirf = dir + fileName + '\\';
     ctx.gb[fileName] = { data: {} };
     if (filedata.charCodeAt(0) === 0xFEFF) {
         filedata = filedata.substring(1);
