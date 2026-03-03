@@ -5,6 +5,7 @@ import fs, { readdirSync } from 'fs';
 import * as rpgencrypt from "../libs/rpgencrypt";
 import yaml from 'js-yaml';
 import fsx from 'fs-extra'
+import { sleep } from './globalutils';
 
 function reader(dir:string){
     if(fs.existsSync(dir+'.yaml')){
@@ -18,11 +19,7 @@ function reader(dir:string){
     return JSON.parse(data)
 }
 
-const sleep = (ms:number) => {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function getFilesRecursively (directory:string, dita:null|string = null):string[] {
+function getFilesRecursively(directory:string, dita:null|string = null):string[] {
     let files:string[] = []
     const filesInDirectory = fs.readdirSync(directory);
     const dira = dita ?? ''
@@ -66,7 +63,7 @@ export async function DecryptDir (DataDir:string, type:string):Promise<void> {
             const pat =path.join(ExtractImgDir , tlan)
             fsx.mkdirsSync(pat)
             rpgencrypt.Decrypt(loc, pat, Key)
-        }catch{}
+        }catch(error){ console.warn('Decrypt failed:', files[i], error) }
         await sleep(1)
     }
 
@@ -107,7 +104,7 @@ export async function EncryptDir (DataDir:string, type:string, instantapply:bool
             const pat =path.join(CompleteDir , tlan)
             fsx.mkdirsSync(pat)
             rpgencrypt.Encrypt(loc, pat, Key, MVMode)
-        }catch{}
+        }catch(error){ console.warn('Encrypt failed:', files[i], error) }
         await sleep(1)
     }
 

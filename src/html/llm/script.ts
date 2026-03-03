@@ -18,7 +18,7 @@
         }
     });
 
-    document.getElementById('startBtn').onclick = () => {
+    document.getElementById('startBtn')!.onclick = () => {
         if (!settings.llmApiKey) {
             alert('API 키가 설정되지 않았습니다. 메인 설정에서 API 키를 입력해주세요.');
             return;
@@ -31,7 +31,7 @@
         ipcRenderer.send('llmSettingsApply', data);
     };
 
-    document.getElementById('cancelBtn').onclick = () => {
+    document.getElementById('cancelBtn')!.onclick = () => {
         ipcRenderer.send('llmSettingsClose');
     };
 })();

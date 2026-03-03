@@ -6,10 +6,6 @@ import tools from '../libs/projectTools'
 import fg from 'fast-glob'
 import * as rpgencrypt from '../libs/rpgencrypt'
 
-function setProgressBar(now:number, max:number=100){
-    globalThis.mwindow.webContents.send('loading', (now/max) * 100);
-}
-
 async function clearTemp() {
     const qTemp = path.join(app.getPath('temp'), 'Extractorpp')
     fsa.emptyDirSync(qTemp)
@@ -59,7 +55,7 @@ export async function ConvertProject(dir:string){
                 fsa.mkdirsSync(path.dirname(targetdir))
             }
             await fsa.copyFile(files[i], targetdir)
-            setProgressBar((i/files.length*50))
+            tools.setProgress(i, files.length, 50)
         }
     
         // plugin.js
@@ -94,7 +90,7 @@ export async function ConvertProject(dir:string){
             if(encryptedFiles.length > 0){
                 const key:string = sysdata.encryptionKey
                 for(const i in encryptedFiles){
-                    setProgressBar(50 + (parseInt(i)/encryptedFiles.length*50))
+                    tools.send('loading', 50 + (parseInt(i)/encryptedFiles.length*50))
                     await rpgencrypt.Decrypt(encryptedFiles[i], path.dirname(encryptedFiles[i]), key)
                     fs.rmSync(encryptedFiles[i])
                 }
@@ -135,7 +131,7 @@ export async function ConvertProject(dir:string){
         else{
             fs.writeFileSync(path.join(projectSaveDir, 'Game.rpgproject'), fileVersion)
         }
-        setProgressBar(0)
+        tools.send('loading', 0)
         tools.sendAlert('완료되었습니다')
         tools.worked()
         clearTemp()

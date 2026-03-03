@@ -3,14 +3,12 @@ import * as  ExtTool from './extract.js';
 import path from 'path';
 import * as edTool from './edtool.js';
 import yaml from 'js-yaml';
+import { sleep } from './globalutils';
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-function getBinarySize(string) {
+function getBinarySize(string: any) {
     return Buffer.byteLength(string, 'utf8');
 }
-export const apply = async (ev, arg) => {
+export const apply = async (ev: any, arg: any) => {
     try {
       const dir = (Buffer.from(arg.dir, "base64").toString('utf8'));
       if (! fs.existsSync(dir + '/Extract')){
@@ -28,15 +26,8 @@ export const apply = async (ev, arg) => {
           fs.rmSync(dir + '/Completed', { recursive: true })
         }
         if (!fs.existsSync(dir + '/.Completed')){
-          try {
-            fs.mkdirSync(dir + '/Completed')
-          } catch (error) {}
-          try {
-            fs.mkdirSync(dir + '/Completed/data')
-          } catch (error) {}
-          try {
-            fs.mkdirSync(dir + '/Completed/js')
-          } catch (error) {}
+          fs.mkdirSync(dir + '/Completed/data', { recursive: true })
+          fs.mkdirSync(dir + '/Completed/js', { recursive: true })
         }
       }
       const jsdir = ((dir.substring(0,dir.length-5) + '/js').replaceAll('//','/'))
@@ -44,7 +35,7 @@ export const apply = async (ev, arg) => {
       const ext_dat = ext_data.main
       const max_files = Object.keys(ext_dat).length
       let worked_files = 0
-      let OutputData = {}
+      let OutputData: Record<string, any> = {}
       for(const i of Object.keys(ext_dat)){
         if(fs.existsSync(dir + '/Backup/' + i)){
           let filedata = fs.readFileSync(dir + '/Backup/' + i, 'utf8')
@@ -53,7 +44,7 @@ export const apply = async (ev, arg) => {
           }
           try {
             OutputData[i] = JSON.parse(filedata)  
-          } catch (error) {}
+          } catch (error) { console.warn('Failed to parse backup file:', i, error) }
         }
       }
       for(const i of Object.keys(ext_dat)){
@@ -104,7 +95,7 @@ export const apply = async (ev, arg) => {
                 }
               }
               OutputData[originFile] = ExtTool.setObj(ext_dat[i].data[q].val, output, OutputData[originFile]) 
-            } catch (error) {}
+            } catch (error) { console.warn('Failed to set value for:', ext_dat[i].data[q].val, error) }
           }
         }
         globalThis.mwindow.webContents.send('loading', worked_files/max_files*100);

@@ -14,7 +14,7 @@ export function decodeEncoding(buffer:Uint8Array){
 export function getAllFileInDir(Directory:string, ext:null|string = null) {
     let Files:string[] = [];
 
-    function ThroughDirectory(Directory) {
+    function ThroughDirectory(Directory: string) {
         fs.readdirSync(Directory).forEach(File => {
             const Absolute = path.join(Directory, File);
             if (fs.statSync(Absolute).isDirectory()){
@@ -37,4 +37,11 @@ export function getAllFileInDir(Directory:string, ext:null|string = null) {
 
     ThroughDirectory(Directory);
     return Files
+}
+
+export function rmBom(text: string): string {
+    if (text.charCodeAt(0) === 0xFEFF) {
+        return text.substring(1);
+    }
+    return text;
 }

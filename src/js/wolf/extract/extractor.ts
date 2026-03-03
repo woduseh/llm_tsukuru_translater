@@ -4,12 +4,9 @@ import { extractEvent } from './ext_events.js'
 import { wolfExtractCommon, wolfExtractMap } from '../parser/Map.js';
 import { getAllFileInDir } from '../../../utils.js';
 import { sleep } from '../../rpgmv/globalutils.js';
+import Tools from '../../libs/projectTools';
 import { wolfDecrypt } from './decrypter.js';
 import { wolfExtractMapPattern } from '../parser/patternBased.js';
-
-function setProgressBar(now:number, max:number, multipl=50){
-    globalThis.mwindow.webContents.send('loading', (now/max) * multipl);
-}
 
 export async function extractWolfFolder(DataDir:string, conf:{[key:string]:boolean}){
 
@@ -19,7 +16,7 @@ export async function extractWolfFolder(DataDir:string, conf:{[key:string]:boole
     let patternMode = conf.extPattern
     let i = 0;
     for(const map of maps){
-        setProgressBar(i,maps.length)
+        Tools.setProgress(i,maps.length, 50)
         try {
             const buf = fs.readFileSync(map)
             WolfCache[map] = buf
@@ -36,11 +33,10 @@ export async function extractWolfFolder(DataDir:string, conf:{[key:string]:boole
                     }
                 }
             }
-        } catch (error) {
-        }
+        } catch (error) { console.warn('Wolf map extraction failed:', map, error) }
         await sleep(1)
         i += 1
 
     }
-    setProgressBar(1,1)
+    Tools.setProgress(1,1, 50)
 }

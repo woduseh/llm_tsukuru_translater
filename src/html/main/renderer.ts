@@ -40,26 +40,26 @@
     }
     let _mode = -1
     
-    document.getElementById('icon1').onclick = () => {ipcRenderer.send('close')}
-    document.getElementById('icon2').onclick = () => {ipcRenderer.send('minimize')}
-    document.getElementById('fold').onclick = () => {ipcRenderer.send("openFolder", (document.getElementById('folder_input') as HTMLInputElement).value)}
-    document.querySelector('#sel').addEventListener('click', () => {
+    document.getElementById('icon1')!.onclick = () => {ipcRenderer.send('close')}
+    document.getElementById('icon2')!.onclick = () => {ipcRenderer.send('minimize')}
+    document.getElementById('fold')!.onclick = () => {ipcRenderer.send("openFolder", (document.getElementById('folder_input') as HTMLInputElement).value)}
+    document.querySelector('#sel')!.addEventListener('click', () => {
         ipcRenderer.send('select_folder', 'folder_input');
     });
 
     ipcRenderer.send('setheight', 550);
 
     
-    ipcRenderer.on('set_path', (evn, tt) => {
+    ipcRenderer.on('set_path', (evn: any, tt: any) => {
         (document.getElementById(tt.type) as HTMLInputElement).value = tt.dir
         if(tt.type !== 'folder_input'){
-            document.getElementById(tt.type).innerText = tt.dir
+            document.getElementById(tt.type)!.innerText = tt.dir
         }
     });
     
     
     
-    ipcRenderer.on('getGlobalSettings', (evn, tt) => {
+    ipcRenderer.on('getGlobalSettings', (evn: any, tt: any) => {
         if(tt.language === 'en'){
             
             globalThis.loadEn()
@@ -72,12 +72,12 @@
         }
     })
     
-    ipcRenderer.on('loadingTag', (evn, tt) => {
+    ipcRenderer.on('loadingTag', (evn: any, tt: any) => {
         loadingTag = tt
     })
     
-    ipcRenderer.on('loading', (evn, tt) => {
-        document.getElementById('border_r').style.width = `${tt}vw`
+    ipcRenderer.on('loading', (evn: any, tt: any) => {
+        document.getElementById('border_r')!.style.width = `${tt}vw`
         let ds = Math.floor(new Date().getTime()/1000)
         if(tt > 0 && globalSettings.loadingText){
             if(LastTime != ds){
@@ -96,29 +96,29 @@
                     estimatedTime = `${toHHMMSS(TimeLeftSec)} 남음`
                 }
             }
-            document.getElementById('loading-text').innerText = `${loadingTag}${loadingTag ? ' · ' : ''}${Number.parseFloat(tt).toFixed(1)}% ${estimatedTime}`
-            document.getElementById('loading-text').style.visibility = 'visible'
+            document.getElementById('loading-text')!.innerText = `${loadingTag}${loadingTag ? ' · ' : ''}${Number.parseFloat(tt).toFixed(1)}% ${estimatedTime}`
+            document.getElementById('loading-text')!.style.visibility = 'visible'
         }
         else{
             speedSamples = []
             estimatedTime = ''
             LastTime = ds
             LastPercent = -1.0
-            document.getElementById('loading-text').style.visibility = 'hidden'
+            document.getElementById('loading-text')!.style.visibility = 'hidden'
             loadingTag = ''
         }
     });
     
     ipcRenderer.on('worked', () => {running = false})
     
-    ipcRenderer.on('check_force', (evn, arg) => {
+    ipcRenderer.on('check_force', (evn: any, arg: any) => {
         Swal.fire({
             icon: 'question',
             text: 'Extract 폴더가 존재합니다. \n덮어씌우겠습니까?',
             confirmButtonText: '예',
             showDenyButton: true,
             denyButtonText: `아니오`,
-        }).then((result) => {
+        }).then((result: any) => {
             if (result.isConfirmed) {
                 arg.force = true
                 ipcRenderer.send('extract', arg);
@@ -126,7 +126,7 @@
         })
     });
     
-    ipcRenderer.on('alert', (evn, tt) => {
+    ipcRenderer.on('alert', (evn: any, tt: any) => {
         if (typeof tt === 'string') {
             Swal.fire({
                 icon: 'success',
@@ -141,11 +141,11 @@
         }
     });
     
-    ipcRenderer.on('alert_free', (evn, tt) => {
+    ipcRenderer.on('alert_free', (evn: any, tt: any) => {
         Swal.fire(tt)
     });
     
-    ipcRenderer.on('alert2', async (evn, tt) => {
+    ipcRenderer.on('alert2', async (evn: any, tt: any) => {
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
@@ -158,62 +158,62 @@
         }
     });
     
-    document.getElementById('WolfBtn').onclick = () => {
+    document.getElementById('WolfBtn')!.onclick = () => {
         ipcRenderer.send('changeURL', './src/html/wolf/index.html')
     }
     
     function _reload(){
         if(_mode == 0){
-            document.getElementById('ext').style.backgroundColor = 'var(--Selected)'
-            document.getElementById('ext').style.opacity = '1'
-            document.getElementById('ext').style.color = '#fff'
-            document.getElementById('apply').style.backgroundColor = ''
-            document.getElementById('apply').style.opacity = ''
-            document.getElementById('apply').style.color = ''
-            if (document.getElementById('c-ext').classList.contains("hiddenc")) {
-                document.getElementById('c-ext').classList.remove("hiddenc");}
-            if (!document.getElementById('c-app').classList.contains("hiddenc")) {
-                document.getElementById('c-app').classList.add("hiddenc");}
+            document.getElementById('ext')!.style.backgroundColor = 'var(--Selected)'
+            document.getElementById('ext')!.style.opacity = '1'
+            document.getElementById('ext')!.style.color = '#fff'
+            document.getElementById('apply')!.style.backgroundColor = ''
+            document.getElementById('apply')!.style.opacity = ''
+            document.getElementById('apply')!.style.color = ''
+            if (document.getElementById('c-ext')!.classList.contains("hiddenc")) {
+                document.getElementById('c-ext')!.classList.remove("hiddenc");}
+            if (!document.getElementById('c-app')!.classList.contains("hiddenc")) {
+                document.getElementById('c-app')!.classList.add("hiddenc");}
         }
         else if(_mode == 1){
-            document.getElementById('ext').style.backgroundColor = ''
-            document.getElementById('ext').style.opacity = ''
-            document.getElementById('ext').style.color = ''
-            document.getElementById('apply').style.backgroundColor = 'var(--Selected)'
-            document.getElementById('apply').style.opacity = '1'
-            document.getElementById('apply').style.color = '#fff'
-            if (document.getElementById('c-app').classList.contains("hiddenc")) {
-                document.getElementById('c-app').classList.remove("hiddenc");}
-            if (!document.getElementById('c-ext').classList.contains("hiddenc")) {
-                document.getElementById('c-ext').classList.add("hiddenc");}
+            document.getElementById('ext')!.style.backgroundColor = ''
+            document.getElementById('ext')!.style.opacity = ''
+            document.getElementById('ext')!.style.color = ''
+            document.getElementById('apply')!.style.backgroundColor = 'var(--Selected)'
+            document.getElementById('apply')!.style.opacity = '1'
+            document.getElementById('apply')!.style.color = '#fff'
+            if (document.getElementById('c-app')!.classList.contains("hiddenc")) {
+                document.getElementById('c-app')!.classList.remove("hiddenc");}
+            if (!document.getElementById('c-ext')!.classList.contains("hiddenc")) {
+                document.getElementById('c-ext')!.classList.add("hiddenc");}
         }
         else{
-            document.getElementById('ext').style.backgroundColor = ''
-            document.getElementById('ext').style.opacity = ''
-            document.getElementById('ext').style.color = ''
-            document.getElementById('apply').style.backgroundColor = ''
-            document.getElementById('apply').style.opacity = ''
-            document.getElementById('apply').style.color = ''
+            document.getElementById('ext')!.style.backgroundColor = ''
+            document.getElementById('ext')!.style.opacity = ''
+            document.getElementById('ext')!.style.color = ''
+            document.getElementById('apply')!.style.backgroundColor = ''
+            document.getElementById('apply')!.style.opacity = ''
+            document.getElementById('apply')!.style.color = ''
         }
         const DomList = ['ext_plugin','ext_note','ext_src','autoline','instantapply','exJson','decryptImg','decryptAudio', 'ext_javascript']
         for(const i in DomList){
-            if(config[DomList[i]]){
-                document.getElementById(DomList[i]).style.backgroundColor = 'var(--Selected)'
-                document.getElementById(DomList[i]).style.color = '#fff'
+            if((config as Record<string, boolean>)[DomList[i]]){
+                document.getElementById(DomList[i])!.style.backgroundColor = 'var(--Selected)'
+                document.getElementById(DomList[i])!.style.color = '#fff'
             }
             else{
-                document.getElementById(DomList[i]).style.backgroundColor = ''
-                document.getElementById(DomList[i]).style.color = ''
+                document.getElementById(DomList[i])!.style.backgroundColor = ''
+                document.getElementById(DomList[i])!.style.color = ''
             }
         }
     }
     
-    ipcRenderer.on('is_version', (ev, arg)=>{
-        globalThis.version = arg
+    ipcRenderer.on('is_version', (ev: any, arg: any)=>{
+        (globalThis as any).version = arg
     })
     
-    document.getElementById('ext').onclick = () => {_mode=0;_reload()}
-    document.getElementById('apply').onclick = () => {_mode=1;_reload()}
+    document.getElementById('ext')!.onclick = () => {_mode=0;_reload()}
+    document.getElementById('apply')!.onclick = () => {_mode=1;_reload()}
     _reload()
     
     if(true){
@@ -223,12 +223,12 @@
     // LLM translation abort button
     let llmTranslating = false;
 
-    ipcRenderer.on('llmTranslating', (ev, val) => {
+    ipcRenderer.on('llmTranslating', (ev: any, val: any) => {
         llmTranslating = val;
-        document.getElementById('abort-llm-btn').style.display = val ? 'block' : 'none';
+        document.getElementById('abort-llm-btn')!.style.display = val ? 'block' : 'none';
     })
 
-    document.getElementById('abort-llm-btn').onclick = async () => {
+    document.getElementById('abort-llm-btn')!.onclick = async () => {
         const result = await Swal.fire({
             icon: 'warning',
             text: '번역을 중단하시겠습니까?\n현재까지의 진행 상태는 저장됩니다.',
@@ -257,7 +257,7 @@
         }
     })
     
-    document.getElementById('ext_plugin').onclick = () => {
+    document.getElementById('ext_plugin')!.onclick = () => {
         if(!config.ext_plugin){
             Swal.fire({
                 icon: 'warning',
@@ -265,7 +265,7 @@
                 confirmButtonText: '예',
                 showDenyButton: true,
                 denyButtonText: `아니오`,
-            }).then((result) => {
+            }).then((result: any) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         icon: 'success',
@@ -282,10 +282,10 @@
         }
     }
     
-    document.getElementById('decryptImg').onclick = () => {config.decryptImg = !config.decryptImg; _reload()}
-    document.getElementById('decryptAudio').onclick = () => {config.decryptAudio = !config.decryptAudio; _reload()}
+    document.getElementById('decryptImg')!.onclick = () => {config.decryptImg = !config.decryptImg; _reload()}
+    document.getElementById('decryptAudio')!.onclick = () => {config.decryptAudio = !config.decryptAudio; _reload()}
     
-    document.getElementById('exJson').onclick = () => {
+    document.getElementById('exJson')!.onclick = () => {
         if(!config.exJson){
             Swal.fire({
                 icon: 'warning',
@@ -293,7 +293,7 @@
                 confirmButtonText: '예',
                 showDenyButton: true,
                 denyButtonText: `아니오`,
-            }).then((result) => {
+            }).then((result: any) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         icon: 'success',
@@ -310,7 +310,7 @@
         }
     }
     
-    document.getElementById('settings').onclick = () => {
+    document.getElementById('settings')!.onclick = () => {
         if(running){
             Swal.fire({
                 icon: 'error',
@@ -322,7 +322,7 @@
         running = true
     }
     
-    document.getElementById('ext_src').onclick = () => {
+    document.getElementById('ext_src')!.onclick = () => {
         if(!config.ext_src){
             Swal.fire({
                 icon: 'warning',
@@ -330,7 +330,7 @@
                 confirmButtonText: '예',
                 showDenyButton: true,
                 denyButtonText: `아니오`,
-            }).then((result) => {
+            }).then((result: any) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         icon: 'success',
@@ -347,7 +347,7 @@
         }
     }
     
-    document.getElementById('ext_javascript').onclick = () => {
+    document.getElementById('ext_javascript')!.onclick = () => {
         if(!config.ext_javascript){
             Swal.fire({
                 icon: 'warning',
@@ -355,7 +355,7 @@
                 confirmButtonText: '예',
                 showDenyButton: true,
                 denyButtonText: `아니오`,
-            }).then((result) => {
+            }).then((result: any) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         icon: 'success',
@@ -372,7 +372,7 @@
         }
     }
     
-    document.getElementById('toProject').onclick = () => {
+    document.getElementById('toProject')!.onclick = () => {
         if(running){
             Swal.fire({
                 icon: 'error',
@@ -386,7 +386,7 @@
             confirmButtonText: '예',
             showDenyButton: true,
             denyButtonText: `아니오`,
-        }).then(async (result) => {
+        }).then(async (result: any) => {
             if (result.isConfirmed) {
                 await Swal.fire({
                     icon: "info",
@@ -398,7 +398,7 @@
         })
     }
     
-    document.getElementById('ext_note').onclick = () => {
+    document.getElementById('ext_note')!.onclick = () => {
         if(!config.ext_note){
             Swal.fire({
                 icon: 'warning',
@@ -406,7 +406,7 @@
                 confirmButtonText: '예',
                 showDenyButton: true,
                 denyButtonText: `아니오`,
-            }).then((result) => {
+            }).then((result: any) => {
                 if (result.isConfirmed) {
                     Swal.fire({
                         icon: 'success',
@@ -423,7 +423,7 @@
         }
     }
     
-    ipcRenderer.on('alertExten', async (ev, arg) => {
+    ipcRenderer.on('alertExten', async (ev: any, arg: any) => {
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
@@ -438,10 +438,10 @@
         }
     })
 
-    document.getElementById('autoline').onclick = () => {config.autoline = !config.autoline;_reload();}
-    document.getElementById('instantapply').onclick = () => {config.instantapply = !config.instantapply;_reload();}
+    document.getElementById('autoline')!.onclick = () => {config.autoline = !config.autoline;_reload();}
+    document.getElementById('instantapply')!.onclick = () => {config.instantapply = !config.instantapply;_reload();}
     
-    document.getElementById('run').onclick = () => {
+    document.getElementById('run')!.onclick = () => {
         if(running){
             Swal.fire({
                 icon: 'error',
@@ -466,7 +466,7 @@
         }
     }
     
-    document.getElementById('eztrans').onclick = async () => {
+    document.getElementById('eztrans')!.onclick = async () => {
         if(running){
             Swal.fire({
                 icon: 'error',
@@ -478,7 +478,7 @@
         ipcRenderer.send('openLLMSettings', { dir: dir, game: 'mv' });
     }
 
-    document.getElementById('llmCompare').onclick = () => {
+    document.getElementById('llmCompare')!.onclick = () => {
         const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
         if (!dir) {
             Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' })
@@ -487,7 +487,7 @@
         ipcRenderer.send('openLLMCompare', dir);
     }
 
-    document.getElementById('jsonVerify').onclick = () => {
+    document.getElementById('jsonVerify')!.onclick = () => {
         const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
         if (!dir) {
             Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' })
@@ -497,7 +497,7 @@
     }
     
     
-    document.getElementById('versionUp').onclick = async () => {
+    document.getElementById('versionUp')!.onclick = async () => {
         if(running){
             Swal.fire({
                 icon: 'error',
@@ -525,20 +525,22 @@
         const { value: formValues } = await Swal.fire({
             title: '버전 업 툴',
             html:
-              '<div id="swi1" class="cfolder" placeholder="구버전 번역 data 폴더"'+
-              'onclick="ipcRenderer.send(\'select_folder\', \'swi1\')">구버전 번역본 폴더</div>' +
-              '<div id="swi3" class="cfolder" placeholder="구버전 미번역 data 폴더"'+
-              'onclick="ipcRenderer.send(\'select_folder\', \'swi3\')">구버전 미번역 폴더</div>' +
-              '<div id="swi2" class="cfolder" placeholder="신버전 미번역 data 폴더"'+
-              'onclick="ipcRenderer.send(\'select_folder\', \'swi2\')">신버전 폴더</div>',
+              '<div id="swi1" class="cfolder" placeholder="구버전 번역 data 폴더">구버전 번역본 폴더</div>' +
+              '<div id="swi3" class="cfolder" placeholder="구버전 미번역 data 폴더">구버전 미번역 폴더</div>' +
+              '<div id="swi2" class="cfolder" placeholder="신버전 미번역 data 폴더">신버전 폴더</div>',
             focusConfirm: false,
             showDenyButton: true,
             denyButtonText: `취소`,
+            didOpen: () => {
+                document.getElementById('swi1')!.onclick = () => ipcRenderer.send('select_folder', 'swi1');
+                document.getElementById('swi3')!.onclick = () => ipcRenderer.send('select_folder', 'swi3');
+                document.getElementById('swi2')!.onclick = () => ipcRenderer.send('select_folder', 'swi2');
+            },
             preConfirm: () => {
               return [
-                document.getElementById('swi1').innerText,
-                document.getElementById('swi2').innerText,
-                document.getElementById('swi3').innerText
+                document.getElementById('swi1')!.innerText,
+                document.getElementById('swi2')!.innerText,
+                document.getElementById('swi3')!.innerText
               ]
             }
         })
@@ -568,7 +570,7 @@
         }
     }
     
-    document.getElementById('fontConfig').onclick = async () => {
+    document.getElementById('fontConfig')!.onclick = async () => {
         if(running){
             Swal.fire({
                 icon: 'error',
@@ -599,7 +601,7 @@
                 input: 'text',
                 inputValue: 24,
                 showCancelButton: true,
-                inputValidator: (value) => {
+                inputValidator: (value: any) => {
                   if (!value) {
                     return '무언가 입력해야 합니다!'
                   }

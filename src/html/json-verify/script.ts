@@ -56,7 +56,7 @@
 
         const dirs = detectDirs(dir);
         if (!dirs) {
-            document.getElementById('summary').innerHTML =
+            document.getElementById('summary')!.innerHTML =
                 '<span class="summary-error">Completed/data 또는 Backup 폴더가 없습니다. 적용(Apply)을 먼저 실행하세요.</span>';
             return;
         }
@@ -87,7 +87,7 @@
             } catch (e) {
                 files.push({
                     name, origPath, transPath,
-                    issues: [{ path: '$', type: 'parse_error', severity: 'error', message: `JSON 파싱 오류: ${e.message}` }],
+                    issues: [{ path: '$', type: 'parse_error', severity: 'error', message: `JSON 파싱 오류: ${(e as any).message}` }],
                     errorCount: 1, warningCount: 0, repaired: false
                 });
             }
@@ -100,7 +100,7 @@
     }
 
     function renderSummary() {
-        const el = document.getElementById('summary');
+        const el = document.getElementById('summary')!;
         const errorFiles = files.filter(f => f.errorCount > 0).length;
         const warnFiles = files.filter(f => f.warningCount > 0 && f.errorCount === 0).length;
         const totalIssues = files.reduce((sum, f) => sum + f.issues.length, 0);
@@ -136,10 +136,10 @@
     }
 
     function renderFileList() {
-        const list = document.getElementById('file-list');
+        const list = document.getElementById('file-list')!;
         list.innerHTML = '';
         const filtered = getFilteredFiles();
-        document.getElementById('file-count').textContent = `${filtered.length}/${files.length}`;
+        document.getElementById('file-count')!.textContent = `${filtered.length}/${files.length}`;
 
         for (const { file, realIdx } of filtered) {
             const item = document.createElement('div');
@@ -188,8 +188,8 @@
     }
 
     function renderIssues() {
-        const issuesList = document.getElementById('issues-list');
-        const fileNameEl = document.getElementById('issues-file-name');
+        const issuesList = document.getElementById('issues-list')!;
+        const fileNameEl = document.getElementById('issues-file-name')!;
         issuesList.innerHTML = '';
 
         if (files.length === 0) {
@@ -287,7 +287,7 @@
             return { success: true };
         } catch (e) {
             console.error('repairFile error:', e);
-            return { success: false, error: e.message || String(e) };
+            return { success: false, error: (e as any).message || String(e) };
         }
     }
 
@@ -301,14 +301,14 @@
     });
 
     // 검색 / 필터
-    document.getElementById('file-search').addEventListener('input', () => renderFileList());
-    document.getElementById('filter-issues').addEventListener('change', () => renderFileList());
+    document.getElementById('file-search')!.addEventListener('input', () => renderFileList());
+    document.getElementById('filter-issues')!.addEventListener('change', () => renderFileList());
 
     // 개별 파일 수정
-    document.getElementById('repairFileBtn').onclick = () => {
+    document.getElementById('repairFileBtn')!.onclick = () => {
         if (files.length === 0) return;
         const result = repairFile(currentIdx);
-        const statusEl = document.getElementById('status');
+        const statusEl = document.getElementById('status')!;
         if (result.success) {
             statusEl.textContent = `✓ ${files[currentIdx].name} 수정 및 저장 완료 → ${files[currentIdx].transPath}`;
             statusEl.className = 'status-ok';
@@ -323,7 +323,7 @@
     };
 
     // 전체 수정
-    document.getElementById('repairAllBtn').onclick = () => {
+    document.getElementById('repairAllBtn')!.onclick = () => {
         let repaired = 0;
         let failed = 0;
         let lastError = '';
@@ -338,7 +338,7 @@
                 }
             }
         }
-        const statusEl = document.getElementById('status');
+        const statusEl = document.getElementById('status')!;
         if (failed === 0) {
             statusEl.textContent = `✓ ${repaired}개 파일 수정 및 저장 완료`;
             statusEl.className = 'status-ok';
@@ -353,7 +353,7 @@
     };
 
     // 닫기
-    document.getElementById('closeBtn').onclick = () => {
+    document.getElementById('closeBtn')!.onclick = () => {
         window.close();
     };
 })();
