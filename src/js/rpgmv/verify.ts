@@ -250,17 +250,7 @@ export function verifyJsonIntegrity(
                     transValue: trans
                 });
             } else if (stringPolicy === 'warn') {
-                // 플러그인 태그 구조가 보존된 경우 안전한 번역으로 간주
-                if (!hasPreservedTagStructure(orig, trans)) {
-                    issues.push({
-                        path,
-                        type: 'string_changed',
-                        severity: 'warning',
-                        message: `주의 필요 위치의 문자열 변경: "${truncate(orig)}" → "${truncate(trans)}"`,
-                        origValue: orig,
-                        transValue: trans
-                    });
-                }
+                // warn 정책: 번역이 의도적일 수 있으므로 제어문자만 검사
                 checkControlChars(orig, trans, path, issues);
             } else {
                 // allow: 번역 허용, 제어문자만 검사
