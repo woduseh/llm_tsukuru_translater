@@ -6,7 +6,7 @@ const MAX_ISSUES = 500;
 
 export interface VerifyIssue {
     path: string;
-    type: 'array_length' | 'type_mismatch' | 'keys_added' | 'keys_removed' | 'value_changed' | 'string_changed' | 'control_char_mismatch';
+    type: 'array_length' | 'type_mismatch' | 'keys_added' | 'keys_removed' | 'value_changed' | 'string_changed' | 'control_char_mismatch' | 'text_shift';
     severity: 'error' | 'warning';
     message: string;
     origValue?: any;
@@ -47,6 +47,11 @@ const CONTROL_PATTERNS = [
     /\\[CVNPGIcvnpgi]\[\d+\]/g,
     /\\[G${}.|!><^\\]/g
 ];
+
+// ── 줄밀림 감지용 패턴 ──
+const PLACEHOLDER_RE = /^---\s*\d+\s*---$/;
+const NAME_BRACKET_FULL_RE = /^【.+】$/;
+const NAME_BRACKET_PARTIAL_RE = /【.*】/;
 
 function getType(v: any): string {
     if (v === null || v === undefined) return 'null';
@@ -132,6 +137,74 @@ function getParamPolicy(code: number, paramIndex: number): StringPolicy {
     return 'deny';
 }
 
+// ═══════════════════════════════════════════
+// 텍스트 줄밀림(Text Shift) 감지
+// 구조가 동일해도 내용물이 밀려서 들어간 경우를 감지
+// ═══════════════════════════════════════════
+
+function checkTextShift(origStr: string, transStr: string, path: string, issues: VerifyIssue[]): void {
+    if (origStr === transStr) return;
+
+    // 1. 플레이스홀더(--- 101 --- 등) 보존 검사
+    if (PLACEHOLDER_RE.test(origStr.trim())) {
+        if (!PLACEHOLDER_RE.test(transStr.trim())) {
+            issues.push({
+                path,
+                type: 'text_shift',
+                severity: 'error',
+                message: `줄밀림 감지: 마커 "${origStr.trim()}"가 대사로 덮어씌워짐 → "${truncate(transStr)}"`,
+                origValue: origStr,
+                transValue: transStr
+            });
+            return;
+        }
+    }
+
+    // 2. 이름 태그 괄호(【】) 보존 검사
+    if (NAME_BRACKET_FULL_RE.test(origStr.trim())) {
+        if (!NAME_BRACKET_PARTIAL_RE.test(transStr)) {
+            issues.push({
+                path,
+                type: 'text_shift',
+                severity: 'error',
+                message: `줄밀림 감지: 이름표 "${origStr.trim()}"가 대사로 덮어씌워짐 → "${truncate(transStr)}"`,
+                origValue: origStr,
+                transValue: transStr
+            });
+            return;
+        }
+    }
+
+    // 3. 빈 문자열 보존 검사
+    if (origStr === '' && transStr !== '') {
+        issues.push({
+            path,
+            type: 'text_shift',
+            severity: 'error',
+            message: `줄밀림 감지: 빈 줄이어야 할 위치에 텍스트 밀려옴 → "${truncate(transStr)}"`,
+            origValue: origStr,
+            transValue: transStr
+        });
+        return;
+    }
+
+    // 4. 특수 기호 전용 줄 보존 검사 (........, ……, ！？！？ 등)
+    const origTrimmed = origStr.trim();
+    if (origTrimmed.length > 0 && /^[.…!！?？、。·\-~～♪♫★☆♥♡●○■□▲△▼▽\s]+$/.test(origTrimmed)) {
+        const transHasLetters = /[a-zA-Z\u3040-\u9FFF\uAC00-\uD7AF]/.test(transStr);
+        if (transHasLetters && transStr.trim() !== origTrimmed) {
+            issues.push({
+                path,
+                type: 'text_shift',
+                severity: 'warning',
+                message: `줄밀림 의심: 기호 전용 줄 "${truncate(origTrimmed)}"에 문자가 포함된 텍스트 → "${truncate(transStr)}"`,
+                origValue: origStr,
+                transValue: transStr
+            });
+        }
+    }
+}
+
 // 필드 이름에 따른 문자열 정책 결정 (null = 부모 정책 상속)
 function getFieldPolicy(key: string, parentObj: any): StringPolicy | null {
     if (key === 'note') return 'warn';
@@ -199,6 +272,11 @@ function verifyEventCommand(orig: any, trans: any, path: string, issues: VerifyI
             if (issues.length >= MAX_ISSUES) break;
             const policy = getParamPolicy(code, i);
             verifyJsonIntegrity(origParams[i], transParams[i], `${path}.parameters[${i}]`, issues, policy);
+            // 번역 허용 코드(401, 405)의 문자열 파라미터에 대해 줄밀림 검사
+            if ((code === 401 || code === 405) && policy === 'allow' &&
+                typeof origParams[i] === 'string' && typeof transParams[i] === 'string') {
+                checkTextShift(origParams[i], transParams[i], `${path}.parameters[${i}]`, issues);
+            }
         }
     }
     // 그 외 키는 원본과 동일해야 함
@@ -338,6 +416,18 @@ export function verifyJsonIntegrity(
                 verifyJsonIntegrity(orig[key], trans[key], `${path}.${key}`, issues, childPolicy);
             }
         }
+
+        // comment_ 딕셔너리 줄밀림 검사 (MVT 등 번역 툴이 추가한 키)
+        const origCommentKeys = Object.keys(orig).filter(k => COMMENT_KEY_RE.test(k));
+        if (origCommentKeys.length > 0) {
+            for (const key of origCommentKeys) {
+                if (issues.length >= MAX_ISSUES) break;
+                if (key in trans && typeof orig[key] === 'string' && typeof trans[key] === 'string') {
+                    checkTextShift(orig[key], trans[key], `${path}.${key}`, issues);
+                }
+            }
+        }
+
         return issues;
     }
 

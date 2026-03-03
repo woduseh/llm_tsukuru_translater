@@ -225,6 +225,7 @@
                 'value_changed': '값 변경됨',
                 'string_changed': '번역 불가 문자열 변경',
                 'control_char_mismatch': '제어문자 불일치',
+                'text_shift': '텍스트 줄밀림',
                 'parse_error': 'JSON 파싱 오류'
             };
             typeEl.textContent = typeLabels[issue.type] || issue.type;
