@@ -108,6 +108,21 @@ function checkControlChars(orig: string, trans: string, path: string, issues: Ve
     }
 }
 
+// warn 정책 문자열에서 플러그인 태그 구조가 보존되었는지 확인
+// <TagName ...> 패턴의 태그 이름이 원본과 번역본에서 동일하면 안전한 번역으로 간주
+function hasPreservedTagStructure(orig: string, trans: string): boolean {
+    const tagPattern = /<\/?([A-Za-z_][A-Za-z0-9_]*)/g;
+    const origTags: string[] = [];
+    const transTags: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = tagPattern.exec(orig)) !== null) origTags.push(m[1]);
+    tagPattern.lastIndex = 0;
+    while ((m = tagPattern.exec(trans)) !== null) transTags.push(m[1]);
+    if (origTags.length === 0) return false;
+    if (origTags.length !== transTags.length) return false;
+    return origTags.every((t, i) => t === transTags[i]);
+}
+
 function getParamPolicy(code: number, paramIndex: number): StringPolicy {
     if (TRANSLATABLE_CODES.has(code)) return 'allow';
     if (code === 101) return paramIndex === 4 ? 'allow' : 'deny';
@@ -235,14 +250,17 @@ export function verifyJsonIntegrity(
                     transValue: trans
                 });
             } else if (stringPolicy === 'warn') {
-                issues.push({
-                    path,
-                    type: 'string_changed',
-                    severity: 'warning',
-                    message: `주의 필요 위치의 문자열 변경: "${truncate(orig)}" → "${truncate(trans)}"`,
-                    origValue: orig,
-                    transValue: trans
-                });
+                // 플러그인 태그 구조가 보존된 경우 안전한 번역으로 간주
+                if (!hasPreservedTagStructure(orig, trans)) {
+                    issues.push({
+                        path,
+                        type: 'string_changed',
+                        severity: 'warning',
+                        message: `주의 필요 위치의 문자열 변경: "${truncate(orig)}" → "${truncate(trans)}"`,
+                        origValue: orig,
+                        transValue: trans
+                    });
+                }
                 checkControlChars(orig, trans, path, issues);
             } else {
                 // allow: 번역 허용, 제어문자만 검사

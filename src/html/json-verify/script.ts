@@ -275,9 +275,13 @@
 
             // Re-verify
             const newIssues: VerifyIssue[] = verifyJsonIntegrity(orig, repaired);
-            f.issues = newIssues;
-            f.errorCount = newIssues.filter(i => i.severity === 'error').length;
-            f.warningCount = newIssues.filter(i => i.severity === 'warning').length;
+            // 수정 후에는 의도적으로 보존된 warn 레벨 문자열 변경 경고를 제외
+            const filteredIssues = newIssues.filter(i =>
+                !(i.type === 'string_changed' && i.severity === 'warning')
+            );
+            f.issues = filteredIssues;
+            f.errorCount = filteredIssues.filter(i => i.severity === 'error').length;
+            f.warningCount = filteredIssues.filter(i => i.severity === 'warning').length;
             f.repaired = true;
             return { success: true };
         } catch (e) {
