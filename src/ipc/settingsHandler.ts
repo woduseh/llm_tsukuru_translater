@@ -15,6 +15,7 @@ ipcMain.on('settings', () => {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,
       preload: path.join(__dirname, '..', 'preload.js')
     },
     icon: path.join(__dirname, '../../res/icon.png'),
@@ -67,6 +68,7 @@ ipcMain.on('gamePatcher', (ev, dir) => {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,
       preload: path.join(__dirname, '..', 'preload.js')
     },
     icon: path.join(__dirname, '../../res/icon.png'),

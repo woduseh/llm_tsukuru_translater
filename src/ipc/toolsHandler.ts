@@ -26,6 +26,7 @@ ipcMain.on('openLLMCompare', (ev, dir: string) => {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,
       preload: path.join(__dirname, '..', 'preload.js')
     },
     icon: path.join(__dirname, '../../res/icon.png'),
@@ -62,6 +63,7 @@ ipcMain.on('openJsonVerify', (ev, dir: string) => {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,
       preload: path.join(__dirname, '..', 'preload.js')
     },
     icon: path.join(__dirname, '../../res/icon.png'),
