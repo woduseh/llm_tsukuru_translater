@@ -18,11 +18,6 @@ export async function extractor(arg: ExtractArg){
   try {
     appCtx.gb = {}
     let file
-    let v
-    const extended = true
-    if(!arg.silent){
-      arg.silent = false
-    }
     const dir = Buffer.from(arg.dir, "base64").toString('utf8');
     if(!fs.existsSync(dir)){
       getMainWindow().webContents.send('alert', {icon: 'error', message: '지정된 디렉토리가 없습니다'}); 
@@ -109,7 +104,7 @@ export async function extractor(arg: ExtractArg){
         continue
       }
       const conf = {
-        extended: extended,
+        extended: true,
         fileName: fileName,
         dir: dir,
         srce: arg.ext_src,

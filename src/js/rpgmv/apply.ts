@@ -74,7 +74,7 @@ export const apply = async (ev: unknown, arg: ApplyArg) => {
               let forUse = Edata[x]
               if(autoline && (getBinarySize(forUse) > autolineSize)){
                   let v = forUse.split(' ')
-                  if(v.length > 0){
+                  if(v.length > 1){
                     v[(Math.floor(v.length/2)) - 1] = '\n' + v[(Math.floor(v.length/2)) - 1]
                   }
                   forUse = v.join(' ')
@@ -91,7 +91,7 @@ export const apply = async (ev: unknown, arg: ApplyArg) => {
                   let filedata = readTextFile(fidir)
                   try {
                     OutputData[originFile] = JSON.parse(filedata)
-                  } catch (error) {}
+                  } catch (error) { log.warn('Failed to parse backup JSON:', originFile, error) }
                 }
               }
               OutputData[originFile] = ExtTool.setObj(ext_dat[i].data[q].val, output, OutputData[originFile]) 

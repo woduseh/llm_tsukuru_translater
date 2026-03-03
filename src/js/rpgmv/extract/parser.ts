@@ -178,7 +178,7 @@ function forEvent(d: Record<string, unknown>, dat_obj: DatObj, conf: ExtractConf
                 if([356,355,108,408,357].includes(list[i].code as number) && appCtx.settings.extractSomeScript){
                     ischeckable = true
                 }
-                acceptable.concat(appCtx.settings.extractPlus)
+                acceptable = acceptable.concat(appCtx.settings.extractPlus)
                 eventID += 1
                 function checker(dat_obj: DatObj, da: unknown, ca: string){
                     if(typeof da === 'object'){
