@@ -97,16 +97,20 @@ ipcMain.on('select_folder', async (ev, typeo) => {
     let dir = qs
     if(qv === 'data'){
       getMainWindow().webContents.send('set_path', {type:typeo, dir:dir});
+      getMainWindow().webContents.send('set-allowed-paths', [dir]);
     }
     else{
       if(fs.existsSync(path.join(qs, 'www', 'data'))){
         getMainWindow().webContents.send('set_path', {type:typeo, dir:path.join(qs, 'www', 'data')});
+        getMainWindow().webContents.send('set-allowed-paths', [path.join(qs, 'www', 'data')]);
       }
       else if(fs.existsSync(path.join(qs, 'data'))){
         getMainWindow().webContents.send('set_path', {type:typeo, dir:path.join(qs, 'data')});
+        getMainWindow().webContents.send('set-allowed-paths', [path.join(qs, 'data')]);
       }
       else if(fs.existsSync(path.join(qs, 'Data.wolf'))){
         getMainWindow().webContents.send('set_path', {type:typeo, dir:path.join(qs)});
+        getMainWindow().webContents.send('set-allowed-paths', [path.join(qs)]);
       }
       else{
         getMainWindow().webContents.send('alert', {icon: 'error',  message:'폴더가 올바르지 않습니다'});

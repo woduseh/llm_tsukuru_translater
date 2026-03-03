@@ -1,16 +1,16 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
 
-let allowedBasePaths: string[] = [];
+let allowedBasePaths = [];
 
-ipcRenderer.on('set-allowed-paths', (_event: any, paths: string[]) => {
-  allowedBasePaths = paths.map((p: string) => path.resolve(p));
+ipcRenderer.on('set-allowed-paths', (_event, paths) => {
+  allowedBasePaths = paths.map((p) => path.resolve(p));
 });
 
-function isPathAllowed(filePath: string): boolean {
+function isPathAllowed(filePath) {
   if (allowedBasePaths.length === 0) return true;
   const resolved = path.resolve(filePath);
-  return allowedBasePaths.some((base: string) => resolved === base || resolved.startsWith(base + path.sep));
+  return allowedBasePaths.some((base) => resolved === base || resolved.startsWith(base + path.sep));
 }
 
 const SEND_CHANNELS = [
@@ -34,29 +34,29 @@ const RECEIVE_CHANNELS = [
 ];
 
 contextBridge.exposeInMainWorld('api', {
-  send: (channel: string, ...args: any[]) => {
+  send: (channel, ...args) => {
     if (SEND_CHANNELS.includes(channel)) {
       ipcRenderer.send(channel, ...args);
     }
   },
-  on: (channel: string, callback: (...args: any[]) => void) => {
+  on: (channel, callback) => {
     if (RECEIVE_CHANNELS.includes(channel)) {
-      const subscription = (_event: any, ...args: any[]) => callback(...args);
+      const subscription = (_event, ...args) => callback(...args);
       ipcRenderer.on(channel, subscription);
       return subscription;
     }
   },
-  once: (channel: string, callback: (...args: any[]) => void) => {
+  once: (channel, callback) => {
     if (RECEIVE_CHANNELS.includes(channel)) {
-      ipcRenderer.once(channel, (_event: any, ...args: any[]) => callback(...args));
+      ipcRenderer.once(channel, (_event, ...args) => callback(...args));
     }
   },
-  removeAllListeners: (channel: string) => {
+  removeAllListeners: (channel) => {
     if (RECEIVE_CHANNELS.includes(channel)) {
       ipcRenderer.removeAllListeners(channel);
     }
   },
-  invoke: (channel: string, ...args: any[]) => {
+  invoke: (channel, ...args) => {
     if (SEND_CHANNELS.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args);
     }
@@ -64,41 +64,41 @@ contextBridge.exposeInMainWorld('api', {
 });
 
 contextBridge.exposeInMainWorld('nodeBuffer', {
-  toBase64: (str: string) => Buffer.from(str, 'utf8').toString('base64'),
-  fromBase64: (str: string) => Buffer.from(str, 'base64').toString('utf8')
+  toBase64: (str) => Buffer.from(str, 'utf8').toString('base64'),
+  fromBase64: (str) => Buffer.from(str, 'base64').toString('utf8')
 });
 
 contextBridge.exposeInMainWorld('nodeFs', {
-  readFileSync: (filePath: string, encoding: string) => {
+  readFileSync: (filePath, encoding) => {
     if (!isPathAllowed(filePath)) throw new Error('Access denied: path not in allowed directories');
     return require('fs').readFileSync(filePath, encoding);
   },
-  readdirSync: (dirPath: string) => {
+  readdirSync: (dirPath) => {
     if (!isPathAllowed(dirPath)) throw new Error('Access denied: path not in allowed directories');
     return require('fs').readdirSync(dirPath);
   },
-  existsSync: (filePath: string) => {
+  existsSync: (filePath) => {
     if (!isPathAllowed(filePath)) throw new Error('Access denied: path not in allowed directories');
     return require('fs').existsSync(filePath);
   },
-  writeFileSync: (filePath: string, data: string, encoding: string) => {
+  writeFileSync: (filePath, data, encoding) => {
     if (!isPathAllowed(filePath)) throw new Error('Access denied: path not in allowed directories');
     return require('fs').writeFileSync(filePath, data, encoding);
   }
 });
 
 contextBridge.exposeInMainWorld('nodePath', {
-  join: (...args: string[]) => require('path').join(...args),
-  parse: (p: string) => require('path').parse(p),
-  basename: (p: string) => require('path').basename(p)
+  join: (...args) => require('path').join(...args),
+  parse: (p) => require('path').parse(p),
+  basename: (p) => require('path').basename(p)
 });
 
 contextBridge.exposeInMainWorld('verify', {
-  verifyJsonIntegrity: (orig: any, trans: any) => {
+  verifyJsonIntegrity: (orig, trans) => {
     const { verifyJsonIntegrity } = require('./js/rpgmv/verify.js');
     return verifyJsonIntegrity(orig, trans);
   },
-  repairJson: (orig: any, trans: any) => {
+  repairJson: (orig, trans) => {
     const { repairJson } = require('./js/rpgmv/verify.js');
     return repairJson(orig, trans);
   }
