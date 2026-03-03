@@ -223,6 +223,8 @@
                 'keys_added': '키 추가됨',
                 'keys_removed': '키 제거됨',
                 'value_changed': '값 변경됨',
+                'string_changed': '번역 불가 문자열 변경',
+                'control_char_mismatch': '제어문자 불일치',
                 'parse_error': 'JSON 파싱 오류'
             };
             typeEl.textContent = typeLabels[issue.type] || issue.type;
