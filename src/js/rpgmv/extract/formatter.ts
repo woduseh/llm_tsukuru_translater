@@ -12,6 +12,15 @@ export function jpathIsMap(jpath: string){
     return (name.length === 6 && name.substring(0,3) === 'Map' && !isNaN(Number(name.substring(3))))
 }
 
+/** Count newline characters in a string without allocating an array. */
+function countNewlines(str: string): number {
+    let count = 0;
+    for(let i = 0; i < str.length; i++){
+        if(str.charCodeAt(i) === 10) count++
+    }
+    return count
+}
+
 export const format_extracted = async(dats: {datobj: Record<string, ExtractDictEntry>; edited: Record<string, unknown>; conf: ExtractConf}, typ = 0, ctx: AppContext) => {
     const datobj = dats.datobj
     const conf = dats.conf
@@ -21,8 +30,10 @@ export const format_extracted = async(dats: {datobj: Record<string, ExtractDictE
     if(typ == 0){
         const Keys = Object.keys(datobj)
         let LenMemory: Record<string, number> = {}
-        let LenKeys: string[] = []
-        let usedEid: number[] = []
+        const usedEid = new Set<number>()
+        const beautifyCodesSet = new Set(beautifyCodes)
+        const beautifyCodes2Set = new Set(beautifyCodes2)
+        const externMsgKeySet = ctx.useExternMsg ? new Set(ctx.externMsgKeys) : null
         ctx.gb[fileName].outputText = ''
         for(const d of Keys){
             let jpath = fileName
@@ -41,28 +52,25 @@ export const format_extracted = async(dats: {datobj: Record<string, ExtractDictE
             else if(ctx.settings.oneMapFile && jpathIsMap(jpath)){
                 jpath = 'Maps.json'
             }
-            if(ctx.useExternMsg){
-                if(ctx.externMsgKeys.includes(datobj[d].var)){
+            if(externMsgKeySet !== null){
+                if(externMsgKeySet.has(datobj[d].var)){
                     datobj[d].var = ctx.externMsg[datobj[d].var]
                 }
             }
-            if(!LenKeys.includes(jpath)){
-                LenMemory[jpath] = (ctx.gb[jpath].outputText!.split('\n').length - 1)
-                LenKeys.push(jpath)
+            if(!(jpath in LenMemory)){
+                LenMemory[jpath] = countNewlines(ctx.gb[jpath].outputText!)
             }
             if(ctx.settings.formatNice && obNullSafe(datobj[d].conf)){
-                if(beautifyCodes.includes(datobj[d].conf!.code!)){
-                    const toadd = '==========\n'
-                    ctx.gb[jpath].outputText += toadd
-                    LenMemory[jpath] += (toadd.split('\n').length - 1)
+                if(beautifyCodesSet.has(datobj[d].conf!.code!)){
+                    ctx.gb[jpath].outputText += '==========\n'
+                    LenMemory[jpath] += 1
                 }
                 const eid = datobj[d].conf!.eid
                 if(eid !== undefined && eid !== null){
-                    if(!usedEid.includes(eid) && beautifyCodes2.includes(datobj[d].conf!.code!)){
-                        const toadd = `//==========//\n`
-                        ctx.gb[jpath].outputText += toadd
-                        LenMemory[jpath] += (toadd.split('\n').length - 1)
-                        usedEid.push(eid)
+                    if(!usedEid.has(eid) && beautifyCodes2Set.has(datobj[d].conf!.code!)){
+                        ctx.gb[jpath].outputText += `//==========//\n`
+                        LenMemory[jpath] += 1
+                        usedEid.add(eid)
                     }
                 }
             }
@@ -77,7 +85,7 @@ export const format_extracted = async(dats: {datobj: Record<string, ExtractDictE
             const toadd = datobj[d].var +'\n'
 
             ctx.gb[jpath].outputText += toadd
-            LenMemory[jpath] += (toadd.split('\n').length - 1)
+            LenMemory[jpath] += countNewlines(toadd)
 
             ctx.gb[jpath].data[cid].m = LenMemory[jpath]
         }

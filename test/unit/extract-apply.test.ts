@@ -49,6 +49,28 @@ describe('extract-apply round-trip', () => {
     it('returns empty string for undefined root', () => {
       expect(getVal('missing.path', undefined)).toBe('');
     });
+
+    it('creates intermediate objects for missing getVal path', () => {
+      const obj: Record<string, unknown> = {};
+      getVal('a.b.c', obj);
+      expect(obj).toHaveProperty('a');
+      expect((obj.a as Record<string, unknown>)).toHaveProperty('b');
+    });
+
+    it('sets multiple keys at different depths', () => {
+      let obj: Record<string, unknown> = {};
+      obj = setObj('a.b.c', 1, obj);
+      obj = setObj('a.b.d', 2, obj);
+      obj = setObj('a.e', 3, obj);
+      expect(getVal('a.b.c', obj)).toBe(1);
+      expect(getVal('a.b.d', obj)).toBe(2);
+      expect(getVal('a.e', obj)).toBe(3);
+    });
+
+    it('handles numeric-like path segments', () => {
+      const obj = setObj('0.pages.1.list.2', 'val', {});
+      expect(getVal('0.pages.1.list.2', obj)).toBe('val');
+    });
   });
 
   describe('basic extraction - Actors.json', () => {
