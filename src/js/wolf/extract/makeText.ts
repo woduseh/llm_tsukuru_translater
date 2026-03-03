@@ -17,20 +17,14 @@ export default async function makeText(){
     for(let i =0;i<ext.length;i++){
         setProgressBar(i,ext.length)
         await sleep(1)
-        let perform = performance.now()
         let decoded = (decodeEncoding(ext[i].str.str)).replaceAll('\\','\\\\')
         if(decoded.endsWith('\0')){
             decoded = decoded.substring(0,decoded.length-1)
             appCtx.WolfExtData[i].endsWithNull = true
         }
-        const DecodePerformace = performance.now() - perform
-        perform = performance.now()
 
         const text = decoded.split('\n')
         appCtx.WolfExtData[i].textLineNumber = []
-
-        const SplitPerformace = performance.now() - perform
-        perform = performance.now()
 
         if(!texts[ext[i].extractFile]){
             texts[ext[i].extractFile] = []
@@ -41,9 +35,6 @@ export default async function makeText(){
             texts[ext[i].extractFile].push(txt)
             appCtx.WolfExtData[i].textLineNumber.push(texts[ext[i].extractFile].length-1)
         }
-
-        const PushPerformace = performance.now() - perform
-        perform = performance.now()
     }
     const extTextDir = path.join(appCtx.sourceDir, '_Extract')
     if(fs.existsSync(extTextDir)){

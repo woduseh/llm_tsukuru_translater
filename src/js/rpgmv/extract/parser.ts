@@ -3,7 +3,6 @@ import { appCtx } from '../../../appContext';
 let eventID = 0
 
 let hadComment = false
-let hadMemoComment = false
 
 interface DatObj {
     main: Record<string, ExtractDictEntry>;
