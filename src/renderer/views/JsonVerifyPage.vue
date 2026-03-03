@@ -159,6 +159,26 @@ const loading = ref(true)
 const issueSeverityFilter = ref<'all' | 'error' | 'warning'>('all')
 const previewSamples = ref<{ orig: string; trans: string; path: string }[]>([])
 
+/**
+ * Local setAtPath — avoids contextBridge structured-clone which discards mutations.
+ * Navigates a JSON path (e.g. "$.events[0].pages[1].list[5].parameters[0]") and sets value.
+ */
+function localSetAtPath(obj: unknown, jsonPath: string, value: unknown): boolean {
+  const cleaned = jsonPath.replace(/^\$\.?/, '')
+  if (!cleaned) return false
+  const parts = cleaned.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean)
+    .map(p => /^\d+$/.test(p) ? Number(p) : p)
+  if (parts.length === 0) return false
+  let current: unknown = obj
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (current == null || typeof current !== 'object') return false
+    current = (current as Record<string, unknown>)[parts[i] as string]
+  }
+  if (current == null || typeof current !== 'object') return false
+  ;(current as Record<string, unknown>)[parts[parts.length - 1] as string] = value
+  return true
+}
+
 const currentFileName = computed(() => files.value.length > 0 ? files.value[currentIdx.value].name : '')
 const currentIssues = computed(() => files.value.length > 0 ? files.value[currentIdx.value].issues : [])
 const currentHasIssues = computed(() => files.value.length > 0 && files.value[currentIdx.value].issues.length > 0)
@@ -383,7 +403,7 @@ function revertSelected() {
       if (!issue || issue.path === '$') continue
       const origVal = window.verify.getAtPath(orig, issue.path)
       if (origVal !== undefined) {
-        window.verify.setAtPath(trans, issue.path, JSON.parse(JSON.stringify(origVal)))
+        localSetAtPath(trans, issue.path, JSON.parse(JSON.stringify(origVal)))
         reverted++
       }
     }
@@ -506,7 +526,7 @@ function applyLlmRepair() {
     let applied = 0
     for (const item of llmRepairResults.value) {
       if (item.newText.startsWith('[번역 실패:')) continue
-      if (window.verify.setAtPath(trans, item.path, item.newText)) applied++
+      if (localSetAtPath(trans, item.path, item.newText)) applied++
     }
     if (applied > 0) {
       const indent = getIndent()

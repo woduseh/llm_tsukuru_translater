@@ -96,6 +96,49 @@ describe('isBlockUntranslated', () => {
   it('returns true for empty lines in both', () => {
     const orig: Block = { sep: '--- 1 ---', lines: [''] }
     const trans: Block = { sep: '--- 1 ---', lines: [''] }
+    expect(isBlockUntranslated(orig, trans)).toBe(false) // empty lines have no translatable text
+  })
+
+  it('returns false for special-char-only identical blocks', () => {
+    const orig: Block = { sep: '--- 1 ---', lines: ['!!!', '***', '---'] }
+    const trans: Block = { sep: '--- 1 ---', lines: ['!!!', '***', '---'] }
+    expect(isBlockUntranslated(orig, trans)).toBe(false) // no translatable characters
+  })
+
+  it('returns false for number-only identical blocks', () => {
+    const orig: Block = { sep: '--- 1 ---', lines: ['12345', '67890'] }
+    const trans: Block = { sep: '--- 1 ---', lines: ['12345', '67890'] }
+    expect(isBlockUntranslated(orig, trans)).toBe(false)
+  })
+
+  it('returns true for identical blocks with Japanese text', () => {
+    const orig: Block = { sep: '--- 1 ---', lines: ['こんにちは'] }
+    const trans: Block = { sep: '--- 1 ---', lines: ['こんにちは'] }
+    expect(isBlockUntranslated(orig, trans)).toBe(true)
+  })
+
+  it('returns true for identical blocks with Korean text', () => {
+    const orig: Block = { sep: '--- 1 ---', lines: ['안녕하세요'] }
+    const trans: Block = { sep: '--- 1 ---', lines: ['안녕하세요'] }
+    expect(isBlockUntranslated(orig, trans)).toBe(true)
+  })
+
+  it('returns true for identical blocks with CJK characters', () => {
+    const orig: Block = { sep: '--- 1 ---', lines: ['你好世界'] }
+    const trans: Block = { sep: '--- 1 ---', lines: ['你好世界'] }
+    expect(isBlockUntranslated(orig, trans)).toBe(true)
+  })
+
+  it('returns true for identical blocks with English text', () => {
+    const orig: Block = { sep: '--- 1 ---', lines: ['Hello world'] }
+    const trans: Block = { sep: '--- 1 ---', lines: ['Hello world'] }
+    expect(isBlockUntranslated(orig, trans)).toBe(true)
+  })
+
+  it('returns true for blocks with control codes containing letters', () => {
+    const orig: Block = { sep: '--- 1 ---', lines: ['\\C[2]', '100'] }
+    const trans: Block = { sep: '--- 1 ---', lines: ['\\C[2]', '100'] }
+    // 'C' is an alphabet character, so this block is considered translatable
     expect(isBlockUntranslated(orig, trans)).toBe(true)
   })
 })
