@@ -1,10 +1,4 @@
-import path from 'path';
-import csv from '@fast-csv/parse';
-import encoding from 'encoding-japanese';
-import { writeToPath } from '@fast-csv/format';
-import { DecryptDir as DecryptDirs, EncryptDir as EncryptDirs } from './fileCrypto';
-import { beautifyCodes, beautifyCodes2 } from "./datas";
-import type { ExtractConf, ExtractFileType, ExtractEntryConf, ExtractDictEntry, ExtractArg, ExtractedDataEntry } from './types';
+import type { ExtractConf, ExtractFileType, ExtractEntryConf, ExtractDictEntry } from '../types';
 let eventID = 0
 
 let hadComment = false
@@ -113,28 +107,6 @@ function strNullSafe(d: unknown){
     return (typeof d === 'string' && d !== undefined && d !== null)
 }
 
-export const init_extract = (arg: ExtractArg) => {
-    hadComment = false
-    function c(fileName: string){
-        globalThis.gb[fileName] = {data: {}}
-        globalThis.gb[fileName].outputText = ''
-        globalThis.gb[fileName].isbom = false 
-    }
-    if(globalThis.settings.onefile_src && arg.ext_src){
-        c('ext_scripts.json')
-    }
-    if(globalThis.settings.onefile_src && arg.ext_javascript){
-        c('ext_javascript.json')
-    }
-    if(globalThis.settings.onefile_note && arg.ext_note){
-        c('ext_note.json')
-        c('ext_note2.json')
-    }
-    if(globalThis.settings.oneMapFile){
-        c('Maps.json')
-    }
-}
-
 function Extreturnit(dat_obj: DatObj, Path='', nas: unknown=null){
     if(typeof(nas) === 'object' && nas !== null){
         const keys = Object.keys(nas as Record<string, unknown>)
@@ -153,44 +125,105 @@ function Extreturnit(dat_obj: DatObj, Path='', nas: unknown=null){
     }
 }
 
+function isIncludeAble(sc: unknown){
+    const ess = globalThis.settings.extractSomeScript2
+    let able = false
+    if(sc === null || sc === undefined){
+        return false
+    }
+    for(let i=0;i<ess.length;i++){
+        if(ess[i] === ''){
+            continue
+        }
+        else if((sc as string).includes(ess[i])){
+            able = true
+            break
+        }
+    }
+    return able
+}
 
-export const parse_externMsg = (dir: string, useI: boolean) => {
-    return new Promise((resolve, reject) => {
-        let a: Record<string, string> = {}
-        csv.parseFile(dir, {encoding: "binary"})
-        .on('data', (row) => {
-            function Convert(txt: unknown){
-                if(txt === undefined || txt === null){
-                    return ''
+function forEvent(d: Record<string, unknown>, dat_obj: DatObj, conf: ExtractConf, Path: string){
+    const extended = conf.extended
+    const fileName = conf.fileName
+    const dir = conf.dir
+    if(obNullSafe(d)){
+        if(conf.note){
+            if(globalThis.settings.extractSomeScript){
+                if(isIncludeAble(d.note)){
+                    dat_obj = addtodic(Path + '.note', dat_obj, 'note')
                 }
-                const bf = Buffer.from(txt as string, "binary")
-                const Utf8Array = new Uint8Array(encoding.convert(bf, 'UTF8', 'AUTO'));
-                return new TextDecoder().decode(Utf8Array)
-            }
-            if(useI){
-                a[`\\M[${Convert(row[0])}]`] = Convert(row[1])
             }
             else{
-                a[Convert(row[0])] = Convert(row[1])
+                dat_obj = addtodic(Path + '.note', dat_obj, 'note')
             }
-        })
-        .on('end', () => {
-            resolve(a)
-        })
-    })
+        }
+        if(typeof d.list === 'object' && d.list !== undefined && d.list !== null){
+            let messageHasFace = false
+            const list = d.list as Record<string, unknown>[]
+            for(let i=0;i<list.length;i++){
+                let acceptable = [401, 102, 405, 101, 105]
+                let ischeckable = false
+                let reportDebug = false
+                if(conf.srce){
+                    acceptable = acceptable.concat([356,357])
+                }
+                if(conf.arg.ext_javascript){
+                    acceptable = acceptable.concat([355,655])
+                }
+                if(conf.note){
+                    acceptable = acceptable.concat([408, 108])
+                }
+                if([356,355,108,408,357].includes(list[i].code as number) && globalThis.settings.extractSomeScript){
+                    ischeckable = true
+                }
+                acceptable.concat(globalThis.settings.extractPlus)
+                eventID += 1
+                function checker(dat_obj: DatObj, da: unknown, ca: string){
+                    if(typeof da === 'object'){
+                        for(let i3 in (da as Record<string, unknown>)){
+                            dat_obj = checker(dat_obj, (da as Record<string, unknown>)[i3], ca + `.${i3}`)
+                        }
+                    }
+                    else if(!ischeckable || isIncludeAble(da)){
+                        dat_obj = addtodic(ca, dat_obj, '', {type: "event",code:list[i].code as number,eid:eventID,face:messageHasFace})
+                    }
+                    return dat_obj
+                }
+                
+                if (acceptable.includes(list[i].code as number) && list[i].parameters !== undefined && list[i].parameters !== null){
+                    if([101,102,105].includes(list[i].code as number)){
+                        dat_obj = addComment(dat_obj, `--- ${list[i].code} ---`)
+                    }
+                    if(list[i].code === 101){
+                        if((list[i].parameters as unknown[]).length >= 5){
+                            dat_obj = checker(dat_obj, (list[i].parameters as unknown[])[4], Path + `.list.${i}.parameters.${4}`)
+                        }
+                    }
+                    else if(![105].includes(list[i].code as number)){
+                        for(let i2=0;i2<(list[i].parameters as unknown[]).length;i2++){
+                            dat_obj = checker(dat_obj, (list[i].parameters as unknown[])[i2], Path + `.list.${i}.parameters.${i2}`)
+                        }
+                    }
+                }
+                else{
+                    try {
+                        switch(list[i].code){
+                            case 101:
+                                messageHasFace = ((list[i].parameters as unknown[])[0] !== '')
+                                break
+                        }   
+                    } catch (error) { /* non-critical: event metadata parse can fail silently */ }
+                }
+            }
+        }
+    }
+    return dat_obj
 }
 
-export const pack_externMsg = (dir:string, data: Record<string, string>) => {
-    return new Promise<void>((resolve, reject) => {
-        let rows = []
-        for(const i in data){
-            rows.push([i, data[i]])
-        }
-        writeToPath(dir, rows)
-        .on('error', err => console.error(err))
-        .on('finish', () => resolve());
-    })
-}
+export { hadComment }
+
+export const resetHadComment = () => { hadComment = false }
 
 export const extract = async (filedata: string, conf: ExtractConf, ftype: ExtractFileType) => {
     const extended = conf.extended
@@ -405,182 +438,3 @@ export const extract = async (filedata: string, conf: ExtractConf, ftype: Extrac
         conf: conf
     }
 }
-
-function isIncludeAble(sc: unknown){
-    const ess = globalThis.settings.extractSomeScript2
-    let able = false
-    if(sc === null || sc === undefined){
-        return false
-    }
-    for(let i=0;i<ess.length;i++){
-        if(ess[i] === ''){
-            continue
-        }
-        else if((sc as string).includes(ess[i])){
-            able = true
-            break
-        }
-    }
-    return able
-}
-
-function forEvent(d: Record<string, unknown>, dat_obj: DatObj, conf: ExtractConf, Path: string){
-    const extended = conf.extended
-    const fileName = conf.fileName
-    const dir = conf.dir
-    if(obNullSafe(d)){
-        if(conf.note){
-            if(globalThis.settings.extractSomeScript){
-                if(isIncludeAble(d.note)){
-                    dat_obj = addtodic(Path + '.note', dat_obj, 'note')
-                }
-            }
-            else{
-                dat_obj = addtodic(Path + '.note', dat_obj, 'note')
-            }
-        }
-        if(typeof d.list === 'object' && d.list !== undefined && d.list !== null){
-            let messageHasFace = false
-            const list = d.list as Record<string, unknown>[]
-            for(let i=0;i<list.length;i++){
-                let acceptable = [401, 102, 405, 101, 105]
-                let ischeckable = false
-                let reportDebug = false
-                if(conf.srce){
-                    acceptable = acceptable.concat([356,357])
-                }
-                if(conf.arg.ext_javascript){
-                    acceptable = acceptable.concat([355,655])
-                }
-                if(conf.note){
-                    acceptable = acceptable.concat([408, 108])
-                }
-                if([356,355,108,408,357].includes(list[i].code as number) && globalThis.settings.extractSomeScript){
-                    ischeckable = true
-                }
-                acceptable.concat(globalThis.settings.extractPlus)
-                eventID += 1
-                function checker(dat_obj: DatObj, da: unknown, ca: string){
-                    if(typeof da === 'object'){
-                        for(let i3 in (da as Record<string, unknown>)){
-                            dat_obj = checker(dat_obj, (da as Record<string, unknown>)[i3], ca + `.${i3}`)
-                        }
-                    }
-                    else if(!ischeckable || isIncludeAble(da)){
-                        dat_obj = addtodic(ca, dat_obj, '', {type: "event",code:list[i].code as number,eid:eventID,face:messageHasFace})
-                    }
-                    return dat_obj
-                }
-                
-                if (acceptable.includes(list[i].code as number) && list[i].parameters !== undefined && list[i].parameters !== null){
-                    if([101,102,105].includes(list[i].code as number)){
-                        dat_obj = addComment(dat_obj, `--- ${list[i].code} ---`)
-                    }
-                    if(list[i].code === 101){
-                        if((list[i].parameters as unknown[]).length >= 5){
-                            dat_obj = checker(dat_obj, (list[i].parameters as unknown[])[4], Path + `.list.${i}.parameters.${4}`)
-                        }
-                    }
-                    else if(![105].includes(list[i].code as number)){
-                        for(let i2=0;i2<(list[i].parameters as unknown[]).length;i2++){
-                            dat_obj = checker(dat_obj, (list[i].parameters as unknown[])[i2], Path + `.list.${i}.parameters.${i2}`)
-                        }
-                    }
-                }
-                else{
-                    try {
-                        switch(list[i].code){
-                            case 101:
-                                messageHasFace = ((list[i].parameters as unknown[])[0] !== '')
-                                break
-                        }   
-                    } catch (error) { /* non-critical: event metadata parse can fail silently */ }
-                }
-            }
-        }
-    }
-    return dat_obj
-}
-
-function jpathIsMap(jpath: string){
-    const name = path.parse(jpath).name
-    return (name.length === 6 && name.substring(0,3) === 'Map' && !isNaN(Number(name.substring(3))))
-}
-
-
-export const format_extracted = async(dats: {datobj: Record<string, ExtractDictEntry>; edited: Record<string, unknown>; conf: ExtractConf}, typ = 0) => {
-    const datobj = dats.datobj
-    const conf = dats.conf
-    const extended = conf.extended
-    const fileName = conf.fileName
-    const dir = conf.dir
-    if(typ == 0){
-        const Keys = Object.keys(datobj)
-        let LenMemory: Record<string, number> = {}
-        let LenKeys: string[] = []
-        let usedEid: number[] = []
-        globalThis.gb[fileName].outputText = ''
-        for(const d of Keys){
-            let jpath = fileName
-            if(datobj[d].qpath === 'script' && globalThis.settings.onefile_src){
-                jpath = 'ext_scripts.json'
-            }
-            else if(datobj[d].qpath === 'note' && globalThis.settings.onefile_note){
-                jpath = 'ext_note.json'
-            }
-            else if(datobj[d].qpath === 'note2' && globalThis.settings.onefile_note){
-                jpath = 'ext_note2.json'
-            }
-            else if(datobj[d].qpath === 'javascript' && globalThis.settings.onefile_src){
-                jpath = 'ext_javascript.json'
-            }
-            else if(globalThis.settings.oneMapFile && jpathIsMap(jpath)){
-                jpath = 'Maps.json'
-            }
-            if(globalThis.useExternMsg){
-                if(globalThis.externMsgKeys.includes(datobj[d].var)){
-                    datobj[d].var = globalThis.externMsg[datobj[d].var]
-                }
-            }
-            if(!LenKeys.includes(jpath)){
-                LenMemory[jpath] = (globalThis.gb[jpath].outputText!.split('\n').length - 1)
-                LenKeys.push(jpath)
-            }
-            if(globalThis.settings.formatNice && obNullSafe(datobj[d].conf)){
-                if(beautifyCodes.includes(datobj[d].conf!.code!)){
-                    const toadd = '==========\n'
-                    globalThis.gb[jpath].outputText += toadd
-                    LenMemory[jpath] += (toadd.split('\n').length - 1)
-                }
-                const eid = datobj[d].conf!.eid
-                if(eid !== undefined && eid !== null){
-                    if(!usedEid.includes(eid) && beautifyCodes2.includes(datobj[d].conf!.code!)){
-                        const toadd = `//==========//\n`
-                        globalThis.gb[jpath].outputText += toadd
-                        LenMemory[jpath] += (toadd.split('\n').length - 1)
-                        usedEid.push(eid)
-                    }
-                }
-            }
-            const cid = LenMemory[jpath]
-            globalThis.gb[jpath].data[cid] = {} as ExtractedDataEntry
-            globalThis.gb[jpath].data[cid].origin = fileName
-            globalThis.gb[jpath].data[cid].type = 'None'
-            globalThis.gb[jpath].data[cid].val = d
-            globalThis.gb[jpath].data[cid].conf = datobj[d].conf
-            globalThis.gb[jpath].data[cid].originText = datobj[d].var
-
-            const toadd = datobj[d].var +'\n'
-
-            globalThis.gb[jpath].outputText += toadd
-            LenMemory[jpath] += (toadd.split('\n').length - 1)
-
-            globalThis.gb[jpath].data[cid].m = LenMemory[jpath]
-        }
-    }
-}
-
-export const DecryptDir = DecryptDirs
-
-
-export const EncryptDir = EncryptDirs
