@@ -35,6 +35,7 @@ onMounted(() => {
       }
     }
   })
+  api.send('mainReady')
 })
 </script>
 

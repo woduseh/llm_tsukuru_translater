@@ -10,9 +10,7 @@ import log from '../logger';
 let llmSettingsWindow: Electron.BrowserWindow | null = null;
 let llmPendingArg: { dir: string; game: string } | null = null;
 
-ipcMain.on('eztrans', eztrans.trans)
-
-ipcMain.on('openLLMSettings', (ev, arg) => {
+ipcMain.on('openLLMSettings',(ev, arg) => {
   llmPendingArg = arg;
   if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
     llmSettingsWindow.focus();
@@ -36,11 +34,16 @@ ipcMain.on('openLLMSettings', (ev, arg) => {
   loadRoute(llmSettingsWindow, '/llm-settings');
   llmSettingsWindow.webContents.on('did-finish-load', () => {
     llmSettingsWindow!.show();
-    llmSettingsWindow!.webContents.send('llmSettings', globalThis.settings);
   });
   llmSettingsWindow.on('closed', () => {
     llmSettingsWindow = null;
   });
+})
+
+ipcMain.on('llmSettingsReady', () => {
+  if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
+    llmSettingsWindow.webContents.send('llmSettings', globalThis.settings);
+  }
 })
 
 ipcMain.on('llmSettingsApply', (ev, data) => {

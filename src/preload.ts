@@ -16,19 +16,20 @@ function isPathAllowed(filePath: string): boolean {
 
 const SEND_CHANNELS = [
   'close', 'minimize', 'select_folder', 'setheight', 'extract', 'apply',
-  'changeURL', 'settings', 'applysettings', 'closesettings', 'changeLang',
-  'eztrans', 'openLLMSettings', 'llmSettingsApply', 'llmSettingsClose', 'abortLLM',
+  'changeURL', 'settings', 'applysettings', 'closesettings',
+  'openLLMSettings', 'llmSettingsApply', 'llmSettingsClose', 'abortLLM',
   'openLLMCompare', 'llmCompareClose', 'openJsonVerify',
   'retranslateFile', 'retranslateBlocks',
   'openFolder', 'projectConvert', 'log', 'license', 'app_version',
   'getextention', 'selFont', 'changeFontSize', 'updateVersion',
   'wolf_ext', 'wolf_apply', 'gamePatcher',
   'compareReady', 'verifyReady',
+  'llmSettingsReady', 'settingsReady', 'mainReady',
 ];
 
 const RECEIVE_CHANNELS = [
   'set_path', 'getGlobalSettings', 'loadingTag', 'loading', 'worked',
-  'check_force', 'alert', 'alert_free', 'alert2', 'is_version',
+  'check_force', 'alert', 'alert_free', 'alert2',
   'llmTranslating', 'alertExten', 'settings', 'llmSettings',
   'initCompare', 'retranslateProgress', 'retranslateFileDone', 'retranslateBlocksDone',
   'initVerify', 'verifySettings',

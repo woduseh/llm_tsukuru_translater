@@ -46,8 +46,7 @@ const viteHelper_1 = require("./viteHelper");
 const logger_1 = __importDefault(require("../logger"));
 let llmSettingsWindow = null;
 let llmPendingArg = null;
-electron_1.ipcMain.on('eztrans', eztrans.trans);
-electron_1.ipcMain.on('openLLMSettings', (ev, arg) => {
+electron_1.ipcMain.on('openLLMSettings',(ev, arg) => {
     llmPendingArg = arg;
     if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
         llmSettingsWindow.focus();
@@ -71,11 +70,15 @@ electron_1.ipcMain.on('openLLMSettings', (ev, arg) => {
     (0, viteHelper_1.loadRoute)(llmSettingsWindow, '/llm-settings');
     llmSettingsWindow.webContents.on('did-finish-load', () => {
         llmSettingsWindow.show();
-        llmSettingsWindow.webContents.send('llmSettings', globalThis.settings);
     });
     llmSettingsWindow.on('closed', () => {
         llmSettingsWindow = null;
     });
+});
+electron_1.ipcMain.on('llmSettingsReady', () => {
+    if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
+        llmSettingsWindow.webContents.send('llmSettings', globalThis.settings);
+    }
 });
 electron_1.ipcMain.on('llmSettingsApply', (ev, data) => {
     globalThis.settings = { ...globalThis.settings, llmSortOrder: data.llmSortOrder };
