@@ -18,6 +18,36 @@ export declare global {
     var WolfEncoding:'utf8'|'shift-jis'
     var WolfCache: {[key:string]:Buffer}
     var WolfMetadata: wolfMetadata
+
+    interface Window {
+        api: {
+            send: (channel: string, ...args: any[]) => void;
+            on: (channel: string, callback: (...args: any[]) => void) => any;
+            once: (channel: string, callback: (...args: any[]) => void) => void;
+            removeAllListeners: (channel: string) => void;
+            invoke: (channel: string, ...args: any[]) => Promise<any>;
+        };
+        nodeBuffer: {
+            toBase64: (str: string) => string;
+            fromBase64: (str: string) => string;
+        };
+        nodeFs: {
+            readFileSync: (filePath: string, encoding: string) => string;
+            readdirSync: (dirPath: string) => string[];
+            existsSync: (filePath: string) => boolean;
+            writeFileSync: (filePath: string, data: string, encoding: string) => void;
+        };
+        nodePath: {
+            join: (...args: string[]) => string;
+            parse: (p: string) => { root: string; dir: string; base: string; ext: string; name: string };
+            basename: (p: string) => string;
+        };
+        Swal: any;
+        verify: {
+            verifyJsonIntegrity: (orig: any, trans: any) => any[];
+            repairJson: (orig: any, trans: any) => any;
+        };
+    }
 }
 
 interface wolfMetadata{

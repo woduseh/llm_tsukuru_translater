@@ -1,5 +1,3 @@
-const { ipcRenderer } = require('electron');
-
 let gsettings:{[key:string]:any} = {}
 const CheckboxValues = [
   'ExtractAddLine',
@@ -14,7 +12,7 @@ const CheckboxValues = [
   'formatNice'
 ]
 
-ipcRenderer.on("settings", (evt: any, arg: any) => {
+window.api.on("settings", (arg: any) => {
   try{
     gsettings = arg
     const ess2 = arg.extractSomeScript2
@@ -42,7 +40,7 @@ ipcRenderer.on("settings", (evt: any, arg: any) => {
     (document.getElementById('llmCustomPrompt') as HTMLTextAreaElement).value = gsettings.llmCustomPrompt || '';
     updateChunkSizeVisibility()
 
-    document.getElementById('license')!.onclick = () => {ipcRenderer.send('license')}
+    document.getElementById('license')!.onclick = () => {window.api.send('license')}
     _reload()
   }
   catch(e){
@@ -100,9 +98,9 @@ document.getElementById('apply')!.onclick = () => {
   gsettings.llmTimeout = parseInt((document.getElementById('llmTimeout') as HTMLInputElement).value) || 600;
   gsettings.llmCustomPrompt = (document.getElementById('llmCustomPrompt') as HTMLTextAreaElement).value;
 
-  ipcRenderer.send('applysettings', gsettings);
+  window.api.send('applysettings', gsettings);
 }
 
 document.getElementById('close')!.onclick = () => {
-  ipcRenderer.send('closesettings', gsettings);
+  window.api.send('closesettings', gsettings);
 }

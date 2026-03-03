@@ -49,8 +49,9 @@ electron_1.ipcMain.on('settings', () => {
         show: false,
         autoHideMenuBar: true,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path_1.default.join(__dirname, '..', 'preload.js')
         },
         icon: path_1.default.join(__dirname, '../../res/icon.png'),
     });
@@ -96,8 +97,9 @@ electron_1.ipcMain.on('gamePatcher', (ev, dir) => {
         show: false,
         autoHideMenuBar: true,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path_1.default.join(__dirname, '..', 'preload.js')
         },
         icon: path_1.default.join(__dirname, '../../res/icon.png'),
     });

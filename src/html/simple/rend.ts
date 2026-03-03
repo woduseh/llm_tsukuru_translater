@@ -1,10 +1,9 @@
 (() => {
-    const { ipcRenderer} = require('electron');
     const mainMenu = document.querySelector('#mainMenu') as HTMLDivElement
     
     let globalSettings
     
-    ipcRenderer.on('getGlobalSettings', (evn: any, tt: any) => {
+    window.api.on('getGlobalSettings', (tt: any) => {
         globalSettings = tt
         if(tt.language === 'en'){
             document.getElementById('lang-en')!.classList.add('btxSel')            
@@ -20,14 +19,14 @@
         }
     })
     
-    document.getElementById('icon1')!.onclick = () => {ipcRenderer.send('close')}
-    document.getElementById('icon2')!.onclick = () => {ipcRenderer.send('minimize')}
-    document.getElementById('gokupu')!.onclick = () => {ipcRenderer.send('changeURL', './src/html/main/index.html')}
-    document.getElementById('simpuru')!.onclick = () => {ipcRenderer.send('changeURL', './src/html/wolf/index.html')}
-    document.getElementById('lang-en')!.onclick = () => {ipcRenderer.send('changeLang', 'en')}
-    document.getElementById('lang-ko')!.onclick = () => {ipcRenderer.send('changeLang', 'ko')}
+    document.getElementById('icon1')!.onclick = () => {window.api.send('close')}
+    document.getElementById('icon2')!.onclick = () => {window.api.send('minimize')}
+    document.getElementById('gokupu')!.onclick = () => {window.api.send('changeURL', './src/html/main/index.html')}
+    document.getElementById('simpuru')!.onclick = () => {window.api.send('changeURL', './src/html/wolf/index.html')}
+    document.getElementById('lang-en')!.onclick = () => {window.api.send('changeLang', 'en')}
+    document.getElementById('lang-ko')!.onclick = () => {window.api.send('changeLang', 'ko')}
 
-    ipcRenderer.on('set_path', (evn: any, tt: any) => {
+    window.api.on('set_path', (tt: any) => {
         (document.getElementById(tt.type) as HTMLInputElement).value = tt.dir
         if(tt.type !== 'folder_input'){
             document.getElementById(tt.type)!.innerText = tt.dir

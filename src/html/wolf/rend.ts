@@ -1,5 +1,4 @@
 (() => {
-    const { ipcRenderer} = require('electron');
     const bottomMenu = document.querySelector('.smalmar') as HTMLDivElement
     const mainMenu = document.querySelector('#mainMenu') as HTMLDivElement
     const simpleMenu = document.querySelector('#simpleMenu') as HTMLDivElement
@@ -23,11 +22,11 @@
         return timeString
     }
 
-    ipcRenderer.send('setheight', 550);
+    window.api.send('setheight', 550);
     //@ts-ignore
     const Swal = window.Swal
     
-    ipcRenderer.on('getGlobalSettings', (evn: any, tt: any) => {
+    window.api.on('getGlobalSettings', (tt: any) => {
         globalSettings = tt
         if(tt.language === 'en'){
             globalThis.loadEn()
@@ -39,7 +38,7 @@
         }
     })
 
-    ipcRenderer.on('alertExten', async (ev: any, arg: any) => {
+    window.api.on('alertExten', async (arg: any) => {
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
@@ -47,10 +46,10 @@
             title: arg[0],
         })
         if(!isDenied){
-            ipcRenderer.send("getextention", arg[1])
+            window.api.send("getextention", arg[1])
         }
         else{
-            ipcRenderer.send("getextention", 'none')
+            window.api.send("getextention", 'none')
         }
     })
 
@@ -67,19 +66,19 @@
         }
     }
     
-    document.getElementById('icon1')!.onclick = () => {ipcRenderer.send('close')}
-    document.getElementById('icon2')!.onclick = () => {ipcRenderer.send('minimize')}
+    document.getElementById('icon1')!.onclick = () => {window.api.send('close')}
+    document.getElementById('icon2')!.onclick = () => {window.api.send('minimize')}
     document.getElementById('sel')!.addEventListener('click', () => {
-        ipcRenderer.send('select_folder', 'folder_input');
+        window.api.send('select_folder', 'folder_input');
     });
-    ipcRenderer.on('set_path', (evn: any, tt: any) => {
+    window.api.on('set_path', (tt: any) => {
         (document.getElementById(tt.type) as HTMLInputElement).value = tt.dir
         if(tt.type !== 'folder_input'){
             document.getElementById(tt.type)!.innerText = tt.dir
         }
     });
     document.getElementById('WolfBtn')!.onclick = () => {
-        ipcRenderer.send('changeURL', './src/html/main/index.html')
+        window.api.send('changeURL', './src/html/main/index.html')
     }
     changeMenu('simple')
     {
@@ -111,7 +110,7 @@
             }
             running = true
             const folder = (document.getElementById('folder_input') as HTMLInputElement).value
-            ipcRenderer.send('wolf_ext', {folder:folder,config:config})
+            window.api.send('wolf_ext', {folder:folder,config:config})
         }
         document.getElementById('runbtn2')!.onclick = () => {
             if(running){
@@ -123,10 +122,10 @@
             }
             running = true
             const folder = (document.getElementById('folder_input') as HTMLInputElement).value
-            ipcRenderer.send('wolf_apply', {folder:folder,config:config})
+            window.api.send('wolf_apply', {folder:folder,config:config})
         }
 
-        document.getElementById('fold')!.onclick = () => {ipcRenderer.send("openFolder", (document.getElementById('folder_input') as HTMLInputElement).value)}
+        document.getElementById('fold')!.onclick = () => {window.api.send("openFolder", (document.getElementById('folder_input') as HTMLInputElement).value)}
 
     }
     {
@@ -146,7 +145,7 @@
         }
     }
 
-    ipcRenderer.on('alert', (evn: any, tt: any) => {
+    window.api.on('alert', (tt: any) => {
         if (typeof tt === 'string') {
             Swal.fire({
                 icon: 'success',
@@ -161,11 +160,11 @@
         }
     });
 
-    ipcRenderer.on('loadingTag', (evn: any, tt: any) => {
+    window.api.on('loadingTag', (tt: any) => {
         loadingTag = tt
     })
 
-    ipcRenderer.on('loading', (evn: any, tt: any) => {
+    window.api.on('loading', (tt: any) => {
         document.getElementById('border_r')!.style.width = `${tt}vw`
         let ds = Math.floor(new Date().getTime()/1000)
         if(tt > 0 && globalSettings.loadingText){
@@ -198,7 +197,7 @@
         }
     });
 
-    ipcRenderer.on('alert2', async (evn: any, tt: any) => {
+    window.api.on('alert2', async (tt: any) => {
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
@@ -207,7 +206,7 @@
             title: '완료되었습니다',
         })
         if(isDenied){
-            ipcRenderer.send("openFolder", (document.getElementById('folder_input') as HTMLInputElement).value)
+            window.api.send("openFolder", (document.getElementById('folder_input') as HTMLInputElement).value)
         }
     });
 
@@ -220,7 +219,7 @@
             return
         }
         const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
-        ipcRenderer.send('openLLMSettings', { dir: dir, game: 'wolf' });
+        window.api.send('openLLMSettings', { dir: dir, game: 'wolf' });
     }
 
     document.getElementById('llmCompare')!.onclick = () => {
@@ -229,13 +228,13 @@
             Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' })
             return
         }
-        ipcRenderer.send('openLLMCompare', dir)
+        window.api.send('openLLMCompare', dir)
     }
 
     // LLM translation abort button
     let llmTranslating = false;
 
-    ipcRenderer.on('llmTranslating', (ev: any, val: any) => {
+    window.api.on('llmTranslating', (val: any) => {
         llmTranslating = val;
         document.getElementById('abort-llm-btn')!.style.display = val ? 'block' : 'none';
     })
@@ -249,7 +248,7 @@
             denyButtonText: '계속',
         })
         if (result.isConfirmed) {
-            ipcRenderer.send('abortLLM');
+            window.api.send('abortLLM');
         }
     }
 
@@ -263,12 +262,12 @@
                 denyButtonText: '계속',
             })
             if (result.isConfirmed) {
-                ipcRenderer.send('abortLLM');
+                window.api.send('abortLLM');
             }
         }
     })
 
-    ipcRenderer.on('worked', () => {
+    window.api.on('worked', () => {
         running = false
     })
 
@@ -280,7 +279,7 @@
             })
             return
         }
-        ipcRenderer.send('settings')
+        window.api.send('settings')
         running = true
     }
     

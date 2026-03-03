@@ -1,8 +1,4 @@
 (() => {
-    const { ipcRenderer } = require('electron');
-    const fs = require('fs');
-    const path = require('path');
-    const { verifyJsonIntegrity, repairJson } = require('../../js/rpgmv/verify.js');
 
     interface VerifyIssue {
         path: string;
@@ -30,19 +26,19 @@
     let currentIdx = 0;
 
     function detectDirs(dir: string): { origDir: string; transDir: string } | null {
-        const completedDir = path.join(dir, 'Completed', 'data');
-        const backupDir = path.join(dir, 'Backup');
+        const completedDir = window.nodePath.join(dir, 'Completed', 'data');
+        const backupDir = window.nodePath.join(dir, 'Backup');
 
         // Completed/data 존재 → Backup(원본) vs Completed/data(번역)
-        if (fs.existsSync(completedDir)) {
-            if (fs.existsSync(backupDir)) {
+        if (window.nodeFs.existsSync(completedDir)) {
+            if (window.nodeFs.existsSync(backupDir)) {
                 return { origDir: backupDir, transDir: completedDir };
             }
             return { origDir: dir, transDir: completedDir };
         }
 
         // Backup만 존재 (즉시 적용 모드) → Backup(원본) vs data(번역)
-        if (fs.existsSync(backupDir)) {
+        if (window.nodeFs.existsSync(backupDir)) {
             return { origDir: backupDir, transDir: dir };
         }
 
@@ -64,22 +60,22 @@
         origDir = dirs.origDir;
         transDir = dirs.transDir;
 
-        const transFiles = fs.readdirSync(transDir).filter((f: string) => f.endsWith('.json'));
+        const transFiles = window.nodeFs.readdirSync(transDir).filter((f: string) => f.endsWith('.json'));
 
         for (const name of transFiles) {
-            const origPath = path.join(origDir, name);
-            const transPath = path.join(transDir, name);
-            if (!fs.existsSync(origPath)) continue;
+            const origPath = window.nodePath.join(origDir, name);
+            const transPath = window.nodePath.join(transDir, name);
+            if (!window.nodeFs.existsSync(origPath)) continue;
 
             try {
-                let origData = fs.readFileSync(origPath, 'utf-8');
-                let transData = fs.readFileSync(transPath, 'utf-8');
+                let origData = window.nodeFs.readFileSync(origPath, 'utf-8');
+                let transData = window.nodeFs.readFileSync(transPath, 'utf-8');
                 if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1);
                 if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1);
 
                 const orig = JSON.parse(origData);
                 const trans = JSON.parse(transData);
-                const issues: VerifyIssue[] = verifyJsonIntegrity(orig, trans);
+                const issues: VerifyIssue[] = window.verify.verifyJsonIntegrity(orig, trans);
                 const errorCount = issues.filter(i => i.severity === 'error').length;
                 const warningCount = issues.filter(i => i.severity === 'warning').length;
 
@@ -253,29 +249,29 @@
         if (f.issues.length === 0) return { success: false, error: '문제가 없는 파일입니다' };
 
         try {
-            let origData = fs.readFileSync(f.origPath, 'utf-8');
-            let transData = fs.readFileSync(f.transPath, 'utf-8');
+            let origData = window.nodeFs.readFileSync(f.origPath, 'utf-8');
+            let transData = window.nodeFs.readFileSync(f.transPath, 'utf-8');
             if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1);
             if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1);
 
             const orig = JSON.parse(origData);
             const trans = JSON.parse(transData);
-            const repaired = repairJson(orig, trans);
+            const repaired = window.verify.repairJson(orig, trans);
 
             const indent = 4 * (globalThis.settings?.JsonChangeLine || 0);
             const output = JSON.stringify(repaired, null, indent);
 
             // 실제 저장
-            fs.writeFileSync(f.transPath, output, 'utf-8');
+            window.nodeFs.writeFileSync(f.transPath, output, 'utf-8');
 
             // 저장 확인: 파일이 실제로 기록되었는지 검증
-            const written = fs.readFileSync(f.transPath, 'utf-8');
+            const written = window.nodeFs.readFileSync(f.transPath, 'utf-8');
             if (written !== output) {
                 return { success: false, error: '파일 저장 후 검증 실패: 기록된 내용이 일치하지 않습니다' };
             }
 
             // Re-verify
-            const newIssues: VerifyIssue[] = verifyJsonIntegrity(orig, repaired);
+            const newIssues: VerifyIssue[] = window.verify.verifyJsonIntegrity(orig, repaired);
             // 수정 후에는 의도적으로 보존된 warn 레벨 문자열 변경 경고를 제외
             const filteredIssues = newIssues.filter(i =>
                 !(i.type === 'string_changed' && i.severity === 'warning')
@@ -292,11 +288,11 @@
     }
 
     // IPC: 초기화
-    ipcRenderer.on('initVerify', (_ev: any, dir: string) => {
+    window.api.on('initVerify', (dir: string) => {
         loadFiles(dir);
     });
 
-    ipcRenderer.on('verifySettings', (_ev: any, settings: any) => {
+    window.api.on('verifySettings', (settings: any) => {
         globalThis.settings = settings;
     });
 

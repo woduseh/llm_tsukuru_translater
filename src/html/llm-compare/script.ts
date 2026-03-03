@@ -1,8 +1,4 @@
 (() => {
-    const { ipcRenderer } = require('electron');
-    const fs = require('fs');
-    const path = require('path');
-
     const SEP_RE = /^---\s*\d+\s*---$/;
 
     interface FileEntry {
@@ -22,14 +18,14 @@
     function loadFiles(dir: string) {
         dataDir = dir;
         // Detect Wolf RPG vs RPG Maker extract path
-        const wolfExtractDir = path.join(dir, '_Extract', 'Texts');
+        const wolfExtractDir = window.nodePath.join(dir, '_Extract', 'Texts');
         const wolfBackupDir = wolfExtractDir + '_backup';
-        const mvExtractDir = path.join(dir, 'Extract');
+        const mvExtractDir = window.nodePath.join(dir, 'Extract');
         const mvBackupDir = mvExtractDir + '_backup';
 
         let extractDir: string;
         let backupDir: string;
-        if (fs.existsSync(wolfExtractDir) && fs.existsSync(wolfBackupDir)) {
+        if (window.nodeFs.existsSync(wolfExtractDir) && window.nodeFs.existsSync(wolfBackupDir)) {
             extractDir = wolfExtractDir;
             backupDir = wolfBackupDir;
         } else {
@@ -39,19 +35,19 @@
         files = [];
         dirty = {};
 
-        if (!fs.existsSync(extractDir) || !fs.existsSync(backupDir)) {
+        if (!window.nodeFs.existsSync(extractDir) || !window.nodeFs.existsSync(backupDir)) {
             document.getElementById('summary')!.innerHTML =
                 '<span class="summary-error">Extract 또는 Extract_backup 폴더가 없습니다.</span>';
             return;
         }
 
-        const transFiles: string[] = fs.readdirSync(extractDir).filter((f: string) => f.endsWith('.txt'));
+        const transFiles: string[] = window.nodeFs.readdirSync(extractDir).filter((f: string) => f.endsWith('.txt'));
         for (const name of transFiles) {
-            const origPath = path.join(backupDir, name);
-            const transPath = path.join(extractDir, name);
-            if (!fs.existsSync(origPath)) continue;
-            const origContent = fs.readFileSync(origPath, 'utf-8');
-            const transContent = fs.readFileSync(transPath, 'utf-8');
+            const origPath = window.nodePath.join(backupDir, name);
+            const transPath = window.nodePath.join(extractDir, name);
+            if (!window.nodeFs.existsSync(origPath)) continue;
+            const origContent = window.nodeFs.readFileSync(origPath, 'utf-8');
+            const transContent = window.nodeFs.readFileSync(transPath, 'utf-8');
             const origLines = origContent.split('\n');
             const transLines = transContent.split('\n');
             const mismatch = checkMismatch(origLines, transLines);
@@ -221,8 +217,8 @@
         if (files.length === 0) return;
 
         const f = files[currentIdx];
-        const origLines = fs.readFileSync(f.origPath, 'utf-8').split('\n');
-        const transLines = fs.readFileSync(f.transPath, 'utf-8').split('\n');
+        const origLines = window.nodeFs.readFileSync(f.origPath, 'utf-8').split('\n');
+        const transLines = window.nodeFs.readFileSync(f.transPath, 'utf-8').split('\n');
         const origBlocks = splitBlocks(origLines);
         const transBlocks = splitBlocks(transLines);
         const maxLen = Math.max(origBlocks.length, transBlocks.length);
@@ -373,7 +369,7 @@
     function saveCurrentFile() {
         if (files.length === 0) return;
         const f = files[currentIdx];
-        const transLines = fs.readFileSync(f.transPath, 'utf-8').split('\n');
+        const transLines = window.nodeFs.readFileSync(f.transPath, 'utf-8').split('\n');
         const transBlocks = splitBlocks(transLines);
 
         // Collect edited blocks from textareas
@@ -391,13 +387,13 @@
             if (block.sep) parts.push(block.sep);
             parts.push(...block.lines);
         }
-        fs.writeFileSync(f.transPath, parts.join('\n'), 'utf-8');
+        window.nodeFs.writeFileSync(f.transPath, parts.join('\n'), 'utf-8');
 
         // Recheck mismatch
-        const origLines = fs.readFileSync(f.origPath, 'utf-8').split('\n');
-        const newTransLines = fs.readFileSync(f.transPath, 'utf-8').split('\n');
+        const origLines = window.nodeFs.readFileSync(f.origPath, 'utf-8').split('\n');
+        const newTransLines = window.nodeFs.readFileSync(f.transPath, 'utf-8').split('\n');
         f.mismatch = checkMismatch(origLines, newTransLines);
-        f.untranslated = fs.readFileSync(f.origPath, 'utf-8') === fs.readFileSync(f.transPath, 'utf-8');
+        f.untranslated = window.nodeFs.readFileSync(f.origPath, 'utf-8') === window.nodeFs.readFileSync(f.transPath, 'utf-8');
         dirty[f.name] = false;
 
         (document.getElementById('saveBtn') as HTMLButtonElement).disabled = true;
@@ -407,24 +403,24 @@
         renderBlocks();
     }
 
-    ipcRenderer.on('initCompare', (_ev: any, dir: string) => {
+    window.api.on('initCompare', (dir: string) => {
         loadFiles(dir);
         (document.getElementById('retranslateBtn') as HTMLButtonElement).disabled = false;
     });
 
-    ipcRenderer.on('retranslateProgress', (_ev: any, msg: string) => {
+    window.api.on('retranslateProgress', (msg: string) => {
         document.getElementById('save-status')!.textContent = `🔄 ${msg}`;
     });
 
-    ipcRenderer.on('retranslateFileDone', (_ev: any, result: { success: boolean; error?: string }) => {
+    window.api.on('retranslateFileDone', (result: { success: boolean; error?: string }) => {
         const btn = document.getElementById('retranslateBtn') as HTMLButtonElement;
         btn.disabled = false;
         btn.textContent = '전체 재번역';
         if (result.success) {
             document.getElementById('save-status')!.textContent = '재번역 완료 ✓';
             const f = files[currentIdx];
-            const origContent = fs.readFileSync(f.origPath, 'utf-8');
-            const transContent = fs.readFileSync(f.transPath, 'utf-8');
+            const origContent = window.nodeFs.readFileSync(f.origPath, 'utf-8');
+            const transContent = window.nodeFs.readFileSync(f.transPath, 'utf-8');
             const origLines = origContent.split('\n');
             const transLines = transContent.split('\n');
             f.mismatch = checkMismatch(origLines, transLines);
@@ -438,15 +434,15 @@
         }
     });
 
-    ipcRenderer.on('retranslateBlocksDone', (_ev: any, result: { success: boolean; error?: string }) => {
+    window.api.on('retranslateBlocksDone', (result: { success: boolean; error?: string }) => {
         const btn = document.getElementById('retranslateSelBtn') as HTMLButtonElement;
         btn.disabled = false;
         btn.textContent = '선택 블록 재번역';
         if (result.success) {
             document.getElementById('save-status')!.textContent = `${selectedBlocks.size}개 블록 재번역 완료 ✓`;
             const f = files[currentIdx];
-            const origContent = fs.readFileSync(f.origPath, 'utf-8');
-            const transContent = fs.readFileSync(f.transPath, 'utf-8');
+            const origContent = window.nodeFs.readFileSync(f.origPath, 'utf-8');
+            const transContent = window.nodeFs.readFileSync(f.transPath, 'utf-8');
             const origLines = origContent.split('\n');
             const transLines = transContent.split('\n');
             f.mismatch = checkMismatch(origLines, transLines);
@@ -556,7 +552,7 @@
         btn.disabled = true;
         btn.textContent = '번역 중...';
         document.getElementById('save-status')!.textContent = '🔄 준비 중...';
-        ipcRenderer.send('retranslateFile', { dir: dataDir, fileName: f.name });
+        window.api.send('retranslateFile', { dir: dataDir, fileName: f.name });
     };
 
     document.getElementById('retranslateSelBtn')!.onclick = () => {
@@ -567,7 +563,7 @@
         btn.textContent = '번역 중...';
         document.getElementById('save-status')!.textContent = '🔄 준비 중...';
         const indices = Array.from(selectedBlocks).sort((a, b) => a - b);
-        ipcRenderer.send('retranslateBlocks', { dir: dataDir, fileName: f.name, blockIndices: indices });
+        window.api.send('retranslateBlocks', { dir: dataDir, fileName: f.name, blockIndices: indices });
     };
 
     document.getElementById('closeBtn')!.onclick = () => {
