@@ -5,7 +5,6 @@ out/
 /electron-builder.yml
 dist/
 *.txt
-package-lock.json
 *.js.map
 *.css.map
 /main.js
@@ -13,3 +12,5 @@ package-lock.json
 /src/js/**/*.js
 /src/html/**/*.js
 /src/utils.js
+debug_crash.log
+audit_report.html
