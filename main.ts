@@ -1,3 +1,6 @@
+import { initAppContext } from './src/appContext';
+initAppContext();
+
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as applyjs from "./src/js/rpgmv/apply.js";
 import { createWindow } from './src/ipc/windowManager';
