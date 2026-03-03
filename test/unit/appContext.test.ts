@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 const syncedGlobalNames = [
   'mwindow', 'settingsWindow', 'settings', 'gb', 'externMsg',
   'useExternMsg', 'externMsgKeys', 'llmAbort', 'oPath', 'sourceDir',
-  'iconPath', 'keyvalue', 'loadEn', 'WolfExtData', 'WolfEncoding',
+  'loadEn', 'WolfExtData',
   'WolfCache', 'WolfMetadata',
 ];
 
@@ -61,16 +61,8 @@ describe('appContext', () => {
       expect(appCtx.sourceDir).toBe('');
     });
 
-    it('has WolfEncoding as utf8', () => {
-      expect(appCtx.WolfEncoding).toBe('utf8');
-    });
-
     it('has WolfMetadata with ver -1', () => {
       expect(appCtx.WolfMetadata).toEqual({ ver: -1 });
-    });
-
-    it('has undefined keyvalue', () => {
-      expect(appCtx.keyvalue).toBeUndefined();
     });
 
     it('has empty WolfExtData array', () => {

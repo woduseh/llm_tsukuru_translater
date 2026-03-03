@@ -14,7 +14,9 @@ src/html/main/renderer.bundle.js
 /src/utils.js
 /src/appContext.js
 /src/preload.js
+/src/logger.js
 /src/ipc/**/*.js
+/src/types/**/*.js
 debug_crash.log
 audit_report.html
 .store-key
