@@ -1,6 +1,4 @@
 (() => {
-    const { ipcRenderer } = window.require('electron');
-    const {_} = window.require('lodash');
     let running = false
     let loadingTag = ''
     let menu_open = false
@@ -40,17 +38,17 @@
     }
     let _mode = -1
     
-    document.getElementById('icon1')!.onclick = () => {ipcRenderer.send('close')}
-    document.getElementById('icon2')!.onclick = () => {ipcRenderer.send('minimize')}
-    document.getElementById('fold')!.onclick = () => {ipcRenderer.send("openFolder", (document.getElementById('folder_input') as HTMLInputElement).value)}
+    document.getElementById('icon1')!.onclick = () => {window.api.send('close')}
+    document.getElementById('icon2')!.onclick = () => {window.api.send('minimize')}
+    document.getElementById('fold')!.onclick = () => {window.api.send("openFolder", (document.getElementById('folder_input') as HTMLInputElement).value)}
     document.querySelector('#sel')!.addEventListener('click', () => {
-        ipcRenderer.send('select_folder', 'folder_input');
+        window.api.send('select_folder', 'folder_input');
     });
 
-    ipcRenderer.send('setheight', 550);
+    window.api.send('setheight', 550);
 
     
-    ipcRenderer.on('set_path', (evn: any, tt: any) => {
+    window.api.on('set_path', (tt: any) => {
         (document.getElementById(tt.type) as HTMLInputElement).value = tt.dir
         if(tt.type !== 'folder_input'){
             document.getElementById(tt.type)!.innerText = tt.dir
@@ -59,7 +57,7 @@
     
     
     
-    ipcRenderer.on('getGlobalSettings', (evn: any, tt: any) => {
+    window.api.on('getGlobalSettings', (tt: any) => {
         if(tt.language === 'en'){
             
             globalThis.loadEn()
@@ -72,11 +70,11 @@
         }
     })
     
-    ipcRenderer.on('loadingTag', (evn: any, tt: any) => {
+    window.api.on('loadingTag', (tt: any) => {
         loadingTag = tt
     })
     
-    ipcRenderer.on('loading', (evn: any, tt: any) => {
+    window.api.on('loading', (tt: any) => {
         document.getElementById('border_r')!.style.width = `${tt}vw`
         let ds = Math.floor(new Date().getTime()/1000)
         if(tt > 0 && globalSettings.loadingText){
@@ -109,9 +107,9 @@
         }
     });
     
-    ipcRenderer.on('worked', () => {running = false})
+    window.api.on('worked', () => {running = false})
     
-    ipcRenderer.on('check_force', (evn: any, arg: any) => {
+    window.api.on('check_force', (arg: any) => {
         Swal.fire({
             icon: 'question',
             text: 'Extract 폴더가 존재합니다. \n덮어씌우겠습니까?',
@@ -121,12 +119,12 @@
         }).then((result: any) => {
             if (result.isConfirmed) {
                 arg.force = true
-                ipcRenderer.send('extract', arg);
+                window.api.send('extract', arg);
             }
         })
     });
     
-    ipcRenderer.on('alert', (evn: any, tt: any) => {
+    window.api.on('alert', (tt: any) => {
         if (typeof tt === 'string') {
             Swal.fire({
                 icon: 'success',
@@ -141,11 +139,11 @@
         }
     });
     
-    ipcRenderer.on('alert_free', (evn: any, tt: any) => {
+    window.api.on('alert_free', (tt: any) => {
         Swal.fire(tt)
     });
     
-    ipcRenderer.on('alert2', async (evn: any, tt: any) => {
+    window.api.on('alert2', async (tt: any) => {
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
@@ -154,12 +152,12 @@
             title: '완료되었습니다',
         })
         if(isDenied){
-            ipcRenderer.send("openFolder", (document.getElementById('folder_input') as HTMLInputElement).value)
+            window.api.send("openFolder", (document.getElementById('folder_input') as HTMLInputElement).value)
         }
     });
     
     document.getElementById('WolfBtn')!.onclick = () => {
-        ipcRenderer.send('changeURL', './src/html/wolf/index.html')
+        window.api.send('changeURL', './src/html/wolf/index.html')
     }
     
     function _reload(){
@@ -208,7 +206,7 @@
         }
     }
     
-    ipcRenderer.on('is_version', (ev: any, arg: any)=>{
+    window.api.on('is_version', (arg: any)=>{
         (globalThis as any).version = arg
     })
     
@@ -223,7 +221,7 @@
     // LLM translation abort button
     let llmTranslating = false;
 
-    ipcRenderer.on('llmTranslating', (ev: any, val: any) => {
+    window.api.on('llmTranslating', (val: any) => {
         llmTranslating = val;
         document.getElementById('abort-llm-btn')!.style.display = val ? 'block' : 'none';
     })
@@ -237,7 +235,7 @@
             denyButtonText: '계속',
         })
         if (result.isConfirmed) {
-            ipcRenderer.send('abortLLM');
+            window.api.send('abortLLM');
         }
     }
 
@@ -252,7 +250,7 @@
                 denyButtonText: '계속',
             })
             if (result.isConfirmed) {
-                ipcRenderer.send('abortLLM');
+                window.api.send('abortLLM');
             }
         }
     })
@@ -318,7 +316,7 @@
             })
             return
         }
-        ipcRenderer.send('settings')
+        window.api.send('settings')
         running = true
     }
     
@@ -393,7 +391,7 @@
                     text: "프로젝트를 저장할 위치를 선택해주세요"
                 })
                 running = true
-                ipcRenderer.send('projectConvert', (document.getElementById('folder_input') as HTMLInputElement).value)
+                window.api.send('projectConvert', (document.getElementById('folder_input') as HTMLInputElement).value)
             }
         })
     }
@@ -423,7 +421,7 @@
         }
     }
     
-    ipcRenderer.on('alertExten', async (ev: any, arg: any) => {
+    window.api.on('alertExten', async (arg: any) => {
         const {isDenied} = await Swal.fire({
             icon: 'success',
             showDenyButton: true,
@@ -431,10 +429,10 @@
             title: arg[0],
         })
         if(!isDenied){
-            ipcRenderer.send("getextention", arg[1])
+            window.api.send("getextention", arg[1])
         }
         else{
-            ipcRenderer.send("getextention", 'none')
+            window.api.send("getextention", 'none')
         }
     })
 
@@ -452,17 +450,17 @@
         const kas = (document.getElementById('folder_input') as HTMLInputElement).value
         if(_mode == 0){
             const a = {
-                dir: Buffer.from(kas.replace('\\','/'), "utf8").toString('base64')
+                dir: window.nodeBuffer.toBase64(kas.replace('\\','/'))
             };
             running = true
-            ipcRenderer.send('extract', _.merge({}, a, config));
+            window.api.send('extract', {...a, ...config});
         }
         else if(_mode == 1){
             const a = {
-                dir: Buffer.from(kas.replace('\\','/'), "utf8").toString('base64')
+                dir: window.nodeBuffer.toBase64(kas.replace('\\','/'))
             };
             running = true
-            ipcRenderer.send('apply', _.merge({}, a, config));
+            window.api.send('apply', {...a, ...config});
         }
     }
     
@@ -475,7 +473,7 @@
             return
         }
         const dir = (document.getElementById('folder_input') as HTMLInputElement).value.replaceAll('\\','/')
-        ipcRenderer.send('openLLMSettings', { dir: dir, game: 'mv' });
+        window.api.send('openLLMSettings', { dir: dir, game: 'mv' });
     }
 
     document.getElementById('llmCompare')!.onclick = () => {
@@ -484,7 +482,7 @@
             Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' })
             return
         }
-        ipcRenderer.send('openLLMCompare', dir);
+        window.api.send('openLLMCompare', dir);
     }
 
     document.getElementById('jsonVerify')!.onclick = () => {
@@ -493,7 +491,7 @@
             Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' })
             return
         }
-        ipcRenderer.send('openJsonVerify', dir);
+        window.api.send('openJsonVerify', dir);
     }
     
     
@@ -532,9 +530,9 @@
             showDenyButton: true,
             denyButtonText: `취소`,
             didOpen: () => {
-                document.getElementById('swi1')!.onclick = () => ipcRenderer.send('select_folder', 'swi1');
-                document.getElementById('swi3')!.onclick = () => ipcRenderer.send('select_folder', 'swi3');
-                document.getElementById('swi2')!.onclick = () => ipcRenderer.send('select_folder', 'swi2');
+                document.getElementById('swi1')!.onclick = () => window.api.send('select_folder', 'swi1');
+                document.getElementById('swi3')!.onclick = () => window.api.send('select_folder', 'swi3');
+                document.getElementById('swi2')!.onclick = () => window.api.send('select_folder', 'swi2');
             },
             preConfirm: () => {
               return [
@@ -555,16 +553,16 @@
                     const kas2 = formValues[1]
                     const kas3 = formValues[2]
                     const a = {
-                        dir1: _.merge({}, {dir: Buffer.from(kas.replace('\\','/'), "utf8").toString('base64')}, config),
-                        dir2: _.merge({}, {dir: Buffer.from(kas2.replace('\\','/'), "utf8").toString('base64')}, config),
-                        dir3: _.merge({}, {dir: Buffer.from(kas3.replace('\\','/'), "utf8").toString('base64')}, config),
+                        dir1: {...{dir: window.nodeBuffer.toBase64(kas.replace('\\','/'))}, ...config},
+                        dir2: {...{dir: window.nodeBuffer.toBase64(kas2.replace('\\','/'))}, ...config},
+                        dir3: {...{dir: window.nodeBuffer.toBase64(kas3.replace('\\','/'))}, ...config},
                         dir1_base: kas,
                         dir2_base: kas2,
                         dir3_base: kas3,
                         config: config
                     };
                     running = true
-                    ipcRenderer.send('updateVersion', a);
+                    window.api.send('updateVersion', a);
                 }
             }
         }
@@ -594,7 +592,7 @@
         })
         if (result.isConfirmed) {
             running = true
-            ipcRenderer.send('selFont', (document.getElementById('folder_input') as HTMLInputElement).value)
+            window.api.send('selFont', (document.getElementById('folder_input') as HTMLInputElement).value)
         } else if (result.isDenied) {
             let { value: result2 } = await Swal.fire({
                 title: '폰트 크기 입력',
@@ -612,7 +610,7 @@
             })
             if(result2){
                 running = true
-                ipcRenderer.send('changeFontSize', [(document.getElementById('folder_input') as HTMLInputElement).value, parseInt(result2)])
+                window.api.send('changeFontSize', [(document.getElementById('folder_input') as HTMLInputElement).value, parseInt(result2)])
             }
     
         }

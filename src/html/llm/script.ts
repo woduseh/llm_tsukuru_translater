@@ -1,9 +1,7 @@
 (() => {
-    const { ipcRenderer } = require('electron');
-
     let settings: { [key: string]: any } = {};
 
-    ipcRenderer.on('llmSettings', (ev: any, arg: any) => {
+    window.api.on('llmSettings', (arg: any) => {
         settings = arg;
         (document.getElementById('sortOrder') as HTMLSelectElement).value = settings.llmSortOrder || 'name-asc';
 
@@ -28,10 +26,10 @@
             llmSortOrder: (document.getElementById('sortOrder') as HTMLSelectElement).value,
             llmTranslationMode: (document.getElementById('translationMode') as HTMLSelectElement).value
         };
-        ipcRenderer.send('llmSettingsApply', data);
+        window.api.send('llmSettingsApply', data);
     };
 
     document.getElementById('cancelBtn')!.onclick = () => {
-        ipcRenderer.send('llmSettingsClose');
+        window.api.send('llmSettingsClose');
     };
 })();
