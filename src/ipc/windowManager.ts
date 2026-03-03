@@ -3,13 +3,14 @@ import fs from 'fs';
 import path from 'path';
 import tools from '../js/libs/projectTools'
 import Themes from '../js/rpgmv/styles'
-import { getMainWindow, sendAlert, sendError, worked, loadSettings, setOPath, defaultHeight, setMainId } from './shared';
+import { loadSettings, setOPath, defaultHeight, storage } from './shared';
 import { loadRoute } from './viteHelper';
-import { appCtx } from '../appContext';
+import { AppContext } from '../appContext';
+import { PROJECT_ROOT } from '../projectRoot';
 
-export function createWindow() {
-  loadSettings()
-  setOPath()
+export function createWindow(ctx: AppContext) {
+  loadSettings(ctx)
+  setOPath(ctx)
   const mainWindow = new BrowserWindow({
     width: 800,
     height: defaultHeight,
@@ -23,7 +24,7 @@ export function createWindow() {
       sandbox: false,
       preload: path.join(__dirname, '..', 'preload.js')
     },
-    icon: path.join(__dirname, '../../res/icon.png')
+    icon: path.join(PROJECT_ROOT, 'res', 'icon.png')
   })
   
   mainWindow.setMenu(null)
@@ -43,89 +44,90 @@ export function createWindow() {
       });
     }
   });
-  setMainId(mainWindow.id);
-  appCtx.mainWindow = mainWindow
+  ctx.mainWindow = mainWindow
   mainWindow.on('close', () => {
     app.quit()
   })
-  tools.init()
+  tools.init(ctx)
 }
 
-ipcMain.on('mainReady', () => {
-  appCtx.settings.themeData = (Themes as Record<string, Record<string, string>>)[appCtx.settings.theme]
-  const { llmApiKey, ...safeSettings } = appCtx.settings;
-  getMainWindow().webContents.send('getGlobalSettings', safeSettings);
-})
-
-ipcMain.on('license', () => {
-  const licenseWindow = new BrowserWindow({
-    width: 800,
-    height: 400,
-    resizable: true,
-    autoHideMenuBar: true,
-    icon: path.join(__dirname, '../../res/icon.png')
+export function registerWindowHandlers(ctx: AppContext) {
+  ipcMain.on('mainReady', () => {
+    ctx.settings.themeData = (Themes as Record<string, Record<string, string>>)[ctx.settings.theme]
+    const { llmApiKey, ...safeSettings } = ctx.settings;
+    ctx.mainWindow!.webContents.send('getGlobalSettings', safeSettings);
   })
-  licenseWindow.setMenu(null)
-  licenseWindow.loadFile('src/html/license.html')
-  licenseWindow.show()
-})
 
-ipcMain.on('changeURL', (ev, arg) => {
-  loadRoute(appCtx.mainWindow!, arg);
-})
+  ipcMain.on('license', () => {
+    const licenseWindow = new BrowserWindow({
+      width: 800,
+      height: 400,
+      resizable: true,
+      autoHideMenuBar: true,
+      icon: path.join(PROJECT_ROOT, 'res', 'icon.png')
+    })
+    licenseWindow.setMenu(null)
+    licenseWindow.loadFile('src/html/license.html')
+    licenseWindow.show()
+  })
 
-ipcMain.on('minimize', () => {
-  getMainWindow().minimize()
-})
+  ipcMain.on('changeURL', (ev, arg) => {
+    loadRoute(ctx.mainWindow!, arg);
+  })
 
-ipcMain.on('close', () => {
-  getMainWindow().close()
-})
+  ipcMain.on('minimize', () => {
+    ctx.mainWindow!.minimize()
+  })
 
-ipcMain.on('setheight', (ev,arg) =>{
-  appCtx.mainWindow!.setResizable(true);
-  appCtx.mainWindow!.setSize(800, arg, false)
-  appCtx.mainWindow!.setResizable(false)
-})
+  ipcMain.on('close', () => {
+    ctx.mainWindow!.close()
+  })
 
-ipcMain.on('app_version', (event) => {
-  event.sender.send('app_version', { version: app.getVersion() });
-});
+  ipcMain.on('setheight', (ev,arg) =>{
+    ctx.mainWindow!.setResizable(true);
+    ctx.mainWindow!.setSize(800, arg, false)
+    ctx.mainWindow!.setResizable(false)
+  })
 
-ipcMain.on('select_folder', async (ev, typeo) => {
-  let Path = await dialog.showOpenDialog({
-    properties: ['openDirectory']
+  ipcMain.on('app_version', (event) => {
+    event.sender.send('app_version', { version: app.getVersion() });
   });
-  if(!Path.canceled){
-    const qs = Path.filePaths[0]
-    let qv
-    if(qs.includes('\\')){
-      qv = qs.split('\\')[qs.split('\\').length-1]
-    }
-    else{
-      qv = qs.split('/')[qs.split('/').length-1]
-    }
-    let dir = qs
-    if(qv === 'data'){
-      getMainWindow().webContents.send('set_path', {type:typeo, dir:dir});
-      getMainWindow().webContents.send('set-allowed-paths', [dir]);
-    }
-    else{
-      if(fs.existsSync(path.join(qs, 'www', 'data'))){
-        getMainWindow().webContents.send('set_path', {type:typeo, dir:path.join(qs, 'www', 'data')});
-        getMainWindow().webContents.send('set-allowed-paths', [path.join(qs, 'www', 'data')]);
-      }
-      else if(fs.existsSync(path.join(qs, 'data'))){
-        getMainWindow().webContents.send('set_path', {type:typeo, dir:path.join(qs, 'data')});
-        getMainWindow().webContents.send('set-allowed-paths', [path.join(qs, 'data')]);
-      }
-      else if(fs.existsSync(path.join(qs, 'Data.wolf'))){
-        getMainWindow().webContents.send('set_path', {type:typeo, dir:path.join(qs)});
-        getMainWindow().webContents.send('set-allowed-paths', [path.join(qs)]);
+
+  ipcMain.on('select_folder', async (ev, typeo) => {
+    let Path = await dialog.showOpenDialog({
+      properties: ['openDirectory']
+    });
+    if(!Path.canceled){
+      const qs = Path.filePaths[0]
+      let qv
+      if(qs.includes('\\')){
+        qv = qs.split('\\')[qs.split('\\').length-1]
       }
       else{
-        getMainWindow().webContents.send('alert', {icon: 'error',  message:'폴더가 올바르지 않습니다'});
+        qv = qs.split('/')[qs.split('/').length-1]
+      }
+      let dir = qs
+      if(qv === 'data'){
+        ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:dir});
+        ctx.mainWindow!.webContents.send('set-allowed-paths', [dir]);
+      }
+      else{
+        if(fs.existsSync(path.join(qs, 'www', 'data'))){
+          ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:path.join(qs, 'www', 'data')});
+          ctx.mainWindow!.webContents.send('set-allowed-paths', [path.join(qs, 'www', 'data')]);
+        }
+        else if(fs.existsSync(path.join(qs, 'data'))){
+          ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:path.join(qs, 'data')});
+          ctx.mainWindow!.webContents.send('set-allowed-paths', [path.join(qs, 'data')]);
+        }
+        else if(fs.existsSync(path.join(qs, 'Data.wolf'))){
+          ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:path.join(qs)});
+          ctx.mainWindow!.webContents.send('set-allowed-paths', [path.join(qs)]);
+        }
+        else{
+          ctx.mainWindow!.webContents.send('alert', {icon: 'error',  message:'폴더가 올바르지 않습니다'});
+        }
       }
     }
-  }
-});
+  });
+}

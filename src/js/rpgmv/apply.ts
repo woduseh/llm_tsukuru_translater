@@ -6,15 +6,15 @@ import yaml from 'js-yaml';
 import { sleep } from './globalutils';
 import Tools from '../libs/projectTools';
 import log from '../../logger';
-import { readTextFile } from '../libs/fileIO';
-import { appCtx } from '../../appContext';
+import { readTextFile, writeTextFile } from '../libs/fileIO';
+import { AppContext } from '../../appContext';
 
 import type { ApplyArg } from './types';
 
 function getBinarySize(string: string) {
     return Buffer.byteLength(string, 'utf8');
 }
-export const apply = async (ev: unknown, arg: ApplyArg) => {
+export const apply = async (ev: unknown, arg: ApplyArg, ctx: AppContext) => {
     try {
       const dir = (Buffer.from(arg.dir, "base64").toString('utf8'));
       if (! fs.existsSync(dir + '/Extract')){
@@ -28,13 +28,12 @@ export const apply = async (ev: unknown, arg: ApplyArg) => {
         return
       }
       if(!arg.instantapply){
-        if (fs.existsSync(dir + '/.Completed')){
-          fs.rmSync(dir + '/Completed', { recursive: true })
+        const completedDir = dir + '/Completed'
+        if (fs.existsSync(completedDir)){
+          fs.rmSync(completedDir, { recursive: true })
         }
-        if (!fs.existsSync(dir + '/.Completed')){
-          fs.mkdirSync(dir + '/Completed/data', { recursive: true })
-          fs.mkdirSync(dir + '/Completed/js', { recursive: true })
-        }
+        fs.mkdirSync(completedDir + '/data', { recursive: true })
+        fs.mkdirSync(completedDir + '/js', { recursive: true })
       }
       const jsdir = ((dir.substring(0,dir.length-5) + '/js').replaceAll('//','/'))
       let ext_data = edTool.read(dir)
@@ -107,10 +106,10 @@ export const apply = async (ev: unknown, arg: ApplyArg) => {
         if(i == 'ext_plugins.json'){
           const vaq = `var $plugins = ${JSON.stringify(data)};`
           if(arg.instantapply){
-            fs.writeFileSync(jsdir + '/plugins.js', vaq,'utf8')
+            writeTextFile(jsdir + '/plugins.js', vaq)
           }
           else{
-            fs.writeFileSync(dir + '/Completed/js/plugins.js', vaq,'utf8')
+            writeTextFile(dir + '/Completed/js/plugins.js', vaq)
           }
         }
         else if(i == 'ExternMsgcsv.json'){
@@ -125,8 +124,8 @@ export const apply = async (ev: unknown, arg: ApplyArg) => {
           const fdir = arg.instantapply ? path.join(dir, i) : path.join(dir,'Completed','data',i)
           const fdir2 = arg.instantapply ? path.join(dir, `${i}.yaml`) : path.join(dir,'Completed','data', `${i}.yaml`)
           const fd = arg.useYaml ? fdir2 : fdir
-          const dataJson = arg.useYaml ? yaml.dump(data) : JSON.stringify(data, null, 4*Number(appCtx.settings.JsonChangeLine))
-          fs.writeFileSync(fd, dataJson,'utf8')
+          const dataJson = arg.useYaml ? yaml.dump(data) : JSON.stringify(data, null, 4*Number(ctx.settings.JsonChangeLine))
+          writeTextFile(fd, dataJson)
           if(arg.useYaml && fs.existsSync(fdir)){
             fs.rmSync(fdir)
           }

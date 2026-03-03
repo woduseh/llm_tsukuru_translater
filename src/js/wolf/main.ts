@@ -8,12 +8,12 @@ import { wolfAppyier } from "./apply/applyWolf";
 import { getAllFileInDir } from "../../utils";
 import { wolfDecrypt } from "./extract/decrypter";
 import Tools from '../libs/projectTools';
-import { appCtx } from '../../appContext';
+import { AppContext } from '../../appContext';
 
-export async function wolfInit() {
+export function registerWolfHandlers(ctx: AppContext) {
     ipcMain.on('wolf_ext', async (ev, arg:{folder:string,config:{[key:string]:boolean}}) => {
         try {
-          appCtx.WolfMetadata = {
+          ctx.WolfMetadata = {
             ver:-1
           }
           let dir = arg.folder
@@ -27,22 +27,22 @@ export async function wolfInit() {
           }
           if(!fs.existsSync(dir)){
             Tools.sendError('지정된 디렉토리가 없습니다');
-            worked()
+            worked(ctx)
             return
           }
           if((path.parse(dir).name !== 'data' && (!fs.existsSync(path.join(dir, 'Data.wolf')))) && (!arg.config.force)){
             Tools.sendError('data 폴더가 아닙니다');
-            worked()
+            worked(ctx)
             return
           }
 
-          appCtx.sourceDir  = arg.folder
-          appCtx.WolfExtData = []
+          ctx.sourceDir  = arg.folder
+          ctx.WolfExtData = []
           const encrypted = getAllFileInDir(path.dirname(dir), '.wolf')
           if(encrypted.length > 0){
-            const d = await wolfDecrypt(encrypted)
+            const d = await wolfDecrypt(encrypted, ctx)
             if(!d){
-              worked()
+              worked(ctx)
             }
           }
           if(path.parse(dir).name !== 'data'){
@@ -53,14 +53,14 @@ export async function wolfInit() {
               dir = path.join(dir, 'data')
             }
           }
-          await extractWolfFolder(dir, arg.config)
-          await makeText()
+          await extractWolfFolder(dir, arg.config, ctx)
+          await makeText(ctx)
           Tools.send('alert2');
-          worked()
+          worked(ctx)
         }
         catch(err){
           Tools.sendError(JSON.stringify(err, Object.getOwnPropertyNames(err)));
-          worked()
+          worked(ctx)
         }
     })
     ipcMain.on('wolf_apply',  async (ev, arg:{folder:string,config:{[key:string]:boolean}}) => {
@@ -68,22 +68,22 @@ export async function wolfInit() {
         const dir = arg.folder
         if(!fs.existsSync(dir)){
           Tools.sendError('지정된 디렉토리가 없습니다');
-          worked()
+          worked(ctx)
           return
         }
         if(path.parse(dir).name !== 'data' && (!arg.config.force)){
           Tools.sendError('data 폴더가 아닙니다');
-          worked()
+          worked(ctx)
           return
         }
-        appCtx.sourceDir  = arg.folder
-        appCtx.WolfExtData = []
-        await wolfAppyier()
+        ctx.sourceDir  = arg.folder
+        ctx.WolfExtData = []
+        await wolfAppyier(ctx)
         Tools.send('alert2');
-        worked()
+        worked(ctx)
       } catch(err){
         Tools.sendError(JSON.stringify(err, Object.getOwnPropertyNames(err)));
-        worked()
+        worked(ctx)
       }
     })
 }

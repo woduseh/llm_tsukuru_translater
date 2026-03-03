@@ -1,7 +1,11 @@
 import axios from 'axios';
 import { hanguls } from '../rpgmv/datas';
 import * as crypto from 'crypto';
-import { appCtx } from '../../appContext';
+import {
+    API_BACKOFF_BASE_MS, API_BACKOFF_MAX_MS,
+    VALIDATION_RETRY_BASE_MS, VALIDATION_RETRY_MAX_MS,
+    RATE_LIMIT_DELAY_MS, DEFAULT_API_TIMEOUT_SEC
+} from './constants';
 
 const SEPARATOR_REGEX = /^--- 101 ---$/;
 
@@ -50,6 +54,7 @@ interface GeminiConfig {
     maxRetries: number;
     maxApiRetries: number;
     timeout: number;
+    isAborted?: () => boolean;
 }
 
 export function splitIntoBlocks(content: string): { separator: string; lines: string[] }[] {
@@ -305,7 +310,7 @@ export class GeminiTranslator {
         let processedBlocks = 0;
         for (let ci = 0; ci < chunks.length; ci++) {
             // Check abort flag between chunks
-            if (appCtx.llmAbort) break;
+            if (this.config.isAborted?.()) break;
 
             const chunk = chunks[ci];
             const chunkText = reassembleBlocks(chunk);
@@ -346,7 +351,7 @@ export class GeminiTranslator {
             let success = false;
 
             while (!success && retries <= maxRetries) {
-                if (appCtx.llmAbort) break;
+                if (this.config.isAborted?.()) break;
                 try {
                     let translated = await this.translateText(chunkText);
                     // Normalize trailing newline to match original
@@ -387,7 +392,7 @@ export class GeminiTranslator {
                     } else if (isRetryableApiError(error) && apiRetries < maxApiRetries) {
                         apiRetries++;
                         logData.retries++;
-                        const backoffMs = Math.min(2000 * Math.pow(2, apiRetries - 1), 60000);
+                        const backoffMs = Math.min(API_BACKOFF_BASE_MS * Math.pow(2, apiRetries - 1), API_BACKOFF_MAX_MS);
                         console.log(`API error on chunk ${ci}, backoff ${backoffMs}ms (${apiRetries}/${maxApiRetries})...`);
                         logData.errors.push(`Chunk ${ci}: API retry ${apiRetries} (${String(error).substring(0, 100)})`);
                         await new Promise(r => setTimeout(r, backoffMs));
@@ -410,7 +415,7 @@ export class GeminiTranslator {
                         } else {
                             retries++;
                             logData.retries++;
-                            const backoffMs = Math.min(2000 * Math.pow(2, retries), 30000);
+                            const backoffMs = Math.min(VALIDATION_RETRY_BASE_MS * Math.pow(2, retries), VALIDATION_RETRY_MAX_MS);
                             await new Promise(r => setTimeout(r, backoffMs));
                         }
                     }
@@ -430,7 +435,7 @@ export class GeminiTranslator {
 
             // Rate limit delay between chunks
             if (ci < chunks.length - 1) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
             }
         }
 
@@ -440,12 +445,12 @@ export class GeminiTranslator {
             translatedContent: reassembleBlocks(allTranslatedBlocks),
             validation: allValidations,
             logEntry: logData,
-            aborted: !!appCtx.llmAbort
+            aborted: !!this.config.isAborted?.()
         };
     }
 }
 
-export function createGeminiTranslator(settings: Record<string, any>, sourceLang: string, targetLang = 'ko'): GeminiTranslator {
+export function createGeminiTranslator(settings: Record<string, any>, sourceLang: string, targetLang = 'ko', isAborted?: () => boolean): GeminiTranslator {
     return new GeminiTranslator({
         apiKey: settings.llmApiKey,
         model: settings.llmModel,
@@ -457,6 +462,7 @@ export function createGeminiTranslator(settings: Record<string, any>, sourceLang
         doNotTransHangul: settings.DoNotTransHangul,
         maxRetries: settings.llmMaxRetries ?? 2,
         maxApiRetries: settings.llmMaxApiRetries ?? 5,
-        timeout: (settings.llmTimeout || 600) * 1000
+        timeout: (settings.llmTimeout || DEFAULT_API_TIMEOUT_SEC) * 1000,
+        isAborted
     });
 }

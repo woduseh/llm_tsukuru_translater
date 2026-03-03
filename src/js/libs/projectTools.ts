@@ -1,5 +1,4 @@
-import { rmBom } from './fileIO';
-import { appCtx } from '../../appContext';
+import { AppContext } from '../../appContext';
 
 interface PTools{
     send: (channel: string, ...args: unknown[]) => void;
@@ -7,24 +6,24 @@ interface PTools{
     sendError: (txt: string) => void;
     sendAlert: (txt: string) => void;
     worked: () => void;
-    init: () => void;
+    init: (ctx: AppContext) => void;
 }
 
 
-function INIT(){
+function INIT(ctx: AppContext){
     pTools = {
         send: (channel: string, ...args: unknown[]) => {
-            appCtx.mainWindow!.webContents.send(channel, ...args);
+            ctx.mainWindow!.webContents.send(channel, ...args);
         },
         sendError: (txt:string) => {
-            appCtx.mainWindow!.webContents.send('alert', {icon: 'error',  message: txt});
+            ctx.mainWindow!.webContents.send('alert', {icon: 'error',  message: txt});
         },
         sendAlert: (txt:string) => {
-            appCtx.mainWindow!.webContents.send('alert', txt);
+            ctx.mainWindow!.webContents.send('alert', txt);
         },
         worked: () => {
-            appCtx.mainWindow!.webContents.send('worked', 0);
-            appCtx.mainWindow!.webContents.send('loading', 0);
+            ctx.mainWindow!.webContents.send('worked', 0);
+            ctx.mainWindow!.webContents.send('loading', 0);
         },
         init: () => {}
     }
@@ -52,7 +51,6 @@ const Tools = {
         pTools.send('loading', (now / max) * multiplier);
     },
     init: INIT,
-    rmBom
 }
 
 

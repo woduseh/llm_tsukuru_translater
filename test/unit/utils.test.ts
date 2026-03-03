@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
-import { rmBom, getAllFileInDir, decodeEncoding } from '../../src/utils';
+import { rmBom } from '../../src/js/libs/fileIO';
+import { getAllFileInDir, decodeEncoding } from '../../src/utils';
+import { appCtx } from '../../src/appContext';
 
 describe('rmBom', () => {
   it('removes BOM from string that starts with BOM', () => {
@@ -30,44 +32,40 @@ describe('rmBom', () => {
 
 describe('decodeEncoding', () => {
   beforeEach(() => {
-    (globalThis as any).WolfMetadata = { ver: -1 };
-  });
-
-  afterEach(() => {
-    delete (globalThis as any).WolfMetadata;
+    appCtx.WolfMetadata = { ver: -1 };
   });
 
   it('decodes as Shift_JIS when WolfMetadata.ver is 2', () => {
-    (globalThis as any).WolfMetadata = { ver: 2 };
+    appCtx.WolfMetadata = { ver: 2 };
     // 0x82 0xB1 0x82 0xF1 0x82 0xC9 0x82 0xBF 0x82 0xCD = "こんにちは" in Shift_JIS
     const buf = new Uint8Array([0x82, 0xB1, 0x82, 0xF1, 0x82, 0xC9, 0x82, 0xBF, 0x82, 0xCD]);
-    const result = decodeEncoding(buf);
+    const result = decodeEncoding(buf, appCtx.WolfMetadata);
     expect(result).toBe('こんにちは');
   });
 
   it('decodes ASCII bytes as Shift_JIS when ver is 2', () => {
-    (globalThis as any).WolfMetadata = { ver: 2 };
+    appCtx.WolfMetadata = { ver: 2 };
     const buf = new Uint8Array([0x48, 0x65, 0x6c, 0x6c, 0x6f]);
-    expect(decodeEncoding(buf)).toBe('Hello');
+    expect(decodeEncoding(buf, appCtx.WolfMetadata)).toBe('Hello');
   });
 
   it('decodes as UTF-8 when WolfMetadata.ver is not 2', () => {
-    (globalThis as any).WolfMetadata = { ver: 3 };
+    appCtx.WolfMetadata = { ver: 3 };
     const buf = new Uint8Array([0x48, 0x65, 0x6c]);
-    expect(decodeEncoding(buf)).toBe('Hel');
+    expect(decodeEncoding(buf, appCtx.WolfMetadata)).toBe('Hel');
   });
 
   it('decodes as UTF-8 when WolfMetadata.ver is -1', () => {
-    (globalThis as any).WolfMetadata = { ver: -1 };
+    appCtx.WolfMetadata = { ver: -1 };
     const buf = new Uint8Array([0x41, 0x42, 0x43]);
-    expect(decodeEncoding(buf)).toBe('ABC');
+    expect(decodeEncoding(buf, appCtx.WolfMetadata)).toBe('ABC');
   });
 
   it('decodes UTF-8 multibyte characters when ver is 3', () => {
-    (globalThis as any).WolfMetadata = { ver: 3 };
+    appCtx.WolfMetadata = { ver: 3 };
     // "가" in UTF-8 is 0xEA 0xB0 0x80
     const buf = new Uint8Array([0xEA, 0xB0, 0x80]);
-    expect(decodeEncoding(buf)).toBe('가');
+    expect(decodeEncoding(buf, appCtx.WolfMetadata)).toBe('가');
   });
 });
 

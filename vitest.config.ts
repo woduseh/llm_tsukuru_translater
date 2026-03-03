@@ -11,4 +11,7 @@ export default defineConfig({
       exclude: ['src/**/*.js', 'src/html/**', 'src/types/**'],
     },
   },
+  resolve: {
+    extensions: ['.ts', '.tsx', '.mts', '.js', '.mjs', '.jsx', '.json'],
+  },
 });

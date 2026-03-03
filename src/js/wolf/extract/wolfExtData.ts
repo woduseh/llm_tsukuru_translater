@@ -1,21 +1,30 @@
 import { writeFileSync, readFileSync } from 'fs'
 import zlib from 'zlib'
 import {encode, decode} from '@msgpack/msgpack'
-import { appCtx } from '../../../appContext';
+import { FileIOError } from '../../libs/fileIO';
+import { AppContext } from '../../../appContext';
 
 const WolfExtDataParser = {
-    create: (dir:string)=>{
-        writeFileSync(dir,zlib.deflateSync(Buffer.from(encode({
-            ext: appCtx.WolfExtData,
-            cache: appCtx.WolfCache,
-            meta: appCtx.WolfMetadata
-        }))))
+    create: (dir:string, ctx: AppContext)=>{
+        try {
+            writeFileSync(dir,zlib.deflateSync(Buffer.from(encode({
+                ext: ctx.WolfExtData,
+                cache: ctx.WolfCache,
+                meta: ctx.WolfMetadata
+            }))))
+        } catch (err) {
+            throw new FileIOError(`Wolf 추출 데이터를 쓸 수 없습니다: ${dir}`, dir, 'write', err);
+        }
     },
-    read:(dir:string) =>{
-        const ca =  decode(zlib.inflateSync(readFileSync(dir))) as { ext: extData[]; meta: wolfMetadata; cache: Record<string, Buffer> }
-        appCtx.WolfExtData = ca.ext
-        appCtx.WolfMetadata = ca.meta
-        appCtx.WolfCache = ca.cache
+    read:(dir:string, ctx: AppContext) =>{
+        try {
+            const ca =  decode(zlib.inflateSync(readFileSync(dir))) as { ext: extData[]; meta: wolfMetadata; cache: Record<string, Buffer> }
+            ctx.WolfExtData = ca.ext
+            ctx.WolfMetadata = ca.meta
+            ctx.WolfCache = ca.cache
+        } catch (err) {
+            throw new FileIOError(`Wolf 추출 데이터를 읽을 수 없습니다: ${dir}`, dir, 'read', err);
+        }
     }
 }
 

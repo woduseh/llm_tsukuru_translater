@@ -201,8 +201,9 @@ describe('repairJson', () => {
   });
 });
 
+import { getAtPath, setAtPath } from '../../src/js/rpgmv/verify';
+
 describe('getAtPath / setAtPath', () => {
-  const { getAtPath, setAtPath } = require('../../src/js/rpgmv/verify');
 
   it('navigates dot paths', () => {
     const obj = { a: { b: { c: 42 } } };

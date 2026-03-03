@@ -1,23 +1,23 @@
 import { WolfCmd, WolfMapEvent, WolfParserIo } from "./io";
-import { appCtx } from '../../../appContext';
+import { AppContext } from '../../../appContext';
 
-export function wolfExtractMap(data:Buffer){
+export function wolfExtractMap(data:Buffer, ctx: AppContext){
     const io = new WolfParserIo(data)
     const magic = io.readBytes(20)
     if (!io.byteArrayCompare(magic, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 87, 79, 76, 70, 77, 0, 85, 0, 0, 0])){
         if(io.byteArrayCompare(magic,[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 87, 79, 76, 70,77, 0, 0,  0,  0,  0])){
-            appCtx.WolfMetadata.ver = 2
+            ctx.WolfMetadata.ver = 2
         }
         else{
             throw new Error('Unvalid 1')
         }
     }
     else{
-        appCtx.WolfMetadata.ver = 3
+        ctx.WolfMetadata.ver = 3
     }
     const len = io.readU4le()
     const check = io.readU1()
-    if(appCtx.WolfMetadata.ver === 2){
+    if(ctx.WolfMetadata.ver === 2){
         if (!(check == 101)) {
             throw new Error('Unvalid 2')
         }
@@ -49,7 +49,7 @@ export function wolfExtractMap(data:Buffer){
     }
 }
 
-export function wolfExtractCommon(data:Buffer){
+export function wolfExtractCommon(data:Buffer, ctx: AppContext){
     const io = new WolfParserIo(data)
     const magic = io.readBytes(10)
     if (!io.byteArrayCompare(magic, [0, 87, 0, 0, 79, 76, 85, 70, 67,  0])){
@@ -62,11 +62,11 @@ export function wolfExtractCommon(data:Buffer){
     const check = io.readU1();
     if (!(check === 144)) {
         if(check === 143){
-            appCtx.WolfMetadata.ver = 2
+            ctx.WolfMetadata.ver = 2
         }
     }
     else{
-        appCtx.WolfMetadata.ver = 3
+        ctx.WolfMetadata.ver = 3
     }
     const eventsLen = io.readU4le();
     let events:WolfCmd[] = [];

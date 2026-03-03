@@ -3,6 +3,7 @@ import { removeSync } from "fs-extra";
 import path from "path";
 import { checkExtention, ExtentionPath } from "../../libs/extentions";
 import Tools from '../../libs/projectTools';
+import { AppContext } from '../../../appContext';
 
 const Decrypter = path.join(ExtentionPath, 'wolfdec.exe')
 
@@ -17,8 +18,8 @@ function DecryptFile(file:string) {
 }
 
 
-export async function wolfDecrypt(files:string[]) {
-    if(await checkExtention('wolfdec')){
+export async function wolfDecrypt(files:string[], ctx: AppContext) {
+    if(await checkExtention('wolfdec', ctx)){
         Tools.send('loadingTag', `복호화 중`);
         let i=0;
         for(const file of files){
