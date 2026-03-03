@@ -29,6 +29,8 @@ interface NodeBuffer {
 interface Verify {
   verifyJsonIntegrity: (orig: unknown, trans: unknown) => unknown[]
   repairJson: (orig: unknown, trans: unknown) => unknown
+  getAtPath: (obj: unknown, path: string) => unknown
+  setAtPath: (obj: unknown, path: string, value: unknown) => boolean
 }
 
 declare global {

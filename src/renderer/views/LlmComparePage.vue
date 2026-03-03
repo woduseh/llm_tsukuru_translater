@@ -47,9 +47,9 @@
           <div v-for="(block, i) in origBlocks" :key="i"
             class="block" :class="blockStatus(i)"
             :ref="el => setOrigBlockRef(i, el as HTMLElement)">
-            <label class="select-indicator" @click.stop="toggleSelection(i)">
+            <div class="select-indicator" @click.stop="toggleSelection(i)">
               <input type="checkbox" :checked="selectedBlocks.has(i)" tabindex="-1" @click.prevent>
-            </label>
+            </div>
             <div v-if="block.sep" class="sep-label">{{ block.sep }}</div>
             <pre>{{ block.lines.join('\n') }}</pre>
             <span class="line-count">{{ block.lines.length }}줄</span>
@@ -98,6 +98,7 @@ const editedTransLines = reactive<Record<number, number>>({})
 const saveStatus = ref('')
 const retranslating = ref(false)
 const isDirty = ref(false)
+const loading = ref(true)
 let dataDir = ''
 
 const origBlocksEl = ref<HTMLElement | null>(null)
@@ -109,6 +110,7 @@ function setOrigBlockRef(i: number, el: HTMLElement | null) {
 }
 
 const summaryHtml = computed(() => {
+  if (loading.value) return '<span class="summary-loading">⏳ 파일 비교 중...</span>'
   if (files.value.length === 0) return '<span class="summary-error">비교할 파일이 없습니다.</span>'
   const mc = files.value.filter(f => f.mismatch).length
   const uc = files.value.filter(f => f.untranslated).length
@@ -142,6 +144,7 @@ function checkMismatch(origLines: string[], transLines: string[]): boolean {
 }
 
 function loadFiles(dir: string) {
+  loading.value = true
   dataDir = dir
   const wolfExtDir = window.nodePath.join(dir, '_Extract', 'Texts')
   const wolfBkDir = wolfExtDir + '_backup'
@@ -154,7 +157,7 @@ function loadFiles(dir: string) {
     extractDir = mvExtDir; backupDir = mvBkDir
   }
   files.value = []
-  if (!window.nodeFs.existsSync(extractDir) || !window.nodeFs.existsSync(backupDir)) return
+  if (!window.nodeFs.existsSync(extractDir) || !window.nodeFs.existsSync(backupDir)) { loading.value = false; return }
 
   const transFiles: string[] = window.nodeFs.readdirSync(extractDir).filter((f: string) => f.endsWith('.txt'))
   for (const name of transFiles) {
@@ -170,6 +173,7 @@ function loadFiles(dir: string) {
   selectedBlocks.value = new Set()
   updateFilteredFiles()
   renderBlocks()
+  loading.value = false
 }
 
 function updateFilteredFiles() {
@@ -211,7 +215,9 @@ function blockStatus(i: number): string {
 
 function onBlockEdit(i: number, event: Event) {
   const ta = event.target as HTMLTextAreaElement
-  editedTransLines[i] = ta.value.split('\n').length
+  const newLines = ta.value.split('\n')
+  transBlocks.value[i].lines = newLines
+  editedTransLines[i] = newLines.length
   isDirty.value = true
   dirty[files.value[currentIdx.value].name] = true
   saveStatus.value = ''
@@ -238,16 +244,13 @@ function syncScroll(source: 'orig' | 'trans') {
 function saveFile() {
   if (files.value.length === 0) return
   const f = files.value[currentIdx.value]
-  const tb = splitBlocks(window.nodeFs.readFileSync(f.transPath, 'utf-8').split('\n'))
-  const textareas = document.querySelectorAll('.block-editor') as NodeListOf<HTMLTextAreaElement>
-  textareas.forEach((ta, idx) => { if (idx < tb.length) tb[idx].lines = ta.value.split('\n') })
   const parts: string[] = []
-  for (const block of tb) { if (block.sep) parts.push(block.sep); parts.push(...block.lines) }
+  for (const block of transBlocks.value) { if (block.sep) parts.push(block.sep); parts.push(...block.lines) }
   window.nodeFs.writeFileSync(f.transPath, parts.join('\n'), 'utf-8')
-  const origLines = window.nodeFs.readFileSync(f.origPath, 'utf-8').split('\n')
-  const newTransLines = window.nodeFs.readFileSync(f.transPath, 'utf-8').split('\n')
-  f.mismatch = checkMismatch(origLines, newTransLines)
-  f.untranslated = window.nodeFs.readFileSync(f.origPath, 'utf-8') === window.nodeFs.readFileSync(f.transPath, 'utf-8')
+  const origContent = window.nodeFs.readFileSync(f.origPath, 'utf-8')
+  const transContent = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+  f.mismatch = checkMismatch(origContent.split('\n'), transContent.split('\n'))
+  f.untranslated = origContent === transContent
   dirty[f.name] = false
   isDirty.value = false
   saveStatus.value = '저장됨 ✓'
@@ -432,4 +435,5 @@ pre { margin: 0; white-space: pre-wrap; word-break: break-all; font-size: 12px; 
 :deep(.summary-warn) { color: #f1fa8c; }
 :deep(.summary-ok) { color: #50fa7b; }
 :deep(.summary-total) { opacity: 0.4; }
+:deep(.summary-loading) { color: #8be9fd; }
 </style>
