@@ -1,8 +1,9 @@
 import { BrowserWindow } from "electron"
+import { AppSettings } from "./src/types/settings"
 
 export declare global {
     var mwindow:BrowserWindow
-    var settings:{[key:string]: any}
+    var settings:AppSettings
     var settingsWindow:BrowserWindow
     var keyvalue:CryptoKey|undefined
     var oPath:string

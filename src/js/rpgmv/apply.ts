@@ -125,7 +125,7 @@ export const apply = async (ev: any, arg: any) => {
           const fdir = arg.instantapply ? path.join(dir, i) : path.join(dir,'Completed','data',i)
           const fdir2 = arg.instantapply ? path.join(dir, `${i}.yaml`) : path.join(dir,'Completed','data', `${i}.yaml`)
           const fd = arg.useYaml ? fdir2 : fdir
-          const dataJson = arg.useYaml ? yaml.dump(data) : JSON.stringify(data, null, 4*globalThis.settings.JsonChangeLine)
+          const dataJson = arg.useYaml ? yaml.dump(data) : JSON.stringify(data, null, 4*Number(globalThis.settings.JsonChangeLine))
           fs.writeFileSync(fd, dataJson,'utf8')
           if(arg.useYaml && fs.existsSync(fdir)){
             fs.rmSync(fdir)
