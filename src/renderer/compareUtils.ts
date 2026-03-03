@@ -31,11 +31,19 @@ export function checkMismatch(origLines: string[], transLines: string[]): boolea
   return false
 }
 
+/**
+ * Regex matching at least one translatable character (alphabet, CJK, Korean, Japanese kana).
+ * Blocks containing only special characters/numbers are not considered translatable.
+ */
+const TRANSLATABLE_RE = /[a-zA-Z\u3000-\u9FFF\uF900-\uFAFF\uAC00-\uD7AF\u3040-\u309F\u30A0-\u30FF]/
+
 /** Whether a block is untranslated (orig and trans content are identical). */
 export function isBlockUntranslated(origBlock: Block, transBlock: Block): boolean {
   if (!origBlock || !transBlock) return false
   if (origBlock.lines.length !== transBlock.lines.length) return false
-  return origBlock.lines.every((line, i) => line === transBlock.lines[i])
+  if (!origBlock.lines.every((line, i) => line === transBlock.lines[i])) return false
+  // Identical blocks are only "untranslated" if they contain translatable text
+  return origBlock.lines.some(line => TRANSLATABLE_RE.test(line))
 }
 
 /**

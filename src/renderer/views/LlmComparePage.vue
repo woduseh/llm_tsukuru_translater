@@ -1,5 +1,11 @@
 <template>
   <div class="compare-layout">
+    <!-- Loading overlay -->
+    <div v-if="busy" class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">{{ busyMessage }}</div>
+    </div>
+
     <!-- Left: File list -->
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -18,6 +24,7 @@
           <span v-if="dirty[item.file.name]" class="badge badge-dirty">수정됨</span>
           <span v-if="item.file.mismatch" class="badge badge-error">불일치</span>
           <span v-if="item.file.untranslated" class="badge badge-untranslated">미번역</span>
+          <span v-if="!item.file.mismatch && !item.file.untranslated" class="badge badge-ok">정상</span>
         </div>
       </div>
     </aside>
@@ -29,8 +36,8 @@
         <div class="nav-buttons">
           <button @click="navigateFile(-1)" title="이전 문제 파일">◀ 파일</button>
           <button @click="navigateFile(1)" title="다음 문제 파일">파일 ▶</button>
-          <button @click="navigateBlock(-1)" title="이전 불일치 블록">◀ 블록</button>
-          <button @click="navigateBlock(1)" title="다음 불일치 블록">블록 ▶</button>
+          <button :disabled="!hasProblems" @click="navigateBlock(-1)" title="이전 불일치 블록">◀ 블록</button>
+          <button :disabled="!hasProblems" @click="navigateBlock(1)" title="다음 불일치 블록">블록 ▶</button>
         </div>
         <div class="toolbar-separator"></div>
         <div class="action-group">
@@ -38,8 +45,10 @@
           <span class="selection-count">{{ selectedBlocks.size > 0 ? `${selectedBlocks.size}개 선택` : '' }}</span>
           <button :disabled="selectedBlocks.size === 0" @click="autoFixSelected"
             title="선택 블록 자동 수정: 빈줄 추가/제거, 구분자 수정">선택 블록 자동 수정</button>
-          <button :disabled="files.length === 0" @click="autoFixAll"
-            title="전체 불일치 블록 자동 수정: 빈줄 추가/제거, 구분자 수정">전체 불일치 자동 수정</button>
+          <button :disabled="files.length === 0" @click="autoFixCurrentFile"
+            title="현재 파일의 모든 불일치 블록 자동 수정: 빈줄 추가/제거, 구분자 수정">파일 불일치 자동 수정</button>
+          <button :disabled="files.length === 0" @click="autoFixAllMapFiles"
+            title="모든 Map***.txt 파일의 불일치 블록 자동 수정 (Map 파일만 안전하게 자동 수정 가능)">전체 불일치 자동 수정</button>
         </div>
         <div class="toolbar-separator"></div>
         <div class="action-group">
@@ -122,6 +131,8 @@ const saveStatus = ref('')
 const retranslating = ref(false)
 const isDirty = ref(false)
 const loading = ref(true)
+const busy = ref(false)
+const busyMessage = ref('')
 let dataDir = ''
 
 const origBlocksEl = ref<HTMLElement | null>(null)
@@ -137,6 +148,14 @@ function setTransBlockRef(i: number, el: HTMLElement | null) {
 }
 
 const hasUntranslatedBlocks = computed(() => untranslatedBlocks.value.size > 0)
+
+/** Whether the current file has any problem blocks (mismatch or untranslated). */
+const hasProblems = computed(() => {
+  for (let i = 0; i < origBlocks.value.length; i++) {
+    if (blockClass(i) !== 'ok') return true
+  }
+  return false
+})
 
 const summaryHtml = computed(() => {
   if (loading.value) return '<span class="summary-loading">⏳ 파일 비교 중...</span>'
@@ -164,6 +183,8 @@ function checkFileUntranslated(origContent: string, transContent: string): boole
 
 function loadFiles(dir: string) {
   loading.value = true
+  busy.value = true
+  busyMessage.value = '파일 비교 중...'
   dataDir = dir
   const wolfExtDir = window.nodePath.join(dir, '_Extract', 'Texts')
   const wolfBkDir = wolfExtDir + '_backup'
@@ -176,7 +197,7 @@ function loadFiles(dir: string) {
     extractDir = mvExtDir; backupDir = mvBkDir
   }
   files.value = []
-  if (!window.nodeFs.existsSync(extractDir) || !window.nodeFs.existsSync(backupDir)) { loading.value = false; return }
+  if (!window.nodeFs.existsSync(extractDir) || !window.nodeFs.existsSync(backupDir)) { loading.value = false; busy.value = false; return }
 
   const transFiles: string[] = window.nodeFs.readdirSync(extractDir).filter((f: string) => f.endsWith('.txt'))
   for (const name of transFiles) {
@@ -193,6 +214,7 @@ function loadFiles(dir: string) {
   updateFilteredFiles()
   renderBlocks()
   loading.value = false
+  busy.value = false
 }
 
 function updateFilteredFiles() {
@@ -278,7 +300,7 @@ function autoFixSelected() {
   }
 }
 
-function autoFixAll() {
+function autoFixCurrentFile() {
   let count = 0
   for (let i = 0; i < origBlocks.value.length; i++) {
     if (autoFixBlock(origBlocks.value[i], transBlocks.value[i])) {
@@ -291,6 +313,44 @@ function autoFixAll() {
     dirty[files.value[currentIdx.value].name] = true
     saveStatus.value = `${count}개 블록 자동 수정됨`
     nextTick(syncBlockHeights)
+  }
+}
+
+/** Auto-fix + save all Map***.txt files. Other files are skipped due to higher error risk. */
+function autoFixAllMapFiles() {
+  const MAP_RE = /^Map\d+\.txt$/i
+  busy.value = true
+  busyMessage.value = '전체 Map 파일 자동 수정 중...'
+  let totalFixed = 0, filesFixed = 0
+  try {
+    for (let fi = 0; fi < files.value.length; fi++) {
+      const f = files.value[fi]
+      if (!MAP_RE.test(f.name) || !f.mismatch) continue
+      const ob = splitBlocks(window.nodeFs.readFileSync(f.origPath, 'utf-8').split('\n'))
+      const tb = splitBlocks(window.nodeFs.readFileSync(f.transPath, 'utf-8').split('\n'))
+      let count = 0
+      for (let i = 0; i < ob.length; i++) {
+        if (autoFixBlock(ob[i], tb[i])) count++
+      }
+      if (count > 0) {
+        const parts: string[] = []
+        for (const block of tb) { if (block.sep) parts.push(block.sep); parts.push(...block.lines) }
+        window.nodeFs.writeFileSync(f.transPath, parts.join('\n'), 'utf-8')
+        const origContent = window.nodeFs.readFileSync(f.origPath, 'utf-8')
+        const transContent = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+        f.mismatch = checkMismatch(origContent.split('\n'), transContent.split('\n'))
+        f.untranslated = checkFileUntranslated(origContent, transContent)
+        totalFixed += count
+        filesFixed++
+      }
+    }
+    saveStatus.value = filesFixed > 0
+      ? `${filesFixed}개 Map 파일, ${totalFixed}개 블록 자동 수정 완료`
+      : '수정할 Map 파일이 없습니다'
+    updateFilteredFiles()
+    renderBlocks()
+  } finally {
+    busy.value = false
   }
 }
 
@@ -325,19 +385,29 @@ function syncScroll(source: 'orig' | 'trans') {
 
 function saveFile() {
   if (files.value.length === 0) return
-  const f = files.value[currentIdx.value]
-  const parts: string[] = []
-  for (const block of transBlocks.value) { if (block.sep) parts.push(block.sep); parts.push(...block.lines) }
-  window.nodeFs.writeFileSync(f.transPath, parts.join('\n'), 'utf-8')
-  const origContent = window.nodeFs.readFileSync(f.origPath, 'utf-8')
-  const transContent = window.nodeFs.readFileSync(f.transPath, 'utf-8')
-  f.mismatch = checkMismatch(origContent.split('\n'), transContent.split('\n'))
-  f.untranslated = checkFileUntranslated(origContent, transContent)
-  dirty[f.name] = false
-  isDirty.value = false
-  saveStatus.value = '저장됨 ✓'
-  updateFilteredFiles()
-  renderBlocks()
+  busy.value = true
+  busyMessage.value = '저장 중...'
+  try {
+    const f = files.value[currentIdx.value]
+    const parts: string[] = []
+    for (const block of transBlocks.value) { if (block.sep) parts.push(block.sep); parts.push(...block.lines) }
+    window.nodeFs.writeFileSync(f.transPath, parts.join('\n'), 'utf-8')
+    const origContent = window.nodeFs.readFileSync(f.origPath, 'utf-8')
+    const transContent = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+    f.mismatch = checkMismatch(origContent.split('\n'), transContent.split('\n'))
+    f.untranslated = checkFileUntranslated(origContent, transContent)
+    dirty[f.name] = false
+    isDirty.value = false
+    saveStatus.value = '저장됨 ✓'
+    updateFilteredFiles()
+    renderBlocks()
+    // Auto-navigate to next problem file if current has no issues
+    if (!f.mismatch && !f.untranslated) {
+      navigateFile(1)
+    }
+  } finally {
+    busy.value = false
+  }
 }
 
 function retranslateFile() {
@@ -443,7 +513,22 @@ function onKeydown(e: KeyboardEvent) {
 </script>
 
 <style scoped>
-.compare-layout { display: flex; height: 100vh; }
+.compare-layout { display: flex; height: 100vh; position: relative; }
+
+/* Loading overlay */
+.loading-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5); z-index: 100;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+}
+.loading-spinner {
+  width: 36px; height: 36px; border: 3px solid rgba(255,255,255,0.15);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 13px; color: var(--mainColor); opacity: 0.8; }
+
 .sidebar { width: 240px; border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; }
 .sidebar-header { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
 .search-input {
@@ -464,16 +549,18 @@ function onKeydown(e: KeyboardEvent) {
 .badge-error { background: rgba(255,85,85,0.2); color: #ff5555; }
 .badge-dirty { background: rgba(241,250,140,0.2); color: #f1fa8c; }
 .badge-untranslated { background: rgba(139,233,253,0.15); color: #8be9fd; }
+.badge-ok { background: rgba(80,250,123,0.15); color: #50fa7b; }
 
 .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .toolbar {
   padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.06);
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; overflow-x: auto;
+  flex-shrink: 0;
 }
-.summary { font-size: 12px; }
+.summary { font-size: 12px; white-space: nowrap; }
 .toolbar-separator { width: 1px; height: 20px; background: rgba(255,255,255,0.1); flex-shrink: 0; }
-.nav-buttons { display: flex; gap: 3px; align-items: center; }
-.action-group { display: flex; gap: 3px; align-items: center; }
+.nav-buttons { display: flex; gap: 3px; align-items: center; flex-shrink: 0; }
+.action-group { display: flex; gap: 3px; align-items: center; flex-shrink: 0; }
 .group-label { font-size: 9px; opacity: 0.35; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 .nav-buttons button, .action-group button {
   padding: 3px 8px; font-size: 11px; background: var(--Highlight1);
@@ -482,14 +569,16 @@ function onKeydown(e: KeyboardEvent) {
 }
 .nav-buttons button:hover, .action-group button:hover { background: rgba(255,255,255,0.08); }
 .nav-buttons button:disabled, .action-group button:disabled { opacity: 0.3; cursor: default; }
-.selection-count { font-size: 10px; opacity: 0.5; }
-.save-status { font-size: 11px; opacity: 0.6; }
+.selection-count { font-size: 10px; opacity: 0.5; white-space: nowrap; }
+.save-status { font-size: 11px; opacity: 0.6; white-space: nowrap; }
 
 .blocks-container { flex: 1; display: flex; overflow: hidden; }
 .blocks-col { flex: 1; overflow-y: auto; padding: 8px; }
 .col-header {
-  font-size: 11px; font-weight: 700; opacity: 0.4; padding: 4px 8px;
-  position: sticky; top: 0; background: var(--background); z-index: 1;
+  font-size: 11px; font-weight: 700; opacity: 0.4; padding: 4px 8px 6px;
+  position: sticky; top: 0; background: var(--background); z-index: 2;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 4px;
 }
 .block {
   margin-bottom: 4px; padding: 8px 10px; border-radius: 6px; position: relative;
