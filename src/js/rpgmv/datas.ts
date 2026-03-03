@@ -1,7 +1,8 @@
+import { AppSettings } from '../../types/settings'
 
 const styles = require('./styles').default
 
-export const settings = {
+export const settings: AppSettings = {
     extractJs: false,
     extractSomeScript: false,
     extractSomeScript2: [],

@@ -1,0 +1,31 @@
+export interface AppSettings {
+  extractJs: boolean;
+  extractSomeScript: boolean;
+  extractSomeScript2: string[];
+  code122: boolean;
+  onefile_src: boolean;
+  onefile_note: boolean;
+  exJson: boolean;
+  loadingText: boolean;
+  JsonChangeLine: boolean;
+  ExtractAddLine: boolean;
+  oneMapFile: boolean;
+  ExternMsgJson: boolean;
+  DoNotTransHangul: boolean;
+  formatNice: boolean;
+  theme: string;
+  themeData: Record<string, any>;
+  extractPlus: number[];
+  themeList: string[];
+  language: string;
+  HideExtractAll: boolean;
+  llmApiKey: string;
+  llmModel: string;
+  llmCustomPrompt: string;
+  llmChunkSize: number;
+  llmTranslationUnit: string;
+  llmTargetLang: string;
+  llmSourceLang?: string;
+  version?: string;
+  [key: string]: any;
+}

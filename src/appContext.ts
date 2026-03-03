@@ -1,9 +1,10 @@
 import { BrowserWindow } from 'electron';
+import { AppSettings } from './types/settings';
 
 export interface AppContextType {
   mainWindow: BrowserWindow | null;
   settingsWindow: BrowserWindow | null;
-  settings: Record<string, any>;
+  settings: AppSettings;
   gb: Record<string, any>;
   externMsg: Record<string, any>;
   useExternMsg: boolean;
@@ -23,7 +24,7 @@ export interface AppContextType {
 export const appCtx: AppContextType = {
   mainWindow: null,
   settingsWindow: null,
-  settings: {},
+  settings: {} as AppSettings,
   gb: {},
   externMsg: {},
   useExternMsg: false,

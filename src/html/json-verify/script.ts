@@ -258,7 +258,7 @@
             const trans = JSON.parse(transData);
             const repaired = window.verify.repairJson(orig, trans);
 
-            const indent = 4 * (globalThis.settings?.JsonChangeLine || 0);
+            const indent = 4 * Number(globalThis.settings?.JsonChangeLine || 0);
             const output = JSON.stringify(repaired, null, indent);
 
             // 실제 저장
