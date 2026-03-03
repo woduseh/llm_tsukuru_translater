@@ -19,14 +19,14 @@ function DecryptFile(file:string) {
 
 export async function wolfDecrypt(files:string[]) {
     if(await checkExtention('wolfdec')){
-        globalThis.mwindow.webContents.send('loadingTag', `복호화 중`);
+        Tools.send('loadingTag', `복호화 중`);
         let i=0;
         for(const file of files){
             Tools.setProgress(i, files.length)
             await DecryptFile(file)
             i+=1
         }
-        globalThis.mwindow.webContents.send('loadingTag', ``);
+        Tools.send('loadingTag', ``);
         return true
     }
     else{

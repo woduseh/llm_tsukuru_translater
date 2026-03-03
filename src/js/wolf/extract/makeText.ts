@@ -54,6 +54,6 @@ export default async function makeText(){
     for(const key in texts){
         fs.writeFileSync(path.join(extTextDir, 'Texts',`${key}.txt`),texts[key].join('\n'), 'utf-8')
     }
-    globalThis.mwindow.webContents.send('loading', 0);
+    Tools.send('loading', 0);
     WolfExtDataParser.create(path.join(extTextDir, '.extracteddata'))
 }
