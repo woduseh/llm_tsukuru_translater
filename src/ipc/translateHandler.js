@@ -55,7 +55,7 @@ electron_1.ipcMain.on('openLLMSettings', (ev, arg) => {
     }
     llmSettingsWindow = new electron_1.BrowserWindow({
         width: 550,
-        height: 300,
+        height: 420,
         resizable: true,
         show: false,
         autoHideMenuBar: true,

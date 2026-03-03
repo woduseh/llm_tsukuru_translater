@@ -162,11 +162,20 @@ async function openVersionUp() {
     html: `
       <div style="text-align:left;font-size:13px;">
         <label style="display:block;margin-bottom:4px;">구버전 번역본 폴더</label>
-        <input id="swal-old-trans" class="swal2-input" placeholder="구버전 번역된 data 폴더">
-        <label style="display:block;margin-bottom:4px;margin-top:8px;">구버전 미번역 폴더</label>
-        <input id="swal-old-orig" class="swal2-input" placeholder="구버전 원본 data 폴더">
-        <label style="display:block;margin-bottom:4px;margin-top:8px;">신버전 폴더</label>
-        <input id="swal-new" class="swal2-input" placeholder="신버전 data 폴더">
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
+          <input id="swal-old-trans" class="swal2-input" style="flex:1;margin:0;" placeholder="구버전 번역된 data 폴더" readonly>
+          <button type="button" id="btn-old-trans" class="swal2-confirm swal2-styled" style="padding:6px 14px;font-size:12px;margin:0;">찾아보기</button>
+        </div>
+        <label style="display:block;margin-bottom:4px;">구버전 미번역 폴더</label>
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
+          <input id="swal-old-orig" class="swal2-input" style="flex:1;margin:0;" placeholder="구버전 원본 data 폴더" readonly>
+          <button type="button" id="btn-old-orig" class="swal2-confirm swal2-styled" style="padding:6px 14px;font-size:12px;margin:0;">찾아보기</button>
+        </div>
+        <label style="display:block;margin-bottom:4px;">신버전 폴더</label>
+        <div style="display:flex;gap:6px;">
+          <input id="swal-new" class="swal2-input" style="flex:1;margin:0;" placeholder="신버전 data 폴더" readonly>
+          <button type="button" id="btn-new" class="swal2-confirm swal2-styled" style="padding:6px 14px;font-size:12px;margin:0;">찾아보기</button>
+        </div>
       </div>
     `,
     focusConfirm: false,
@@ -181,17 +190,17 @@ async function openVersionUp() {
       }
     },
     didOpen: (popup: HTMLElement) => {
-      const makeSelectable = (inputId: string) => {
-        const input = popup.querySelector(`#${inputId}`) as HTMLInputElement
-        if (input) {
-          input.addEventListener('click', () => {
+      const bindBrowse = (btnId: string, inputId: string) => {
+        const btn = popup.querySelector(`#${btnId}`) as HTMLButtonElement
+        if (btn) {
+          btn.addEventListener('click', () => {
             api.send('select_folder', inputId)
           })
         }
       }
-      makeSelectable('swal-old-trans')
-      makeSelectable('swal-old-orig')
-      makeSelectable('swal-new')
+      bindBrowse('btn-old-trans', 'swal-old-trans')
+      bindBrowse('btn-old-orig', 'swal-old-orig')
+      bindBrowse('btn-new', 'swal-new')
     },
   })
   if (formValues) {
