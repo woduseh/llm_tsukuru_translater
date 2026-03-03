@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { hanguls } from '../rpgmv/datas';
 import * as crypto from 'crypto';
+import { appCtx } from '../../appContext';
 
 const SEPARATOR_REGEX = /^--- 101 ---$/;
 
@@ -304,7 +305,7 @@ export class GeminiTranslator {
         let processedBlocks = 0;
         for (let ci = 0; ci < chunks.length; ci++) {
             // Check abort flag between chunks
-            if (globalThis.llmAbort) break;
+            if (appCtx.llmAbort) break;
 
             const chunk = chunks[ci];
             const chunkText = reassembleBlocks(chunk);
@@ -345,7 +346,7 @@ export class GeminiTranslator {
             let success = false;
 
             while (!success && retries <= maxRetries) {
-                if (globalThis.llmAbort) break;
+                if (appCtx.llmAbort) break;
                 try {
                     let translated = await this.translateText(chunkText);
                     // Normalize trailing newline to match original
@@ -439,7 +440,7 @@ export class GeminiTranslator {
             translatedContent: reassembleBlocks(allTranslatedBlocks),
             validation: allValidations,
             logEntry: logData,
-            aborted: !!globalThis.llmAbort
+            aborted: !!appCtx.llmAbort
         };
     }
 }

@@ -5,6 +5,7 @@ import tools from '../js/libs/projectTools'
 import Themes from '../js/rpgmv/styles'
 import { getMainWindow, sendAlert, sendError, worked, loadSettings, setOPath, defaultHeight, setMainId } from './shared';
 import { loadRoute } from './viteHelper';
+import { appCtx } from '../appContext';
 
 export function createWindow() {
   loadSettings()
@@ -43,7 +44,7 @@ export function createWindow() {
     }
   });
   setMainId(mainWindow.id);
-  globalThis.mwindow = mainWindow
+  appCtx.mainWindow = mainWindow
   mainWindow.on('close', () => {
     app.quit()
   })
@@ -51,8 +52,8 @@ export function createWindow() {
 }
 
 ipcMain.on('mainReady', () => {
-  globalThis.settings.themeData = (Themes as Record<string, Record<string, string>>)[globalThis.settings.theme]
-  const { llmApiKey, ...safeSettings } = globalThis.settings;
+  appCtx.settings.themeData = (Themes as Record<string, Record<string, string>>)[appCtx.settings.theme]
+  const { llmApiKey, ...safeSettings } = appCtx.settings;
   getMainWindow().webContents.send('getGlobalSettings', safeSettings);
 })
 
@@ -70,7 +71,7 @@ ipcMain.on('license', () => {
 })
 
 ipcMain.on('changeURL', (ev, arg) => {
-  loadRoute(globalThis.mwindow, arg);
+  loadRoute(appCtx.mainWindow!, arg);
 })
 
 ipcMain.on('minimize', () => {
@@ -82,9 +83,9 @@ ipcMain.on('close', () => {
 })
 
 ipcMain.on('setheight', (ev,arg) =>{
-  globalThis.mwindow.setResizable(true);
-  globalThis.mwindow.setSize(800, arg, false)
-  globalThis.mwindow.setResizable(false)
+  appCtx.mainWindow!.setResizable(true);
+  appCtx.mainWindow!.setSize(800, arg, false)
+  appCtx.mainWindow!.setResizable(false)
 })
 
 ipcMain.on('app_version', (event) => {

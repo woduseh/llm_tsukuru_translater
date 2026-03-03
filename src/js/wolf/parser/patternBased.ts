@@ -1,23 +1,24 @@
 import { lenStr } from "../../../../globals"
 import { WolfCmd, WolfMapEvent, WolfParserIo } from "./io"
+import { appCtx } from '../../../appContext';
 
 export function wolfExtractMapPattern(data:Buffer){
     const io = new WolfParserIo(data)
     const magic = io.readBytes(20)
     if (!io.byteArrayCompare(magic, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 87, 79, 76, 70, 77, 0, 85, 0, 0, 0])){
         if(io.byteArrayCompare(magic,[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 87, 79, 76, 70,77, 0, 0,  0,  0,  0])){
-            globalThis.WolfMetadata.ver = 2
+            appCtx.WolfMetadata.ver = 2
         }
         else{
             throw 'Unvalid 1'
         }
     }
     else{
-        globalThis.WolfMetadata.ver = 3
+        appCtx.WolfMetadata.ver = 3
     }
     const len = io.readU4le()
     const check = io.readU1()
-    if(globalThis.WolfMetadata.ver === 2){
+    if(appCtx.WolfMetadata.ver === 2){
         if (!(check == 101)) {
             throw 'Unvalid 2'
         }

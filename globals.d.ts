@@ -1,24 +1,6 @@
-import { BrowserWindow } from "electron"
-import { AppSettings } from "./src/types/settings"
-import { ExtractedFileData } from "./src/js/rpgmv/types"
 import { VerifyIssue } from "./src/js/rpgmv/verify"
 
 export declare global {
-    var mwindow:BrowserWindow
-    var settings:AppSettings
-    var settingsWindow:BrowserWindow
-    var oPath:string
-    var sourceDir:string
-    var gb:Record<string, ExtractedFileData>
-    var externMsg:Record<string, string>
-    var useExternMsg:boolean
-    var externMsgKeys:string[]
-    var llmAbort:boolean
-    var loadEn:() => void
-    var WolfExtData: extData[]
-    var WolfCache: {[key:string]:Buffer}
-    var WolfMetadata: wolfMetadata
-
     interface Window {
         api: {
             send: (channel: string, ...args: unknown[]) => void;

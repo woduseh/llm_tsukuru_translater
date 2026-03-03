@@ -4,9 +4,10 @@ import * as edTool from '../js/rpgmv/edtool.js';
 import Themes from '../js/rpgmv/styles'
 import { getMainWindow, sendError, worked, getSettings, storage } from './shared';
 import { loadRoute } from './viteHelper';
+import { appCtx } from '../appContext';
 
 ipcMain.on('settings', () => {
-  globalThis.settingsWindow = new BrowserWindow({
+  appCtx.settingsWindow = new BrowserWindow({
     width: 800,
     height: 900,
     resizable: true,
@@ -20,34 +21,34 @@ ipcMain.on('settings', () => {
     },
     icon: path.join(__dirname, '../../res/icon.png'),
   })
-  globalThis.settingsWindow.setMenu(null)
-  loadRoute(globalThis.settingsWindow, '/settings')
-  globalThis.settingsWindow.webContents.on('did-finish-load', function () {
-    globalThis.settingsWindow.show();
+  appCtx.settingsWindow.setMenu(null)
+  loadRoute(appCtx.settingsWindow, '/settings')
+  appCtx.settingsWindow.webContents.on('did-finish-load', function () {
+    appCtx.settingsWindow!.show();
   });
 })
 
 ipcMain.on('settingsReady', () => {
-  if (globalThis.settingsWindow && !globalThis.settingsWindow.isDestroyed()) {
-    globalThis.settingsWindow.webContents.send('settings', getSettings());
+  if (appCtx.settingsWindow && !appCtx.settingsWindow.isDestroyed()) {
+    appCtx.settingsWindow.webContents.send('settings', getSettings());
   }
 })
 
 ipcMain.on('applysettings', (ev, arg) => {
-  globalThis.settings = {...globalThis.settings, ...arg}
-  storage.set('settings', JSON.stringify(globalThis.settings))
-  globalThis.settings.themeData = (Themes as Record<string, Record<string, string>>)[globalThis.settings.theme]
-  const { llmApiKey, ...safeSettings } = globalThis.settings;
+  appCtx.settings = {...appCtx.settings, ...arg}
+  storage.set('settings', JSON.stringify(appCtx.settings))
+  appCtx.settings.themeData = (Themes as Record<string, Record<string, string>>)[appCtx.settings.theme]
+  const { llmApiKey, ...safeSettings } = appCtx.settings;
   getMainWindow().webContents.send('getGlobalSettings', safeSettings);
-  if (globalThis.settingsWindow && !globalThis.settingsWindow.isDestroyed()) {
-    globalThis.settingsWindow.close()
+  if (appCtx.settingsWindow && !appCtx.settingsWindow.isDestroyed()) {
+    appCtx.settingsWindow.close()
   }
   worked()
 })
 
 ipcMain.on('closesettings', () => {
-  if (globalThis.settingsWindow && !globalThis.settingsWindow.isDestroyed()) {
-    globalThis.settingsWindow.close()
+  if (appCtx.settingsWindow && !appCtx.settingsWindow.isDestroyed()) {
+    appCtx.settingsWindow.close()
   }
   worked()
 })
@@ -58,7 +59,7 @@ ipcMain.on('gamePatcher', (ev, dir) => {
     worked()
     return
   }
-  globalThis.settingsWindow = new BrowserWindow({
+  appCtx.settingsWindow = new BrowserWindow({
     width: 800,
     height: 400,
     resizable: false,
@@ -72,14 +73,14 @@ ipcMain.on('gamePatcher', (ev, dir) => {
     },
     icon: path.join(__dirname, '../../res/icon.png'),
   })
-  globalThis.settingsWindow.setMenu(null)
-  loadRoute(globalThis.settingsWindow, '/game-patcher')
-  globalThis.settingsWindow.webContents.on('did-finish-load', function () {
-    globalThis.settingsWindow.show();
-    globalThis.settingsWindow.webContents.send('settings', getSettings());
+  appCtx.settingsWindow.setMenu(null)
+  loadRoute(appCtx.settingsWindow, '/game-patcher')
+  appCtx.settingsWindow.webContents.on('did-finish-load', function () {
+    appCtx.settingsWindow!.show();
+    appCtx.settingsWindow!.webContents.send('settings', getSettings());
   });
-  globalThis.settingsWindow.on('close', function() {
+  appCtx.settingsWindow.on('close', function() {
     worked()
   });
-  globalThis.settingsWindow.show()
+  appCtx.settingsWindow!.show()
 })

@@ -4,6 +4,7 @@ import { app, ipcMain } from "electron";
 import { existsSync, mkdir, mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { sleep } from "../rpgmv/globalutils";
+import { appCtx } from '../../appContext';
 
 // TODO: populate with actual hash after first verified download
 const WOLFDEC_SHA256 = '';
@@ -31,7 +32,7 @@ export function initExtentions(){
                     console.log(`WolfDec.exe SHA-256: ${hash}`)
                     if (WOLFDEC_SHA256 && hash !== WOLFDEC_SHA256) {
                         console.error(`WolfDec.exe hash mismatch: expected ${WOLFDEC_SHA256}, got ${hash}`)
-                        mwindow.webContents.send('alert', 'WolfDec.exe download integrity check failed. The file may be corrupted or tampered with.')
+                        appCtx.mainWindow!.webContents.send('alert', 'WolfDec.exe download integrity check failed. The file may be corrupted or tampered with.')
                         acceptedExt = false
                         break
                     }
@@ -39,7 +40,7 @@ export function initExtentions(){
                     writeFileSync(filePath, v)
                 } catch (e: unknown) {
                     console.error('Failed to download WolfDec.exe:', (e as Error).message || e)
-                    mwindow.webContents.send('alert', 'Failed to download WolfDec.exe. Please check your internet connection.')
+                    appCtx.mainWindow!.webContents.send('alert', 'Failed to download WolfDec.exe. Please check your internet connection.')
                     acceptedExt = false
                 }
                 break
@@ -63,11 +64,11 @@ export async function checkExtention(param:'wolfdec') {
     }
 
     if(!isInstalled){
-        if(globalThis.settings.language === 'ko'){
-            mwindow.webContents.send('alertExten', [`${parKo[param]}에는 확장 설치가 필요합니다. 설치하시겠습니까?`,param])
+        if(appCtx.settings.language === 'ko'){
+            appCtx.mainWindow!.webContents.send('alertExten', [`${parKo[param]}에는 확장 설치가 필요합니다. 설치하시겠습니까?`,param])
         }
         else{
-            mwindow.webContents.send('alertExten', [`${parEn[param]} requires an extension installation. Do you want to install it?`,param])
+            appCtx.mainWindow!.webContents.send('alertExten', [`${parEn[param]} requires an extension installation. Do you want to install it?`,param])
         }
         gExt = false
         while(!gExt){

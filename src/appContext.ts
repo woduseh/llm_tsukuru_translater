@@ -17,7 +17,6 @@ export interface AppContextType {
   WolfExtData: extData[];  // extData from globals.d.ts
   WolfCache: Record<string, Buffer>;
   WolfMetadata: { ver: 2 | 3 | -1 };
-  [key: string]: unknown;
 }
 
 export const appCtx: AppContextType = {
@@ -37,34 +36,6 @@ export const appCtx: AppContextType = {
   WolfMetadata: { ver: -1 },
 };
 
-// Backward compat: sync globalThis with appCtx for gradual migration
-function syncToGlobal() {
-  const g = globalThis as Record<string, unknown>;
-  const propertyMap: Record<string, keyof AppContextType> = {
-    mwindow: 'mainWindow',
-    settingsWindow: 'settingsWindow',
-    settings: 'settings',
-    gb: 'gb',
-    externMsg: 'externMsg',
-    useExternMsg: 'useExternMsg',
-    externMsgKeys: 'externMsgKeys',
-    llmAbort: 'llmAbort',
-    oPath: 'oPath',
-    sourceDir: 'sourceDir',
-    loadEn: 'loadEn',
-    WolfExtData: 'WolfExtData',
-    WolfCache: 'WolfCache',
-    WolfMetadata: 'WolfMetadata',
-  };
-  for (const [globalName, ctxName] of Object.entries(propertyMap)) {
-    Object.defineProperty(g, globalName, {
-      get: () => (appCtx as Record<string, unknown>)[ctxName],
-      set: (v: unknown) => { (appCtx as Record<string, unknown>)[ctxName] = v; },
-      configurable: true
-    });
-  }
-}
-
 export function initAppContext() {
-  syncToGlobal();
+  // No-op — kept for backward compatibility with main.ts call
 }

@@ -1,10 +1,11 @@
 import path from 'path'
 import fs from 'fs'
 import iconv from 'iconv-lite'
+import { appCtx } from './appContext'
 export { rmBom } from './js/libs/fileIO'
 
 export function decodeEncoding(buffer:Uint8Array){
-    if(globalThis.WolfMetadata.ver === 2){
+    if(appCtx.WolfMetadata.ver === 2){
         return iconv.decode(Buffer.from(buffer), "Shift_JIS")
     }
     else{

@@ -49,9 +49,9 @@ const CONTROL_PATTERNS = [
 ];
 
 // ── 줄밀림 감지용 패턴 ──
-const PLACEHOLDER_RE = /^---\s*\d+\s*---$/;
-const NAME_BRACKET_FULL_RE = /^【.+】$/;
-const NAME_BRACKET_PARTIAL_RE = /【.*】/;
+const PLACEHOLDER_RE = /^-{3,}\s*(\d+\s*)?-{3,}$|^-{5,}$/;
+const NAME_BRACKET_FULL_RE = /^[【\[].+[】\]]$/;
+const NAME_BRACKET_PARTIAL_RE = /[【\[][^】\]]+[】\]]/;
 
 function getType(v: unknown): string {
     if (v === null || v === undefined) return 'null';
@@ -113,21 +113,6 @@ function checkControlChars(orig: string, trans: string, path: string, issues: Ve
     }
 }
 
-// warn 정책 문자열에서 플러그인 태그 구조가 보존되었는지 확인
-// <TagName ...> 패턴의 태그 이름이 원본과 번역본에서 동일하면 안전한 번역으로 간주
-function hasPreservedTagStructure(orig: string, trans: string): boolean {
-    const tagPattern = /<\/?([A-Za-z_][A-Za-z0-9_]*)/g;
-    const origTags: string[] = [];
-    const transTags: string[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = tagPattern.exec(orig)) !== null) origTags.push(m[1]);
-    tagPattern.lastIndex = 0;
-    while ((m = tagPattern.exec(trans)) !== null) transTags.push(m[1]);
-    if (origTags.length === 0) return false;
-    if (origTags.length !== transTags.length) return false;
-    return origTags.every((t, i) => t === transTags[i]);
-}
-
 function getParamPolicy(code: number, paramIndex: number): StringPolicy {
     if (TRANSLATABLE_CODES.has(code)) return 'allow';
     if (code === 101) return paramIndex === 4 ? 'allow' : 'deny';
@@ -160,7 +145,7 @@ function checkTextShift(origStr: string, transStr: string, path: string, issues:
         }
     }
 
-    // 2. 이름 태그 괄호(【】) 보존 검사
+    // 2. 이름 태그 괄호(【】 또는 []) 보존 검사
     if (NAME_BRACKET_FULL_RE.test(origStr.trim())) {
         if (!NAME_BRACKET_PARTIAL_RE.test(transStr)) {
             issues.push({
@@ -272,11 +257,6 @@ function verifyEventCommand(orig: Record<string, unknown>, trans: Record<string,
             if (issues.length >= MAX_ISSUES) break;
             const policy = getParamPolicy(code, i);
             verifyJsonIntegrity(origParams[i], transParams[i], `${path}.parameters[${i}]`, issues, policy);
-            // 번역 허용 코드(401, 405)의 문자열 파라미터에 대해 줄밀림 검사
-            if ((code === 401 || code === 405) && policy === 'allow' &&
-                typeof origParams[i] === 'string' && typeof transParams[i] === 'string') {
-                checkTextShift(origParams[i] as string, transParams[i] as string, `${path}.parameters[${i}]`, issues);
-            }
         }
     }
     // 그 외 키는 원본과 동일해야 함
@@ -331,8 +311,9 @@ export function verifyJsonIntegrity(
                 // warn 정책: 번역이 의도적일 수 있으므로 제어문자만 검사
                 checkControlChars(orig as string, trans as string, path, issues);
             } else {
-                // allow: 번역 허용, 제어문자만 검사
+                // allow: 번역 허용, 제어문자 및 줄밀림 검사
                 checkControlChars(orig as string, trans as string, path, issues);
+                checkTextShift(orig as string, trans as string, path, issues);
             }
         }
         return issues;
@@ -440,6 +421,23 @@ export function verifyJsonIntegrity(
 // Repair: 원본 구조 기반으로 번역 문자열만 유지하여 복원
 // ═══════════════════════════════════════════
 
+// 줄밀림이 발생한 문자열인지 판별 (repair에서 원본으로 되돌릴지 결정)
+function isTextShifted(origStr: string, transStr: string): boolean {
+    if (origStr === transStr) return false;
+    const origTrimmed = origStr.trim();
+    // 빈 문자열이 채워진 경우
+    if (origStr === '' && transStr !== '') return true;
+    // 플레이스홀더가 덮어씌워진 경우
+    if (PLACEHOLDER_RE.test(origTrimmed) && !PLACEHOLDER_RE.test(transStr.trim())) return true;
+    // 이름표 괄호가 사라진 경우
+    if (NAME_BRACKET_FULL_RE.test(origTrimmed) && !NAME_BRACKET_PARTIAL_RE.test(transStr)) return true;
+    // 기호 전용 줄에 문자가 들어온 경우
+    if (origTrimmed.length > 0 && /^[.…!！?？、。·\-~～♪♫★☆♥♡●○■□▲△▼▽\s]+$/.test(origTrimmed)) {
+        if (/[a-zA-Z\u3040-\u9FFF\uAC00-\uD7AF]/.test(transStr) && transStr.trim() !== origTrimmed) return true;
+    }
+    return false;
+}
+
 function repairEventCommand(orig: Record<string, unknown>, trans: Record<string, unknown>): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     result.code = orig.code;
@@ -471,7 +469,12 @@ export function repairJson(orig: unknown, trans: unknown, stringPolicy: StringPo
     const transType = getType(trans);
 
     if (origType === 'string' && transType === 'string') {
-        return stringPolicy !== 'deny' ? trans : orig;
+        if (stringPolicy !== 'deny') {
+            // 줄밀림이 감지되면 원본으로 되돌림
+            if (isTextShifted(orig as string, trans as string)) return orig;
+            return trans;
+        }
+        return orig;
     }
 
     if (origType !== transType) {
@@ -506,6 +509,12 @@ export function repairJson(orig: unknown, trans: unknown, stringPolicy: StringPo
         const result: Record<string, unknown> = {};
         for (const key of Object.keys(origObj)) {
             if (key in transObj) {
+                // comment_ 키는 줄밀림 검사 후 allow 정책으로 처리
+                if (COMMENT_KEY_RE.test(key) && typeof origObj[key] === 'string' && typeof transObj[key] === 'string') {
+                    result[key] = isTextShifted(origObj[key] as string, transObj[key] as string)
+                        ? origObj[key] : transObj[key];
+                    continue;
+                }
                 const specificPolicy = getFieldPolicy(key, origObj);
                 const childPolicy = specificPolicy !== null ? specificPolicy : stringPolicy;
                 result[key] = repairJson(origObj[key], transObj[key], childPolicy);

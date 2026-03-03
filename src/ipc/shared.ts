@@ -5,6 +5,7 @@ import * as dataBaseO from '../js/rpgmv/datas.js';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { appCtx } from '../appContext';
 
 function getEncryptionKey(): string {
   const keyPath = path.join(app.getPath('userData'), '.store-key');
@@ -51,7 +52,7 @@ export function worked(){
 }
 
 export function getSettings(){
-  return globalThis.settings
+  return appCtx.settings
 }
 
 export async function loadSettings(){
@@ -61,19 +62,19 @@ export async function loadSettings(){
     givensettings = JSON.parse(storage.get('settings') as string)
   }
 
-  globalThis.settings = dataBaseO.settings
+  appCtx.settings = dataBaseO.settings
 
 
-  globalThis.settings = {...globalThis.settings, ...givensettings}
-  globalThis.settings.version = app.getVersion()
-  storage.set('settings', JSON.stringify(globalThis.settings))
+  appCtx.settings = {...appCtx.settings, ...givensettings}
+  appCtx.settings.version = app.getVersion()
+  storage.set('settings', JSON.stringify(appCtx.settings))
 }
 
 export function setOPath(){
   if(tools.packed){
-    globalThis.oPath = process.resourcesPath
+    appCtx.oPath = process.resourcesPath
   }
   else{
-    globalThis.oPath = __dirname.replace(/[/\\]src[/\\]ipc$/, '')
+    appCtx.oPath = __dirname.replace(/[/\\]src[/\\]ipc$/, '')
   }
 }
