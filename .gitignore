@@ -11,5 +11,8 @@ dist/
 /src/js/**/*.js
 /src/html/**/*.js
 /src/utils.js
+/src/appContext.js
+/src/preload.js
+/src/ipc/**/*.js
 debug_crash.log
 audit_report.html
