@@ -6,6 +6,7 @@ import yaml from 'js-yaml';
 import { sleep } from './globalutils';
 import Tools from '../libs/projectTools';
 import log from '../../logger';
+import { readTextFile } from '../libs/fileIO';
 
 import type { ApplyArg } from './types';
 
@@ -42,10 +43,7 @@ export const apply = async (ev: unknown, arg: ApplyArg) => {
       let OutputData: Record<string, any> = {}
       for(const i of Object.keys(ext_dat)){
         if(fs.existsSync(dir + '/Backup/' + i)){
-          let filedata = fs.readFileSync(dir + '/Backup/' + i, 'utf8')
-          if (filedata.charCodeAt(0) === 0xFEFF) {
-            filedata = filedata.substring(1);
-          }
+          let filedata = readTextFile(dir + '/Backup/' + i)
           try {
             OutputData[i] = JSON.parse(filedata)  
           } catch (error) { log.warn('Failed to parse backup file:', i, error) }
@@ -55,7 +53,7 @@ export const apply = async (ev: unknown, arg: ApplyArg) => {
         worked_files += 1
         if(i.includes('.json')){
           let fname = (i === 'ext_javascript.json') ? dir + '/Extract/ext_javascript.js' : dir + '/Extract/' + path.parse(i).name + '.txt'
-          let Edata = fs.readFileSync(fname, 'utf8').split('\n')
+          let Edata = readTextFile(fname).split('\n')
           for(const q of Object.keys(ext_dat[i].data)){
             let output = ''
             let autoline = false
@@ -89,10 +87,7 @@ export const apply = async (ev: unknown, arg: ApplyArg) => {
               if(!Object.keys(OutputData).includes(originFile)){
                 const fidir = path.join(dir, 'Backup', originFile)
                 if(fs.existsSync(fidir)){
-                  let filedata = fs.readFileSync(fidir, 'utf8')
-                  if (filedata.charCodeAt(0) === 0xFEFF) {
-                    filedata = filedata.substring(1);
-                  }
+                  let filedata = readTextFile(fidir)
                   try {
                     OutputData[originFile] = JSON.parse(filedata)
                   } catch (error) {}

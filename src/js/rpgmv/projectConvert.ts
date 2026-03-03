@@ -6,6 +6,7 @@ import tools from '../libs/projectTools'
 import { getMainWindow } from '../../ipc/shared'
 import fg from 'fast-glob'
 import * as rpgencrypt from '../libs/rpgencrypt'
+import { readTextFile, readJsonFile } from '../libs/fileIO'
 
 async function clearTemp() {
     const qTemp = path.join(app.getPath('temp'), 'Extractorpp')
@@ -62,7 +63,7 @@ export async function ConvertProject(dir:string){
         // plugin.js
         const pluginjsPath = path.join(projectSaveDir, 'js', 'plugins.js')
         if(fs.existsSync(pluginjsPath)){
-            let pluginjs = fs.readFileSync(pluginjsPath, 'utf8')
+            let pluginjs = readTextFile(pluginjsPath)
             let hail0 = pluginjs.split('$plugins =')
             pluginjs = hail0[hail0.length - 1] + '  '
             pluginjs = pluginjs.substring(pluginjs.indexOf('['), pluginjs.lastIndexOf(']') + 1)
@@ -78,7 +79,7 @@ export async function ConvertProject(dir:string){
         }
         const sysJsonDir = path.join(projectSaveDir, 'data', 'System.json')
         if(fs.existsSync(sysJsonDir)){
-            let sysdata = JSON.parse(tools.rmBom(await fsa.readFile(sysJsonDir, 'utf-8')))
+            let sysdata = JSON.parse(readTextFile(sysJsonDir))
             sysdata.hasEncryptedImages = false
             sysdata.hasEncryptedAudio = false
             fs.writeFileSync(sysJsonDir, JSON.stringify(sysdata))
@@ -102,7 +103,7 @@ export async function ConvertProject(dir:string){
         const rpgCoreDir = path.join(projectSaveDir, 'js', 'rpg_core.js')
         const mzCoreDir = path.join(projectSaveDir, 'js', 'rmmz_core.js')
         if(fs.existsSync(rpgCoreDir)){
-            const d = fs.readFileSync(rpgCoreDir, 'utf-8').split('\n')
+            const d = readTextFile(rpgCoreDir).split('\n')
             for(let i=0;i<d.length;i++){
                 if(d[i].includes('rpg_core.js')){
                     let t = d[i].replaceAll(' ','')
@@ -115,7 +116,7 @@ export async function ConvertProject(dir:string){
         }
         if(fs.existsSync(mzCoreDir)){
             isMz = true
-            const d = fs.readFileSync(mzCoreDir, 'utf-8').split('\n')
+            const d = readTextFile(mzCoreDir).split('\n')
             for(let i=0;i<d.length;i++){
                 if(d[i].includes('rmmz_core.js')){
                     let t = d[i].replaceAll(' ','')

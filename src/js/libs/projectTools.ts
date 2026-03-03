@@ -1,3 +1,5 @@
+import { rmBom } from './fileIO';
+
 interface PTools{
     send: (channel: string, ...args: unknown[]) => void;
     packed?: boolean;
@@ -5,7 +7,6 @@ interface PTools{
     sendAlert: (txt: string) => void;
     worked: () => void;
     init: () => void;
-    rmBom?: (txt:string) => string
 }
 
 
@@ -50,12 +51,7 @@ const Tools = {
         pTools.send('loading', (now / max) * multiplier);
     },
     init: INIT,
-    rmBom: (txt:string) => {
-        if (txt.charCodeAt(0) === 0xFEFF) {
-            txt = txt.substring(1);
-        }
-        return txt
-    }
+    rmBom
 }
 
 
