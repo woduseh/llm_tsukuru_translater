@@ -339,6 +339,7 @@ onMounted(() => {
   })
 
   document.addEventListener('keydown', onKeydown)
+  api.send('compareReady')
 })
 
 onUnmounted(() => {

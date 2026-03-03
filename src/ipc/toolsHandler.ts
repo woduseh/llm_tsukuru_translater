@@ -6,6 +6,8 @@ import { loadRoute } from './viteHelper';
 
 let llmCompareWindow: Electron.BrowserWindow | null = null;
 let jsonVerifyWindow: Electron.BrowserWindow | null = null;
+let pendingCompareDir: string | null = null;
+let pendingVerifyDir: string | null = null;
 
 export function getLLMCompareWindow(): Electron.BrowserWindow | null {
   return llmCompareWindow;
@@ -17,6 +19,7 @@ ipcMain.on('openLLMCompare', (ev, dir: string) => {
     llmCompareWindow.focus();
     return;
   }
+  pendingCompareDir = dir;
   llmCompareWindow = new BrowserWindow({
     width: 1100,
     height: 750,
@@ -35,7 +38,6 @@ ipcMain.on('openLLMCompare', (ev, dir: string) => {
   loadRoute(llmCompareWindow, '/llm-compare');
   llmCompareWindow.webContents.on('did-finish-load', () => {
     llmCompareWindow!.show();
-    llmCompareWindow!.webContents.send('initCompare', dir);
   });
   llmCompareWindow.on('closed', () => {
     llmCompareWindow = null;
@@ -48,12 +50,20 @@ ipcMain.on('llmCompareClose', () => {
   }
 })
 
+ipcMain.on('compareReady', () => {
+  if (pendingCompareDir && llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+    llmCompareWindow.webContents.send('initCompare', pendingCompareDir);
+    pendingCompareDir = null;
+  }
+})
+
 ipcMain.on('openJsonVerify', (ev, dir: string) => {
   if (jsonVerifyWindow && !jsonVerifyWindow.isDestroyed()) {
     jsonVerifyWindow.webContents.send('initVerify', dir);
     jsonVerifyWindow.focus();
     return;
   }
+  pendingVerifyDir = dir;
   jsonVerifyWindow = new BrowserWindow({
     width: 900,
     height: 700,
@@ -72,12 +82,20 @@ ipcMain.on('openJsonVerify', (ev, dir: string) => {
   loadRoute(jsonVerifyWindow, '/json-verify');
   jsonVerifyWindow.webContents.on('did-finish-load', () => {
     jsonVerifyWindow!.show();
-    jsonVerifyWindow!.webContents.send('verifySettings', globalThis.settings);
-    jsonVerifyWindow!.webContents.send('initVerify', dir);
   });
   jsonVerifyWindow.on('closed', () => {
     jsonVerifyWindow = null;
   });
+})
+
+ipcMain.on('verifyReady', () => {
+  if (jsonVerifyWindow && !jsonVerifyWindow.isDestroyed()) {
+    jsonVerifyWindow.webContents.send('verifySettings', globalThis.settings);
+    if (pendingVerifyDir) {
+      jsonVerifyWindow.webContents.send('initVerify', pendingVerifyDir);
+      pendingVerifyDir = null;
+    }
+  }
 })
 
 ipcMain.on('openFolder', (ev, arg) => {

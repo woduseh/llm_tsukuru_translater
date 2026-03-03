@@ -44,6 +44,8 @@ const prjc = __importStar(require("../js/rpgmv/projectConvert"));
 const viteHelper_1 = require("./viteHelper");
 let llmCompareWindow = null;
 let jsonVerifyWindow = null;
+let pendingCompareDir = null;
+let pendingVerifyDir = null;
 function getLLMCompareWindow() {
     return llmCompareWindow;
 }
@@ -53,6 +55,7 @@ electron_1.ipcMain.on('openLLMCompare', (ev, dir) => {
         llmCompareWindow.focus();
         return;
     }
+    pendingCompareDir = dir;
     llmCompareWindow = new electron_1.BrowserWindow({
         width: 1100,
         height: 750,
@@ -71,7 +74,6 @@ electron_1.ipcMain.on('openLLMCompare', (ev, dir) => {
     (0, viteHelper_1.loadRoute)(llmCompareWindow, '/llm-compare');
     llmCompareWindow.webContents.on('did-finish-load', () => {
         llmCompareWindow.show();
-        llmCompareWindow.webContents.send('initCompare', dir);
     });
     llmCompareWindow.on('closed', () => {
         llmCompareWindow = null;
@@ -82,12 +84,19 @@ electron_1.ipcMain.on('llmCompareClose', () => {
         llmCompareWindow.close();
     }
 });
+electron_1.ipcMain.on('compareReady', () => {
+    if (pendingCompareDir && llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+        llmCompareWindow.webContents.send('initCompare', pendingCompareDir);
+        pendingCompareDir = null;
+    }
+});
 electron_1.ipcMain.on('openJsonVerify', (ev, dir) => {
     if (jsonVerifyWindow && !jsonVerifyWindow.isDestroyed()) {
         jsonVerifyWindow.webContents.send('initVerify', dir);
         jsonVerifyWindow.focus();
         return;
     }
+    pendingVerifyDir = dir;
     jsonVerifyWindow = new electron_1.BrowserWindow({
         width: 900,
         height: 700,
@@ -106,12 +115,19 @@ electron_1.ipcMain.on('openJsonVerify', (ev, dir) => {
     (0, viteHelper_1.loadRoute)(jsonVerifyWindow, '/json-verify');
     jsonVerifyWindow.webContents.on('did-finish-load', () => {
         jsonVerifyWindow.show();
-        jsonVerifyWindow.webContents.send('verifySettings', globalThis.settings);
-        jsonVerifyWindow.webContents.send('initVerify', dir);
     });
     jsonVerifyWindow.on('closed', () => {
         jsonVerifyWindow = null;
     });
+});
+electron_1.ipcMain.on('verifyReady', () => {
+    if (jsonVerifyWindow && !jsonVerifyWindow.isDestroyed()) {
+        jsonVerifyWindow.webContents.send('verifySettings', globalThis.settings);
+        if (pendingVerifyDir) {
+            jsonVerifyWindow.webContents.send('initVerify', pendingVerifyDir);
+            pendingVerifyDir = null;
+        }
+    }
 });
 electron_1.ipcMain.on('openFolder', (ev, arg) => {
     (0, open_1.default)(arg);

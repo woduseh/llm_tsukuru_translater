@@ -23,6 +23,7 @@ const SEND_CHANNELS = [
   'openFolder', 'projectConvert', 'log', 'license', 'app_version',
   'getextention', 'selFont', 'changeFontSize', 'updateVersion',
   'wolf_ext', 'wolf_apply', 'gamePatcher',
+  'compareReady', 'verifyReady',
 ];
 
 const RECEIVE_CHANNELS = [

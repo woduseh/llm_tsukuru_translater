@@ -212,6 +212,7 @@ function close() { window.close() }
 onMounted(() => {
   api.on('initVerify', (dir: string) => loadFiles(dir))
   api.on('verifySettings', (s: unknown) => { globalThis.settings = s as typeof globalThis.settings })
+  api.send('verifyReady')
 })
 onUnmounted(() => {
   api.removeAllListeners('initVerify')
