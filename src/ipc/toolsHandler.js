@@ -86,6 +86,7 @@ electron_1.ipcMain.on('llmCompareClose', () => {
 });
 electron_1.ipcMain.on('compareReady', () => {
     if (pendingCompareDir && llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+        llmCompareWindow.webContents.send('set-allowed-paths', [pendingCompareDir]);
         llmCompareWindow.webContents.send('initCompare', pendingCompareDir);
         pendingCompareDir = null;
     }
@@ -124,6 +125,7 @@ electron_1.ipcMain.on('verifyReady', () => {
     if (jsonVerifyWindow && !jsonVerifyWindow.isDestroyed()) {
         jsonVerifyWindow.webContents.send('verifySettings', globalThis.settings);
         if (pendingVerifyDir) {
+            jsonVerifyWindow.webContents.send('set-allowed-paths', [pendingVerifyDir]);
             jsonVerifyWindow.webContents.send('initVerify', pendingVerifyDir);
             pendingVerifyDir = null;
         }
