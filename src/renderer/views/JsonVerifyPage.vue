@@ -5,7 +5,8 @@
       <div class="sidebar-header">
         <input type="text" v-model="searchQuery" class="search-input" placeholder="파일 검색..." @input="updateFilteredFiles">
         <div class="filter-row">
-          <label><input type="checkbox" v-model="filterIssues" @change="updateFilteredFiles"> 문제 있는 파일만</label>
+          <label><input type="checkbox" v-model="filterErrors" @change="updateFilteredFiles"> 오류</label>
+          <label><input type="checkbox" v-model="filterWarnings" @change="updateFilteredFiles"> 경고</label>
           <span class="file-count">{{ filteredFiles.length }}/{{ files.length }}</span>
         </div>
       </div>
@@ -29,6 +30,9 @@
         <div class="action-buttons">
           <span class="selection-count" v-if="selectedIssues.size > 0">{{ selectedIssues.size }}개 선택</span>
           <button :disabled="selectedIssues.size === 0" @click="revertSelected" title="선택한 항목을 원본 값으로 되돌립니다">선택 되돌리기</button>
+          <button :disabled="!llmButtonEnabled" @click="llmRepairShift" title="줄밀림 위치의 원본 텍스트를 LLM으로 재번역합니다">
+            {{ llmButtonText }}
+          </button>
           <button :disabled="!currentHasIssues" @click="repairCurrentFile">현재 파일 수정</button>
           <button :disabled="!anyHasIssues" @click="repairAll">전체 수정</button>
           <button @click="close">닫기</button>
@@ -38,28 +42,85 @@
 
       <div class="issues-panel">
         <div class="issues-file-name">{{ currentFileName }}</div>
-        <div v-if="currentIssues.length === 0" class="no-issues">
-          ✓ 구조적 문제가 없습니다
+
+        <!-- 심각도 필터 탭 -->
+        <div v-if="currentIssues.length > 0" class="severity-tabs">
+          <button :class="{ active: issueSeverityFilter === 'all' }" @click="issueSeverityFilter = 'all'">
+            전체 ({{ currentIssues.length }})
+          </button>
+          <button :class="{ active: issueSeverityFilter === 'error' }" @click="issueSeverityFilter = 'error'">
+            ❌ 오류 ({{ currentErrorCount }})
+          </button>
+          <button :class="{ active: issueSeverityFilter === 'warning' }" @click="issueSeverityFilter = 'warning'">
+            ⚠ 경고 ({{ currentWarningCount }})
+          </button>
         </div>
-        <div v-for="(issue, i) in currentIssues" :key="i"
-          class="issue-item" :class="[issue.severity, selectedIssues.has(i) ? 'selected' : '']">
-          <label class="issue-checkbox" @click.stop="toggleIssue(i)">
-            <input type="checkbox" :checked="selectedIssues.has(i)" tabindex="-1" @click.prevent>
-          </label>
+
+        <!-- LLM 재번역 미리보기 -->
+        <div v-if="llmRepairResults.length > 0" class="llm-preview">
+          <div class="llm-preview-header">
+            <span class="llm-preview-title">🔄 LLM 재번역 미리보기 ({{ llmRepairResults.length }}건)</span>
+            <div class="llm-preview-actions">
+              <button @click="applyLlmRepair">전체 적용</button>
+              <button @click="llmRepairResults = []">취소</button>
+            </div>
+          </div>
+          <div v-for="(item, i) in llmRepairResults" :key="i" class="llm-preview-item">
+            <div class="issue-path" style="margin-bottom: 4px;">{{ item.path }}</div>
+            <div class="value-row">
+              <span class="value-label">원본:</span>
+              <code class="value-content orig">{{ item.origText }}</code>
+            </div>
+            <div class="value-row">
+              <span class="value-label">현재:</span>
+              <code class="value-content trans">{{ item.currentText }}</code>
+            </div>
+            <div class="value-row">
+              <span class="value-label">새 번역:</span>
+              <code class="value-content new-trans">{{ item.newText }}</code>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="currentIssues.length === 0 && llmRepairResults.length === 0" class="no-issues">
+          <div class="no-issues-header">✓ 구조적 문제가 없습니다</div>
+          <div v-if="previewSamples.length > 0" class="preview-section">
+            <div class="preview-title">번역 미리보기 ({{ previewSamples.length }}건)</div>
+            <div v-for="(s, i) in previewSamples" :key="i" class="preview-item">
+              <div class="preview-path">{{ s.path }}</div>
+              <div class="value-row">
+                <span class="value-label">원본:</span>
+                <code class="value-content orig">{{ s.orig }}</code>
+              </div>
+              <div class="value-row">
+                <span class="value-label">번역:</span>
+                <code class="value-content trans">{{ s.trans }}</code>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="filteredIssueItems.length === 0 && currentIssues.length > 0" class="no-issues-filter">
+          선택한 유형의 문제가 없습니다
+        </div>
+        <div v-for="item in filteredIssueItems" :key="item.origIdx"
+          class="issue-item" :class="[item.issue.severity, selectedIssues.has(item.origIdx) ? 'selected' : '']">
+          <div class="issue-checkbox" @click.stop="toggleIssue(item.origIdx)">
+            <input type="checkbox" :checked="selectedIssues.has(item.origIdx)" tabindex="-1" @click.prevent>
+          </div>
           <div class="issue-content">
             <div class="issue-header">
-              <div class="issue-type">{{ typeLabel(issue.type) }}</div>
-              <div class="issue-path">{{ issue.path }}</div>
+              <div class="issue-type">{{ typeLabel(item.issue.type) }}</div>
+              <div class="issue-path">{{ item.issue.path }}</div>
             </div>
-            <div class="issue-message">{{ issue.message }}</div>
-            <div v-if="issue.origValue !== undefined || issue.transValue !== undefined" class="issue-values">
-              <div class="value-row" v-if="issue.origValue !== undefined">
+            <div class="issue-message">{{ item.issue.message }}</div>
+            <div v-if="item.issue.origValue !== undefined || item.issue.transValue !== undefined" class="issue-values">
+              <div class="value-row" v-if="item.issue.origValue !== undefined">
                 <span class="value-label">원본:</span>
-                <code class="value-content orig">{{ formatValue(issue.origValue) }}</code>
+                <code class="value-content orig">{{ formatValue(item.issue.origValue) }}</code>
               </div>
-              <div class="value-row" v-if="issue.transValue !== undefined">
+              <div class="value-row" v-if="item.issue.transValue !== undefined">
                 <span class="value-label">번역:</span>
-                <code class="value-content trans">{{ formatValue(issue.transValue) }}</code>
+                <code class="value-content trans">{{ formatValue(item.issue.transValue) }}</code>
               </div>
             </div>
           </div>
@@ -85,16 +146,55 @@ interface FileEntry {
 const files = ref<FileEntry[]>([])
 const currentIdx = ref(0)
 const searchQuery = ref('')
-const filterIssues = ref(false)
+const filterErrors = ref(false)
+const filterWarnings = ref(false)
 const filteredFiles = ref<{ file: FileEntry; realIdx: number }[]>([])
 const statusText = ref('')
 const statusClass = ref('')
 const selectedIssues = ref<Set<number>>(new Set())
+const llmRepairing = ref(false)
+const llmProgress = ref('')
+const llmRepairResults = ref<{ path: string; origText: string; currentText: string; newText: string }[]>([])
+const loading = ref(true)
+const issueSeverityFilter = ref<'all' | 'error' | 'warning'>('all')
+const previewSamples = ref<{ orig: string; trans: string; path: string }[]>([])
 
 const currentFileName = computed(() => files.value.length > 0 ? files.value[currentIdx.value].name : '')
 const currentIssues = computed(() => files.value.length > 0 ? files.value[currentIdx.value].issues : [])
 const currentHasIssues = computed(() => files.value.length > 0 && files.value[currentIdx.value].issues.length > 0)
+const currentErrorCount = computed(() => files.value.length > 0 ? files.value[currentIdx.value].errorCount : 0)
+const currentWarningCount = computed(() => files.value.length > 0 ? files.value[currentIdx.value].warningCount : 0)
 const anyHasIssues = computed(() => files.value.some(f => f.issues.length > 0))
+
+const filteredIssueItems = computed(() => {
+  return currentIssues.value
+    .map((issue, origIdx) => ({ issue, origIdx }))
+    .filter(({ issue }) => {
+      if (issueSeverityFilter.value === 'all') return true
+      return issue.severity === issueSeverityFilter.value
+    })
+})
+
+const shiftIssueCount = computed(() => currentIssues.value.filter(i => i.type === 'text_shift' && i.origValue !== undefined).length)
+const selectedShiftCount = computed(() => {
+  if (selectedIssues.value.size === 0) return 0
+  return [...selectedIssues.value].filter(i => {
+    const issue = currentIssues.value[i]
+    return issue?.type === 'text_shift' && issue.origValue !== undefined
+  }).length
+})
+const llmButtonEnabled = computed(() => {
+  if (llmRepairing.value) return false
+  if (selectedIssues.value.size > 0) return selectedShiftCount.value > 0
+  return shiftIssueCount.value > 0
+})
+const llmButtonText = computed(() => {
+  if (llmRepairing.value) return `LLM 번역 중 (${llmProgress.value})`
+  if (selectedIssues.value.size > 0 && selectedShiftCount.value > 0) {
+    return `선택 항목 LLM 수정 (${selectedShiftCount.value}개)`
+  }
+  return `줄밀림 LLM 수정 (${shiftIssueCount.value}개)`
+})
 
 const typeLabels: Record<string, string> = {
   'array_length': '배열 길이 불일치', 'type_mismatch': '타입 불일치',
@@ -111,6 +211,7 @@ function formatValue(val: unknown): string {
 }
 
 const summaryHtml = computed(() => {
+  if (loading.value) return '<span class="summary-loading">⏳ 파일 비교 중...</span>'
   if (files.value.length === 0) return '<span class="summary-error">비교할 파일이 없습니다.</span>'
   const ef = files.value.filter(f => f.errorCount > 0).length
   const wf = files.value.filter(f => f.warningCount > 0 && f.errorCount === 0).length
@@ -124,6 +225,7 @@ const summaryHtml = computed(() => {
 })
 
 function loadFiles(dir: string) {
+  loading.value = true
   files.value = []
   currentIdx.value = 0
   selectedIssues.value = new Set()
@@ -136,7 +238,7 @@ function loadFiles(dir: string) {
     transDir = completedDir
   } else if (window.nodeFs.existsSync(backupDir)) {
     origDir = backupDir; transDir = dir
-  } else { return }
+  } else { loading.value = false; return }
 
   const transFiles = window.nodeFs.readdirSync(transDir).filter((f: string) => f.endsWith('.json'))
   for (const name of transFiles) {
@@ -165,6 +267,12 @@ function loadFiles(dir: string) {
     }
   }
   updateFilteredFiles()
+  loading.value = false
+  if (files.value.length > 0 && files.value[0].issues.length === 0) {
+    loadPreview(files.value[0])
+  } else {
+    previewSamples.value = []
+  }
 }
 
 function updateFilteredFiles() {
@@ -173,7 +281,11 @@ function updateFilteredFiles() {
     .map((file, i) => ({ file, realIdx: i }))
     .filter(({ file }) => {
       if (q && !file.name.toLowerCase().includes(q)) return false
-      if (filterIssues.value && file.issues.length === 0) return false
+      if (filterErrors.value || filterWarnings.value) {
+        const matchError = filterErrors.value && file.errorCount > 0
+        const matchWarning = filterWarnings.value && file.warningCount > 0
+        if (!matchError && !matchWarning) return false
+      }
       return true
     })
 }
@@ -181,12 +293,57 @@ function updateFilteredFiles() {
 function selectFile(idx: number) {
   currentIdx.value = idx
   selectedIssues.value = new Set()
+  llmRepairResults.value = []
+  issueSeverityFilter.value = 'all'
+  const f = files.value[idx]
+  if (f && f.issues.length === 0) {
+    loadPreview(f)
+  } else {
+    previewSamples.value = []
+  }
 }
 
 function toggleIssue(i: number) {
   const s = new Set(selectedIssues.value)
   if (s.has(i)) s.delete(i); else s.add(i)
   selectedIssues.value = s
+}
+
+function loadPreview(f: FileEntry) {
+  try {
+    let origData = window.nodeFs.readFileSync(f.origPath, 'utf-8')
+    let transData = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+    if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1)
+    if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
+    const orig = JSON.parse(origData), trans = JSON.parse(transData)
+    const samples: { orig: string; trans: string; path: string }[] = []
+    const events = orig?.events || []
+    for (let ei = 0; ei < events.length && samples.length < 10; ei++) {
+      const ev = events[ei]
+      if (!ev?.pages) continue
+      for (let pi = 0; pi < ev.pages.length && samples.length < 10; pi++) {
+        const list = ev.pages[pi]?.list || []
+        const tList = trans?.events?.[ei]?.pages?.[pi]?.list || []
+        for (let li = 0; li < list.length && samples.length < 10; li++) {
+          const cmd = list[li]
+          if (cmd?.code === 401 || cmd?.code === 405) {
+            const origText = cmd.parameters?.[0]
+            const transText = tList[li]?.parameters?.[0]
+            if (typeof origText === 'string' && typeof transText === 'string' && origText !== transText && origText.trim()) {
+              samples.push({
+                orig: origText,
+                trans: transText,
+                path: `events[${ei}].pages[${pi}].list[${li}].parameters[0]`
+              })
+            }
+          }
+        }
+      }
+    }
+    previewSamples.value = samples
+  } catch {
+    previewSamples.value = []
+  }
 }
 
 function getIndent(): number {
@@ -313,14 +470,96 @@ function repairAll() {
 
 function close() { window.close() }
 
+function llmRepairShift() {
+  const f = files.value[currentIdx.value]
+  if (!f) return
+
+  let shiftIssues: VerifyIssue[]
+  if (selectedIssues.value.size > 0) {
+    shiftIssues = [...selectedIssues.value]
+      .map(i => f.issues[i])
+      .filter(i => i?.type === 'text_shift' && i.origValue !== undefined)
+  } else {
+    shiftIssues = f.issues.filter(i => i.type === 'text_shift' && i.origValue !== undefined)
+  }
+  if (shiftIssues.length === 0) return
+
+  llmRepairing.value = true
+  llmProgress.value = `0/${shiftIssues.length}`
+  llmRepairResults.value = []
+
+  const items = shiftIssues.map(issue => ({
+    path: issue.path,
+    origText: String(issue.origValue)
+  }))
+
+  api.send('verifyLlmRepair', items)
+}
+
+function applyLlmRepair() {
+  const f = files.value[currentIdx.value]
+  if (!f || llmRepairResults.value.length === 0) return
+  try {
+    let transData = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+    if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
+    const trans = JSON.parse(transData)
+    let applied = 0
+    for (const item of llmRepairResults.value) {
+      if (item.newText.startsWith('[번역 실패:')) continue
+      if (window.verify.setAtPath(trans, item.path, item.newText)) applied++
+    }
+    if (applied > 0) {
+      const indent = getIndent()
+      window.nodeFs.writeFileSync(f.transPath, JSON.stringify(trans, null, indent || undefined), 'utf-8')
+      refreshFileIssues(currentIdx.value)
+      f.repaired = true
+      statusText.value = `✓ LLM 재번역 ${applied}건 적용 완료 (남은 문제: ${f.issues.length}개)`
+      statusClass.value = 'status-ok'
+    }
+    llmRepairResults.value = []
+    updateFilteredFiles()
+  } catch (e) {
+    statusText.value = `❌ LLM 적용 실패: ${(e as Error).message}`
+    statusClass.value = 'status-error'
+  }
+}
+
 onMounted(() => {
   api.on('initVerify', (dir: string) => loadFiles(dir))
   api.on('verifySettings', (s: unknown) => { (globalThis as any).settings = s })
+  api.on('verifyLlmRepairProgress', (data: { current: number; total: number; path: string }) => {
+    llmProgress.value = `${data.current}/${data.total}`
+  })
+  api.on('verifyLlmRepairDone', (data: { success: boolean; results?: { path: string; origText: string; newText: string }[]; error?: string }) => {
+    llmRepairing.value = false
+    if (data.success && data.results) {
+      const f = files.value[currentIdx.value]
+      if (!f) return
+      try {
+        let transData = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+        if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
+        const trans = JSON.parse(transData)
+        llmRepairResults.value = data.results.map(r => ({
+          ...r,
+          currentText: String(window.verify.getAtPath(trans, r.path) ?? '')
+        }))
+      } catch {
+        llmRepairResults.value = data.results.map(r => ({ ...r, currentText: '(읽기 실패)' }))
+      }
+      statusText.value = `✓ LLM 재번역 ${data.results.length}건 완료 — 미리보기를 확인 후 적용하세요`
+      statusClass.value = 'status-ok'
+    } else {
+      statusText.value = `❌ LLM 재번역 실패: ${data.error}`
+      statusClass.value = 'status-error'
+    }
+  })
   api.send('verifyReady')
 })
 onUnmounted(() => {
   api.removeAllListeners('initVerify')
   api.removeAllListeners('verifySettings')
+  api.removeAllListeners('verifyLlmRepairProgress')
+  api.removeAllListeners('verifyLlmRepairDone')
 })
 </script>
 
@@ -370,6 +609,23 @@ onUnmounted(() => {
 .issues-panel { flex: 1; overflow-y: auto; padding: 12px; }
 .issues-file-name { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
 .no-issues { font-size: 13px; color: #50fa7b; opacity: 0.6; padding: 20px; text-align: center; }
+.no-issues-header { font-size: 14px; margin-bottom: 16px; }
+.no-issues-filter { font-size: 13px; opacity: 0.4; padding: 20px; text-align: center; }
+.preview-section { text-align: left; }
+.preview-title { font-size: 12px; font-weight: 600; opacity: 0.7; margin-bottom: 8px; color: #8be9fd; }
+.preview-item {
+  padding: 8px; margin-bottom: 6px; border-radius: 6px;
+  background: rgba(0,0,0,0.2); font-size: 11px;
+}
+.preview-path { font-size: 10px; opacity: 0.3; font-family: monospace; margin-bottom: 4px; }
+.severity-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+.severity-tabs button {
+  padding: 4px 10px; font-size: 11px; background: var(--Highlight1);
+  border: var(--border); border-radius: 4px; color: var(--mainColor);
+  cursor: pointer; font-family: inherit; transition: var(--transition); opacity: 0.5;
+}
+.severity-tabs button:hover { opacity: 0.8; }
+.severity-tabs button.active { opacity: 1; background: rgba(124,111,219,0.15); border-color: rgba(124,111,219,0.3); }
 .issue-item {
   margin-bottom: 8px; padding: 10px 12px 10px 44px; border-radius: 6px;
   background: var(--Highlight1); border-left: 3px solid transparent;
@@ -403,9 +659,31 @@ onUnmounted(() => {
 }
 .value-content.orig { color: #8be9fd; }
 .value-content.trans { color: #f1fa8c; }
+.value-content.new-trans { color: #50fa7b; }
+
+.llm-preview {
+  margin-bottom: 16px; padding: 10px; border-radius: 8px;
+  background: rgba(80,250,123,0.04); border: 1px solid rgba(80,250,123,0.15);
+}
+.llm-preview-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+}
+.llm-preview-title { font-size: 13px; font-weight: 700; color: #50fa7b; }
+.llm-preview-actions { display: flex; gap: 4px; }
+.llm-preview-actions button {
+  padding: 3px 10px; font-size: 11px; background: var(--Highlight1);
+  border: var(--border); border-radius: 4px; color: var(--mainColor);
+  cursor: pointer; font-family: inherit; transition: var(--transition);
+}
+.llm-preview-actions button:hover { background: rgba(255,255,255,0.08); }
+.llm-preview-item {
+  padding: 8px; margin-bottom: 6px; border-radius: 6px;
+  background: rgba(0,0,0,0.2); font-size: 11px;
+}
 
 :deep(.summary-error) { color: #ff5555; }
 :deep(.summary-warn) { color: #f1fa8c; }
 :deep(.summary-ok) { color: #50fa7b; }
 :deep(.summary-total) { opacity: 0.4; }
+:deep(.summary-loading) { color: #8be9fd; }
 </style>

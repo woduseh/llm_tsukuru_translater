@@ -73,6 +73,48 @@ describe('verifyJsonIntegrity', () => {
     // code 401 params are translatable, so no string_changed errors
     expect(issues.filter(i => i.type === 'string_changed')).toEqual([]);
   });
+
+  it('detects text shift on code 102 (choice text)', () => {
+    const orig = { code: 102, indent: 0, parameters: [['はい', '--- 5 ---', 'いいえ']] };
+    const trans = { code: 102, indent: 0, parameters: [['예', '밀려온 텍스트', '아니오']] };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.some(i => i.type === 'text_shift')).toBe(true);
+  });
+
+  it('detects text shift on code 101 param[4] (name tag)', () => {
+    const orig = { code: 101, indent: 0, parameters: ['face.png', 0, 0, 2, '【月茜】'] };
+    const trans = { code: 101, indent: 0, parameters: ['face.png', 0, 0, 2, '밀려온 대사'] };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.some(i => i.type === 'text_shift')).toBe(true);
+  });
+
+  it('detects text shift on code 402 param[1] (branch text)', () => {
+    const orig = { code: 402, indent: 0, parameters: [0, ''] };
+    const trans = { code: 402, indent: 0, parameters: [0, '밀려온 텍스트'] };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.some(i => i.type === 'text_shift')).toBe(true);
+  });
+
+  it('detects placeholder ----- (dashes without number)', () => {
+    const orig = { code: 401, indent: 0, parameters: ['-----'] };
+    const trans = { code: 401, indent: 0, parameters: ['밀려온 대사'] };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.some(i => i.type === 'text_shift')).toBe(true);
+  });
+
+  it('detects half-width bracket name tag [名前]', () => {
+    const orig = { code: 401, indent: 0, parameters: ['[名前]'] };
+    const trans = { code: 401, indent: 0, parameters: ['밀려온 대사'] };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.some(i => i.type === 'text_shift')).toBe(true);
+  });
+
+  it('allows translated half-width bracket name tag', () => {
+    const orig = { code: 401, indent: 0, parameters: ['[名前]'] };
+    const trans = { code: 401, indent: 0, parameters: ['[이름]'] };
+    const issues = verifyJsonIntegrity(orig, trans);
+    expect(issues.filter(i => i.type === 'text_shift')).toEqual([]);
+  });
 });
 
 describe('repairJson', () => {
@@ -113,6 +155,49 @@ describe('repairJson', () => {
 
   it('returns null for null inputs', () => {
     expect(repairJson(null, null)).toBe(null);
+  });
+
+  it('reverts empty string that got filled (text shift repair)', () => {
+    const orig = { code: 401, indent: 0, parameters: [''] };
+    const trans = { code: 401, indent: 0, parameters: ['밀려온 대사'] };
+    const result = repairJson(orig, trans) as Record<string, any>;
+    expect(result.parameters[0]).toBe('');
+  });
+
+  it('reverts placeholder marker that got overwritten (text shift repair)', () => {
+    const orig = { code: 401, indent: 0, parameters: ['--- 101 ---'] };
+    const trans = { code: 401, indent: 0, parameters: ['번역된 대사가 밀려옴'] };
+    const result = repairJson(orig, trans) as Record<string, any>;
+    expect(result.parameters[0]).toBe('--- 101 ---');
+  });
+
+  it('reverts name bracket that got overwritten (text shift repair)', () => {
+    const orig = { code: 401, indent: 0, parameters: ['【月茜】'] };
+    const trans = { code: 401, indent: 0, parameters: ['밀려온 대사'] };
+    const result = repairJson(orig, trans) as Record<string, any>;
+    expect(result.parameters[0]).toBe('【月茜】');
+  });
+
+  it('keeps translated name bracket if brackets preserved', () => {
+    const orig = { code: 401, indent: 0, parameters: ['【月茜】'] };
+    const trans = { code: 401, indent: 0, parameters: ['【유에시】'] };
+    const result = repairJson(orig, trans) as Record<string, any>;
+    expect(result.parameters[0]).toBe('【유에시】');
+  });
+
+  it('reverts symbol-only line that got filled with text (text shift repair)', () => {
+    const orig = { code: 401, indent: 0, parameters: ['........'] };
+    const trans = { code: 401, indent: 0, parameters: ['실제 대사가 밀려옴'] };
+    const result = repairJson(orig, trans) as Record<string, any>;
+    expect(result.parameters[0]).toBe('........');
+  });
+
+  it('repairs comment_ keys with text shift', () => {
+    const orig = { id: 1, comment_0: '--- 5 ---', comment_1: '대화 내용' };
+    const trans = { id: 1, comment_0: '밀려온 텍스트', comment_1: '번역된 대화' };
+    const result = repairJson(orig, trans) as Record<string, any>;
+    expect(result.comment_0).toBe('--- 5 ---');
+    expect(result.comment_1).toBe('번역된 대화');
   });
 });
 

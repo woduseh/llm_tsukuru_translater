@@ -19,7 +19,7 @@ const SEND_CHANNELS = [
   'changeURL', 'settings', 'applysettings', 'closesettings',
   'openLLMSettings', 'llmSettingsApply', 'llmSettingsClose', 'abortLLM',
   'openLLMCompare', 'llmCompareClose', 'openJsonVerify',
-  'retranslateFile', 'retranslateBlocks',
+  'retranslateFile', 'retranslateBlocks', 'verifyLlmRepair',
   'openFolder', 'projectConvert', 'log', 'license', 'app_version',
   'getextention', 'selFont', 'changeFontSize', 'updateVersion',
   'wolf_ext', 'wolf_apply', 'gamePatcher',
@@ -32,7 +32,7 @@ const RECEIVE_CHANNELS = [
   'check_force', 'alert', 'alert_free', 'alert2',
   'llmTranslating', 'alertExten', 'settings', 'llmSettings',
   'initCompare', 'retranslateProgress', 'retranslateFileDone', 'retranslateBlocksDone',
-  'initVerify', 'verifySettings',
+  'initVerify', 'verifySettings', 'verifyLlmRepairProgress', 'verifyLlmRepairDone',
   'set-allowed-paths',
 ];
 
