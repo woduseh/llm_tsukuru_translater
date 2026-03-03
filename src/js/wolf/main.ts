@@ -1,7 +1,7 @@
 import { ipcMain } from "electron";
 import path from 'path'
 import fs from 'fs'
-import { worked } from "../../../main";
+import { worked } from "../../ipc/shared";
 import { extractWolfFolder } from "./extract/extractor";
 import makeText from "./extract/makeText";
 import { wolfAppyier } from "./apply/applyWolf";
