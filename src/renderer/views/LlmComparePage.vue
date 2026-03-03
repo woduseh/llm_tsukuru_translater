@@ -47,7 +47,9 @@
           <div v-for="(block, i) in origBlocks" :key="i"
             class="block" :class="blockStatus(i)"
             :ref="el => setOrigBlockRef(i, el as HTMLElement)">
-            <div class="select-indicator" @click.stop="toggleSelection(i)">✓</div>
+            <label class="select-indicator" @click.stop="toggleSelection(i)">
+              <input type="checkbox" :checked="selectedBlocks.has(i)" tabindex="-1" @click.prevent>
+            </label>
             <div v-if="block.sep" class="sep-label">{{ block.sep }}</div>
             <pre>{{ block.lines.join('\n') }}</pre>
             <span class="line-count">{{ block.lines.length }}줄</span>
@@ -404,17 +406,21 @@ function onKeydown(e: KeyboardEvent) {
   margin-bottom: 4px; padding: 8px 10px; border-radius: 6px; position: relative;
   background: var(--Highlight1); border: 1px solid transparent; font-size: 12px;
 }
+.blocks-col:first-child .block { padding-left: 40px; }
 .block.ok { border-color: rgba(80,250,123,0.1); }
 .block.error-lines, .block.error-sep { border-color: rgba(255,85,85,0.3); background: rgba(255,85,85,0.05); }
 .block.missing { border-color: rgba(255,184,108,0.3); background: rgba(255,184,108,0.05); }
 .block.selected { border-color: rgba(124,111,219,0.5); background: rgba(124,111,219,0.08); }
 .select-indicator {
-  position: absolute; top: 4px; right: 4px; width: 18px; height: 18px;
-  border-radius: 4px; display: flex; align-items: center; justify-content: center;
-  font-size: 10px; cursor: pointer; opacity: 0.3; transition: var(--transition);
-  background: rgba(255,255,255,0.05);
+  position: absolute; top: 0; left: 0; width: 32px; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0.4; transition: var(--transition);
+  background: rgba(255,255,255,0.02); border-right: 1px solid rgba(255,255,255,0.04);
 }
-.select-indicator:hover { opacity: 1; background: rgba(124,111,219,0.3); }
+.select-indicator:hover { opacity: 1; background: rgba(124,111,219,0.15); }
+.select-indicator input[type="checkbox"] {
+  width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent);
+}
 .sep-label { font-size: 10px; opacity: 0.3; margin-bottom: 4px; }
 .line-count { position: absolute; bottom: 4px; right: 8px; font-size: 9px; opacity: 0.3; }
 pre { margin: 0; white-space: pre-wrap; word-break: break-all; font-size: 12px; font-family: inherit; }

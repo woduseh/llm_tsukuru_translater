@@ -100,5 +100,13 @@ contextBridge.exposeInMainWorld('verify', {
     repairJson: (orig, trans) => {
         const { repairJson } = require('./js/rpgmv/verify.js');
         return repairJson(orig, trans);
+    },
+    getAtPath: (obj, jsonPath) => {
+        const { getAtPath } = require('./js/rpgmv/verify.js');
+        return getAtPath(obj, jsonPath);
+    },
+    setAtPath: (obj, jsonPath, value) => {
+        const { setAtPath } = require('./js/rpgmv/verify.js');
+        return setAtPath(obj, jsonPath, value);
     }
 });

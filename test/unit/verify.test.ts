@@ -115,3 +115,42 @@ describe('repairJson', () => {
     expect(repairJson(null, null)).toBe(null);
   });
 });
+
+describe('getAtPath / setAtPath', () => {
+  const { getAtPath, setAtPath } = require('../../src/js/rpgmv/verify');
+
+  it('navigates dot paths', () => {
+    const obj = { a: { b: { c: 42 } } };
+    expect(getAtPath(obj, '$.a.b.c')).toBe(42);
+  });
+
+  it('navigates array indices', () => {
+    const obj = { items: [10, 20, 30] };
+    expect(getAtPath(obj, '$.items[1]')).toBe(20);
+  });
+
+  it('navigates mixed paths', () => {
+    const obj = { events: [null, { pages: [{ list: [{ code: 401 }] }] }] };
+    expect(getAtPath(obj, '$.events[1].pages[0].list[0].code')).toBe(401);
+  });
+
+  it('returns undefined for missing paths', () => {
+    expect(getAtPath({ a: 1 }, '$.b.c')).toBeUndefined();
+  });
+
+  it('sets value at dot path', () => {
+    const obj = { a: { b: 'old' } };
+    expect(setAtPath(obj, '$.a.b', 'new')).toBe(true);
+    expect(obj.a.b).toBe('new');
+  });
+
+  it('sets value at array index', () => {
+    const obj = { items: [1, 2, 3] };
+    expect(setAtPath(obj, '$.items[1]', 99)).toBe(true);
+    expect(obj.items[1]).toBe(99);
+  });
+
+  it('returns false for invalid paths', () => {
+    expect(setAtPath({ a: 1 }, '$.b.c', 'x')).toBe(false);
+  });
+});

@@ -27,6 +27,8 @@
       <div class="toolbar">
         <div class="summary" v-html="summaryHtml"></div>
         <div class="action-buttons">
+          <span class="selection-count" v-if="selectedIssues.size > 0">{{ selectedIssues.size }}개 선택</span>
+          <button :disabled="selectedIssues.size === 0" @click="revertSelected" title="선택한 항목을 원본 값으로 되돌립니다">선택 되돌리기</button>
           <button :disabled="!currentHasIssues" @click="repairCurrentFile">현재 파일 수정</button>
           <button :disabled="!anyHasIssues" @click="repairAll">전체 수정</button>
           <button @click="close">닫기</button>
@@ -40,10 +42,27 @@
           ✓ 구조적 문제가 없습니다
         </div>
         <div v-for="(issue, i) in currentIssues" :key="i"
-          class="issue-item" :class="issue.severity">
-          <div class="issue-path">{{ issue.path }}</div>
-          <div class="issue-type">{{ typeLabel(issue.type) }}</div>
-          <div class="issue-message">{{ issue.message }}</div>
+          class="issue-item" :class="[issue.severity, selectedIssues.has(i) ? 'selected' : '']">
+          <label class="issue-checkbox" @click.stop="toggleIssue(i)">
+            <input type="checkbox" :checked="selectedIssues.has(i)" tabindex="-1" @click.prevent>
+          </label>
+          <div class="issue-content">
+            <div class="issue-header">
+              <div class="issue-type">{{ typeLabel(issue.type) }}</div>
+              <div class="issue-path">{{ issue.path }}</div>
+            </div>
+            <div class="issue-message">{{ issue.message }}</div>
+            <div v-if="issue.origValue !== undefined || issue.transValue !== undefined" class="issue-values">
+              <div class="value-row" v-if="issue.origValue !== undefined">
+                <span class="value-label">원본:</span>
+                <code class="value-content orig">{{ formatValue(issue.origValue) }}</code>
+              </div>
+              <div class="value-row" v-if="issue.transValue !== undefined">
+                <span class="value-label">번역:</span>
+                <code class="value-content trans">{{ formatValue(issue.transValue) }}</code>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -70,6 +89,7 @@ const filterIssues = ref(false)
 const filteredFiles = ref<{ file: FileEntry; realIdx: number }[]>([])
 const statusText = ref('')
 const statusClass = ref('')
+const selectedIssues = ref<Set<number>>(new Set())
 
 const currentFileName = computed(() => files.value.length > 0 ? files.value[currentIdx.value].name : '')
 const currentIssues = computed(() => files.value.length > 0 ? files.value[currentIdx.value].issues : [])
@@ -84,6 +104,11 @@ const typeLabels: Record<string, string> = {
   'parse_error': 'JSON 파싱 오류'
 }
 function typeLabel(type: string) { return typeLabels[type] || type }
+
+function formatValue(val: unknown): string {
+  if (typeof val === 'string') return val.length > 100 ? val.substring(0, 100) + '...' : val
+  return JSON.stringify(val)
+}
 
 const summaryHtml = computed(() => {
   if (files.value.length === 0) return '<span class="summary-error">비교할 파일이 없습니다.</span>'
@@ -101,6 +126,7 @@ const summaryHtml = computed(() => {
 function loadFiles(dir: string) {
   files.value = []
   currentIdx.value = 0
+  selectedIssues.value = new Set()
 
   const completedDir = window.nodePath.join(dir, 'Completed', 'data')
   const backupDir = window.nodePath.join(dir, 'Backup')
@@ -152,58 +178,136 @@ function updateFilteredFiles() {
     })
 }
 
-function selectFile(idx: number) { currentIdx.value = idx }
+function selectFile(idx: number) {
+  currentIdx.value = idx
+  selectedIssues.value = new Set()
+}
 
-function repairFile(idx: number): { success: boolean; error?: string } {
+function toggleIssue(i: number) {
+  const s = new Set(selectedIssues.value)
+  if (s.has(i)) s.delete(i); else s.add(i)
+  selectedIssues.value = s
+}
+
+function getIndent(): number {
+  return 4 * Number((globalThis as any).settings?.JsonChangeLine || 0)
+}
+
+function refreshFileIssues(idx: number) {
   const f = files.value[idx]
-  if (f.issues.length === 0) return { success: false, error: '문제가 없는 파일' }
   try {
     let origData = window.nodeFs.readFileSync(f.origPath, 'utf-8')
     let transData = window.nodeFs.readFileSync(f.transPath, 'utf-8')
     if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1)
     if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
     const orig = JSON.parse(origData), trans = JSON.parse(transData)
+    const issues: VerifyIssue[] = window.verify.verifyJsonIntegrity(orig, trans)
+    f.issues = issues
+    f.errorCount = issues.filter(i => i.severity === 'error').length
+    f.warningCount = issues.filter(i => i.severity === 'warning').length
+  } catch (e) {
+    f.issues = [{ path: '$', type: 'parse_error', severity: 'error', message: `JSON 파싱 오류: ${(e as Error).message}` }]
+    f.errorCount = 1; f.warningCount = 0
+  }
+}
+
+function revertSelected() {
+  const f = files.value[currentIdx.value]
+  if (!f || selectedIssues.value.size === 0) return
+  try {
+    let origData = window.nodeFs.readFileSync(f.origPath, 'utf-8')
+    let transData = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+    if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1)
+    if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
+    const orig = JSON.parse(origData), trans = JSON.parse(transData)
+    let reverted = 0
+    for (const idx of selectedIssues.value) {
+      const issue = f.issues[idx]
+      if (!issue || issue.path === '$') continue
+      const origVal = window.verify.getAtPath(orig, issue.path)
+      if (origVal !== undefined) {
+        window.verify.setAtPath(trans, issue.path, JSON.parse(JSON.stringify(origVal)))
+        reverted++
+      }
+    }
+    if (reverted > 0) {
+      const indent = getIndent()
+      window.nodeFs.writeFileSync(f.transPath, JSON.stringify(trans, null, indent || undefined), 'utf-8')
+      refreshFileIssues(currentIdx.value)
+      f.repaired = true
+      statusText.value = `✓ ${reverted}개 항목 되돌리기 완료 (남은 문제: ${f.issues.length}개)`
+      statusClass.value = 'status-ok'
+    } else {
+      statusText.value = '되돌릴 수 있는 항목이 없습니다'
+      statusClass.value = 'status-error'
+    }
+    selectedIssues.value = new Set()
+    updateFilteredFiles()
+  } catch (e) {
+    statusText.value = `❌ 되돌리기 실패: ${(e as Error).message}`
+    statusClass.value = 'status-error'
+  }
+}
+
+function repairFile(idx: number): { success: boolean; fixed: number; remaining: number; error?: string } {
+  const f = files.value[idx]
+  if (f.issues.length === 0) return { success: false, fixed: 0, remaining: 0, error: '문제가 없는 파일' }
+  try {
+    let origData = window.nodeFs.readFileSync(f.origPath, 'utf-8')
+    let transData = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+    if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1)
+    if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
+    const orig = JSON.parse(origData), trans = JSON.parse(transData)
+    const beforeCount = f.issues.length
     const repaired = window.verify.repairJson(orig, trans)
-    const indent = 4 * Number(globalThis.settings?.JsonChangeLine || 0)
-    const output = JSON.stringify(repaired, null, indent)
+    const indent = getIndent()
+    const output = JSON.stringify(repaired, null, indent || undefined)
     window.nodeFs.writeFileSync(f.transPath, output, 'utf-8')
-    const newIssues: VerifyIssue[] = window.verify.verifyJsonIntegrity(orig, repaired)
-    const filtered = newIssues.filter(i => !(i.type === 'string_changed' && i.severity === 'warning'))
-    f.issues = filtered
-    f.errorCount = filtered.filter(i => i.severity === 'error').length
-    f.warningCount = filtered.filter(i => i.severity === 'warning').length
+    refreshFileIssues(idx)
     f.repaired = true
-    return { success: true }
-  } catch (e) { return { success: false, error: (e as Error).message } }
+    const fixed = beforeCount - f.issues.length
+    return { success: true, fixed, remaining: f.issues.length }
+  } catch (e) { return { success: false, fixed: 0, remaining: f.issues.length, error: (e as Error).message } }
 }
 
 function repairCurrentFile() {
   const result = repairFile(currentIdx.value)
   if (result.success) {
-    statusText.value = `✓ ${files.value[currentIdx.value].name} 수정 완료`
+    if (result.remaining > 0) {
+      statusText.value = `✓ ${result.fixed}개 수정 완료, ${result.remaining}개 항목은 번역 품질 문제로 자동 수정 불가`
+    } else {
+      statusText.value = `✓ ${files.value[currentIdx.value].name} 수정 완료 (${result.fixed}개 문제 해결)`
+    }
     statusClass.value = 'status-ok'
   } else {
     statusText.value = `❌ 수정 실패: ${result.error}`
     statusClass.value = 'status-error'
   }
+  selectedIssues.value = new Set()
   updateFilteredFiles()
 }
 
 function repairAll() {
-  let repaired = 0, failed = 0
+  let repaired = 0, failed = 0, totalFixed = 0, totalRemaining = 0
   for (let i = 0; i < files.value.length; i++) {
     if (files.value[i].issues.length > 0) {
       const r = repairFile(i)
-      if (r.success) repaired++; else failed++
+      if (r.success) { repaired++; totalFixed += r.fixed; totalRemaining += r.remaining }
+      else failed++
     }
   }
   if (failed === 0) {
-    statusText.value = `✓ ${repaired}개 파일 수정 완료`
+    if (totalRemaining > 0) {
+      statusText.value = `✓ ${repaired}개 파일, ${totalFixed}개 문제 수정 완료 (${totalRemaining}개 항목은 수동 확인 필요)`
+    } else {
+      statusText.value = `✓ ${repaired}개 파일, ${totalFixed}개 문제 모두 수정 완료`
+    }
     statusClass.value = 'status-ok'
   } else {
     statusText.value = `${repaired}개 수정, ${failed}개 실패`
     statusClass.value = 'status-error'
   }
+  selectedIssues.value = new Set()
   updateFilteredFiles()
 }
 
@@ -211,7 +315,7 @@ function close() { window.close() }
 
 onMounted(() => {
   api.on('initVerify', (dir: string) => loadFiles(dir))
-  api.on('verifySettings', (s: unknown) => { globalThis.settings = s as typeof globalThis.settings })
+  api.on('verifySettings', (s: unknown) => { (globalThis as any).settings = s })
   api.send('verifyReady')
 })
 onUnmounted(() => {
@@ -250,7 +354,7 @@ onUnmounted(() => {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
 .summary { font-size: 12px; }
-.action-buttons { display: flex; gap: 4px; }
+.action-buttons { display: flex; gap: 4px; align-items: center; }
 .action-buttons button {
   padding: 4px 10px; font-size: 11px; background: var(--Highlight1);
   border: var(--border); border-radius: 4px; color: var(--mainColor);
@@ -258,6 +362,7 @@ onUnmounted(() => {
 }
 .action-buttons button:hover { background: rgba(255,255,255,0.08); }
 .action-buttons button:disabled { opacity: 0.3; cursor: default; }
+.selection-count { font-size: 11px; opacity: 0.5; }
 .status { font-size: 11px; margin-left: auto; }
 .status-ok { color: #50fa7b; }
 .status-error { color: #ff5555; }
@@ -266,14 +371,38 @@ onUnmounted(() => {
 .issues-file-name { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
 .no-issues { font-size: 13px; color: #50fa7b; opacity: 0.6; padding: 20px; text-align: center; }
 .issue-item {
-  margin-bottom: 8px; padding: 10px 12px; border-radius: 6px;
+  margin-bottom: 8px; padding: 10px 12px 10px 44px; border-radius: 6px;
   background: var(--Highlight1); border-left: 3px solid transparent;
+  position: relative; transition: var(--transition);
 }
 .issue-item.error { border-left-color: #ff5555; }
 .issue-item.warning { border-left-color: #ffb86c; }
+.issue-item.selected { background: rgba(124,111,219,0.08); border-color: rgba(124,111,219,0.5); }
+.issue-checkbox {
+  position: absolute; top: 0; left: 0; width: 36px; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0.4; transition: var(--transition);
+}
+.issue-checkbox:hover { opacity: 1; background: rgba(124,111,219,0.15); border-radius: 6px 0 0 6px; }
+.issue-checkbox input[type="checkbox"] {
+  width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent);
+}
+.issue-item.selected .issue-checkbox { opacity: 1; }
+.issue-content { flex: 1; }
+.issue-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .issue-path { font-size: 11px; opacity: 0.4; font-family: monospace; }
-.issue-type { font-size: 12px; font-weight: 600; margin: 4px 0; }
+.issue-type { font-size: 12px; font-weight: 600; white-space: nowrap; }
 .issue-message { font-size: 12px; opacity: 0.7; }
+.issue-values { margin-top: 6px; font-size: 11px; }
+.value-row { display: flex; gap: 6px; align-items: flex-start; margin-bottom: 2px; }
+.value-label { font-weight: 600; opacity: 0.5; min-width: 36px; }
+.value-content {
+  background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;
+  font-family: monospace; font-size: 11px; word-break: break-all;
+  max-height: 60px; overflow-y: auto; display: block;
+}
+.value-content.orig { color: #8be9fd; }
+.value-content.trans { color: #f1fa8c; }
 
 :deep(.summary-error) { color: #ff5555; }
 :deep(.summary-warn) { color: #f1fa8c; }
