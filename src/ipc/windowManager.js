@@ -24,6 +24,7 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
+            sandbox: false,
             preload: path_1.default.join(__dirname, '..', 'preload.js')
         },
         icon: path_1.default.join(__dirname, '../../res/icon.png')
