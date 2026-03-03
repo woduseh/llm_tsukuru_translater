@@ -7,10 +7,8 @@ export declare global {
     var mwindow:BrowserWindow
     var settings:AppSettings
     var settingsWindow:BrowserWindow
-    var keyvalue:CryptoKey|undefined
     var oPath:string
     var sourceDir:string
-    var iconPath:string
     var gb:Record<string, ExtractedFileData>
     var externMsg:Record<string, string>
     var useExternMsg:boolean
@@ -18,7 +16,6 @@ export declare global {
     var llmAbort:boolean
     var loadEn:() => void
     var WolfExtData: extData[]
-    var WolfEncoding:'utf8'|'shift-jis'
     var WolfCache: {[key:string]:Buffer}
     var WolfMetadata: wolfMetadata
 

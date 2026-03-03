@@ -98,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, toRaw, onMounted } from 'vue'
 import { api } from '../composables/useIpc'
 
 const settings = reactive<Record<string, any>>({
@@ -159,11 +159,11 @@ function applySettings() {
   settings.extractPlus = extP
   settings.extractSomeScript2 = extractSomeScript2Text.value.split('\n')
   settings.theme = 'Dracula'
-  api.send('applysettings', { ...settings })
+  api.send('applysettings', { ...toRaw(settings) })
 }
 
 function closeSettings() {
-  api.send('closesettings', { ...settings })
+  api.send('closesettings')
 }
 
 onMounted(() => {

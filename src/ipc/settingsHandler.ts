@@ -25,9 +25,6 @@ ipcMain.on('settings', () => {
   globalThis.settingsWindow.webContents.on('did-finish-load', function () {
     globalThis.settingsWindow.show();
   });
-  globalThis.settingsWindow.on('close', function() {
-    worked()
-  });
 })
 
 ipcMain.on('settingsReady', () => {
@@ -36,18 +33,22 @@ ipcMain.on('settingsReady', () => {
   }
 })
 
-ipcMain.on('applysettings', async (ev, arg) => {
+ipcMain.on('applysettings', (ev, arg) => {
   globalThis.settings = {...globalThis.settings, ...arg}
   storage.set('settings', JSON.stringify(globalThis.settings))
-  globalThis.settingsWindow.close()
   globalThis.settings.themeData = (Themes as Record<string, Record<string, string>>)[globalThis.settings.theme]
   const { llmApiKey, ...safeSettings } = globalThis.settings;
   getMainWindow().webContents.send('getGlobalSettings', safeSettings);
+  if (globalThis.settingsWindow && !globalThis.settingsWindow.isDestroyed()) {
+    globalThis.settingsWindow.close()
+  }
   worked()
 })
 
-ipcMain.on('closesettings', async (ev, arg) => {
-  globalThis.settingsWindow.close()
+ipcMain.on('closesettings', () => {
+  if (globalThis.settingsWindow && !globalThis.settingsWindow.isDestroyed()) {
+    globalThis.settingsWindow.close()
+  }
   worked()
 })
 

@@ -13,11 +13,8 @@ export interface AppContextType {
   llmAbort: boolean;
   oPath: string;
   sourceDir: string;
-  iconPath: string;
-  keyvalue: CryptoKey | undefined;
   loadEn: (() => void) | null;
   WolfExtData: extData[];  // extData from globals.d.ts
-  WolfEncoding: 'utf8' | 'shift-jis';
   WolfCache: Record<string, Buffer>;
   WolfMetadata: { ver: 2 | 3 | -1 };
   [key: string]: unknown;
@@ -34,11 +31,8 @@ export const appCtx: AppContextType = {
   llmAbort: false,
   oPath: '',
   sourceDir: '',
-  iconPath: '',
-  keyvalue: undefined,
   loadEn: null,
   WolfExtData: [],
-  WolfEncoding: 'utf8',
   WolfCache: {},
   WolfMetadata: { ver: -1 },
 };
@@ -57,11 +51,8 @@ function syncToGlobal() {
     llmAbort: 'llmAbort',
     oPath: 'oPath',
     sourceDir: 'sourceDir',
-    iconPath: 'iconPath',
-    keyvalue: 'keyvalue',
     loadEn: 'loadEn',
     WolfExtData: 'WolfExtData',
-    WolfEncoding: 'WolfEncoding',
     WolfCache: 'WolfCache',
     WolfMetadata: 'WolfMetadata',
   };
