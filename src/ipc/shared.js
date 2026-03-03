@@ -51,7 +51,7 @@ const electron_1 = require("electron");
 const electron_store_1 = __importDefault(require("electron-store"));
 const projectTools_1 = __importDefault(require("../js/libs/projectTools"));
 const dataBaseO = __importStar(require("../js/rpgmv/datas.js"));
-exports.storage = new electron_store_1.default();
+exports.storage = new electron_store_1.default({ encryptionKey: 'tsukuru-extractor-store-key' });
 let mainid = 0;
 function getMainId() {
     return mainid;

@@ -238,7 +238,7 @@ export class GeminiTranslator {
     constructor(config: GeminiConfig) {
         this.config = config;
         const modelPath = config.model.includes('/') ? config.model : `models/${config.model}`;
-        this.apiUrl = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${config.apiKey}`;
+        this.apiUrl = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent`;
     }
 
     async translateText(text: string): Promise<string> {
@@ -259,7 +259,7 @@ export class GeminiTranslator {
                 { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
             ]
         }, {
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.config.apiKey },
             timeout: this.config.timeout
         });
         const candidates = response.data?.candidates;
