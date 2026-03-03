@@ -84,7 +84,7 @@ export const apply = async (ev: unknown, arg: ApplyArg, ctx: AppContext) => {
               }
             }
             try {
-              if(!Object.keys(OutputData).includes(originFile)){
+              if(!(originFile in OutputData)){
                 const fidir = path.join(dir, 'Backup', originFile)
                 if(fs.existsSync(fidir)){
                   let filedata = readTextFile(fidir)

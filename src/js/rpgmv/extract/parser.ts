@@ -61,41 +61,27 @@ function addComment(obj: DatObj, comment:string, usePath='', force:'force'|'nonf
     return obj
 }
 
-const addto = (key: string, val: unknown, temppp: Record<string, unknown>): Record<string, unknown> => { 
-    let Keys = key.split('.');
-    const fkey = Keys[0]
-    if(temppp === undefined){
-        temppp = {}
+const addto = (key: string, val: unknown, temppp: Record<string, unknown>): Record<string, unknown> => {
+    if(temppp === undefined) temppp = {}
+    const keys = key.split('.');
+    let current = temppp;
+    for(let i = 0; i < keys.length - 1; i++){
+        if(current[keys[i]] === undefined) current[keys[i]] = {}
+        current = current[keys[i]] as Record<string, unknown>
     }
-    if(Keys.length==1){
-        temppp[fkey] = val;
-    }
-    else{
-        Keys.shift()
-        if(temppp[fkey] === undefined){
-            temppp[fkey] = {}
-        }
-        temppp[fkey] = addto(Keys.join('.'), val, temppp[fkey] as Record<string, unknown>)
-    }
+    current[keys[keys.length - 1]] = val;
     return temppp
 }
 
-const returnVal = (key: string, temppp: Record<string, unknown> | undefined): unknown => { 
-    let Keys = key.split('.');
-    const fkey = Keys[0]
-    if(temppp === undefined){
-        return ''
+const returnVal = (key: string, temppp: Record<string, unknown> | undefined): unknown => {
+    if(temppp === undefined) return ''
+    const keys = key.split('.');
+    let current: Record<string, unknown> = temppp;
+    for(let i = 0; i < keys.length - 1; i++){
+        if(current[keys[i]] === undefined) current[keys[i]] = {}
+        current = current[keys[i]] as Record<string, unknown>
     }
-    if(Keys.length==1){
-        return temppp[fkey];
-    }
-    else{
-        Keys.shift()
-        if(temppp[fkey] === undefined){
-            temppp[fkey] = {}
-        }
-        return returnVal(Keys.join('.'), temppp[fkey] as Record<string, unknown>)
-    }
+    return current[keys[keys.length - 1]];
 }
 
 export const setObj = addto
@@ -163,23 +149,16 @@ function forEvent(d: Record<string, unknown>, dat_obj: DatObj, conf: ExtractConf
         if(typeof d.list === 'object' && d.list !== undefined && d.list !== null){
             let messageHasFace = false
             const list = d.list as Record<string, unknown>[]
+            // Build acceptable codes Set once before the loop
+            const acceptableSet = new Set([401, 102, 405, 101, 105])
+            if(conf.srce){ acceptableSet.add(356); acceptableSet.add(357) }
+            if(conf.arg.ext_javascript){ acceptableSet.add(355); acceptableSet.add(655) }
+            if(conf.note){ acceptableSet.add(408); acceptableSet.add(108) }
+            for(const code of _ctx.settings.extractPlus) acceptableSet.add(code)
+            const scriptCheckCodes = new Set([356, 355, 108, 408, 357])
+            const commentCodes = new Set([101, 102, 105])
             for(let i=0;i<list.length;i++){
-                let acceptable = [401, 102, 405, 101, 105]
-                let ischeckable = false
-                let reportDebug = false
-                if(conf.srce){
-                    acceptable = acceptable.concat([356,357])
-                }
-                if(conf.arg.ext_javascript){
-                    acceptable = acceptable.concat([355,655])
-                }
-                if(conf.note){
-                    acceptable = acceptable.concat([408, 108])
-                }
-                if([356,355,108,408,357].includes(list[i].code as number) && _ctx.settings.extractSomeScript){
-                    ischeckable = true
-                }
-                acceptable = acceptable.concat(_ctx.settings.extractPlus)
+                const ischeckable = scriptCheckCodes.has(list[i].code as number) && _ctx.settings.extractSomeScript
                 eventID += 1
                 function checker(dat_obj: DatObj, da: unknown, ca: string){
                     if(typeof da === 'object'){
@@ -193,8 +172,8 @@ function forEvent(d: Record<string, unknown>, dat_obj: DatObj, conf: ExtractConf
                     return dat_obj
                 }
                 
-                if (acceptable.includes(list[i].code as number) && list[i].parameters !== undefined && list[i].parameters !== null){
-                    if([101,102,105].includes(list[i].code as number)){
+                if (acceptableSet.has(list[i].code as number) && list[i].parameters !== undefined && list[i].parameters !== null){
+                    if(commentCodes.has(list[i].code as number)){
                         dat_obj = addComment(dat_obj, `--- ${list[i].code} ---`)
                     }
                     if(list[i].code === 101){
