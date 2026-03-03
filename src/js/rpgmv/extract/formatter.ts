@@ -23,10 +23,7 @@ function countNewlines(str: string): number {
 
 export const format_extracted = async(dats: {datobj: Record<string, ExtractDictEntry>; edited: Record<string, unknown>; conf: ExtractConf}, typ = 0, ctx: AppContext) => {
     const datobj = dats.datobj
-    const conf = dats.conf
-    const extended = conf.extended
-    const fileName = conf.fileName
-    const dir = conf.dir
+    const fileName = dats.conf.fileName
     if(typ == 0){
         const Keys = Object.keys(datobj)
         let LenMemory: Record<string, number> = {}

@@ -12,13 +12,12 @@ interface DatObj {
 }
 
 function addtodic(pa: string, obj: DatObj, usePath='', conf: ExtractEntryConf | undefined = undefined, spliter=false){
-    const Path = pa
     if(pa === '%comment%'){
         const id = `comment_${(Object.keys(obj.main)).length}`
         obj.main[id] = {var: conf!.comment!, conf: {isComment:true}, qpath:usePath}
         return obj
     }
-    let val = returnVal(Path, obj.edited)
+    let val = returnVal(pa, obj.edited)
     if(!strNullSafe(usePath)){
         usePath = ''
     }
@@ -36,7 +35,7 @@ function addtodic(pa: string, obj: DatObj, usePath='', conf: ExtractEntryConf | 
         }
     }
     if(val !== undefined && val !== null && typeof(val) === 'string' && (val.length > 0 || _ctx.settings.ExtractAddLine)){
-        const id = Path
+        const id = pa
         if(usePath === 'note' || spliter){
             obj = addtodic('%comment%', obj, usePath, {comment:'-----'}) 
         }
@@ -132,9 +131,6 @@ function isIncludeAble(sc: unknown){
 }
 
 function forEvent(d: Record<string, unknown>, dat_obj: DatObj, conf: ExtractConf, Path: string){
-    const extended = conf.extended
-    const fileName = conf.fileName
-    const dir = conf.dir
     if(obNullSafe(d)){
         if(conf.note){
             if(_ctx.settings.extractSomeScript){
@@ -181,7 +177,7 @@ function forEvent(d: Record<string, unknown>, dat_obj: DatObj, conf: ExtractConf
                             dat_obj = checker(dat_obj, (list[i].parameters as unknown[])[4], Path + `.list.${i}.parameters.${4}`)
                         }
                     }
-                    else if(![105].includes(list[i].code as number)){
+                    else if(list[i].code !== 105){
                         for(let i2=0;i2<(list[i].parameters as unknown[]).length;i2++){
                             dat_obj = checker(dat_obj, (list[i].parameters as unknown[])[i2], Path + `.list.${i}.parameters.${i2}`)
                         }
@@ -208,10 +204,7 @@ export const resetHadComment = () => { hadComment = false }
 
 export const extract = async (filedata: string, conf: ExtractConf, ftype: ExtractFileType, ctx: AppContext) => {
     _ctx = ctx;
-    const extended = conf.extended
     const fileName = conf.fileName
-    const dir = conf.dir
-    const dirf = dir + fileName + '\\'
     ctx.gb[fileName] = {data: {}}
     if (filedata.charCodeAt(0) === 0xFEFF) {
         filedata = filedata.substring(1);
