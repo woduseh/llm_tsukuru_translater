@@ -60,9 +60,11 @@ export async function wolfInit() {
         }
         catch(err){
           Tools.sendError(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+          worked()
         }
     })
     ipcMain.on('wolf_apply',  async (ev, arg:{folder:string,config:{[key:string]:boolean}}) => {
+      try {
         const dir = arg.folder
         if(!fs.existsSync(dir)){
           Tools.sendError('지정된 디렉토리가 없습니다');
@@ -79,6 +81,9 @@ export async function wolfInit() {
         await wolfAppyier()
         Tools.send('alert2');
         worked()
-
+      } catch(err){
+        Tools.sendError(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+        worked()
+      }
     })
 }

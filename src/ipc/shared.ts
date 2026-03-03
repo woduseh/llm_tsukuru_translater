@@ -2,7 +2,6 @@ import { app, BrowserWindow } from 'electron';
 import Store from 'electron-store';
 import tools from '../js/libs/projectTools'
 import * as dataBaseO from '../js/rpgmv/datas.js';
-import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { appCtx } from '../appContext';
