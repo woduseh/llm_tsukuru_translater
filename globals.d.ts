@@ -49,6 +49,8 @@ export declare global {
         verify: {
             verifyJsonIntegrity: (orig: unknown, trans: unknown) => VerifyIssue[];
             repairJson: (orig: unknown, trans: unknown) => unknown;
+            getAtPath: (obj: unknown, jsonPath: string) => unknown;
+            setAtPath: (obj: unknown, jsonPath: string, value: unknown) => boolean;
         };
     }
 
