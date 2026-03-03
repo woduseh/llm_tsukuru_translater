@@ -1,4 +1,5 @@
 import { lenStr } from '../../../../globals'
+import { appCtx } from '../../../appContext';
 
 interface Commands{
     numArg:number[]
@@ -9,7 +10,7 @@ let idIndex = 0
 function addString(str:lenStr, sourceFile:string, targetFile:string, codeStr:string = ''){
     const id = idIndex;
     idIndex += 1;
-    globalThis.WolfExtData.push({
+    appCtx.WolfExtData.push({
         str: {
             pos1: str.pos1,
             pos2: str.pos2,

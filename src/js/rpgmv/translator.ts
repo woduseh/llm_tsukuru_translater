@@ -2,6 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import { createGeminiTranslator, TranslationLog, TranslationLogEntry, contentHash } from '../libs/geminiTranslator';
 import Tools from '../libs/projectTools';
+import { appCtx } from '../../appContext';
 
 const PROGRESS_FILE = '.llm_progress.json';
 const CACHE_FILE = '.llm_cache.json';
@@ -89,15 +90,15 @@ export const trans = async (ev: unknown, arg: TransArg) => {
             Tools.worked();
             return;
         }
-        if (!globalThis.settings.llmApiKey) {
+        if (!appCtx.settings.llmApiKey) {
             Tools.sendError('Gemini API 키가 설정되지 않았습니다');
             Tools.send('llmTranslating', false);
             Tools.worked();
             return;
         }
 
-        const targetLang = globalThis.settings.llmTargetLang || 'ko';
-        const gemini = createGeminiTranslator(globalThis.settings, arg.langu || 'ja', targetLang);
+        const targetLang = appCtx.settings.llmTargetLang || 'ko';
+        const gemini = createGeminiTranslator(appCtx.settings, arg.langu || 'ja', targetLang);
         const fileList = fs.readdirSync(edir).filter(f => f.endsWith('.txt'));
 
         if (fileList.length === 0) {
@@ -155,7 +156,7 @@ export const trans = async (ev: unknown, arg: TransArg) => {
                             if (fileContent === backupContent) {
                                 // Untranslated file — invalidate its cache entry
                                 const hash = contentHash(backupContent);
-                                const cacheKey = `${hash}_${globalThis.settings.llmModel}_${targetLang}`;
+                                const cacheKey = `${hash}_${appCtx.settings.llmModel}_${targetLang}`;
                                 if (cache[cacheKey]) {
                                     delete cache[cacheKey];
                                     cacheModified = true;
@@ -177,7 +178,7 @@ export const trans = async (ev: unknown, arg: TransArg) => {
 
         // Cache
         const cache = loadCache(edir);
-        const model = globalThis.settings.llmModel;
+        const model = appCtx.settings.llmModel;
 
         // Log
         const translationLog: TranslationLog = {
@@ -198,7 +199,7 @@ export const trans = async (ev: unknown, arg: TransArg) => {
         const failedFiles: string[] = [];
 
         for (const fileName of fileList) {
-            if (globalThis.llmAbort) break;
+            if (appCtx.llmAbort) break;
             const filePath = path.join(edir, fileName);
             const originalContent = fs.readFileSync(filePath, 'utf-8');
 
@@ -297,7 +298,7 @@ export const trans = async (ev: unknown, arg: TransArg) => {
         }
 
         // Finalize
-        const aborted = !!globalThis.llmAbort;
+        const aborted = !!appCtx.llmAbort;
         if (!aborted) clearProgress(edir);
         translationLog.endTime = new Date().toISOString();
         translationLog.totalDurationMs = Date.now() - startTime;
@@ -347,8 +348,8 @@ export async function retranslateFile(
     }
 
     const originalContent = fs.readFileSync(backupPath, 'utf-8');
-    const gemini = createGeminiTranslator(globalThis.settings, sourceLang, targetLang);
-    const model = globalThis.settings.llmModel;
+    const gemini = createGeminiTranslator(appCtx.settings, sourceLang, targetLang);
+    const model = appCtx.settings.llmModel;
 
     // Invalidate cache for this file's original content and persist immediately
     const cache = loadCache(edir);
@@ -406,7 +407,7 @@ export async function retranslateBlocks(
 
     const originalContent = fs.readFileSync(backupPath, 'utf-8');
     const transContent = fs.readFileSync(filePath, 'utf-8');
-    const gemini = createGeminiTranslator(globalThis.settings, sourceLang, targetLang);
+    const gemini = createGeminiTranslator(appCtx.settings, sourceLang, targetLang);
 
     // Split both files into blocks
     const origLines = originalContent.split('\n');
@@ -464,7 +465,7 @@ export async function retranslateBlocks(
         // Invalidate cache
         const cache = loadCache(edir);
         const hash = contentHash(originalContent);
-        const model = globalThis.settings.llmModel;
+        const model = appCtx.settings.llmModel;
         const cacheKey = `${hash}_${model}_${targetLang}`;
         delete cache[cacheKey];
         saveCache(edir, cache);

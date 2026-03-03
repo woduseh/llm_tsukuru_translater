@@ -4,25 +4,26 @@ import { writeToPath } from '@fast-csv/format';
 import { DecryptDir as DecryptDirs, EncryptDir as EncryptDirs } from '../fileCrypto';
 import type { ExtractArg } from '../types';
 import { resetHadComment } from './parser';
+import { appCtx } from '../../../appContext';
 
 export const init_extract = (arg: ExtractArg) => {
     resetHadComment()
     function c(fileName: string){
-        globalThis.gb[fileName] = {data: {}}
-        globalThis.gb[fileName].outputText = ''
-        globalThis.gb[fileName].isbom = false 
+        appCtx.gb[fileName] = {data: {}}
+        appCtx.gb[fileName].outputText = ''
+        appCtx.gb[fileName].isbom = false 
     }
-    if(globalThis.settings.onefile_src && arg.ext_src){
+    if(appCtx.settings.onefile_src && arg.ext_src){
         c('ext_scripts.json')
     }
-    if(globalThis.settings.onefile_src && arg.ext_javascript){
+    if(appCtx.settings.onefile_src && arg.ext_javascript){
         c('ext_javascript.json')
     }
-    if(globalThis.settings.onefile_note && arg.ext_note){
+    if(appCtx.settings.onefile_note && arg.ext_note){
         c('ext_note.json')
         c('ext_note2.json')
     }
-    if(globalThis.settings.oneMapFile){
+    if(appCtx.settings.oneMapFile){
         c('Maps.json')
     }
 }

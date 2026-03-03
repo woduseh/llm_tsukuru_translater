@@ -8,11 +8,12 @@ import { wolfAppyier } from "./apply/applyWolf";
 import { getAllFileInDir } from "../../utils";
 import { wolfDecrypt } from "./extract/decrypter";
 import Tools from '../libs/projectTools';
+import { appCtx } from '../../appContext';
 
 export async function wolfInit() {
     ipcMain.on('wolf_ext', async (ev, arg:{folder:string,config:{[key:string]:boolean}}) => {
         try {
-          globalThis.WolfMetadata = {
+          appCtx.WolfMetadata = {
             ver:-1
           }
           let dir = arg.folder
@@ -35,8 +36,8 @@ export async function wolfInit() {
             return
           }
 
-          globalThis.sourceDir  = arg.folder
-          globalThis.WolfExtData = []
+          appCtx.sourceDir  = arg.folder
+          appCtx.WolfExtData = []
           const encrypted = getAllFileInDir(path.dirname(dir), '.wolf')
           if(encrypted.length > 0){
             const d = await wolfDecrypt(encrypted)
@@ -73,8 +74,8 @@ export async function wolfInit() {
           worked()
           return
         }
-        globalThis.sourceDir  = arg.folder
-        globalThis.WolfExtData = []
+        appCtx.sourceDir  = arg.folder
+        appCtx.WolfExtData = []
         await wolfAppyier()
         Tools.send('alert2');
         worked()

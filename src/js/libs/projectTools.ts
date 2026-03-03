@@ -1,4 +1,5 @@
 import { rmBom } from './fileIO';
+import { appCtx } from '../../appContext';
 
 interface PTools{
     send: (channel: string, ...args: unknown[]) => void;
@@ -13,17 +14,17 @@ interface PTools{
 function INIT(){
     pTools = {
         send: (channel: string, ...args: unknown[]) => {
-            globalThis.mwindow.webContents.send(channel, ...args);
+            appCtx.mainWindow!.webContents.send(channel, ...args);
         },
         sendError: (txt:string) => {
-            globalThis.mwindow.webContents.send('alert', {icon: 'error',  message: txt});
+            appCtx.mainWindow!.webContents.send('alert', {icon: 'error',  message: txt});
         },
         sendAlert: (txt:string) => {
-            globalThis.mwindow.webContents.send('alert', txt);
+            appCtx.mainWindow!.webContents.send('alert', txt);
         },
         worked: () => {
-            globalThis.mwindow.webContents.send('worked', 0);
-            globalThis.mwindow.webContents.send('loading', 0);
+            appCtx.mainWindow!.webContents.send('worked', 0);
+            appCtx.mainWindow!.webContents.send('loading', 0);
         },
         init: () => {}
     }

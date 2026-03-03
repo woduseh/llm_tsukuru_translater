@@ -6,6 +6,7 @@ import { getMainWindow, storage } from './shared';
 import { getLLMCompareWindow } from './toolsHandler';
 import { loadRoute } from './viteHelper';
 import log from '../logger';
+import { appCtx } from '../appContext';
 
 let llmSettingsWindow: Electron.BrowserWindow | null = null;
 let llmPendingArg: { dir: string; game: string } | null = null;
@@ -42,24 +43,24 @@ ipcMain.on('openLLMSettings',(ev, arg) => {
 
 ipcMain.on('llmSettingsReady', () => {
   if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
-    llmSettingsWindow.webContents.send('llmSettings', globalThis.settings);
+    llmSettingsWindow.webContents.send('llmSettings', appCtx.settings);
   }
 })
 
 ipcMain.on('llmSettingsApply', (ev, data) => {
-  globalThis.settings = { ...globalThis.settings, llmSortOrder: data.llmSortOrder };
-  storage.set('settings', JSON.stringify(globalThis.settings));
+  appCtx.settings = { ...appCtx.settings, llmSortOrder: data.llmSortOrder };
+  storage.set('settings', JSON.stringify(appCtx.settings));
 
   if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
     llmSettingsWindow.close();
   }
 
   if (llmPendingArg) {
-    globalThis.llmAbort = false;
+    appCtx.llmAbort = false;
     const a = {
       dir: Buffer.from(llmPendingArg.dir, 'utf8').toString('base64'),
       type: 'gemini',
-      langu: globalThis.settings.llmSourceLang || 'ja',
+      langu: appCtx.settings.llmSourceLang || 'ja',
       game: llmPendingArg.game,
       resetProgress: data.llmResetProgress || false,
       sortOrder: data.llmSortOrder || 'name-asc',
@@ -72,7 +73,7 @@ ipcMain.on('llmSettingsApply', (ev, data) => {
 })
 
 ipcMain.on('abortLLM', () => {
-  globalThis.llmAbort = true;
+  appCtx.llmAbort = true;
 })
 
 ipcMain.on('llmSettingsClose', () => {
@@ -85,13 +86,13 @@ ipcMain.on('retranslateFile', async (_ev, data: { dir: string; fileName: string 
   const wolfEdir = path.join(data.dir, '_Extract', 'Texts');
   const mvEdir = path.join(data.dir, 'Extract');
   const edir = (fs.existsSync(wolfEdir) && fs.existsSync(wolfEdir + '_backup')) ? wolfEdir : mvEdir;
-  globalThis.llmAbort = false;
+  appCtx.llmAbort = false;
   try {
     const result = await eztrans.retranslateFile(
       edir,
       data.fileName,
-      globalThis.settings.llmSourceLang || 'ja',
-      globalThis.settings.llmTargetLang || 'ko',
+      appCtx.settings.llmSourceLang || 'ja',
+      appCtx.settings.llmTargetLang || 'ko',
       (msg: string) => {
         const lcw = getLLMCompareWindow();
         if (lcw && !lcw.isDestroyed()) {
@@ -116,14 +117,14 @@ ipcMain.on('retranslateBlocks', async (_ev, data: { dir: string; fileName: strin
   const wolfEdir = path.join(data.dir, '_Extract', 'Texts');
   const mvEdir = path.join(data.dir, 'Extract');
   const edir = (fs.existsSync(wolfEdir) && fs.existsSync(wolfEdir + '_backup')) ? wolfEdir : mvEdir;
-  globalThis.llmAbort = false;
+  appCtx.llmAbort = false;
   try {
     const result = await eztrans.retranslateBlocks(
       edir,
       data.fileName,
       data.blockIndices,
-      globalThis.settings.llmSourceLang || 'ja',
-      globalThis.settings.llmTargetLang || 'ko',
+      appCtx.settings.llmSourceLang || 'ja',
+      appCtx.settings.llmTargetLang || 'ko',
       (msg: string) => {
         const lcw = getLLMCompareWindow();
         if (lcw && !lcw.isDestroyed()) {

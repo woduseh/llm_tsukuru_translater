@@ -3,22 +3,23 @@ import path from 'path'
 import { sleep } from '../../rpgmv/globalutils'
 import Tools from '../../libs/projectTools'
 import WolfExtDataParser from '../extract/wolfExtData'
+import { appCtx } from '../../../appContext';
 
 export async function wolfAppyier() {
     let totalOffset:{[key:string]:number} = {}
     let sourceDic:{[key:string]:Buffer} = {}
     let extractedTextDic:{[key:string]:string[]} = {}
-    const extTextDir = path.join(globalThis.sourceDir, '_Extract')
+    const extTextDir = path.join(appCtx.sourceDir, '_Extract')
     WolfExtDataParser.read(path.join(extTextDir, '.extracteddata'))
-    for(let i=0;i<globalThis.WolfExtData.length;i++){
-        Tools.setProgress(i, globalThis.WolfExtData.length)
-        const dat = (globalThis.WolfExtData[i])
+    for(let i=0;i<appCtx.WolfExtData.length;i++){
+        Tools.setProgress(i, appCtx.WolfExtData.length)
+        const dat = (appCtx.WolfExtData[i])
         if(!Object.keys(extractedTextDic).includes(dat.extractFile)){
             extractedTextDic[dat.extractFile] = fs.readFileSync(path.join(extTextDir, 'Texts',`${dat.extractFile}.txt`),'utf-8').split('\n')
         }
         let extractedText = extractedTextDic[dat.extractFile]
         if(!Object.keys(sourceDic).includes(dat.sourceFile)){
-            sourceDic[dat.sourceFile] = globalThis.WolfCache[dat.sourceFile]
+            sourceDic[dat.sourceFile] = appCtx.WolfCache[dat.sourceFile]
             totalOffset[dat.sourceFile] = 0
         }
         let source = sourceDic[dat.sourceFile]

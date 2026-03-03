@@ -8,6 +8,7 @@ import { checkIsMapFile, sleep } from '../js/rpgmv/globalutils.js';
 import * as yaml from 'js-yaml';
 import { getMainWindow, sendError, worked } from './shared';
 import log from '../logger';
+import { appCtx } from '../appContext';
 
 import { ExtractArg } from '../js/rpgmv/types';
 
@@ -15,7 +16,7 @@ const ErrorAlert = (msg: string) => sendError(msg)
 
 export async function extractor(arg: ExtractArg){
   try {
-    globalThis.gb = {}
+    appCtx.gb = {}
     let file
     let v
     const extended = true
@@ -62,17 +63,17 @@ export async function extractor(arg: ExtractArg){
         hail2 = hail2.substring(hail2.indexOf('['), hail2.lastIndexOf(']') + 1)
         fs.writeFileSync(dir + '/ext_plugins.json', JSON.stringify(JSON.parse(hail2)), 'utf-8')
     }
-    globalThis.externMsg = {}
-    globalThis.useExternMsg = false
-    if(fs.existsSync(dir + '/ExternMessage.csv') && arg.exJson && globalThis.settings.ExternMsgJson){
-      const Emsg = await ExtTool.parse_externMsg(dir + '/ExternMessage.csv', !globalThis.settings.ExternMsgJson) as Record<string, string>
-      globalThis.externMsg = Emsg
-      if(globalThis.settings.ExternMsgJson){
+    appCtx.externMsg = {}
+    appCtx.useExternMsg = false
+    if(fs.existsSync(dir + '/ExternMessage.csv') && arg.exJson && appCtx.settings.ExternMsgJson){
+      const Emsg = await ExtTool.parse_externMsg(dir + '/ExternMessage.csv', !appCtx.settings.ExternMsgJson) as Record<string, string>
+      appCtx.externMsg = Emsg
+      if(appCtx.settings.ExternMsgJson){
         fs.writeFileSync(dir + '/ExternMsgcsv.json', JSON.stringify(Emsg, null, 4), 'utf-8')
       }
       else{
-        globalThis.useExternMsg = true
-        globalThis.externMsgKeys = Object.keys(Emsg)
+        appCtx.useExternMsg = true
+        appCtx.externMsgKeys = Object.keys(Emsg)
       }
     }
     let tempjsons: string[] = []
@@ -116,7 +117,7 @@ export async function extractor(arg: ExtractArg){
         note: arg.ext_note,
         arg: arg
       }
-      let runBackup = async () => {
+      let runBackup = () => {
         try {
           fs.copyFileSync(dir + '/' + fileName, dir + '/Backup/' + fileName) 
         } catch (error) { log.error('Backup failed for', fileName, error) }
@@ -139,23 +140,23 @@ export async function extractor(arg: ExtractArg){
       getMainWindow().webContents.send('loading', worked_files/max_files*100);
       await sleep(0)
     }
-    const gbKeys = {...Object.keys(globalThis.gb)}
+    const gbKeys = {...Object.keys(appCtx.gb)}
     for (const i in gbKeys){
       const fileName = gbKeys[i]
-      if(globalThis.gb[fileName].outputText === ''){
-        delete globalThis.gb[fileName]
+      if(appCtx.gb[fileName].outputText === ''){
+        delete appCtx.gb[fileName]
       }
       else if(fileName === 'ext_javascript.json'){
-        fs.writeFileSync(dir + `/Extract/${path.parse(fileName).name}.js`, globalThis.gb[fileName].outputText!,'utf-8')
-        delete globalThis.gb[fileName].outputText
+        fs.writeFileSync(dir + `/Extract/${path.parse(fileName).name}.js`, appCtx.gb[fileName].outputText!,'utf-8')
+        delete appCtx.gb[fileName].outputText
       }
       else{
-        fs.writeFileSync(dir + `/Extract/${path.parse(fileName).name}.txt`, globalThis.gb[fileName].outputText!,'utf-8')
-        delete globalThis.gb[fileName].outputText
+        fs.writeFileSync(dir + `/Extract/${path.parse(fileName).name}.txt`, appCtx.gb[fileName].outputText!,'utf-8')
+        delete appCtx.gb[fileName].outputText
       }
     }
     const ext_data = {
-      main: globalThis.gb
+      main: appCtx.gb
     }
     edTool.write(dir, ext_data)
     if (fs.existsSync(dir + '/ext_plugins.json')){
