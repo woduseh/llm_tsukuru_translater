@@ -1,15 +1,15 @@
 import log from './src/logger';
 
 import { app, BrowserWindow, ipcMain } from 'electron';
-import { apply } from "./src/js/rpgmv/apply";
+import { apply } from "./src/ts/rpgmv/apply";
 import { createWindow, registerWindowHandlers } from './src/ipc/windowManager';
 import { registerExtractHandlers } from './src/ipc/extractHandler';
 import { registerSettingsHandlers } from './src/ipc/settingsHandler';
 import { registerTranslateHandlers } from './src/ipc/translateHandler';
 import { registerToolsHandlers } from './src/ipc/toolsHandler';
-import { registerWolfHandlers } from './src/js/wolf/main';
-import { initFontIPC } from './src/js/rpgmv/fonts';
-import { initExtentions } from './src/js/libs/extentions';
+import { registerWolfHandlers } from './src/ts/wolf/main';
+import { initFontIPC } from './src/ts/rpgmv/fonts';
+import { initExtentions } from './src/ts/libs/extentions';
 import { AppContext } from './src/appContext';
 
 const ctx = new AppContext();

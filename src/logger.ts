@@ -1,5 +1,5 @@
 import log from 'electron-log/main';
-import { MAX_LOG_FILE_SIZE } from './js/libs/constants';
+import { MAX_LOG_FILE_SIZE } from './ts/libs/constants';
 
 // Configure file logging
 log.transports.file.level = 'info';

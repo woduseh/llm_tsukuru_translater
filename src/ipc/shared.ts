@@ -1,8 +1,8 @@
 import { app } from 'electron';
 import Store from 'electron-store';
 import crypto from 'crypto';
-import tools from '../js/libs/projectTools'
-import * as dataBaseO from '../js/rpgmv/datas.js';
+import tools from '../ts/libs/projectTools'
+import * as dataBaseO from '../ts/rpgmv/datas.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AppContext } from '../appContext';

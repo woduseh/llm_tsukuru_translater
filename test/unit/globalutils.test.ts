@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkIsMapFile, sleep } from '../../src/js/rpgmv/globalutils';
+import { checkIsMapFile, sleep } from '../../src/ts/rpgmv/globalutils';
 
 describe('checkIsMapFile', () => {
   it('returns true for Map001.json', () => {

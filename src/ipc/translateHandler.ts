@@ -1,7 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import * as eztrans from '../js/rpgmv/translator.js';
+import * as eztrans from '../ts/rpgmv/translator.js';
 import { storage } from './shared';
 import { getLLMCompareWindow } from './toolsHandler';
 import { loadRoute } from './viteHelper';

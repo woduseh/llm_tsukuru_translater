@@ -7,8 +7,8 @@ import {
   isPermanentApiError,
   isRetryableApiError,
   createGeminiTranslator,
-} from '../../src/js/libs/geminiTranslator';
-import { splitFileBlocks } from '../../src/js/rpgmv/translator';
+} from '../../src/ts/libs/geminiTranslator';
+import { splitFileBlocks } from '../../src/ts/rpgmv/translator';
 
 // ─── splitIntoBlocks ────────────────────────────────────────────────
 
@@ -381,7 +381,7 @@ describe('createGeminiTranslator', () => {
 
 // ─── jpathIsMap (formatter.ts) ──────────────────────────────────────
 
-import { jpathIsMap } from '../../src/js/rpgmv/extract/formatter';
+import { jpathIsMap } from '../../src/ts/rpgmv/extract/formatter';
 
 describe('jpathIsMap', () => {
   it('returns true for valid Map filenames', () => {

@@ -23,15 +23,9 @@ npx tsc --noEmit           # type-check without emitting
 
 ## Architecture
 
-### Dual-file Convention (`.ts` + `.js`) — CRITICAL
+### Build Pipeline
 
-Main-process TypeScript files (`main.ts`, `src/ipc/*.ts`, `src/js/**/*.ts`, `src/utils.ts`, `src/appContext.ts`, `src/preload.ts`) each have a **committed `.js` companion** that is the actual file Electron runs.
-
-The `prestart` and `prebuild` npm scripts automatically run `tsc`, which compiles `.ts` → `.js`. However, **the `.js` files are also committed to git** so that production builds work without a compile step.
-
-**When editing any main-process `.ts` file, you MUST also update or regenerate the corresponding `.js` file.** Run `npx tsc` to regenerate all `.js` files, then use `git add -f` to stage them (they are gitignored by default: `/main.js`, `/src/ipc/**/*.js`, `/src/js/**/*.js`, `/src/preload.js`, etc.).
-
-Main-process imports reference the `.js` extension explicitly (e.g., `import * as applyjs from "./src/js/rpgmv/apply.js"`).
+Main-process TypeScript files (`main.ts`, `src/ipc/*.ts`, `src/ts/**/*.ts`, `src/utils.ts`, `src/appContext.ts`, `src/preload.ts`) are compiled by `tsc` during the `prestart` and `prebuild` npm scripts. The generated `.js` files are **not committed to git** — they are gitignored via `/main.js` and `/src/**/*.js` patterns.
 
 This convention does NOT apply to renderer code (`src/renderer/**`) — those are Vue SFCs compiled by Vite.
 
@@ -73,8 +67,8 @@ Vue components use the `useIpcOn(channel, callback)` composable from `src/render
 
 - Renderer → Main: `window.api.send(channel, ...args)` — channels must be in `SEND_CHANNELS` whitelist in `src/preload.ts`
 - Main → Renderer: `webContents.send(channel, ...args)` — channels must be in `RECEIVE_CHANNELS` whitelist
-- **When adding a new IPC channel**, update both `SEND_CHANNELS`/`RECEIVE_CHANNELS` in `src/preload.ts` AND `src/preload.js`
-- Main-process IPC bridge: `src/js/libs/projectTools.ts` wraps `appCtx.mainWindow.webContents.send()` — all backend-to-renderer messaging goes through `Tools.send()`, `Tools.sendAlert()`, `Tools.sendError()`, `Tools.worked()`
+- **When adding a new IPC channel**, update both `SEND_CHANNELS`/`RECEIVE_CHANNELS` in `src/preload.ts`
+- Main-process IPC bridge: `src/ts/libs/projectTools.ts` wraps `appCtx.mainWindow.webContents.send()` — all backend-to-renderer messaging goes through `Tools.send()`, `Tools.sendAlert()`, `Tools.sendError()`, `Tools.worked()`
 
 ### Sub-window Ready-signal Pattern
 
@@ -91,7 +85,7 @@ Follow this pattern for any new sub-window.
 - `sandbox: false` is REQUIRED in all BrowserWindow `webPreferences` — Electron 40 defaults to `sandbox: true` when `contextIsolation: true`, which blocks Node.js modules in preload
 - `webContents.send` loses `this` binding when stored as a standalone reference — always wrap in an arrow function
 
-### RPG Maker MV/MZ Pipeline (`src/js/rpgmv/`)
+### RPG Maker MV/MZ Pipeline (`src/ts/rpgmv/`)
 
 Core workflow: **Extract → Translate → Apply**
 
@@ -110,7 +104,7 @@ data[lineNumber] = {
 }
 ```
 
-### Wolf RPG Editor Pipeline (`src/js/wolf/`)
+### Wolf RPG Editor Pipeline (`src/ts/wolf/`)
 
 Parallel pipeline with binary parser for `.wolf` data files, separate extract/apply logic.
 
