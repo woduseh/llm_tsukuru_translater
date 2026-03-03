@@ -75,8 +75,7 @@ function truncate(s: string, len: number = 40): string {
 function extractControlChars(str: string): string[] {
     const chars: string[] = [];
     for (const pattern of CONTROL_PATTERNS) {
-        const re = new RegExp(pattern.source, pattern.flags);
-        const matches = str.match(re);
+        const matches = str.match(pattern);
         if (matches) chars.push(...matches);
     }
     return chars.sort();
