@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import * as ExtTool from '../js/rpgmv/extract.js';
+import * as ExtTool from '../js/rpgmv/extract/index.js';
 import * as edTool from '../js/rpgmv/edtool.js';
 import * as dataBaseO from '../js/rpgmv/datas.js';
 import { checkIsMapFile, sleep } from '../js/rpgmv/globalutils.js';

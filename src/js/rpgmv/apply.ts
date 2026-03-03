@@ -1,5 +1,5 @@
 import fs from 'fs';
-import * as  ExtTool from './extract.js';
+import * as  ExtTool from './extract/index.js';
 import path from 'path';
 import * as edTool from './edtool.js';
 import yaml from 'js-yaml';
