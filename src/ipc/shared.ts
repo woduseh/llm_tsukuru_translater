@@ -17,7 +17,7 @@ function getEncryptionKey(): string {
     }
   } catch { /* generate new */ }
   const newKey = crypto.randomBytes(32).toString('hex');
-  try { fs.writeFileSync(keyPath, newKey, 'utf8'); } catch {}
+  try { fs.writeFileSync(keyPath, newKey, 'utf8'); } catch { /* ignore write failure — key stays in memory */ }
   return newKey;
 }
 

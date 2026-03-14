@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import tools from '../ts/libs/projectTools'
 import Themes from '../ts/rpgmv/styles'
-import { loadSettings, setOPath, defaultHeight, storage } from './shared';
+import { loadSettings, setOPath, defaultHeight } from './shared';
 import { loadRoute } from './viteHelper';
 import { AppContext } from '../appContext';
 import { PROJECT_ROOT } from '../projectRoot';
@@ -54,7 +54,7 @@ export function createWindow(ctx: AppContext) {
 export function registerWindowHandlers(ctx: AppContext) {
   ipcMain.on('mainReady', () => {
     ctx.settings.themeData = (Themes as Record<string, Record<string, string>>)[ctx.settings.theme]
-    const { llmApiKey, ...safeSettings } = ctx.settings;
+    const { llmApiKey: _llmApiKey, ...safeSettings } = ctx.settings;
     ctx.mainWindow!.webContents.send('getGlobalSettings', safeSettings);
   })
 

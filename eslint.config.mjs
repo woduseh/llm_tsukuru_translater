@@ -17,7 +17,7 @@ export default [
     },
     rules: {
       'no-empty': ['warn', { allowEmptyCatch: false }],
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', ignoreRestSiblings: true }],
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': 'off',
     },
