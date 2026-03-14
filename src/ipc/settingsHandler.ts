@@ -40,7 +40,7 @@ export function registerSettingsHandlers(ctx: AppContext) {
     ctx.settings = {...ctx.settings, ...arg}
     storage.set('settings', JSON.stringify(ctx.settings))
     ctx.settings.themeData = (Themes as Record<string, Record<string, string>>)[ctx.settings.theme]
-    const { llmApiKey, ...safeSettings } = ctx.settings;
+    const { llmApiKey: _llmApiKey, ...safeSettings } = ctx.settings;
     ctx.mainWindow!.webContents.send('getGlobalSettings', safeSettings);
     if (ctx.settingsWindow && !ctx.settingsWindow.isDestroyed()) {
       ctx.settingsWindow.close()

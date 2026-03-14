@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.send(channel, ...args);
     }
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   on: (channel: string, callback: (...args: any[]) => void) => {
     if (RECEIVE_CHANNELS.includes(channel)) {
       const subscription = (_event: unknown, ...args: unknown[]) => callback(...args);
@@ -49,6 +50,7 @@ contextBridge.exposeInMainWorld('api', {
       return subscription;
     }
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   once: (channel: string, callback: (...args: any[]) => void) => {
     if (RECEIVE_CHANNELS.includes(channel)) {
       ipcRenderer.once(channel, (_event: unknown, ...args: unknown[]) => callback(...args));

@@ -1,9 +1,12 @@
 import { onUnmounted } from 'vue'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type IpcCallback = (...args: any[]) => void
+
 interface ElectronApi {
   send: (channel: string, ...args: unknown[]) => void
-  on: (channel: string, callback: (...args: any[]) => void) => void
-  once: (channel: string, callback: (...args: any[]) => void) => void
+  on: (channel: string, callback: IpcCallback) => void
+  once: (channel: string, callback: IpcCallback) => void
   removeAllListeners: (channel: string) => void
   invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
 }
@@ -40,20 +43,20 @@ declare global {
     nodePath: NodePath
     nodeBuffer: NodeBuffer
     verify: Verify
-    Swal: any
+    Swal: typeof import('sweetalert2').default
   }
 }
 
 export const api = {
   send: (channel: string, ...args: unknown[]) => window.api.send(channel, ...args),
-  on: (channel: string, callback: (...args: any[]) => void) => window.api.on(channel, callback),
-  once: (channel: string, callback: (...args: any[]) => void) => window.api.once(channel, callback),
+  on: (channel: string, callback: IpcCallback) => window.api.on(channel, callback),
+  once: (channel: string, callback: IpcCallback) => window.api.once(channel, callback),
   removeAllListeners: (channel: string) => window.api.removeAllListeners(channel),
   invoke: (channel: string, ...args: unknown[]) => window.api.invoke(channel, ...args),
 }
 
 /** Register an IPC listener that auto-cleans on component unmount */
-export function useIpcOn(channel: string, callback: (...args: any[]) => void) {
+export function useIpcOn(channel: string, callback: IpcCallback) {
   api.on(channel, callback)
   onUnmounted(() => {
     api.removeAllListeners(channel)

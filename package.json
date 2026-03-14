@@ -1,6 +1,6 @@
 {
   "name": "llm-tsukuru-translater",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "LLM Tsukuru Translater",
   "main": "dist-main/main.js",
   "scripts": {
