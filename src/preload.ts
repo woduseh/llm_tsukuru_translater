@@ -98,19 +98,19 @@ contextBridge.exposeInMainWorld('nodePath', {
 
 contextBridge.exposeInMainWorld('verify', {
   verifyJsonIntegrity: (orig: unknown, trans: unknown) => {
-    const { verifyJsonIntegrity } = require('./js/rpgmv/verify.js');
+    const { verifyJsonIntegrity } = require('./ts/rpgmv/verify');
     return verifyJsonIntegrity(orig, trans);
   },
   repairJson: (orig: unknown, trans: unknown) => {
-    const { repairJson } = require('./js/rpgmv/verify.js');
+    const { repairJson } = require('./ts/rpgmv/verify');
     return repairJson(orig, trans);
   },
   getAtPath: (obj: unknown, jsonPath: string) => {
-    const { getAtPath } = require('./js/rpgmv/verify.js');
+    const { getAtPath } = require('./ts/rpgmv/verify');
     return getAtPath(obj, jsonPath);
   },
   setAtPath: (obj: unknown, jsonPath: string, value: unknown) => {
-    const { setAtPath } = require('./js/rpgmv/verify.js');
+    const { setAtPath } = require('./ts/rpgmv/verify');
     return setAtPath(obj, jsonPath, value);
   }
 });
