@@ -1,8 +1,14 @@
 import path from 'path';
 import fs from 'fs';
-import { createGeminiTranslator, TranslationLog, TranslationLogEntry, contentHash } from '../libs/geminiTranslator';
 import Tools from '../libs/projectTools';
 import { AppContext } from '../../appContext';
+import { TranslationLog, TranslationLogEntry, contentHash } from '../libs/translationCore';
+import {
+    buildTranslationCacheKey,
+    createTranslator,
+    getLlmReadinessError,
+    normalizeLlmProvider,
+} from '../libs/translatorFactory';
 
 const PROGRESS_FILE = '.llm_progress.json';
 const CACHE_FILE = '.llm_cache.json';
@@ -14,7 +20,7 @@ interface ProgressState {
 }
 
 interface CacheStore {
-    [fileHash: string]: { translatedContent: string; model: string; targetLang: string };
+    [fileHash: string]: { translatedContent: string; model: string; targetLang: string; provider?: string };
 }
 
 async function createBackup(edir: string): Promise<string> {
@@ -90,15 +96,17 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
             Tools.worked();
             return;
         }
-        if (!ctx.settings.llmApiKey) {
-            Tools.sendError('Gemini API 키가 설정되지 않았습니다');
+        const readinessError = getLlmReadinessError(ctx.settings);
+        if (readinessError) {
+            Tools.sendError(readinessError);
             Tools.send('llmTranslating', false);
             Tools.worked();
             return;
         }
 
         const targetLang = ctx.settings.llmTargetLang || 'ko';
-        const gemini = createGeminiTranslator(ctx.settings, arg.langu || 'ja', targetLang, () => ctx.llmAbort);
+        const provider = normalizeLlmProvider(ctx.settings.llmProvider);
+        const translator = createTranslator(ctx.settings, arg.langu || 'ja', targetLang, () => ctx.llmAbort);
         const fileList = fs.readdirSync(edir).filter(f => f.endsWith('.txt'));
 
         if (fileList.length === 0) {
@@ -156,7 +164,7 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
                             if (fileContent === backupContent) {
                                 // Untranslated file — invalidate its cache entry
                                 const hash = contentHash(backupContent);
-                                const cacheKey = `${hash}_${ctx.settings.llmModel}_${targetLang}`;
+                                const cacheKey = buildTranslationCacheKey(provider, hash, ctx.settings.llmModel, targetLang);
                                 if (cache[cacheKey]) {
                                     delete cache[cacheKey];
                                     cacheModified = true;
@@ -184,6 +192,7 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
         const translationLog: TranslationLog = {
             startTime: new Date().toISOString(),
             endTime: '',
+            provider,
             model,
             sourceLang: arg.langu || 'ja',
             targetLang,
@@ -231,7 +240,7 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
 
             // Cache: skip if content unchanged and same model/target
             const hash = contentHash(originalContent);
-            const cacheKey = `${hash}_${model}_${targetLang}`;
+            const cacheKey = buildTranslationCacheKey(provider, hash, model, targetLang);
             if (cache[cacheKey]) {
                 fs.writeFileSync(filePath, cache[cacheKey].translatedContent, 'utf-8');
                 completedFiles.add(fileName);
@@ -252,7 +261,7 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
 
             Tools.send('loadingTag', `[${workedFiles + 1}/${fileList.length}] ${fileName}`);
 
-            const { translatedContent, validation, logEntry, aborted: fileAborted } = await gemini.translateFileContent(
+            const { translatedContent, validation, logEntry, aborted: fileAborted } = await translator.translateFileContent(
                 originalContent,
                 (current, total, detail) => {
                     const fileProgress = (workedFiles / fileList.length) * 100;
@@ -271,7 +280,7 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
                 fs.writeFileSync(filePath, translatedContent, 'utf-8');
 
                 // Update cache
-                cache[cacheKey] = { translatedContent, model, targetLang };
+                cache[cacheKey] = { translatedContent, model, targetLang, provider };
                 saveCache(edir, cache);
             }
 
@@ -347,20 +356,26 @@ export async function retranslateFile(
         return { success: false, error: '백업 파일이 존재하지 않습니다' };
     }
 
+    const readinessError = getLlmReadinessError(ctx.settings);
+    if (readinessError) {
+        return { success: false, error: readinessError };
+    }
+
     const originalContent = fs.readFileSync(backupPath, 'utf-8');
-    const gemini = createGeminiTranslator(ctx.settings, sourceLang, targetLang, () => ctx.llmAbort);
+    const provider = normalizeLlmProvider(ctx.settings.llmProvider);
+    const translator = createTranslator(ctx.settings, sourceLang, targetLang, () => ctx.llmAbort);
     const model = ctx.settings.llmModel;
 
     // Invalidate cache for this file's original content and persist immediately
     const cache = loadCache(edir);
     const hash = contentHash(originalContent);
-    const cacheKey = `${hash}_${model}_${targetLang}`;
+    const cacheKey = buildTranslationCacheKey(provider, hash, model, targetLang);
     delete cache[cacheKey];
     saveCache(edir, cache);
 
     onProgress?.('번역 중...');
 
-    const { translatedContent, logEntry } = await gemini.translateFileContent(
+    const { translatedContent, logEntry } = await translator.translateFileContent(
         originalContent,
         (current, total, detail) => {
             onProgress?.(`${detail} (${current}/${total} 블록)`);
@@ -376,7 +391,7 @@ export async function retranslateFile(
 
     fs.writeFileSync(filePath, translatedContent, 'utf-8');
 
-    cache[cacheKey] = { translatedContent, model, targetLang };
+    cache[cacheKey] = { translatedContent, model, targetLang, provider };
     saveCache(edir, cache);
 
     // Remove from progress so it can be re-translated in bulk runs too
@@ -406,9 +421,15 @@ export async function retranslateBlocks(
         return { success: false, error: '백업 파일이 존재하지 않습니다' };
     }
 
+    const readinessError = getLlmReadinessError(ctx.settings);
+    if (readinessError) {
+        return { success: false, error: readinessError };
+    }
+
     const originalContent = fs.readFileSync(backupPath, 'utf-8');
     const transContent = fs.readFileSync(filePath, 'utf-8');
-    const gemini = createGeminiTranslator(ctx.settings, sourceLang, targetLang, () => ctx.llmAbort);
+    const provider = normalizeLlmProvider(ctx.settings.llmProvider);
+    const translator = createTranslator(ctx.settings, sourceLang, targetLang, () => ctx.llmAbort);
 
     // Split both files into blocks
     const origLines = originalContent.split('\n');
@@ -439,7 +460,7 @@ export async function retranslateBlocks(
     onProgress?.(`${blockIndices.length}개 블록 번역 중...`);
 
     try {
-        let translated = await gemini.translateText(textToTranslate);
+        let translated = await translator.translateText(textToTranslate);
         if (textToTranslate.endsWith('\n') && !translated.endsWith('\n')) {
             translated += '\n';
         }
@@ -471,7 +492,7 @@ export async function retranslateBlocks(
         const cache = loadCache(edir);
         const hash = contentHash(originalContent);
         const model = ctx.settings.llmModel;
-        const cacheKey = `${hash}_${model}_${targetLang}`;
+        const cacheKey = buildTranslationCacheKey(provider, hash, model, targetLang);
         delete cache[cacheKey];
         saveCache(edir, cache);
 

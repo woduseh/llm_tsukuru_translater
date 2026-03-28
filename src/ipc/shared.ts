@@ -2,11 +2,13 @@ import { app } from 'electron';
 import Store from 'electron-store';
 import crypto from 'crypto';
 import tools from '../ts/libs/projectTools'
-import * as dataBaseO from '../ts/rpgmv/datas.js';
+import Themes from '../ts/rpgmv/styles'
 import * as fs from 'fs';
 import * as path from 'path';
 import { AppContext } from '../appContext';
 import { PROJECT_ROOT } from '../projectRoot';
+import log from '../logger';
+import { sanitizeStoredSettings } from '../ts/libs/settingsRuntimeValidation';
 
 function getEncryptionKey(): string {
   const keyPath = path.join(app.getPath('userData'), '.store-key');
@@ -42,16 +44,19 @@ export function getSettings(ctx: AppContext){
 }
 
 export async function loadSettings(ctx: AppContext){
-  let givensettings = {}
+  let givensettings: unknown = {}
 
   if(storage.has('settings')){
-    givensettings = JSON.parse(storage.get('settings') as string)
+    try {
+      givensettings = JSON.parse(storage.get('settings') as string)
+    } catch (error) {
+      log.warn('Failed to parse stored settings, falling back to defaults.', error)
+    }
   }
 
-  ctx.settings = dataBaseO.settings
-
-
-  ctx.settings = {...ctx.settings, ...givensettings}
+  ctx.settings = sanitizeStoredSettings(givensettings)
+  ctx.settings.themeList = Object.keys(Themes)
+  ctx.settings.themeData = (Themes as Record<string, Record<string, string>>)[ctx.settings.theme] ?? {}
   ctx.settings.version = app.getVersion()
   storage.set('settings', JSON.stringify(ctx.settings))
 }

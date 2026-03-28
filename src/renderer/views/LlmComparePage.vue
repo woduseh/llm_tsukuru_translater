@@ -33,7 +33,9 @@
     <main class="content">
       <div class="toolbar">
         <div class="toolbar-row">
-          <div class="summary" v-html="summaryHtml"></div>
+          <div class="summary">
+            <span v-for="(item, index) in summaryItems" :key="`${item.class}-${index}`" :class="item.class">{{ item.text }}</span>
+          </div>
           <div class="nav-buttons">
             <button @click="navigateFile(-1)" title="이전 문제 파일">◀ 파일</button>
             <button @click="navigateFile(1)" title="다음 문제 파일">파일 ▶</button>
@@ -225,16 +227,22 @@ const hasProblems = computed(() => {
   return false
 })
 
-const summaryHtml = computed(() => {
-  if (loading.value) return '<span class="summary-loading">⏳ 파일 비교 중...</span>'
-  if (files.value.length === 0) return '<span class="summary-error">비교할 파일이 없습니다.</span>'
+interface SummaryItem {
+  class: string
+  text: string
+}
+
+const summaryItems = computed<SummaryItem[]>(() => {
+  if (loading.value) return [{ class: 'summary-loading', text: '⏳ 파일 비교 중...' }]
+  if (files.value.length === 0) return [{ class: 'summary-error', text: '비교할 파일이 없습니다.' }]
   const mc = files.value.filter(f => f.mismatch).length
   const uc = files.value.filter(f => f.untranslated).length
-  const parts: string[] = []
-  if (mc > 0) parts.push(`<span class="summary-error">⚠ ${mc}개 줄 수 불일치</span>`)
-  if (uc > 0) parts.push(`<span class="summary-warn">● ${uc}개 미번역</span>`)
-  if (parts.length === 0) return `<span class="summary-ok">✓ 모든 파일 번역 완료 (${files.value.length}개)</span>`
-  return parts.join(' \u00A0 ') + ` <span class="summary-total">(전체 ${files.value.length}개)</span>`
+  const parts: SummaryItem[] = []
+  if (mc > 0) parts.push({ class: 'summary-error', text: `⚠ ${mc}개 줄 수 불일치` })
+  if (uc > 0) parts.push({ class: 'summary-warn', text: `● ${uc}개 미번역` })
+  if (parts.length === 0) return [{ class: 'summary-ok', text: `✓ 모든 파일 번역 완료 (${files.value.length}개)` }]
+  parts.push({ class: 'summary-total', text: `(전체 ${files.value.length}개)` })
+  return parts
 })
 
 /** Detect untranslated status considering per-block untranslation. */
@@ -665,7 +673,7 @@ function onKeydown(e: KeyboardEvent) {
   flex-shrink: 0;
 }
 .toolbar-row { display: flex; align-items: center; gap: 8px; }
-.summary { font-size: 12px; white-space: nowrap; }
+.summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; white-space: nowrap; }
 .nav-buttons { display: flex; gap: 3px; align-items: center; margin-left: auto; }
 .group-label { font-size: 9px; opacity: 0.35; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; min-width: 48px; }
 .nav-buttons button, .toolbar-row button {

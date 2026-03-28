@@ -1,3 +1,8 @@
+export type LlmProvider = 'gemini' | 'vertex';
+
+export const DEFAULT_LLM_PROVIDER: LlmProvider = 'gemini';
+export const DEFAULT_LLM_VERTEX_LOCATION = 'global';
+
 export interface AppSettings {
   extractJs: boolean;
   extractSomeScript: boolean;
@@ -14,18 +19,25 @@ export interface AppSettings {
   DoNotTransHangul: boolean;
   formatNice: boolean;
   theme: string;
-  themeData: Record<string, any>;
+  themeData: Record<string, string>;
   extractPlus: number[];
   themeList: string[];
   language: string;
   HideExtractAll: boolean;
   llmApiKey: string;
+  llmProvider: LlmProvider;
   llmModel: string;
   llmCustomPrompt: string;
   llmChunkSize: number;
+  llmMaxRetries: number;
+  llmMaxApiRetries: number;
+  llmTimeout: number;
   llmTranslationUnit: string;
   llmTargetLang: string;
   llmSourceLang?: string;
+  llmSortOrder?: string;
+  llmVertexServiceAccountJson: string;
+  llmVertexLocation: string;
   version?: string;
   [key: string]: any;
 }

@@ -2,6 +2,8 @@ import { BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import * as edTool from '../ts/rpgmv/edtool.js';
 import Themes from '../ts/rpgmv/styles'
+import { sanitizeSettingsForRenderer } from '../ts/libs/llmProviderConfig';
+import { applyValidatedSettingsUpdate } from '../ts/libs/settingsRuntimeValidation';
 import { sendError, worked, getSettings, storage } from './shared';
 import { loadRoute } from './viteHelper';
 import { AppContext } from '../appContext';
@@ -37,11 +39,16 @@ export function registerSettingsHandlers(ctx: AppContext) {
   })
 
   ipcMain.on('applysettings', (ev, arg) => {
-    ctx.settings = {...ctx.settings, ...arg}
+    try {
+      ctx.settings = applyValidatedSettingsUpdate(ctx.settings, arg)
+    } catch (error) {
+      sendError(ctx, (error as Error).message)
+      worked(ctx)
+      return
+    }
     storage.set('settings', JSON.stringify(ctx.settings))
-    ctx.settings.themeData = (Themes as Record<string, Record<string, string>>)[ctx.settings.theme]
-    const { llmApiKey: _llmApiKey, ...safeSettings } = ctx.settings;
-    ctx.mainWindow!.webContents.send('getGlobalSettings', safeSettings);
+    ctx.settings.themeData = (Themes as Record<string, Record<string, string>>)[ctx.settings.theme] ?? {}
+    ctx.mainWindow!.webContents.send('getGlobalSettings', sanitizeSettingsForRenderer(ctx.settings));
     if (ctx.settingsWindow && !ctx.settingsWindow.isDestroyed()) {
       ctx.settingsWindow.close()
     }

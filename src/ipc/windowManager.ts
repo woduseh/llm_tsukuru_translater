@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog, globalShortcut } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import tools from '../ts/libs/projectTools'
+import { sanitizeSettingsForRenderer } from '../ts/libs/llmProviderConfig';
 import Themes from '../ts/rpgmv/styles'
 import { loadSettings, setOPath, defaultHeight } from './shared';
 import { loadRoute } from './viteHelper';
@@ -54,8 +55,7 @@ export function createWindow(ctx: AppContext) {
 export function registerWindowHandlers(ctx: AppContext) {
   ipcMain.on('mainReady', () => {
     ctx.settings.themeData = (Themes as Record<string, Record<string, string>>)[ctx.settings.theme]
-    const { llmApiKey: _llmApiKey, ...safeSettings } = ctx.settings;
-    ctx.mainWindow!.webContents.send('getGlobalSettings', safeSettings);
+    ctx.mainWindow!.webContents.send('getGlobalSettings', sanitizeSettingsForRenderer(ctx.settings));
   })
 
   ipcMain.on('license', () => {
