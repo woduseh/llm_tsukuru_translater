@@ -103,9 +103,6 @@ export function validateLlmSettings(settings: AppSettings): LlmSettingsValidatio
   }
 
   if (llmProvider === 'vertex') {
-    if (!hasConfiguredText(settings.llmVertexLocation)) {
-      llmValidationErrors.push('Vertex location is required.');
-    }
     try {
       parseVertexServiceAccountJson(settings.llmVertexServiceAccountJson);
     } catch (error) {

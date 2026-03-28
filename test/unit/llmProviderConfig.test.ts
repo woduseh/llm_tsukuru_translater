@@ -99,6 +99,19 @@ describe('parseVertexServiceAccountJson', () => {
 });
 
 describe('validateLlmSettings', () => {
+  it('uses the default global Vertex location when the stored setting is blank', () => {
+    const validation = validateLlmSettings(
+      createSettings({
+        llmApiKey: '',
+        llmVertexLocation: '',
+      }),
+    );
+
+    expect(validation.llmVertexLocation).toBe('global');
+    expect(validation.llmReady).toBe(true);
+    expect(validation.llmValidationErrors).not.toContain('Vertex location is required.');
+  });
+
   it.each(['client_email', 'private_key', 'project_id'])(
     'fails validation when %s is missing',
     (missingField) => {
@@ -116,4 +129,17 @@ describe('validateLlmSettings', () => {
       expect(validation.llmValidationErrors.join(' ')).toContain(missingField);
     },
   );
+
+  it('fails validation when the Gemini API key is missing', () => {
+    const validation = validateLlmSettings(
+      createSettings({
+        llmProvider: 'gemini',
+        llmApiKey: '',
+        llmVertexServiceAccountJson: '',
+      }),
+    );
+
+    expect(validation.llmReady).toBe(false);
+    expect(validation.llmValidationErrors).toContain('Gemini API key is required.');
+  });
 });
