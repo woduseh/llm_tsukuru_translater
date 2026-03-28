@@ -3,7 +3,7 @@ import path from 'path';
 import open from 'open';
 import * as prjc from '../ts/rpgmv/projectConvert';
 import { buildVerifyWindowState } from '../ts/libs/llmProviderConfig';
-import { createGeminiTranslator } from '../ts/libs/geminiTranslator';
+import { createTranslator, getLlmReadinessError } from '../ts/libs/translatorFactory';
 import { loadRoute } from './viteHelper';
 import { AppContext } from '../appContext';
 import { PROJECT_ROOT } from '../projectRoot';
@@ -127,21 +127,22 @@ export function registerToolsHandlers(ctx: AppContext) {
     };
 
     const settings = ctx.settings;
-    if (!settings?.llmApiKey || !settings?.llmModel) {
-      send('verifyLlmRepairDone', { success: false, error: 'LLM API 키 또는 모델이 설정되지 않았습니다.' });
+    const readinessError = getLlmReadinessError(settings);
+    if (readinessError) {
+      send('verifyLlmRepairDone', { success: false, error: readinessError });
       return;
     }
 
     try {
       const sourceLang = settings.llmSourceLang || settings.langu || 'ja';
       const targetLang = settings.llmTargetLang || 'ko';
-      const gemini = createGeminiTranslator(settings, sourceLang, targetLang);
+      const translator = createTranslator(settings, sourceLang, targetLang);
       const results: { path: string; origText: string; newText: string }[] = [];
 
       for (let i = 0; i < items.length; i++) {
         send('verifyLlmRepairProgress', { current: i + 1, total: items.length, path: items[i].path });
         try {
-          const translated = await gemini.translateText(items[i].origText);
+          const translated = await translator.translateText(items[i].origText);
           results.push({ path: items[i].path, origText: items[i].origText, newText: translated.trim() });
         } catch (e) {
           results.push({ path: items[i].path, origText: items[i].origText, newText: `[번역 실패: ${(e as Error).message}]` });

@@ -62,7 +62,6 @@ export function registerTranslateHandlers(ctx: AppContext) {
       ctx.llmAbort = false;
       const a = {
         dir: Buffer.from(llmPendingArg.dir, 'utf8').toString('base64'),
-        type: 'gemini',
         langu: ctx.settings.llmSourceLang || 'ja',
         game: llmPendingArg.game,
         resetProgress: data.llmResetProgress || false,
