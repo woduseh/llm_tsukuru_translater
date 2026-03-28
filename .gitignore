@@ -11,6 +11,7 @@ dist-main/
 debug_crash.log
 audit_report.html
 .store-key
+.worktrees/
 
 # tsc output (generated from .ts)
 /main.js
