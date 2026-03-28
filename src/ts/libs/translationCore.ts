@@ -32,6 +32,7 @@ export interface TranslationLogEntry {
 export interface TranslationLog {
   startTime: string;
   endTime: string;
+  provider: string;
   model: string;
   sourceLang: string;
   targetLang: string;
