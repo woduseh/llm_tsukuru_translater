@@ -27,12 +27,12 @@ export interface LlmSettingsValidation {
 
 export interface LlmStartWindowState extends Pick<LlmSettingsValidation, 'llmProvider' | 'llmVertexLocation' | 'llmReady' | 'llmHasApiKey' | 'llmHasVertexServiceAccountJson'> {
   llmSortOrder: string;
-  themeData: Record<string, any>;
+  themeData: Record<string, string>;
 }
 
 export interface VerifyWindowState extends Pick<LlmSettingsValidation, 'llmProvider' | 'llmVertexLocation' | 'llmReady' | 'llmHasApiKey' | 'llmHasVertexServiceAccountJson'> {
   JsonChangeLine: boolean;
-  themeData: Record<string, any>;
+  themeData: Record<string, string>;
 }
 
 type SanitizedSettings<T extends Record<string, unknown>> = Omit<T, SecretSettingKeys>;

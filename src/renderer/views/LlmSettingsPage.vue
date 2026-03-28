@@ -43,13 +43,15 @@ import { api } from '../composables/useIpc'
 const translationMode = ref('untranslated')
 const resetProgress = ref(false)
 const sortOrder = ref('name-asc')
-let hasApiKey = false
+let isLlmReady = false
+let currentProvider = 'gemini'
 
 onMounted(() => {
   api.on('llmSettings', (arg: unknown) => {
     const s = arg as Record<string, any>
     sortOrder.value = s.llmSortOrder || 'name-asc'
-    hasApiKey = !!s.llmApiKey
+    isLlmReady = !!s.llmReady
+    currentProvider = typeof s.llmProvider === 'string' ? s.llmProvider : 'gemini'
     if (s.themeData) {
       const root = document.documentElement
       for (const [key, val] of Object.entries(s.themeData as Record<string, string>)) {
@@ -61,8 +63,11 @@ onMounted(() => {
 })
 
 function start() {
-  if (!hasApiKey) {
-    alert('API 키가 설정되지 않았습니다. 메인 설정에서 API 키를 입력해주세요.')
+  if (!isLlmReady) {
+    const missingConfigMessage = currentProvider === 'vertex'
+      ? 'Vertex AI 설정이 완료되지 않았습니다. 메인 설정에서 서비스 계정 JSON, 위치, 모델을 확인해주세요.'
+      : 'API 키가 설정되지 않았습니다. 메인 설정에서 API 키를 입력해주세요.'
+    alert(missingConfigMessage)
     return
   }
   api.send('llmSettingsApply', {
