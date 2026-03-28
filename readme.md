@@ -71,8 +71,8 @@ npm run build
 - **Release**: `v*` 태그 push 시 CI 검증 후 Windows 빌드 → GitHub Release (draft) 자동 생성
 
 ```bash
-git tag v3.1.0
-git push origin v3.1.0
+git tag v3.1.1
+git push origin v3.1.1
 ```
 
 ## 프로젝트 구조
@@ -95,7 +95,7 @@ src/
 ├── appContext.ts    # 앱 상태 싱글톤
 └── utils.ts         # 인코딩/파일 유틸리티
 test/
-├── unit/            # 유닛 테스트 (vitest, 324개)
+├── unit/            # 유닛 테스트 (vitest, 362개)
 └── fixtures/        # 테스트 픽스처
 ```
 

@@ -31,8 +31,12 @@ export const settings: AppSettings = {
     llmModel: 'gemini-3.0-flash-preview',
     llmCustomPrompt: '',
     llmChunkSize: 30,
+    llmMaxRetries: 2,
+    llmMaxApiRetries: 5,
+    llmTimeout: 600,
     llmTranslationUnit: 'chunk',
     llmTargetLang: 'ko',
+    llmSourceLang: 'ja',
     llmSortOrder: 'name-asc',
     llmVertexServiceAccountJson: '',
     llmVertexLocation: DEFAULT_LLM_VERTEX_LOCATION

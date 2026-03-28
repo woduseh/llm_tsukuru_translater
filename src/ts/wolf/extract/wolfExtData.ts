@@ -3,6 +3,7 @@ import zlib from 'zlib'
 import {encode, decode} from '@msgpack/msgpack'
 import { FileIOError } from '../../libs/fileIO';
 import { AppContext } from '../../../appContext';
+import { validateWolfExtDataPayload } from '../../libs/metadataValidation';
 
 const WolfExtDataParser = {
     create: (dir:string, ctx: AppContext)=>{
@@ -18,7 +19,7 @@ const WolfExtDataParser = {
     },
     read:(dir:string, ctx: AppContext) =>{
         try {
-            const ca =  decode(zlib.inflateSync(readFileSync(dir))) as { ext: extData[]; meta: wolfMetadata; cache: Record<string, Buffer> }
+            const ca = validateWolfExtDataPayload(decode(zlib.inflateSync(readFileSync(dir))))
             ctx.WolfExtData = ca.ext
             ctx.WolfMetadata = ca.meta
             ctx.WolfCache = ca.cache

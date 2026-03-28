@@ -26,7 +26,9 @@
     <!-- Right: Issues -->
     <main class="content">
       <div class="toolbar">
-        <div class="summary" v-html="summaryHtml"></div>
+        <div class="summary">
+          <span v-for="(item, index) in summaryItems" :key="`${item.class}-${index}`" :class="item.class">{{ item.text }}</span>
+        </div>
         <div class="action-buttons">
           <span class="selection-count" v-if="selectedIssues.size > 0">{{ selectedIssues.size }}개 선택</span>
           <button :disabled="selectedIssues.size === 0" @click="revertSelected" title="선택한 항목을 원본 값으로 되돌립니다">선택 되돌리기</button>
@@ -241,18 +243,23 @@ function formatValue(val: unknown): string {
   return JSON.stringify(val)
 }
 
-const summaryHtml = computed(() => {
-  if (loading.value) return '<span class="summary-loading">⏳ 파일 비교 중...</span>'
-  if (files.value.length === 0) return '<span class="summary-error">비교할 파일이 없습니다.</span>'
+interface SummaryItem {
+  class: string
+  text: string
+}
+
+const summaryItems = computed<SummaryItem[]>(() => {
+  if (loading.value) return [{ class: 'summary-loading', text: '⏳ 파일 비교 중...' }]
+  if (files.value.length === 0) return [{ class: 'summary-error', text: '비교할 파일이 없습니다.' }]
   const ef = files.value.filter(f => f.errorCount > 0).length
   const wf = files.value.filter(f => f.warningCount > 0 && f.errorCount === 0).length
   const total = files.value.reduce((s, f) => s + f.issues.length, 0)
-  if (total === 0) return `<span class="summary-ok">✓ 모든 파일의 JSON 구조가 일치합니다 (${files.value.length}개)</span>`
-  const parts: string[] = []
-  if (ef > 0) parts.push(`<span class="summary-error">❌ ${ef}개 파일에서 구조 오류</span>`)
-  if (wf > 0) parts.push(`<span class="summary-warn">⚠ ${wf}개 파일에서 경고</span>`)
-  parts.push(`<span class="summary-total">(전체 ${files.value.length}개, ${total}개 문제)</span>`)
-  return parts.join(' \u00A0 ')
+  if (total === 0) return [{ class: 'summary-ok', text: `✓ 모든 파일의 JSON 구조가 일치합니다 (${files.value.length}개)` }]
+  const parts: SummaryItem[] = []
+  if (ef > 0) parts.push({ class: 'summary-error', text: `❌ ${ef}개 파일에서 구조 오류` })
+  if (wf > 0) parts.push({ class: 'summary-warn', text: `⚠ ${wf}개 파일에서 경고` })
+  parts.push({ class: 'summary-total', text: `(전체 ${files.value.length}개, ${total}개 문제)` })
+  return parts
 })
 
 function loadFiles(dir: string) {
@@ -639,7 +646,7 @@ onUnmounted(() => {
   padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
-.summary { font-size: 12px; }
+.summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; }
 .action-buttons { display: flex; gap: 4px; align-items: center; }
 .action-buttons button {
   padding: 4px 10px; font-size: 11px; background: var(--Highlight1);

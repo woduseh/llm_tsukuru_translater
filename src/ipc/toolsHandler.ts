@@ -110,7 +110,6 @@ export function registerToolsHandlers(ctx: AppContext) {
     open(arg)
   })
 
-  ipcMain.on('log', async(ev, arg) => console.log(arg))
   ipcMain.on('projectConvert', async(ev, arg) => prjc.ConvertProject(arg, ctx))
 
   // ── 줄밀림 LLM 재번역 ──
