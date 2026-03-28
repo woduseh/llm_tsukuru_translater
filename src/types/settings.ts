@@ -19,7 +19,7 @@ export interface AppSettings {
   DoNotTransHangul: boolean;
   formatNice: boolean;
   theme: string;
-  themeData: Record<string, any>;
+  themeData: Record<string, string>;
   extractPlus: number[];
   themeList: string[];
   language: string;

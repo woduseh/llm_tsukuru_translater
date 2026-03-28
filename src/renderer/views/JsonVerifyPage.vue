@@ -546,7 +546,16 @@ function applyLlmRepair() {
 
 onMounted(() => {
   api.on('initVerify', (dir: string) => loadFiles(dir))
-  api.on('verifySettings', (s: unknown) => { (globalThis as any).settings = s })
+  api.on('verifySettings', (s: unknown) => {
+    (globalThis as any).settings = s
+    const settings = s as Record<string, any>
+    if (settings.themeData) {
+      const root = document.documentElement
+      for (const [key, val] of Object.entries(settings.themeData as Record<string, string>)) {
+        root.style.setProperty(key, val)
+      }
+    }
+  })
   api.on('verifyLlmRepairProgress', (data: { current: number; total: number; path: string }) => {
     llmProgress.value = `${data.current}/${data.total}`
   })
