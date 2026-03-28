@@ -1,25 +1,34 @@
 import fs from 'fs';
 import zlib from 'zlib'
 import iconv from 'iconv-lite'
+import path from 'path';
+import { validateExtractedData } from '../libs/metadataValidation';
 
 export function read(dir: string){ 
-    const readF = fs.readFileSync(dir + '/.extracteddata')
-    let data:any
-    data = JSON.parse(iconv.decode(zlib.inflateSync(readF), 'utf8'))
-    while(data.main === undefined){
-        if(data.dat === undefined){
-            throw new Error('Invalid .extracteddata: missing "main" property')
+    const filePath = path.join(dir, '.extracteddata')
+    try {
+        const readF = fs.readFileSync(filePath)
+        let data: unknown = JSON.parse(iconv.decode(zlib.inflateSync(readF), 'utf8'))
+        while(true){
+            if(typeof data === 'object' && data !== null && !Array.isArray(data) && 'main' in data){
+                return validateExtractedData(data)
+            }
+            if(typeof data === 'object' && data !== null && !Array.isArray(data) && 'dat' in data){
+                data = (data as Record<string, unknown>).dat
+                continue
+            }
+            throw new Error('missing "main" property')
         }
-        data = data.dat
+    } catch (error) {
+        throw new Error(`Invalid .extracteddata: ${(error as Error).message}`)
     }
-    return data
 }
 
 export function write(dir: string, ext_data: Object){
     const d = iconv.encode(JSON.stringify({dat: ext_data}), 'utf8')
-    fs.writeFileSync(dir + `/.extracteddata`, zlib.deflateSync(d))
+    fs.writeFileSync(path.join(dir, '.extracteddata'), zlib.deflateSync(d))
 }
 
 export function exists (dir: string){
-    return (fs.existsSync(dir + '/.extracteddata') )
+    return fs.existsSync(path.join(dir, '.extracteddata'))
 }

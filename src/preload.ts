@@ -20,7 +20,7 @@ const SEND_CHANNELS = [
   'openLLMSettings', 'llmSettingsApply', 'llmSettingsClose', 'abortLLM',
   'openLLMCompare', 'llmCompareClose', 'openJsonVerify',
   'retranslateFile', 'retranslateBlocks', 'verifyLlmRepair',
-  'openFolder', 'projectConvert', 'log', 'license', 'app_version',
+  'openFolder', 'projectConvert', 'license', 'app_version',
   'getextention', 'selFont', 'changeFontSize', 'updateVersion',
   'wolf_ext', 'wolf_apply', 'gamePatcher',
   'compareReady', 'verifyReady',

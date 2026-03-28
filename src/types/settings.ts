@@ -29,6 +29,9 @@ export interface AppSettings {
   llmModel: string;
   llmCustomPrompt: string;
   llmChunkSize: number;
+  llmMaxRetries: number;
+  llmMaxApiRetries: number;
+  llmTimeout: number;
   llmTranslationUnit: string;
   llmTargetLang: string;
   llmSourceLang?: string;
