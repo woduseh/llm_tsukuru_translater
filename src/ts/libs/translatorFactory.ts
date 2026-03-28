@@ -2,11 +2,10 @@ import {
   DEFAULT_LLM_PROVIDER,
   type LlmProvider,
 } from '../../types/settings';
-import type { BlockValidation } from './translationCore';
+import type { BlockValidation, TranslationLogEntry } from './translationCore';
 import {
   createGeminiTranslator,
   GeminiTranslator,
-  type TranslationLogEntry,
 } from './geminiTranslator';
 
 export interface Translator {

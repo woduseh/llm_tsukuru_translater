@@ -16,6 +16,30 @@ export interface BlockValidation {
   separatorMatch: boolean;
 }
 
+export interface TranslationLogEntry {
+  timestamp: string;
+  fileName: string;
+  totalBlocks: number;
+  translatedBlocks: number;
+  skippedBlocks: number;
+  errorBlocks: number;
+  retries: number;
+  cached: boolean;
+  durationMs: number;
+  errors: string[];
+}
+
+export interface TranslationLog {
+  startTime: string;
+  endTime: string;
+  model: string;
+  sourceLang: string;
+  targetLang: string;
+  totalFiles: number;
+  totalDurationMs: number;
+  entries: TranslationLogEntry[];
+}
+
 export function splitIntoBlocks(content: string): TranslationBlock[] {
   const allLines = content.split('\n');
   const blocks: TranslationBlock[] = [];
