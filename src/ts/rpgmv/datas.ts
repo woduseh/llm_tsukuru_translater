@@ -1,4 +1,8 @@
-import { AppSettings } from '../../types/settings'
+import {
+    AppSettings,
+    DEFAULT_LLM_PROVIDER,
+    DEFAULT_LLM_VERTEX_LOCATION,
+} from '../../types/settings'
 import styles from './styles'
 
 export const settings: AppSettings = {
@@ -23,11 +27,15 @@ export const settings: AppSettings = {
     language: 'en',
     HideExtractAll: true,
     llmApiKey: '',
+    llmProvider: DEFAULT_LLM_PROVIDER,
     llmModel: 'gemini-3.0-flash-preview',
     llmCustomPrompt: '',
     llmChunkSize: 30,
     llmTranslationUnit: 'chunk',
-    llmTargetLang: 'ko'
+    llmTargetLang: 'ko',
+    llmSortOrder: 'name-asc',
+    llmVertexServiceAccountJson: '',
+    llmVertexLocation: DEFAULT_LLM_VERTEX_LOCATION
 }
 
 export const onebyone = {

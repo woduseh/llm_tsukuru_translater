@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import * as edTool from '../ts/rpgmv/edtool.js';
 import Themes from '../ts/rpgmv/styles'
+import { sanitizeSettingsForRenderer } from '../ts/libs/llmProviderConfig';
 import { sendError, worked, getSettings, storage } from './shared';
 import { loadRoute } from './viteHelper';
 import { AppContext } from '../appContext';
@@ -40,8 +41,7 @@ export function registerSettingsHandlers(ctx: AppContext) {
     ctx.settings = {...ctx.settings, ...arg}
     storage.set('settings', JSON.stringify(ctx.settings))
     ctx.settings.themeData = (Themes as Record<string, Record<string, string>>)[ctx.settings.theme]
-    const { llmApiKey: _llmApiKey, ...safeSettings } = ctx.settings;
-    ctx.mainWindow!.webContents.send('getGlobalSettings', safeSettings);
+    ctx.mainWindow!.webContents.send('getGlobalSettings', sanitizeSettingsForRenderer(ctx.settings));
     if (ctx.settingsWindow && !ctx.settingsWindow.isDestroyed()) {
       ctx.settingsWindow.close()
     }

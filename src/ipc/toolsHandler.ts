@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import open from 'open';
 import * as prjc from '../ts/rpgmv/projectConvert';
+import { buildVerifyWindowState } from '../ts/libs/llmProviderConfig';
 import { createGeminiTranslator } from '../ts/libs/geminiTranslator';
 import { loadRoute } from './viteHelper';
 import { AppContext } from '../appContext';
@@ -96,7 +97,7 @@ export function registerToolsHandlers(ctx: AppContext) {
 
   ipcMain.on('verifyReady', () => {
     if (jsonVerifyWindow && !jsonVerifyWindow.isDestroyed()) {
-      jsonVerifyWindow.webContents.send('verifySettings', ctx.settings);
+      jsonVerifyWindow.webContents.send('verifySettings', buildVerifyWindowState(ctx.settings));
       if (pendingVerifyDir) {
         jsonVerifyWindow.webContents.send('set-allowed-paths', [pendingVerifyDir]);
         jsonVerifyWindow.webContents.send('initVerify', pendingVerifyDir);
