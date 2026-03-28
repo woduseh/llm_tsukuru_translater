@@ -53,6 +53,7 @@
     "fast-glob": "^3.3.3",
     "fs-extra": "^11.3.3",
     "glob": "^13.0.6",
+    "google-auth-library": "^10.6.2",
     "iconv-lite": "^0.7.2",
     "js-yaml": "^4.1.0",
     "jsdom": "^28.1.0",
