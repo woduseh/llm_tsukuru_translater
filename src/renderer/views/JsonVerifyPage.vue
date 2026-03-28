@@ -30,7 +30,7 @@
         <div class="action-buttons">
           <span class="selection-count" v-if="selectedIssues.size > 0">{{ selectedIssues.size }}개 선택</span>
           <button :disabled="selectedIssues.size === 0" @click="revertSelected" title="선택한 항목을 원본 값으로 되돌립니다">선택 되돌리기</button>
-          <button :disabled="!llmButtonEnabled" @click="llmRepairShift" title="줄밀림 위치의 원본 텍스트를 LLM으로 재번역합니다">
+          <button :disabled="!llmButtonEnabled" @click="llmRepairShift" :title="llmRepairTitle">
             {{ llmButtonText }}
           </button>
           <button :disabled="!currentHasIssues" @click="repairCurrentFile">현재 파일 수정</button>
@@ -131,8 +131,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { api } from '../composables/useIpc'
+import { getLlmProviderMissingConfigMessage } from '../../ts/libs/llmProviderConfig'
 
 interface VerifyIssue {
   path: string; type: string; severity: 'error' | 'warning'; message: string;
@@ -158,6 +159,9 @@ const llmRepairResults = ref<{ path: string; origText: string; currentText: stri
 const loading = ref(true)
 const issueSeverityFilter = ref<'all' | 'error' | 'warning'>('all')
 const previewSamples = ref<{ orig: string; trans: string; path: string }[]>([])
+const jsonChangeLine = ref(false)
+const llmReady = ref(false)
+const currentProvider = ref('gemini')
 
 /**
  * Local setAtPath — avoids contextBridge structured-clone which discards mutations.
@@ -204,11 +208,18 @@ const selectedShiftCount = computed(() => {
   }).length
 })
 const llmButtonEnabled = computed(() => {
+  if (!llmReady.value) return false
   if (llmRepairing.value) return false
   if (selectedIssues.value.size > 0) return selectedShiftCount.value > 0
   return shiftIssueCount.value > 0
 })
+const llmRepairTitle = computed(() => (
+  llmReady.value
+    ? '줄밀림 위치의 원본 텍스트를 LLM으로 재번역합니다'
+    : getLlmProviderMissingConfigMessage(currentProvider.value)
+))
 const llmButtonText = computed(() => {
+  if (!llmReady.value) return currentProvider.value === 'vertex' ? 'Vertex 설정 필요' : 'Gemini 설정 필요'
   if (llmRepairing.value) return `LLM 번역 중 (${llmProgress.value})`
   if (selectedIssues.value.size > 0 && selectedShiftCount.value > 0) {
     return `선택 항목 LLM 수정 (${selectedShiftCount.value}개)`
@@ -367,7 +378,7 @@ function loadPreview(f: FileEntry) {
 }
 
 function getIndent(): number {
-  return 4 * Number((globalThis as any).settings?.JsonChangeLine || 0)
+  return 4 * Number(jsonChangeLine.value)
 }
 
 function refreshFileIssues(idx: number) {
@@ -493,6 +504,11 @@ function close() { window.close() }
 function llmRepairShift() {
   const f = files.value[currentIdx.value]
   if (!f) return
+  if (!llmReady.value) {
+    statusText.value = `❌ ${getLlmProviderMissingConfigMessage(currentProvider.value)}`
+    statusClass.value = 'status-error'
+    return
+  }
 
   let shiftIssues: VerifyIssue[]
   if (selectedIssues.value.size > 0) {
@@ -547,8 +563,10 @@ function applyLlmRepair() {
 onMounted(() => {
   api.on('initVerify', (dir: string) => loadFiles(dir))
   api.on('verifySettings', (s: unknown) => {
-    (globalThis as any).settings = s
     const settings = s as Record<string, any>
+    jsonChangeLine.value = !!settings.JsonChangeLine
+    llmReady.value = !!settings.llmReady
+    currentProvider.value = typeof settings.llmProvider === 'string' ? settings.llmProvider : 'gemini'
     if (settings.themeData) {
       const root = document.documentElement
       for (const [key, val] of Object.entries(settings.themeData as Record<string, string>)) {

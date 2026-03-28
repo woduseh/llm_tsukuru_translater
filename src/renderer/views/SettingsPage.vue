@@ -13,8 +13,34 @@
     <div class="settings-group">
       <div class="group-title">LLM 번역</div>
       <div class="setting-item">
+        <label for="llmProvider">제공자</label>
+        <select id="llmProvider" class="text-input" v-model="settings.llmProvider">
+          <option value="gemini">Gemini API</option>
+          <option value="vertex">Vertex AI</option>
+        </select>
+      </div>
+      <div class="setting-item" v-show="!isVertexProvider">
         <label for="llmApiKey">Gemini API 키</label>
         <input type="password" id="llmApiKey" class="text-input" v-model="settings.llmApiKey" placeholder="API 키">
+      </div>
+      <div class="setting-item multiline" v-show="isVertexProvider">
+        <label for="llmVertexServiceAccountJson">Vertex 서비스 계정 JSON</label>
+        <textarea
+          id="llmVertexServiceAccountJson"
+          spellcheck="false"
+          v-model="settings.llmVertexServiceAccountJson"
+          placeholder='{"type":"service_account","project_id":"...","private_key":"...","client_email":"..."}'
+        ></textarea>
+      </div>
+      <div class="setting-item" v-show="isVertexProvider">
+        <label for="llmVertexLocation">Vertex 위치</label>
+        <input
+          type="text"
+          id="llmVertexLocation"
+          class="text-input"
+          v-model="settings.llmVertexLocation"
+          :placeholder="DEFAULT_LLM_VERTEX_LOCATION"
+        >
       </div>
       <div class="setting-item">
         <label for="llmModel">모델</label>
@@ -62,6 +88,7 @@
       <div class="textarea-label" style="margin-top:8px">추가 지시사항 <span class="hint">번역 스타일, 용어집, 기타 지시</span></div>
       <textarea id="llmCustomPrompt" spellcheck="false" v-model="settings.llmCustomPrompt"
         placeholder="예: 존댓말을 사용하세요&#10;ひかり는 히카리로 번역하세요&#10;판타지 스타일로 번역하세요"></textarea>
+      <div class="provider-hint">{{ providerConfigHint }}</div>
     </div>
 
     <!-- Advanced settings -->
@@ -98,14 +125,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, toRaw, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref, toRaw } from 'vue'
 import { api } from '../composables/useIpc'
+import { DEFAULT_LLM_VERTEX_LOCATION } from '../../types/settings'
+import { getLlmProviderConfigHint } from '../../ts/libs/llmProviderConfig'
 
 const settings = reactive<Record<string, any>>({
   loadingText: false, JsonChangeLine: false, DoNotTransHangul: false, ExtractAddLine: false,
   onefile_src: false, onefile_note: false, ExternMsgJson: false, oneMapFile: false,
   formatNice: false, HideExtractAll: false, extractSomeScript: false,
+  llmProvider: 'gemini',
   llmApiKey: '', llmModel: 'gemini-3.0-flash-preview',
+  llmVertexServiceAccountJson: '', llmVertexLocation: DEFAULT_LLM_VERTEX_LOCATION,
   llmSourceLang: 'ja', llmTargetLang: 'ko', llmTranslationUnit: 'file',
   llmChunkSize: 30, llmMaxRetries: 2, llmMaxApiRetries: 5, llmTimeout: 600,
   llmCustomPrompt: '',
@@ -113,6 +144,8 @@ const settings = reactive<Record<string, any>>({
 
 const extractPlusText = ref('')
 const extractSomeScript2Text = ref('')
+const isVertexProvider = computed(() => settings.llmProvider === 'vertex')
+const providerConfigHint = computed(() => getLlmProviderConfigHint(settings.llmProvider))
 
 const generalSettings = [
   { key: 'loadingText', label: '진행도 퍼센트 표시' },
@@ -158,6 +191,7 @@ function applySettings() {
   }
   settings.extractPlus = extP
   settings.extractSomeScript2 = extractSomeScript2Text.value.split('\n')
+  settings.llmVertexLocation = String(settings.llmVertexLocation || DEFAULT_LLM_VERTEX_LOCATION).trim() || DEFAULT_LLM_VERTEX_LOCATION
   settings.theme = 'Dracula'
   api.send('applysettings', { ...toRaw(settings) })
 }
@@ -178,6 +212,7 @@ onMounted(() => {
     if (s.extractPlus) {
       extractPlusText.value = (s.extractPlus as number[]).map(String).join('\n')
     }
+    settings.llmVertexLocation = String(settings.llmVertexLocation || DEFAULT_LLM_VERTEX_LOCATION).trim() || DEFAULT_LLM_VERTEX_LOCATION
     if (s.themeData) {
       const root = document.documentElement
       for (const [key, val] of Object.entries(s.themeData as Record<string, string>)) {
@@ -201,6 +236,13 @@ onMounted(() => {
   display: flex; align-items: center; justify-content: space-between;
   padding: 6px 0; gap: 12px;
 }
+.setting-item.multiline {
+  display: block;
+}
+.setting-item.multiline label {
+  display: block;
+  margin-bottom: 4px;
+}
 .setting-item label { font-size: 13px; flex: 1; }
 .text-input {
   background: var(--Highlight1); border: var(--border); border-radius: 6px;
@@ -219,6 +261,11 @@ textarea {
   padding: 8px 10px; font-size: 12px; font-family: inherit; resize: vertical;
 }
 .textarea-label { font-size: 13px; margin-bottom: 4px; }
+.provider-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.55;
+}
 details { margin-top: 12px; }
 summary { font-size: 13px; cursor: pointer; opacity: 0.7; }
 .warn-text { font-size: 11px; color: #f1fa8c; margin: 6px 0 8px; }

@@ -60,6 +60,18 @@ function getProviderMetadata(settings: AppSettings): Pick<LlmSettingsValidation,
   };
 }
 
+export function getLlmProviderConfigHint(provider: unknown): string {
+  return normalizeLlmProvider(provider) === 'vertex'
+    ? 'Google Cloud 서비스 계정 JSON 전체를 붙여넣고 Vertex 위치는 기본값 global을 사용하세요.'
+    : 'Gemini API 키를 입력하면 번역, 재번역, JSON 검증 복구에 그대로 사용됩니다.';
+}
+
+export function getLlmProviderMissingConfigMessage(provider: unknown): string {
+  return normalizeLlmProvider(provider) === 'vertex'
+    ? 'Vertex AI 설정이 완료되지 않았습니다. 메인 설정에서 서비스 계정 JSON, 위치, 모델을 확인해주세요.'
+    : 'Gemini API 설정이 완료되지 않았습니다. 메인 설정에서 API 키와 모델을 확인해주세요.';
+}
+
 export function sanitizeSettingsForRenderer<T extends Record<string, unknown>>(settings: T): SanitizedSettings<T> {
   const { llmApiKey: _llmApiKey, llmVertexServiceAccountJson: _llmVertexServiceAccountJson, ...safeSettings } = settings;
   return safeSettings as SanitizedSettings<T>;

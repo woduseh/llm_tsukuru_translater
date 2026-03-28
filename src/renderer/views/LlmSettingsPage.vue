@@ -27,7 +27,7 @@
       </select>
     </div>
 
-    <p class="config-hint">API 키, 모델, 프롬프트 등 번역 설정은 메인 설정에서 변경할 수 있습니다.</p>
+    <p class="config-hint">{{ providerConfigHint }}</p>
   </div>
 
   <div class="button-bar">
@@ -37,21 +37,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '../composables/useIpc'
+import {
+  getLlmProviderConfigHint,
+  getLlmProviderMissingConfigMessage,
+} from '../../ts/libs/llmProviderConfig'
 
 const translationMode = ref('untranslated')
 const resetProgress = ref(false)
 const sortOrder = ref('name-asc')
-let isLlmReady = false
-let currentProvider = 'gemini'
+const llmReady = ref(false)
+const currentProvider = ref('gemini')
+const providerConfigHint = computed(() => getLlmProviderConfigHint(currentProvider.value))
+const missingConfigMessage = computed(() => getLlmProviderMissingConfigMessage(currentProvider.value))
 
 onMounted(() => {
   api.on('llmSettings', (arg: unknown) => {
     const s = arg as Record<string, any>
     sortOrder.value = s.llmSortOrder || 'name-asc'
-    isLlmReady = !!s.llmReady
-    currentProvider = typeof s.llmProvider === 'string' ? s.llmProvider : 'gemini'
+    llmReady.value = !!s.llmReady
+    currentProvider.value = typeof s.llmProvider === 'string' ? s.llmProvider : 'gemini'
     if (s.themeData) {
       const root = document.documentElement
       for (const [key, val] of Object.entries(s.themeData as Record<string, string>)) {
@@ -63,11 +69,8 @@ onMounted(() => {
 })
 
 function start() {
-  if (!isLlmReady) {
-    const missingConfigMessage = currentProvider === 'vertex'
-      ? 'Vertex AI 설정이 완료되지 않았습니다. 메인 설정에서 서비스 계정 JSON, 위치, 모델을 확인해주세요.'
-      : 'API 키가 설정되지 않았습니다. 메인 설정에서 API 키를 입력해주세요.'
-    alert(missingConfigMessage)
+  if (!llmReady.value) {
+    alert(missingConfigMessage.value)
     return
   }
   api.send('llmSettingsApply', {

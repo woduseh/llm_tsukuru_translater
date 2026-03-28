@@ -3,6 +3,8 @@ import { settings as defaultSettings } from '../../src/ts/rpgmv/datas';
 import {
   buildLlmStartWindowState,
   buildVerifyWindowState,
+  getLlmProviderConfigHint,
+  getLlmProviderMissingConfigMessage,
   parseVertexServiceAccountJson,
   sanitizeSettingsForRenderer,
   validateLlmSettings,
@@ -141,5 +143,18 @@ describe('validateLlmSettings', () => {
 
     expect(validation.llmReady).toBe(false);
     expect(validation.llmValidationErrors).toContain('Gemini API key is required.');
+  });
+});
+
+describe('provider UI helpers', () => {
+  it('returns provider-specific setup hints for the settings page', () => {
+    expect(getLlmProviderConfigHint('gemini')).toContain('Gemini API 키');
+    expect(getLlmProviderConfigHint('vertex')).toContain('서비스 계정 JSON');
+    expect(getLlmProviderConfigHint('vertex')).toContain('global');
+  });
+
+  it('returns provider-specific missing-config messages for renderer dialogs', () => {
+    expect(getLlmProviderMissingConfigMessage('gemini')).toContain('Gemini API 설정');
+    expect(getLlmProviderMissingConfigMessage('vertex')).toContain('Vertex AI 설정');
   });
 });
