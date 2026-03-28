@@ -217,7 +217,7 @@ export interface ExtractedDataEntry {
     val: string;         // dotted JSON path into the original data
     m: number;           // exclusive end line number — text spans lines [lineNumber, m)
     origin?: string;     // source JSON filename
-    type: string;        // entry type marker
+    type?: string;       // entry type marker (legacy files may omit this)
     conf?: ExtractEntryConf;
     originText?: string; // original text at extraction time
 }

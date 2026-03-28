@@ -1,5 +1,7 @@
 import { VerifyIssue } from "./src/ts/rpgmv/verify"
 
+export type { extData, lenStr, wolfMetadata } from './src/ts/wolf/types';
+
 export declare global {
     interface Window {
         api: {
@@ -32,25 +34,4 @@ export declare global {
             setAtPath: (obj: unknown, jsonPath: string, value: unknown) => boolean;
         };
     }
-
-    interface wolfMetadata{
-        ver:2|3|-1
-    }
-
-    interface extData{
-        str:lenStr
-        sourceFile:string
-        extractFile:string
-        endsWithNull:boolean
-        textLineNumber:number[]
-        codeStr:string
-    }
-}
-
-export interface lenStr{
-    pos1:number
-    pos2:number
-    pos3:number
-    str:Uint8Array
-    len:number
 }

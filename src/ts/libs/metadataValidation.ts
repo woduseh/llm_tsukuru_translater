@@ -1,5 +1,6 @@
 import { isBoolean, isNumber, isRecord, isString } from '../../types/guards';
 import type { ExtractedData, ExtractedDataEntry, ExtractedFileData } from '../rpgmv/types';
+import type { extData, wolfMetadata } from '../wolf/types';
 
 function assertRecord(value: unknown, path: string): Record<string, unknown> {
   if (!isRecord(value)) {
@@ -68,7 +69,7 @@ export function validateExtractedData(value: unknown): ExtractedData {
         m: endLine,
         origin: entry.origin as string | undefined,
         conf: entry.conf as ExtractedDataEntry['conf'],
-        type: entry.type as string,
+        type: entry.type,
         originText: entry.originText as string | undefined,
       };
     }

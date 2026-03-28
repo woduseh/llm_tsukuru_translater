@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { AppSettings } from './types/settings';
 import { ExtractedFileData } from './ts/rpgmv/types';
+import type { extData, wolfMetadata } from './ts/wolf/types';
 
 export class AppContext {
   mainWindow: BrowserWindow | null = null;
@@ -13,9 +14,9 @@ export class AppContext {
   llmAbort = false;
   oPath = '';
   sourceDir = '';
-  WolfExtData: extData[] = [];  // extData from globals.d.ts
+  WolfExtData: extData[] = [];
   WolfCache: Record<string, Buffer> = {};
-  WolfMetadata: { ver: 2 | 3 | -1 } = { ver: -1 };
+  WolfMetadata: wolfMetadata = { ver: -1 };
 
   /** Reset all state to defaults. Used for test isolation. */
   reset(): void {

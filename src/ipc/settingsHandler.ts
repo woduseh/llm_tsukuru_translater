@@ -46,7 +46,6 @@ export function registerSettingsHandlers(ctx: AppContext) {
       worked(ctx)
       return
     }
-    ctx.settings.themeList = Object.keys(Themes)
     storage.set('settings', JSON.stringify(ctx.settings))
     ctx.settings.themeData = (Themes as Record<string, Record<string, string>>)[ctx.settings.theme] ?? {}
     ctx.mainWindow!.webContents.send('getGlobalSettings', sanitizeSettingsForRenderer(ctx.settings));
