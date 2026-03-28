@@ -6,8 +6,8 @@ import {
   contentHash,
   isPermanentApiError,
   isRetryableApiError,
-  createGeminiTranslator,
-} from '../../src/ts/libs/geminiTranslator';
+} from '../../src/ts/libs/translationCore';
+import { createGeminiTranslator } from '../../src/ts/libs/geminiTranslator';
 import { splitFileBlocks } from '../../src/ts/rpgmv/translator';
 
 // ─── splitIntoBlocks ────────────────────────────────────────────────

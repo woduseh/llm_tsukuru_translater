@@ -1,22 +1,18 @@
 import axios from 'axios';
 import { hanguls } from '../rpgmv/datas';
-import * as crypto from 'crypto';
 import {
     API_BACKOFF_BASE_MS, API_BACKOFF_MAX_MS,
     VALIDATION_RETRY_BASE_MS, VALIDATION_RETRY_MAX_MS,
     RATE_LIMIT_DELAY_MS, DEFAULT_API_TIMEOUT_SEC
 } from './constants';
-
-const SEPARATOR_REGEX = /^---\s*\d+\s*---$/;
-
-export interface BlockValidation {
-    index: number;
-    separator: string;
-    originalLines: string[];
-    translatedLines: string[];
-    lineCountMatch: boolean;
-    separatorMatch: boolean;
-}
+import {
+    splitIntoBlocks,
+    reassembleBlocks,
+    validateChunk,
+    isPermanentApiError,
+    isRetryableApiError,
+    type BlockValidation,
+} from './translationCore';
 
 export interface TranslationLogEntry {
     timestamp: string;
@@ -55,40 +51,6 @@ interface GeminiConfig {
     maxApiRetries: number;
     timeout: number;
     isAborted?: () => boolean;
-}
-
-export function splitIntoBlocks(content: string): { separator: string; lines: string[] }[] {
-    const allLines = content.split('\n');
-    const blocks: { separator: string; lines: string[] }[] = [];
-    let currentSep = '';
-    let currentLines: string[] = [];
-
-    for (const line of allLines) {
-        if (SEPARATOR_REGEX.test(line.trim())) {
-            if (currentSep !== '' || currentLines.length > 0) {
-                blocks.push({ separator: currentSep, lines: [...currentLines] });
-            }
-            currentSep = line;
-            currentLines = [];
-        } else {
-            currentLines.push(line);
-        }
-    }
-    if (currentSep !== '' || currentLines.length > 0) {
-        blocks.push({ separator: currentSep, lines: currentLines });
-    }
-    return blocks;
-}
-
-export function reassembleBlocks(blocks: { separator: string; lines: string[] }[]): string {
-    const parts: string[] = [];
-    for (const block of blocks) {
-        if (block.separator) {
-            parts.push(block.separator);
-        }
-        parts.push(...block.lines);
-    }
-    return parts.join('\n');
 }
 
 const LANG_NAMES: { [key: string]: string } = {
@@ -161,80 +123,6 @@ function buildSystemInstruction(config: GeminiConfig): string {
 
 function buildUserMessage(text: string): string {
     return `<Source_Text>\n${text}\n</Source_Text>`;
-}
-
-export function validateChunk(
-    originalBlocks: { separator: string; lines: string[] }[],
-    translatedText: string
-): { validatedBlocks: { separator: string; lines: string[] }[]; blockValidations: BlockValidation[] } {
-    const translatedBlocks = splitIntoBlocks(translatedText);
-    const blockValidations: BlockValidation[] = [];
-    const validatedBlocks: { separator: string; lines: string[] }[] = [];
-
-    for (let i = 0; i < originalBlocks.length; i++) {
-        const origBlock = originalBlocks[i];
-        const transBlock = translatedBlocks[i];
-
-        if (!transBlock) {
-            blockValidations.push({
-                index: i, separator: origBlock.separator,
-                originalLines: origBlock.lines, translatedLines: origBlock.lines,
-                lineCountMatch: false, separatorMatch: false
-            });
-            validatedBlocks.push({ ...origBlock });
-            continue;
-        }
-
-        const sepMatch = origBlock.separator === transBlock.separator;
-        const lineMatch = origBlock.lines.length === transBlock.lines.length;
-
-        blockValidations.push({
-            index: i, separator: origBlock.separator,
-            originalLines: origBlock.lines, translatedLines: transBlock.lines,
-            lineCountMatch: lineMatch,
-            separatorMatch: origBlock.separator === '' || sepMatch
-        });
-
-        validatedBlocks.push({
-            separator: origBlock.separator,
-            lines: transBlock.lines
-        });
-    }
-
-    if (translatedBlocks.length > originalBlocks.length) {
-        for (let i = originalBlocks.length; i < translatedBlocks.length; i++) {
-            blockValidations.push({
-                index: i, separator: translatedBlocks[i].separator,
-                originalLines: [], translatedLines: translatedBlocks[i].lines,
-                lineCountMatch: false, separatorMatch: false
-            });
-        }
-    }
-
-    return { validatedBlocks, blockValidations };
-}
-
-// Check if an error is permanent (safety block, timeout — retrying won't help)
-export function isPermanentApiError(error: unknown): boolean {
-    if (!error) return false;
-    const msg = String((error as Record<string, unknown>).message || error).toLowerCase();
-    const code = String((error as Record<string, unknown>).code || '').toLowerCase();
-    return msg.includes('blocked') || msg.includes('timeout') || code === 'econnaborted';
-}
-
-// Check if an error is a retryable API error (rate limit, server error, transient)
-export function isRetryableApiError(error: unknown): boolean {
-    if (!error) return false;
-    const msg = String((error as Record<string, unknown>).message || error).toLowerCase();
-    return msg.includes('429') || msg.includes('503') || msg.includes('resource_exhausted')
-        || msg.includes('rate limit') || msg.includes('quota') || msg.includes('overloaded')
-        || msg.includes('internal') || msg.includes('unavailable') || msg.includes('deadline')
-        || msg.includes('no candidates');
-}
-
-// Compute content hash for caching
-export function contentHash(content: string): string {
-    return crypto.createHash('md5').update(content, 'utf8').digest('hex');
 }
 
 export class GeminiTranslator {
@@ -466,3 +354,12 @@ export function createGeminiTranslator(settings: Record<string, any>, sourceLang
         isAborted
     });
 }
+
+export {
+    splitIntoBlocks,
+    reassembleBlocks,
+    validateChunk,
+    isPermanentApiError,
+    isRetryableApiError,
+    contentHash,
+} from './translationCore';
