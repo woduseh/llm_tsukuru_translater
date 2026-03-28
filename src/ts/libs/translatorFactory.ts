@@ -14,7 +14,7 @@ import {
   VertexTranslator,
 } from './vertexTranslator';
 
-type LlmSettingsLike = Partial<AppSettings> & Record<string, any>;
+type LlmSettingsLike = Partial<AppSettings> & Record<string, unknown>;
 
 export interface Translator {
   translateText(text: string): Promise<string>;
@@ -68,7 +68,7 @@ export function assertLlmReady(settings: LlmSettingsLike): void {
 }
 
 export function createTranslator(
-  settings: Record<string, any>,
+  settings: LlmSettingsLike,
   sourceLang: string,
   targetLang = 'ko',
   isAborted?: () => boolean,
