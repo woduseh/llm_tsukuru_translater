@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.1.0] - 2026-03-28
+
+### 추가
+
+- Gemini API와 Google Vertex AI 중 하나를 선택할 수 있는 LLM 제공자 설정
+- Google Cloud Service Account JSON 붙여넣기와 Vertex 위치(`global` 기본값) 지원
+- `google-auth-library` 기반 Vertex AI 번역 클라이언트 및 OAuth 인증 경로
+- 제공자별 설정 안내 문구와 안전한 준비 상태 payload를 사용하는 번역 시작/JSON 검증 UI
+
+### 변경
+
+- 전체 번역, 파일 재번역, 블록 재번역, JSON 검증 복구가 모두 현재 선택한 LLM 제공자를 사용하도록 변경
+- 캐시 키와 번역 로그에 제공자 메타데이터를 포함해 Gemini/Vertex 결과가 서로 섞이지 않도록 변경
+
 ## [3.0.1] - 2026-03-03
 
 ### 추가

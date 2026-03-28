@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { GoogleAuth } from 'google-auth-library';
 import { hanguls } from '../rpgmv/datas';
-import { DEFAULT_LLM_VERTEX_LOCATION } from '../../types/settings';
+import { type AppSettings, DEFAULT_LLM_VERTEX_LOCATION } from '../../types/settings';
 import {
   API_BACKOFF_BASE_MS,
   API_BACKOFF_MAX_MS,
@@ -460,23 +460,23 @@ export class VertexTranslator {
 }
 
 export function createVertexTranslator(
-  settings: Record<string, any>,
+  settings: Partial<AppSettings>,
   sourceLang: string,
   targetLang = 'ko',
   isAborted?: () => boolean,
   deps: VertexDependencies = {},
 ): VertexTranslator {
-  const credentials = parseVertexServiceAccountJson(settings.llmVertexServiceAccountJson);
+  const credentials = parseVertexServiceAccountJson(settings.llmVertexServiceAccountJson || '');
 
   return new VertexTranslator({
     credentials,
-    model: settings.llmModel,
-    customPrompt: settings.llmCustomPrompt,
+    model: settings.llmModel || '',
+    customPrompt: settings.llmCustomPrompt || '',
     chunkSize: settings.llmChunkSize || 30,
     translationUnit: settings.llmTranslationUnit || 'file',
     sourceLang,
     targetLang,
-    doNotTransHangul: settings.DoNotTransHangul,
+    doNotTransHangul: !!settings.DoNotTransHangul,
     maxRetries: settings.llmMaxRetries ?? 2,
     maxApiRetries: settings.llmMaxApiRetries ?? 5,
     timeout: (settings.llmTimeout || DEFAULT_API_TIMEOUT_SEC) * 1000,

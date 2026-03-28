@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { hanguls } from '../rpgmv/datas';
+import type { AppSettings } from '../../types/settings';
 import {
     API_BACKOFF_BASE_MS, API_BACKOFF_MAX_MS,
     VALIDATION_RETRY_BASE_MS, VALIDATION_RETRY_MAX_MS,
@@ -316,16 +317,16 @@ export class GeminiTranslator {
     }
 }
 
-export function createGeminiTranslator(settings: Record<string, any>, sourceLang: string, targetLang = 'ko', isAborted?: () => boolean): GeminiTranslator {
+export function createGeminiTranslator(settings: Partial<AppSettings>, sourceLang: string, targetLang = 'ko', isAborted?: () => boolean): GeminiTranslator {
     return new GeminiTranslator({
-        apiKey: settings.llmApiKey,
-        model: settings.llmModel,
-        customPrompt: settings.llmCustomPrompt,
+        apiKey: settings.llmApiKey || '',
+        model: settings.llmModel || '',
+        customPrompt: settings.llmCustomPrompt || '',
         chunkSize: settings.llmChunkSize || 30,
         translationUnit: settings.llmTranslationUnit || 'file',
         sourceLang,
         targetLang,
-        doNotTransHangul: settings.DoNotTransHangul,
+        doNotTransHangul: !!settings.DoNotTransHangul,
         maxRetries: settings.llmMaxRetries ?? 2,
         maxApiRetries: settings.llmMaxApiRetries ?? 5,
         timeout: (settings.llmTimeout || DEFAULT_API_TIMEOUT_SEC) * 1000,
