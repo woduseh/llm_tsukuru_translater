@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import * as eztrans from '../ts/rpgmv/translator.js';
+import { buildLlmStartWindowState } from '../ts/libs/llmProviderConfig';
 import { storage } from './shared';
 import { getLLMCompareWindow } from './toolsHandler';
 import { loadRoute } from './viteHelper';
@@ -45,7 +46,7 @@ export function registerTranslateHandlers(ctx: AppContext) {
 
   ipcMain.on('llmSettingsReady', () => {
     if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
-      llmSettingsWindow.webContents.send('llmSettings', ctx.settings);
+      llmSettingsWindow.webContents.send('llmSettings', buildLlmStartWindowState(ctx.settings));
     }
   })
 
