@@ -19,7 +19,11 @@
     "lint": "eslint \"src/**/*.ts\" \"main.ts\"",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "harness:core": "node scripts/harness/core.cjs",
+    "harness:eval": "node scripts/harness/eval.cjs",
+    "harness:ui": "node scripts/harness/ui.cjs",
+    "harness:live": "node scripts/harness/live.cjs"
   },
   "author": "Jackdu",
   "license": "GPL-3.0",

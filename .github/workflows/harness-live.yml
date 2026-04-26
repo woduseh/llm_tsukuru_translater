@@ -1,0 +1,36 @@
+name: Harness Live
+
+on:
+  workflow_dispatch:
+
+jobs:
+  live:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run live harness
+        run: npm run harness:live
+        env:
+          LLM_HARNESS_PROVIDER: ${{ vars.LLM_HARNESS_PROVIDER }}
+          LLM_HARNESS_MODEL: ${{ vars.LLM_HARNESS_MODEL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VERTEX_SERVICE_ACCOUNT_JSON: ${{ secrets.VERTEX_SERVICE_ACCOUNT_JSON }}
+          VERTEX_LOCATION: ${{ vars.VERTEX_LOCATION }}
+
+      - name: Upload live harness artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: harness-live-artifacts
+          path: artifacts/harness/

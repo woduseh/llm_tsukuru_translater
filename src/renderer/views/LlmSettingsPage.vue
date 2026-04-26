@@ -1,5 +1,5 @@
 <template>
-  <div id="container">
+  <div id="container" data-harness-view="llm-settings" :data-llm-ready="llmReady ? 'true' : 'false'" :data-provider="currentProvider">
     <h2>번역</h2>
 
     <div class="form-group">

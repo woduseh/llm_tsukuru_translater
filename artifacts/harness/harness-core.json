@@ -1,0 +1,9 @@
+{
+  "suite": "harness-core",
+  "status": "failed",
+  "fatal": true,
+  "error": {
+    "message": "npm.cmd run build:ts failed with exit code null",
+    "stack": "Error: npm.cmd run build:ts failed with exit code null\n    at runCommand (C:\\Users\\wodus\\Copilot\\llm_tsukuru_translater\\scripts\\harness\\_shared.cjs:20:11)\n    at buildMainIfNeeded (C:\\Users\\wodus\\Copilot\\llm_tsukuru_translater\\scripts\\harness\\_shared.cjs:26:3)\n    at main (C:\\Users\\wodus\\Copilot\\llm_tsukuru_translater\\scripts\\harness\\core.cjs:29:3)\n    at Object.<anonymous> (C:\\Users\\wodus\\Copilot\\llm_tsukuru_translater\\scripts\\harness\\core.cjs:262:1)\n    at Module._compile (node:internal/modules/cjs/loader:1812:14)\n    at Object..js (node:internal/modules/cjs/loader:1943:10)\n    at Module.load (node:internal/modules/cjs/loader:1533:32)\n    at Module._load (node:internal/modules/cjs/loader:1335:12)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)"
+  }
+}

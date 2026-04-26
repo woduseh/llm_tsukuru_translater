@@ -11,6 +11,7 @@ import { registerWolfHandlers } from './src/ts/wolf/main';
 import { initFontIPC } from './src/ts/rpgmv/fonts';
 import { initExtentions } from './src/ts/libs/extentions';
 import { AppContext } from './src/appContext';
+import { maybeRunUiHarness } from './src/harness/uiHarness';
 
 const ctx = new AppContext();
 
@@ -27,6 +28,7 @@ ipcMain.on('apply', (ev, arg) => apply(ev, arg, ctx));
 app.whenReady().then(() => {
   createWindow(ctx)
   initExtentions(ctx)
+  void maybeRunUiHarness(ctx)
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow(ctx)

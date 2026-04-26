@@ -1,5 +1,12 @@
 <template>
-  <div class="verify-layout">
+  <div
+    class="verify-layout"
+    data-harness-view="json-verify"
+    :data-file-count="files.length"
+    :data-total-issues="totalIssueCount"
+    :data-error-files="errorFileCount"
+    :data-warning-files="warningFileCount"
+  >
     <!-- Left: File list -->
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -191,6 +198,9 @@ const currentHasIssues = computed(() => files.value.length > 0 && files.value[cu
 const currentErrorCount = computed(() => files.value.length > 0 ? files.value[currentIdx.value].errorCount : 0)
 const currentWarningCount = computed(() => files.value.length > 0 ? files.value[currentIdx.value].warningCount : 0)
 const anyHasIssues = computed(() => files.value.some(f => f.issues.length > 0))
+const totalIssueCount = computed(() => files.value.reduce((sum, file) => sum + file.issues.length, 0))
+const errorFileCount = computed(() => files.value.filter(file => file.errorCount > 0).length)
+const warningFileCount = computed(() => files.value.filter(file => file.warningCount > 0 && file.errorCount === 0).length)
 
 const filteredIssueItems = computed(() => {
   return currentIssues.value

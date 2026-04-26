@@ -1,5 +1,12 @@
 <template>
-  <div class="compare-layout">
+  <div
+    class="compare-layout"
+    data-harness-view="llm-compare"
+    :data-file-count="files.length"
+    :data-mismatch-count="mismatchFileCount"
+    :data-untranslated-count="untranslatedFileCount"
+    :data-loading="loading ? 'true' : 'false'"
+  >
     <!-- Loading overlay -->
     <div v-if="busy" class="loading-overlay">
       <div class="loading-spinner"></div>
@@ -218,6 +225,8 @@ function onViewportScroll() {
 }
 
 const hasUntranslatedBlocks = computed(() => untranslatedBlocks.value.size > 0)
+const mismatchFileCount = computed(() => files.value.filter(f => f.mismatch).length)
+const untranslatedFileCount = computed(() => files.value.filter(f => f.untranslated).length)
 
 /** Whether the current file has any problem blocks (mismatch or untranslated). */
 const hasProblems = computed(() => {

@@ -10,8 +10,17 @@ import { PROJECT_ROOT } from '../projectRoot';
 import log from '../logger';
 import { sanitizeStoredSettings } from '../ts/libs/settingsRuntimeValidation';
 
+function getStorageDir(): string {
+  const override = process.env.LLM_TSUKURU_STORE_DIR;
+  if (override && override.trim()) {
+    fs.mkdirSync(override, { recursive: true });
+    return override;
+  }
+  return app.getPath('userData');
+}
+
 function getEncryptionKey(): string {
-  const keyPath = path.join(app.getPath('userData'), '.store-key');
+  const keyPath = path.join(getStorageDir(), '.store-key');
   try {
     if (fs.existsSync(keyPath)) {
       const key = fs.readFileSync(keyPath, 'utf8').trim();
@@ -23,7 +32,7 @@ function getEncryptionKey(): string {
   return newKey;
 }
 
-export const storage = new Store({ encryptionKey: getEncryptionKey() });
+export const storage = new Store({ encryptionKey: getEncryptionKey(), cwd: getStorageDir() });
 export const defaultHeight = 550;
 
 export function sendAlert(ctx: AppContext, txt: string){

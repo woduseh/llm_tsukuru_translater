@@ -1,6 +1,6 @@
 <template>
   <TitleBar />
-  <div class="home-content">
+  <div class="home-content" data-harness-view="home">
     <div class="hero">
       <h1>Tsukuru Extractor</h1>
       <p class="subtitle">RPG Maker 번역 도구</p>

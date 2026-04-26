@@ -1,0 +1,102 @@
+{
+  "blockCases": [
+    {
+      "id": "block-preserves-structure",
+      "title": "translated chunk preserves separators and line counts",
+      "original": "--- 101 ---\nこんにちは\n\\V[1]\n--- 102 ---\nさようなら",
+      "candidate": "--- 101 ---\n안녕하세요\n\\V[1]\n--- 102 ---\n안녕히 가세요",
+      "expected": {
+        "separatorMatch": true,
+        "lineCountMatch": true
+      }
+    },
+    {
+      "id": "block-detects-line-drift",
+      "title": "translated chunk detects collapsed line counts",
+      "original": "--- 101 ---\nline1\nline2",
+      "candidate": "--- 101 ---\n한 줄로 합쳐짐",
+      "expected": {
+        "separatorMatch": true,
+        "lineCountMatch": false
+      }
+    },
+    {
+      "id": "block-detects-separator-drift",
+      "title": "translated chunk detects separator corruption",
+      "original": "--- 101 ---\nhello",
+      "candidate": "--- 999 ---\n안녕하세요",
+      "expected": {
+        "separatorMatch": false,
+        "lineCountMatch": true
+      }
+    }
+  ],
+  "verifyCases": [
+    {
+      "id": "verify-detects-text-shift",
+      "title": "verify detects marker overwrite as text_shift",
+      "orig": {
+        "code": 401,
+        "indent": 0,
+        "parameters": [
+          "--- 101 ---"
+        ]
+      },
+      "trans": {
+        "code": 401,
+        "indent": 0,
+        "parameters": [
+          "밀려온 대사"
+        ]
+      },
+      "expectedTypes": [
+        "text_shift"
+      ]
+    },
+    {
+      "id": "verify-detects-control-char-mismatch",
+      "title": "verify detects dropped control characters",
+      "orig": "Test \\V[1] message",
+      "trans": "Test message",
+      "expectedTypes": [
+        "control_char_mismatch"
+      ]
+    }
+  ],
+  "repairCases": [
+    {
+      "id": "repair-preserves-display-name",
+      "title": "repair preserves translated displayName while fixing marker shift",
+      "orig": {
+        "displayName": "東の洞窟",
+        "event": {
+          "code": 401,
+          "indent": 0,
+          "parameters": [
+            "--- 101 ---"
+          ]
+        }
+      },
+      "trans": {
+        "displayName": "동쪽 동굴",
+        "event": {
+          "code": 401,
+          "indent": 0,
+          "parameters": [
+            "밀려온 대사"
+          ]
+        }
+      },
+      "expected": {
+        "displayName": "동쪽 동굴",
+        "event": {
+          "code": 401,
+          "indent": 0,
+          "parameters": [
+            "--- 101 ---"
+          ]
+        }
+      }
+    }
+  ]
+}

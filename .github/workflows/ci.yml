@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  ci:
+  quality:
     runs-on: windows-latest
 
     steps:
@@ -30,3 +30,19 @@ jobs:
 
       - name: Test with coverage
         run: npm run test:coverage
+
+      - name: Harness core
+        run: npm run harness:core
+
+      - name: Harness eval
+        run: npm run harness:eval
+
+      - name: Harness UI
+        run: npm run harness:ui
+
+      - name: Upload harness artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: harness-artifacts
+          path: artifacts/harness/
