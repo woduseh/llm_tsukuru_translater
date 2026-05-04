@@ -96,6 +96,8 @@ export const SESSION_STATE_LABELS: Record<AgentTerminalSessionState, string> = {
   exited: 'Exited',
   failed: 'Failed',
   killed: 'Killed',
+  unavailable: 'Unavailable',
+  reconnecting: 'Reconnecting',
 }
 
 export const TERMINAL_EVENT_LABELS: Record<TerminalEventKind, string> = {
@@ -104,6 +106,7 @@ export const TERMINAL_EVENT_LABELS: Record<TerminalEventKind, string> = {
   exit: 'exit',
   started: 'started',
   error: 'error',
+  truncated: 'truncated',
 }
 
 export const MCP_STATUS_LABELS: Record<McpConnectionStatus, string> = {

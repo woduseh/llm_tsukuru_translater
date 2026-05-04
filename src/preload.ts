@@ -44,6 +44,24 @@ contextBridge.exposeInMainWorld('api', {
     if (isSendChannel(channel)) {
       return ipcRenderer.invoke(channel, ...args);
     }
+  },
+  terminal: {
+    create: (request: unknown) => ipcRenderer.invoke('terminalCreate', request),
+    input: (request: unknown) => ipcRenderer.invoke('terminalInput', request),
+    resize: (request: unknown) => ipcRenderer.invoke('terminalResize', request),
+    kill: (request: unknown) => ipcRenderer.invoke('terminalKill', request),
+    list: () => ipcRenderer.invoke('terminalList'),
+    snapshot: (request: unknown) => ipcRenderer.invoke('terminalSnapshot', request),
+    onEvent: (callback: (event: unknown) => void) => {
+      const listener = (_event: unknown, payload: unknown) => callback(payload);
+      ipcRenderer.on('terminalEvent', listener);
+      return () => ipcRenderer.removeListener('terminalEvent', listener);
+    },
+    onSessions: (callback: (payload: unknown) => void) => {
+      const listener = (_event: unknown, payload: unknown) => callback(payload);
+      ipcRenderer.on('terminalSessions', listener);
+      return () => ipcRenderer.removeListener('terminalSessions', listener);
+    },
   }
 });
 

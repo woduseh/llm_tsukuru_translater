@@ -8,8 +8,9 @@ export const SEND_CHANNELS = [
   'openFolder', 'projectConvert', 'license', 'app_version',
   'getextention', 'selFont', 'changeFontSize', 'updateVersion',
   'wolf_ext', 'wolf_apply', 'gamePatcher',
-  'compareReady', 'verifyReady',
-  'llmSettingsReady', 'settingsReady', 'mainReady',
+   'compareReady', 'verifyReady',
+   'llmSettingsReady', 'settingsReady', 'mainReady',
+   'terminalCreate', 'terminalInput', 'terminalResize', 'terminalKill', 'terminalList', 'terminalSnapshot',
 ] as const;
 
 export const RECEIVE_CHANNELS = [
@@ -19,6 +20,7 @@ export const RECEIVE_CHANNELS = [
   'initCompare', 'retranslateProgress', 'retranslateFileDone', 'retranslateBlocksDone',
   'initVerify', 'verifySettings', 'verifyLlmRepairProgress', 'verifyLlmRepairDone',
   'set-allowed-paths',
+  'terminalEvent', 'terminalSessions',
 ] as const;
 
 export type SendChannel = typeof SEND_CHANNELS[number];

@@ -1,4 +1,13 @@
 import { onUnmounted } from 'vue'
+import type {
+  TerminalEvent,
+  TerminalInputRequest,
+  TerminalKillRequest,
+  TerminalOperationResult,
+  TerminalResizeRequest,
+  TerminalSessionCreateRequest,
+  TerminalSnapshotRequest,
+} from '../../types/agentWorkspace'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type IpcCallback = (...args: any[]) => void
@@ -9,6 +18,16 @@ interface ElectronApi {
   once: (channel: string, callback: IpcCallback) => void
   removeAllListeners: (channel: string) => void
   invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
+  terminal: {
+    create: (request: TerminalSessionCreateRequest) => Promise<TerminalOperationResult>
+    input: (request: TerminalInputRequest) => Promise<TerminalOperationResult>
+    resize: (request: TerminalResizeRequest) => Promise<TerminalOperationResult>
+    kill: (request: TerminalKillRequest) => Promise<TerminalOperationResult>
+    list: () => Promise<TerminalOperationResult>
+    snapshot: (request: TerminalSnapshotRequest) => Promise<TerminalOperationResult>
+    onEvent: (callback: (event: TerminalEvent) => void) => () => void
+    onSessions: (callback: (result: TerminalOperationResult) => void) => () => void
+  }
 }
 
 interface NodeFs {
@@ -53,6 +72,7 @@ export const api = {
   once: (channel: string, callback: IpcCallback) => window.api.once(channel, callback),
   removeAllListeners: (channel: string) => window.api.removeAllListeners(channel),
   invoke: (channel: string, ...args: unknown[]) => window.api.invoke(channel, ...args),
+  terminal: window.api.terminal,
 }
 
 /** Register an IPC listener that auto-cleans on component unmount */

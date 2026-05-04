@@ -109,25 +109,25 @@ export function registerWindowHandlers(ctx: AppContext) {
       }
       let dir = qs
       if(qv === 'data'){
-        ctx.allowedProjectRoots = rememberAllowedProjectRoot(ctx.allowedProjectRoots, dir);
+        rememberTrustedProjectPaths(ctx, dir, inferTerminalProjectRoot(dir));
         ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:dir});
         ctx.mainWindow!.webContents.send('set-allowed-paths', [dir]);
       }
       else{
         if(fs.existsSync(path.join(qs, 'www', 'data'))){
           const projectDir = path.join(qs, 'www', 'data');
-          ctx.allowedProjectRoots = rememberAllowedProjectRoot(ctx.allowedProjectRoots, projectDir);
+          rememberTrustedProjectPaths(ctx, projectDir, qs);
           ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:projectDir});
           ctx.mainWindow!.webContents.send('set-allowed-paths', [projectDir]);
         }
         else if(fs.existsSync(path.join(qs, 'data'))){
           const projectDir = path.join(qs, 'data');
-          ctx.allowedProjectRoots = rememberAllowedProjectRoot(ctx.allowedProjectRoots, projectDir);
+          rememberTrustedProjectPaths(ctx, projectDir, qs);
           ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:projectDir});
           ctx.mainWindow!.webContents.send('set-allowed-paths', [projectDir]);
         }
         else if(fs.existsSync(path.join(qs, 'Data.wolf'))){
-          ctx.allowedProjectRoots = rememberAllowedProjectRoot(ctx.allowedProjectRoots, qs);
+          rememberTrustedProjectPaths(ctx, qs, qs);
           ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:path.join(qs)});
           ctx.mainWindow!.webContents.send('set-allowed-paths', [path.join(qs)]);
         }
@@ -137,4 +137,25 @@ export function registerWindowHandlers(ctx: AppContext) {
       }
     }
   });
+}
+
+function rememberTrustedProjectPaths(ctx: AppContext, dataRoot: string, terminalRoot: string): void {
+  const previousCurrentRoot = ctx.currentTerminalProjectRoot;
+  if (previousCurrentRoot && path.resolve(previousCurrentRoot).toLowerCase() !== path.resolve(terminalRoot).toLowerCase()) {
+    ctx.terminalService?.disposeAll('project-change');
+  }
+  ctx.allowedProjectRoots = rememberAllowedProjectRoot(ctx.allowedProjectRoots, dataRoot);
+  ctx.terminalProjectRoots = rememberAllowedProjectRoot(ctx.terminalProjectRoots, terminalRoot);
+  ctx.currentTerminalProjectRoot = terminalRoot;
+}
+
+function inferTerminalProjectRoot(dataRoot: string): string {
+  const normalized = path.resolve(dataRoot);
+  const base = path.basename(normalized).toLowerCase();
+  if (base !== 'data') return normalized;
+  const parent = path.dirname(normalized);
+  if (path.basename(parent).toLowerCase() === 'www') {
+    return path.dirname(parent);
+  }
+  return parent;
 }

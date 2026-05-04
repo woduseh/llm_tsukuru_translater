@@ -64,7 +64,7 @@
         <pre v-if="selectedPrompt" class="prompt-preview">{{ selectedPrompt }}</pre>
         <div class="panel-heading terminal-heading">
           <h2>Terminal sessions</h2>
-          <span>Mock/no-op scaffold</span>
+          <span>Native PTY / degraded fallback</span>
         </div>
         <div class="workspace-tabs">
           <button
@@ -80,9 +80,7 @@
           </button>
         </div>
         <div class="terminal-placeholder">
-          <strong>Privileged command spawning is disabled.</strong>
-          <p>Future MCP/PTY execution can attach here after approval, sandbox, and audit paths are complete.</p>
-          <p>Output retention: {{ activeSession.outputRetention }} (persistOutput={{ activeSession.persistOutput }})</p>
+          <AgentTerminalPane :key="activeSession.id" :kind="activeSession.kind" :title="activeSession.label" />
         </div>
       </div>
 
@@ -115,6 +113,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import TitleBar from '../components/TitleBar.vue'
+import AgentTerminalPane from '../components/AgentTerminalPane.vue'
 import { api } from '../composables/useIpc'
 import {
   createAgentWorkspaceViewModel,

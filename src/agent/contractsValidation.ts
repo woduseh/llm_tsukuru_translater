@@ -60,10 +60,12 @@ export function validateTerminalEvent(value: unknown): ValidationResult<Terminal
     requireSchemaVersion(obj, 'terminalEvent', errors);
     requireString(obj, 'sessionId', errors);
     requireNumber(obj, 'sequence', errors);
-    requireEnum(obj, 'kind', ['stdout', 'stderr', 'exit', 'started', 'error'], errors);
+    requireEnum(obj, 'kind', ['stdout', 'stderr', 'exit', 'started', 'error', 'truncated'], errors);
     requireIsoDate(obj, 'timestamp', errors);
     optionalString(obj, 'data', errors);
     optionalNumber(obj, 'exitCode', errors);
+    optionalNumber(obj, 'omittedBytes', errors);
+    optionalString(obj, 'errorCode', errors);
     requireBoolean(obj, 'redacted', errors);
   });
   return toResult(value, errors);

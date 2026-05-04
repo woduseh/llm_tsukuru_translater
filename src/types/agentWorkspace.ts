@@ -6,9 +6,20 @@ export type JsonObject = { [key: string]: JsonValue };
 
 export type PermissionTier = 'readonly' | 'workspace-write' | 'approval-required' | 'dangerous';
 export type ApprovalStatus = 'pending' | 'granted' | 'denied' | 'expired';
-export type TerminalEventKind = 'stdout' | 'stderr' | 'exit' | 'started' | 'error';
+export type TerminalEventKind = 'stdout' | 'stderr' | 'exit' | 'started' | 'error' | 'truncated';
 export type TerminalSessionKind = 'codex' | 'claude' | 'shell' | 'custom';
-export type TerminalSessionState = 'created' | 'starting' | 'running' | 'idle' | 'exited' | 'failed' | 'killed';
+export type TerminalSessionState = 'created' | 'starting' | 'running' | 'idle' | 'exited' | 'failed' | 'killed' | 'unavailable' | 'reconnecting';
+export type TerminalCapabilityStatus = 'enabled' | 'degraded' | 'unavailable';
+export type TerminalErrorCode =
+  | 'terminal-unavailable'
+  | 'invalid-request'
+  | 'no-trusted-project'
+  | 'cwd-denied'
+  | 'executable-missing'
+  | 'session-not-found'
+  | 'input-too-large'
+  | 'paste-confirmation-required'
+  | 'pty-spawn-failed';
 export type AuditEntryKind = 'tool-call' | 'approval' | 'file-read' | 'file-write' | 'failure' | 'handoff';
 export type AgentResultStatus = 'ok' | 'needs-approval' | 'failed';
 
@@ -55,6 +66,8 @@ export interface TerminalEvent {
   data?: string;
   exitCode?: number;
   redacted: boolean;
+  omittedBytes?: number;
+  errorCode?: TerminalErrorCode;
 }
 
 export interface TerminalSessionSummary {
@@ -67,6 +80,12 @@ export interface TerminalSessionSummary {
   outputRetention: 'ephemeral' | 'persisted';
   persistOutput: boolean;
   exitCode?: number;
+  executableLabel?: string;
+  commandPreview?: string;
+  latestSequence: number;
+  bridgeAttached: boolean;
+  redactionCount: number;
+  truncationCount: number;
 }
 
 export interface TerminalSessionCreateRequest {
@@ -76,7 +95,64 @@ export interface TerminalSessionCreateRequest {
   label?: string;
   cwd?: string;
   commandPresetId?: string;
-  persistOutput?: false;
+  executable?: string;
+  args?: string[];
+  cols?: number;
+  rows?: number;
+  persistOutput?: boolean;
+  allowCustomCommand?: boolean;
+}
+
+export interface TerminalInputRequest {
+  schemaVersion: 1;
+  sessionId: string;
+  data: string;
+  paste?: boolean;
+  confirmed?: boolean;
+}
+
+export interface TerminalResizeRequest {
+  schemaVersion: 1;
+  sessionId: string;
+  cols: number;
+  rows: number;
+}
+
+export interface TerminalKillRequest {
+  schemaVersion: 1;
+  sessionId: string;
+}
+
+export interface TerminalSnapshotRequest {
+  schemaVersion: 1;
+  sessionId: string;
+  afterSequence?: number;
+}
+
+export interface TerminalSnapshot {
+  schemaVersion: 1;
+  session: TerminalSessionSummary;
+  events: TerminalEvent[];
+  truncatedBeforeSequence?: number;
+}
+
+export interface TerminalCapability {
+  schemaVersion: 1;
+  status: TerminalCapabilityStatus;
+  nativePtyAvailable: boolean;
+  reason?: string;
+  fallbackHint?: string;
+}
+
+export interface TerminalOperationResult {
+  schemaVersion: 1;
+  ok: boolean;
+  session?: TerminalSessionSummary;
+  sessions?: TerminalSessionSummary[];
+  snapshot?: TerminalSnapshot;
+  capability?: TerminalCapability;
+  errorCode?: TerminalErrorCode;
+  message?: string;
 }
 
 export interface AuditEntry {

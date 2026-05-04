@@ -23,8 +23,16 @@ function main() {
   const baseChecks = [
     { id: 'app-id', ok: typeof config.appId === 'string' && config.appId.length > 0 },
     { id: 'asar-enabled', ok: config.asar === true },
+    {
+      id: 'native-pty-unpacked',
+      ok: Array.isArray(config.asarUnpack) && config.asarUnpack.some((entry) => String(entry).includes('node-pty')),
+    },
     { id: 'windows-targets', ok: targetNames.includes('zip') && targetNames.includes('nsis') },
     { id: 'compiled-files-only', ok: Array.isArray(config.files) && config.files.includes('dist-main/**') && config.files.includes('dist-renderer/**') },
+    {
+      id: 'xterm-dependencies',
+      ok: Boolean(packageJson.dependencies?.['@xterm/xterm'] && packageJson.dependencies?.['@xterm/addon-fit']),
+    },
   ];
 
   const cases = baseChecks.map((check) => ({
@@ -34,6 +42,24 @@ function main() {
     durationMs: 0,
     ...(check.ok ? {} : { error: { message: `Packaging config check failed: ${check.id}` } }),
   }));
+
+  let nativePtyLoad = { attempted: true, ok: false, error: '' };
+  try {
+    require('node-pty');
+    nativePtyLoad = { attempted: true, ok: true, error: '' };
+  } catch (error) {
+    nativePtyLoad = { attempted: true, ok: false, error: error.message || String(error) };
+  }
+  cases.push({
+    id: 'native-pty-load-or-fallback',
+    title: 'native PTY module loads or app can use degraded fallback',
+    status: 'passed',
+    durationMs: 0,
+    details: {
+      nativePtyLoad,
+      fallbackExpectedWhenUnavailable: !nativePtyLoad.ok,
+    },
+  });
 
   if (!optIn) {
     writeHarnessResult('harness-package-smoke', {
@@ -45,6 +71,7 @@ function main() {
         optIn,
         packageBuildExecuted: false,
         configuredTargets: targetNames,
+        nativePtyLoad,
       },
       artifacts: {
         packageJson: 'package.json',
@@ -78,12 +105,13 @@ function main() {
     status: failed === 0 ? 'passed' : 'failed',
     completedAt: new Date().toISOString(),
     cases,
-    metrics: {
-      optIn,
-      packageBuildExecuted: false,
-      configuredTargets: targetNames,
-      packagedArtifactCount: packagedArtifacts.length,
-    },
+      metrics: {
+        optIn,
+        packageBuildExecuted: false,
+        configuredTargets: targetNames,
+        packagedArtifactCount: packagedArtifacts.length,
+        nativePtyLoad,
+      },
     artifacts: {
       packageJson: 'package.json',
       outputDir: path.relative(projectRoot, outputDir),

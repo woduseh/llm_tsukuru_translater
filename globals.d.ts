@@ -1,4 +1,13 @@
 import { VerifyIssue } from "./src/ts/rpgmv/verify"
+import type {
+    TerminalEvent,
+    TerminalInputRequest,
+    TerminalKillRequest,
+    TerminalOperationResult,
+    TerminalResizeRequest,
+    TerminalSessionCreateRequest,
+    TerminalSnapshotRequest,
+} from './src/types/agentWorkspace';
 
 export type { extData, lenStr, wolfMetadata } from './src/ts/wolf/types';
 
@@ -10,6 +19,16 @@ export declare global {
             once: (channel: string, callback: (...args: any[]) => void) => void;
             removeAllListeners: (channel: string) => void;
             invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+            terminal: {
+                create: (request: TerminalSessionCreateRequest) => Promise<TerminalOperationResult>;
+                input: (request: TerminalInputRequest) => Promise<TerminalOperationResult>;
+                resize: (request: TerminalResizeRequest) => Promise<TerminalOperationResult>;
+                kill: (request: TerminalKillRequest) => Promise<TerminalOperationResult>;
+                list: () => Promise<TerminalOperationResult>;
+                snapshot: (request: TerminalSnapshotRequest) => Promise<TerminalOperationResult>;
+                onEvent: (callback: (event: TerminalEvent) => void) => () => void;
+                onSessions: (callback: (result: TerminalOperationResult) => void) => () => void;
+            };
         };
         nodeBuffer: {
             toBase64: (str: string) => string;

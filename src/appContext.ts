@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron';
 import { AppSettings } from './types/settings';
 import { ExtractedFileData } from './ts/rpgmv/types';
 import type { extData, wolfMetadata } from './ts/wolf/types';
+import type { TerminalService } from './agent/terminalService';
 
 export class AppContext {
   mainWindow: BrowserWindow | null = null;
@@ -15,6 +16,9 @@ export class AppContext {
   oPath = '';
   sourceDir = '';
   allowedProjectRoots: string[] = [];
+  terminalProjectRoots: string[] = [];
+  currentTerminalProjectRoot = '';
+  terminalService: TerminalService | null = null;
   WolfExtData: extData[] = [];
   WolfCache: Record<string, Buffer> = {};
   WolfMetadata: wolfMetadata = { ver: -1 };
@@ -32,6 +36,9 @@ export class AppContext {
     this.oPath = '';
     this.sourceDir = '';
     this.allowedProjectRoots = [];
+    this.terminalProjectRoots = [];
+    this.currentTerminalProjectRoot = '';
+    this.terminalService = null;
     this.WolfExtData = [];
     this.WolfCache = {};
     this.WolfMetadata = { ver: -1 };
