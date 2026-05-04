@@ -11,9 +11,25 @@ interface UiHarnessScenario {
 }
 
 interface UiHarnessResult {
+  schemaVersion?: number;
   suite: string;
   status: 'passed' | 'failed';
   completedAt: string;
+  cases?: Array<{
+    id: string;
+    title: string;
+    status: 'passed' | 'failed';
+    durationMs: number;
+    details?: unknown;
+    error?: {
+      message: string;
+      stack?: string;
+    };
+  }>;
+  metrics?: Record<string, unknown>;
+  artifacts?: Record<string, unknown>;
+  reproCommand?: string;
+  failureHints?: string[];
   snapshots?: Record<string, unknown>;
   error?: {
     message: string;
@@ -113,20 +129,33 @@ async function openLlmSettingsSnapshot(ctx: AppContext, llmReady: boolean, targe
   ctx.settings.llmProvider = 'gemini';
   ctx.settings.llmApiKey = llmReady ? 'harness-key' : '';
   ctx.settings.llmModel = llmReady ? 'gemini-harness' : '';
+  ctx.settings.llmParallelWorkers = 4;
+  ctx.settings.llmCustomPrompt = 'Harness custom prompt';
 
   emit('openLLMSettings', { dir: targetDir.replaceAll('\\', '/'), game: 'mvmz' });
   const win = await waitForWindow('/llm-settings', timeoutMs);
   await waitForSelector(win, '[data-harness-view="llm-settings"]', timeoutMs);
   await waitForAttributeValue(win, '[data-harness-view="llm-settings"]', 'data-llm-ready', llmReady ? 'true' : 'false', timeoutMs);
+  await waitForSelector(win, '[data-harness-guideline-panel]', timeoutMs);
+  await waitForSelector(win, '[data-harness-guideline-draft]', timeoutMs);
 
   const result = await snapshot(win, `(() => {
     const root = document.querySelector('[data-harness-view="llm-settings"]');
     const hint = document.querySelector('.config-hint');
+    const parallelWorkers = document.querySelector('#parallelWorkers');
+    const generateButton = Array.from(document.querySelectorAll('.guideline-actions button'))[1];
+    const applyButton = document.querySelector('.merge-row button');
     return {
       llmReady: root?.getAttribute('data-llm-ready'),
       provider: root?.getAttribute('data-provider'),
+      parallelWorkers: parallelWorkers?.value,
       heading: document.querySelector('h2')?.textContent?.trim(),
       hint: hint?.textContent?.trim(),
+      guidelinePanelPresent: Boolean(document.querySelector('[data-harness-guideline-panel]')),
+      guidelineDraftPlaceholder: document.querySelector('[data-harness-guideline-draft]')?.getAttribute('placeholder'),
+      generateGuidelineDisabled: Boolean(generateButton?.disabled),
+      applyGuidelineDisabled: Boolean(applyButton?.disabled),
+      promptNote: document.querySelector('.prompt-note')?.textContent?.trim(),
     };
   })()`);
 
@@ -190,9 +219,25 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
     })()`);
 
     const result: UiHarnessResult = {
+      schemaVersion: 1,
       suite: 'harness-ui',
       status: 'passed',
       completedAt: new Date().toISOString(),
+      cases: [
+        { id: 'home-window', title: 'home window exposes stable harness state', status: 'passed', durationMs: 0, details: home },
+        { id: 'llm-settings-missing', title: 'LLM settings reports missing provider readiness', status: 'passed', durationMs: 0, details: llmSettingsMissing },
+        { id: 'llm-settings-ready', title: 'LLM settings reports ready provider state', status: 'passed', durationMs: 0, details: llmSettingsReady },
+        { id: 'compare-window', title: 'compare window summarizes fixture mismatches', status: 'passed', durationMs: 0, details: compare },
+        { id: 'json-verify-window', title: 'JSON verify window summarizes fixture issues', status: 'passed', durationMs: 0, details: verify },
+      ],
+      metrics: {
+        windowCount: 5,
+        deterministic: true,
+      },
+      artifacts: {
+        scenario: scenarioPath,
+      },
+      reproCommand: 'npm run harness:ui',
       snapshots: {
         home,
         llmSettingsMissing,
@@ -206,9 +251,22 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
     setTimeout(() => app.exit(0), 100);
   } catch (error) {
     const result: UiHarnessResult = {
+      schemaVersion: 1,
       suite: 'harness-ui',
       status: 'failed',
       completedAt: new Date().toISOString(),
+      cases: [],
+      metrics: {
+        deterministic: true,
+      },
+      artifacts: {
+        scenario: scenarioPath,
+      },
+      reproCommand: 'npm run harness:ui',
+      failureHints: [
+        `Inspect the UI harness scenario at ${scenarioPath}`,
+        'Rerun npm run harness:ui after fixing the failing window or selector.',
+      ],
       error: {
         message: (error as Error).message,
         stack: (error as Error).stack,

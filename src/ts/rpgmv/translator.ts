@@ -3,11 +3,16 @@ import fs from 'fs';
 import Tools from '../libs/projectTools';
 import { AppContext } from '../../appContext';
 import { TranslationLog, TranslationLogEntry, contentHash } from '../libs/translationCore';
+import type { BlockValidation } from '../libs/translationCore';
+import { atomicWriteJsonFile, atomicWriteTextFile } from '../libs/atomicFile';
+import { runWithDirectoryLock } from '../libs/concurrency';
+import { getProviderRegistryEntry } from '../libs/providerRegistry';
 import {
     buildTranslationCacheKey,
     createTranslator,
     getLlmReadinessError,
     normalizeLlmProvider,
+    type Translator,
 } from '../libs/translatorFactory';
 
 const PROGRESS_FILE = '.llm_progress.json';
@@ -49,7 +54,7 @@ function loadProgress(edir: string): ProgressState | null {
 }
 
 function saveProgress(edir: string, state: ProgressState) {
-    fs.writeFileSync(path.join(edir, PROGRESS_FILE), JSON.stringify(state, null, 2), 'utf-8');
+    atomicWriteJsonFile(path.join(edir, PROGRESS_FILE), state, 2);
 }
 
 function clearProgress(edir: string) {
@@ -66,13 +71,13 @@ function loadCache(edir: string): CacheStore {
 }
 
 function saveCache(edir: string, cache: CacheStore) {
-    fs.writeFileSync(path.join(edir, CACHE_FILE), JSON.stringify(cache), 'utf-8');
+    atomicWriteJsonFile(path.join(edir, CACHE_FILE), cache, 0);
 }
 
 function writeTranslationLog(edir: string, log: TranslationLog) {
     const ts = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
     const logFile = path.join(edir, `translation_log_${ts}.json`);
-    fs.writeFileSync(logFile, JSON.stringify(log, null, 2), 'utf-8');
+    atomicWriteJsonFile(logFile, log, 2);
     return logFile;
 }
 
@@ -82,7 +87,339 @@ interface TransArg {
     langu?: string;
     sortOrder?: string;
     resetProgress?: boolean;
+    parallelWorkers?: number;
     translationMode?: string;
+}
+
+interface PendingTranslationFile {
+    fileName: string;
+    fileOrdinal: number;
+    originalContent: string;
+    cacheKey: string;
+}
+
+interface TranslationFileResult extends PendingTranslationFile {
+    translatedContent: string;
+    validation: BlockValidation[];
+    logEntry: Partial<TranslationLogEntry>;
+    aborted: boolean;
+    durationMs: number;
+}
+
+export interface TranslationCoordinatorOptions {
+    edir: string;
+    backupDir: string;
+    fileList: string[];
+    completedFiles: Set<string>;
+    cache: CacheStore;
+    provider: string;
+    model: string;
+    sourceLang: string;
+    targetLang: string;
+    settings: AppContext['settings'];
+    translationMode: string;
+    isResuming: boolean;
+    workerCount: number;
+    isAborted: () => boolean;
+    createTranslatorForFile?: (fileName: string) => Translator;
+    onProgress?: (percent: number) => void;
+    onStatus?: (message: string) => void;
+}
+
+export interface TranslationCoordinatorResult {
+    workedFiles: number;
+    failedFiles: string[];
+    totalErrors: number;
+    totalBlocks: number;
+    entries: TranslationLogEntry[];
+}
+
+export interface FileValidationResult {
+    ok: boolean;
+    errors: string[];
+}
+
+const SEPARATOR_LINE_REGEX = /^---\s*\d+\s*---$/;
+const CONTROL_CODE_REGEX = /\\(?:[A-Za-z]+(?:\[[^\]\r\n]*\])?|[{}$|.!><^])|%[0-9]/g;
+
+export function validateTranslatedFileContent(
+    originalContent: string,
+    translatedContent: string,
+    blockValidation: BlockValidation[] = [],
+): FileValidationResult {
+    const errors: string[] = [];
+    const originalLines = originalContent.split('\n');
+    const translatedLines = translatedContent.split('\n');
+
+    if (originalLines.length !== translatedLines.length) {
+        errors.push(`line count changed (${originalLines.length} -> ${translatedLines.length})`);
+    }
+
+    const maxLines = Math.max(originalLines.length, translatedLines.length);
+    for (let i = 0; i < maxLines; i++) {
+        const originalLine = originalLines[i] ?? '';
+        const translatedLine = translatedLines[i] ?? '';
+        const lineNo = i + 1;
+        const originalIsSeparator = SEPARATOR_LINE_REGEX.test(originalLine.trim());
+        const translatedIsSeparator = SEPARATOR_LINE_REGEX.test(translatedLine.trim());
+
+        if (originalIsSeparator || translatedIsSeparator) {
+            if (originalLine !== translatedLine) {
+                errors.push(`separator changed at line ${lineNo}`);
+            }
+        }
+
+        if (originalLine === '' && translatedLine !== '') {
+            errors.push(`empty line filled at line ${lineNo}`);
+        } else if (originalLine !== '' && translatedLine === '') {
+            errors.push(`non-empty line emptied at line ${lineNo}`);
+        }
+
+        const originalCodes = extractControlCodes(originalLine);
+        const translatedCodes = extractControlCodes(translatedLine);
+        if (!sameStringArray(originalCodes, translatedCodes)) {
+            errors.push(`control codes changed at line ${lineNo}`);
+        }
+    }
+
+    const failedBlocks = blockValidation.filter((b) => !b.lineCountMatch || !b.separatorMatch);
+    if (failedBlocks.length > 0) {
+        errors.push(`block validation failed (${failedBlocks.length} blocks)`);
+    }
+
+    return { ok: errors.length === 0, errors };
+}
+
+export function resolveLlmParallelWorkers(provider: string, requested: unknown): number {
+    const requestedWorkers = Number.isInteger(requested) ? requested as number : 1;
+    const safeRequested = Math.max(1, Math.min(16, requestedWorkers));
+    const providerCap = Math.max(1, getProviderRegistryEntry(provider).concurrencyCap || 1);
+    return Math.min(safeRequested, providerCap);
+}
+
+export async function translateFilesWithCoordinator(options: TranslationCoordinatorOptions): Promise<TranslationCoordinatorResult> {
+    const entries: TranslationLogEntry[] = [];
+    const failedFiles: string[] = [];
+    const pending: PendingTranslationFile[] = [];
+    let workedFiles = 0;
+    let totalErrors = 0;
+    let totalBlocks = 0;
+
+    const saveProgressState = () => saveProgress(options.edir, {
+        completedFiles: [...options.completedFiles],
+        timestamp: new Date().toISOString(),
+    });
+
+    const markWorked = (fileName: string, detail: string) => {
+        workedFiles++;
+        options.onProgress?.((workedFiles / options.fileList.length) * 100);
+        options.onStatus?.(`${fileName} ${detail}`);
+    };
+
+    for (let fileIndex = 0; fileIndex < options.fileList.length; fileIndex++) {
+        const fileName = options.fileList[fileIndex];
+        const fileOrdinal = fileIndex + 1;
+        if (options.isAborted()) {
+            break;
+        }
+
+        const filePath = path.join(options.edir, fileName);
+        const originalContent = fs.readFileSync(filePath, 'utf-8');
+
+        if (options.isResuming && options.completedFiles.has(fileName)) {
+            markWorked(fileName, '(이전 번역 건너뜀)');
+            continue;
+        }
+
+        if (options.translationMode === 'untranslated') {
+            const backupPath = path.join(options.backupDir, fileName);
+            if (fs.existsSync(backupPath)) {
+                const backupContent = fs.readFileSync(backupPath, 'utf-8');
+                if (originalContent !== backupContent) {
+                    options.completedFiles.add(fileName);
+                    saveProgressState();
+                    markWorked(fileName, '(번역됨, 건너뜀)');
+                    continue;
+                }
+            }
+        }
+
+        const hash = contentHash(originalContent);
+        const cacheKey = buildTranslationCacheKey(options.provider, hash, options.model, options.targetLang);
+        const cached = options.cache[cacheKey];
+        if (cached) {
+            const validation = validateTranslatedFileContent(originalContent, cached.translatedContent);
+            if (validation.ok) {
+                atomicWriteTextFile(filePath, cached.translatedContent, { encoding: 'utf-8' });
+                options.completedFiles.add(fileName);
+                saveProgressState();
+                entries.push({
+                    timestamp: new Date().toISOString(),
+                    fileName,
+                    totalBlocks: 0,
+                    translatedBlocks: 0,
+                    skippedBlocks: 0,
+                    errorBlocks: 0,
+                    retries: 0,
+                    cached: true,
+                    durationMs: 0,
+                    errors: [],
+                });
+                markWorked(fileName, '(캐시 사용)');
+            } else {
+                delete options.cache[cacheKey];
+                saveCache(options.edir, options.cache);
+                failedFiles.push(fileName);
+                entries.push(createFailureLogEntry(fileName, validation.errors, true));
+                markWorked(fileName, '(캐시 검증 실패)');
+            }
+            continue;
+        }
+
+        pending.push({ fileName, fileOrdinal, originalContent, cacheKey });
+    }
+
+    await runTranslationQueue(pending, options.workerCount, options.isAborted, async (task) => {
+        options.onStatus?.(`[${task.fileOrdinal}/${options.fileList.length}] ${task.fileName}`);
+        return translateOneFile(task, options, () => workedFiles);
+    }, (result) => {
+        const filePath = path.join(options.edir, result.fileName);
+        if (result.aborted) {
+            return;
+        }
+
+        const fileValidation = validateTranslatedFileContent(
+            result.originalContent,
+            result.translatedContent,
+            result.validation,
+        );
+        const translationSucceeded = result.translatedContent !== result.originalContent && fileValidation.ok;
+
+        totalErrors += result.validation.filter((b) => !b.lineCountMatch || !b.separatorMatch).length;
+        totalBlocks += result.validation.length;
+
+        if (translationSucceeded) {
+            atomicWriteTextFile(filePath, result.translatedContent, { encoding: 'utf-8' });
+            options.cache[result.cacheKey] = {
+                translatedContent: result.translatedContent,
+                model: options.model,
+                targetLang: options.targetLang,
+                provider: options.provider,
+            };
+            saveCache(options.edir, options.cache);
+            options.completedFiles.add(result.fileName);
+            saveProgressState();
+        } else {
+            failedFiles.push(result.fileName);
+        }
+
+        entries.push({
+            timestamp: new Date().toISOString(),
+            fileName: result.fileName,
+            cached: false,
+            ...result.logEntry,
+            errors: [
+                ...((result.logEntry.errors as string[] | undefined) || []),
+                ...(translationSucceeded ? [] : (fileValidation.errors.length ? fileValidation.errors : ['번역 결과가 원본과 동일합니다'])),
+            ],
+        } as TranslationLogEntry);
+        markWorked(result.fileName, translationSucceeded ? '' : '(검증 실패)');
+    }, (task, err) => {
+        if (options.isAborted()) {
+            return;
+        }
+        failedFiles.push(task.fileName);
+        entries.push(createFailureLogEntry(task.fileName, [String((err as Error).message || err)], false));
+        markWorked(task.fileName, '(번역 실패)');
+    });
+
+    return { workedFiles, failedFiles, totalErrors, totalBlocks, entries };
+}
+
+async function translateOneFile(
+    task: PendingTranslationFile,
+    options: TranslationCoordinatorOptions,
+    getWorkedFiles: () => number,
+): Promise<TranslationFileResult> {
+    const started = Date.now();
+    const translator = options.createTranslatorForFile
+        ? options.createTranslatorForFile(task.fileName)
+        : createTranslator(options.settings, options.sourceLang, options.targetLang, options.isAborted);
+    const result = await translator.translateFileContent(
+        task.originalContent,
+        (current, total, detail) => {
+            const fileProgress = (getWorkedFiles() / options.fileList.length) * 100;
+            const blockProgress = total > 0 ? (current / total) * (100 / options.fileList.length) : 0;
+            options.onProgress?.(fileProgress + blockProgress);
+            options.onStatus?.(`[${task.fileOrdinal}/${options.fileList.length}] ${task.fileName} — ${detail} (${current}/${total} 블록)`);
+        },
+    );
+
+    return {
+        ...task,
+        translatedContent: result.translatedContent,
+        validation: result.validation,
+        logEntry: result.logEntry,
+        aborted: !!result.aborted,
+        durationMs: Date.now() - started,
+    };
+}
+
+async function runTranslationQueue<T, R>(
+    tasks: T[],
+    workerCount: number,
+    isAborted: () => boolean,
+    worker: (task: T) => Promise<R>,
+    onSuccess: (result: R) => void,
+    onFailure: (task: T, err: unknown) => void,
+): Promise<void> {
+    return new Promise((resolve) => {
+        let nextIndex = 0;
+        let active = 0;
+
+        const launch = () => {
+            while (active < workerCount && nextIndex < tasks.length && !isAborted()) {
+                const task = tasks[nextIndex++];
+                active++;
+                worker(task).then(onSuccess, (err) => onFailure(task, err)).finally(() => {
+                    active--;
+                    if ((nextIndex >= tasks.length || isAborted()) && active === 0) {
+                        resolve();
+                    } else {
+                        launch();
+                    }
+                });
+            }
+            if ((nextIndex >= tasks.length || isAborted()) && active === 0) {
+                resolve();
+            }
+        };
+
+        launch();
+    });
+}
+
+function createFailureLogEntry(fileName: string, errors: string[], cached: boolean): TranslationLogEntry {
+    return {
+        timestamp: new Date().toISOString(),
+        fileName,
+        totalBlocks: 0,
+        translatedBlocks: 0,
+        skippedBlocks: 0,
+        errorBlocks: 1,
+        retries: 0,
+        cached,
+        durationMs: 0,
+        errors,
+    };
+}
+
+function extractControlCodes(line: string): string[] {
+    return line.match(CONTROL_CODE_REGEX) || [];
+}
+
+function sameStringArray(a: string[], b: string[]): boolean {
+    return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
@@ -105,8 +442,8 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
         }
 
         const targetLang = ctx.settings.llmTargetLang || 'ko';
+        const sourceLang = arg.langu || 'ja';
         const provider = normalizeLlmProvider(ctx.settings.llmProvider);
-        const translator = createTranslator(ctx.settings, arg.langu || 'ja', targetLang, () => ctx.llmAbort);
         const fileList = fs.readdirSync(edir).filter(f => f.endsWith('.txt'));
 
         if (fileList.length === 0) {
@@ -116,221 +453,142 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
             return;
         }
 
-        // Sort files
-        const sortOrder = arg.sortOrder || 'name-asc';
-        if (sortOrder === 'name-desc') {
-            fileList.sort((a, b) => b.localeCompare(a));
-        } else if (sortOrder === 'size-asc') {
-            fileList.sort((a, b) => fs.statSync(path.join(edir, a)).size - fs.statSync(path.join(edir, b)).size);
-        } else if (sortOrder === 'size-desc') {
-            fileList.sort((a, b) => fs.statSync(path.join(edir, b)).size - fs.statSync(path.join(edir, a)).size);
-        } else {
-            fileList.sort((a, b) => a.localeCompare(b));
-        }
-
-        // Auto-backup
-        Tools.send('loadingTag', '백업 생성 중...');
-        const backupDir = edir + BACKUP_SUFFIX;
-        const translationMode = arg.translationMode || 'untranslated';
-
-        // Reset if requested: restore originals from backup, clear progress/cache
-        if (arg.resetProgress) {
-            if (translationMode === 'all') {
-                // Full reset: restore all originals, wipe backup/progress/cache
-                if (fs.existsSync(backupDir)) {
-                    const backupFiles = fs.readdirSync(backupDir).filter(f => f.endsWith('.txt'));
-                    for (const f of backupFiles) {
-                        fs.copyFileSync(path.join(backupDir, f), path.join(edir, f));
-                    }
-                    fs.rmSync(backupDir, { recursive: true, force: true });
-                }
-                clearProgress(edir);
-                const cfile = path.join(edir, CACHE_FILE);
-                if (fs.existsSync(cfile)) fs.unlinkSync(cfile);
+        await runWithDirectoryLock(edir, async () => {
+            // Sort files
+            const sortOrder = arg.sortOrder || 'name-asc';
+            if (sortOrder === 'name-desc') {
+                fileList.sort((a, b) => b.localeCompare(a));
+            } else if (sortOrder === 'size-asc') {
+                fileList.sort((a, b) => fs.statSync(path.join(edir, a)).size - fs.statSync(path.join(edir, b)).size);
+            } else if (sortOrder === 'size-desc') {
+                fileList.sort((a, b) => fs.statSync(path.join(edir, b)).size - fs.statSync(path.join(edir, a)).size);
             } else {
-                // Untranslated-only reset: keep translated files, only clear progress
-                // and invalidate cache for untranslated files so they get fresh translations
-                clearProgress(edir);
-                if (fs.existsSync(backupDir)) {
-                    const cache = loadCache(edir);
-                    const backupFiles = fs.readdirSync(backupDir).filter(f => f.endsWith('.txt'));
-                    let cacheModified = false;
-                    for (const f of backupFiles) {
-                        const filePath = path.join(edir, f);
-                        const backupPath = path.join(backupDir, f);
-                        if (fs.existsSync(filePath)) {
-                            const fileContent = fs.readFileSync(filePath, 'utf-8');
-                            const backupContent = fs.readFileSync(backupPath, 'utf-8');
-                            if (fileContent === backupContent) {
-                                // Untranslated file — invalidate its cache entry
-                                const hash = contentHash(backupContent);
-                                const cacheKey = buildTranslationCacheKey(provider, hash, ctx.settings.llmModel, targetLang);
-                                if (cache[cacheKey]) {
-                                    delete cache[cacheKey];
-                                    cacheModified = true;
+                fileList.sort((a, b) => a.localeCompare(b));
+            }
+
+            // Auto-backup
+            Tools.send('loadingTag', '백업 생성 중...');
+            const backupDir = edir + BACKUP_SUFFIX;
+            const translationMode = arg.translationMode || 'untranslated';
+
+            // Reset if requested: restore originals from backup, clear progress/cache
+            if (arg.resetProgress) {
+                if (translationMode === 'all') {
+                    // Full reset: restore all originals, wipe backup/progress/cache
+                    if (fs.existsSync(backupDir)) {
+                        const backupFiles = fs.readdirSync(backupDir).filter(f => f.endsWith('.txt'));
+                        for (const f of backupFiles) {
+                            fs.copyFileSync(path.join(backupDir, f), path.join(edir, f));
+                        }
+                        fs.rmSync(backupDir, { recursive: true, force: true });
+                    }
+                    clearProgress(edir);
+                    const cfile = path.join(edir, CACHE_FILE);
+                    if (fs.existsSync(cfile)) fs.unlinkSync(cfile);
+                } else {
+                    // Untranslated-only reset: keep translated files, only clear progress
+                    // and invalidate cache for untranslated files so they get fresh translations
+                    clearProgress(edir);
+                    if (fs.existsSync(backupDir)) {
+                        const cache = loadCache(edir);
+                        const backupFiles = fs.readdirSync(backupDir).filter(f => f.endsWith('.txt'));
+                        let cacheModified = false;
+                        for (const f of backupFiles) {
+                            const filePath = path.join(edir, f);
+                            const backupPath = path.join(backupDir, f);
+                            if (fs.existsSync(filePath)) {
+                                const fileContent = fs.readFileSync(filePath, 'utf-8');
+                                const backupContent = fs.readFileSync(backupPath, 'utf-8');
+                                if (fileContent === backupContent) {
+                                    // Untranslated file — invalidate its cache entry
+                                    const hash = contentHash(backupContent);
+                                    const cacheKey = buildTranslationCacheKey(provider, hash, ctx.settings.llmModel, targetLang);
+                                    if (cache[cacheKey]) {
+                                        delete cache[cacheKey];
+                                        cacheModified = true;
+                                    }
                                 }
                             }
                         }
-                    }
-                    if (cacheModified) saveCache(edir, cache);
-                }
-            }
-        }
-
-        await createBackup(edir);
-
-        // Resume state
-        const prevProgress = loadProgress(edir);
-        const completedFiles = new Set(prevProgress?.completedFiles || []);
-        const isResuming = completedFiles.size > 0;
-
-        // Cache
-        const cache = loadCache(edir);
-        const model = ctx.settings.llmModel;
-
-        // Log
-        const translationLog: TranslationLog = {
-            startTime: new Date().toISOString(),
-            endTime: '',
-            provider,
-            model,
-            sourceLang: arg.langu || 'ja',
-            targetLang,
-            totalFiles: fileList.length,
-            totalDurationMs: 0,
-            entries: []
-        };
-        const startTime = Date.now();
-
-        let totalErrors = 0;
-        let totalBlocks = 0;
-        let workedFiles = 0;
-        const failedFiles: string[] = [];
-
-        for (const fileName of fileList) {
-            if (ctx.llmAbort) break;
-            const filePath = path.join(edir, fileName);
-            const originalContent = fs.readFileSync(filePath, 'utf-8');
-
-            // Resume: skip already completed files
-            if (isResuming && completedFiles.has(fileName)) {
-                workedFiles++;
-                const pct = (workedFiles / fileList.length) * 100;
-                Tools.send('loading', pct);
-                Tools.send('loadingTag', `${fileName} (이전 번역 건너뜀)`);
-                continue;
-            }
-
-            // Untranslated-only mode: skip files already translated (different from backup)
-            if (translationMode === 'untranslated') {
-                const backupPath = path.join(backupDir, fileName);
-                if (fs.existsSync(backupPath)) {
-                    const backupContent = fs.readFileSync(backupPath, 'utf-8');
-                    if (originalContent !== backupContent) {
-                        completedFiles.add(fileName);
-                        saveProgress(edir, { completedFiles: [...completedFiles], timestamp: new Date().toISOString() });
-                        workedFiles++;
-                        const pct = (workedFiles / fileList.length) * 100;
-                        Tools.send('loading', pct);
-                        Tools.send('loadingTag', `${fileName} (번역됨, 건너뜀)`);
-                        continue;
+                        if (cacheModified) saveCache(edir, cache);
                     }
                 }
             }
 
-            // Cache: skip if content unchanged and same model/target
-            const hash = contentHash(originalContent);
-            const cacheKey = buildTranslationCacheKey(provider, hash, model, targetLang);
-            if (cache[cacheKey]) {
-                fs.writeFileSync(filePath, cache[cacheKey].translatedContent, 'utf-8');
-                completedFiles.add(fileName);
-                saveProgress(edir, { completedFiles: [...completedFiles], timestamp: new Date().toISOString() });
+            await createBackup(edir);
 
-                const logEntry: TranslationLogEntry = {
-                    timestamp: new Date().toISOString(), fileName,
-                    totalBlocks: 0, translatedBlocks: 0, skippedBlocks: 0,
-                    errorBlocks: 0, retries: 0, cached: true, durationMs: 0, errors: []
-                };
-                translationLog.entries.push(logEntry);
-                workedFiles++;
-                const pct = (workedFiles / fileList.length) * 100;
-                Tools.send('loading', pct);
-                Tools.send('loadingTag', `${fileName} (캐시 사용)`);
-                continue;
-            }
+            // Resume state
+            const prevProgress = loadProgress(edir);
+            const completedFiles = new Set(prevProgress?.completedFiles || []);
+            const isResuming = completedFiles.size > 0;
 
-            Tools.send('loadingTag', `[${workedFiles + 1}/${fileList.length}] ${fileName}`);
+            // Cache
+            const cache = loadCache(edir);
+            const model = ctx.settings.llmModel;
+            const workerCount = resolveLlmParallelWorkers(provider, arg.parallelWorkers ?? ctx.settings.llmParallelWorkers);
 
-            const { translatedContent, validation, logEntry, aborted: fileAborted } = await translator.translateFileContent(
-                originalContent,
-                (current, total, detail) => {
-                    const fileProgress = (workedFiles / fileList.length) * 100;
-                    const blockProgress = (current / total) * (100 / fileList.length);
-                    Tools.send('loading', fileProgress + blockProgress);
-                    Tools.send('loadingTag', `[${workedFiles + 1}/${fileList.length}] ${fileName} — ${detail} (${current}/${total} 블록)`);
-                }
-            );
+            // Log
+            const translationLog: TranslationLog = {
+                startTime: new Date().toISOString(),
+                endTime: '',
+                provider,
+                model,
+                sourceLang,
+                targetLang,
+                totalFiles: fileList.length,
+                totalDurationMs: 0,
+                entries: []
+            };
+            const startTime = Date.now();
 
-            // If aborted mid-file, don't save partial translation
-            if (fileAborted) break;
+            const result = await translateFilesWithCoordinator({
+                edir,
+                backupDir,
+                fileList,
+                completedFiles,
+                cache,
+                provider,
+                model,
+                sourceLang,
+                targetLang,
+                settings: ctx.settings,
+                translationMode,
+                isResuming,
+                workerCount,
+                isAborted: () => ctx.llmAbort,
+                onProgress: (pct) => Tools.send('loading', pct),
+                onStatus: (message) => Tools.send('loadingTag', message),
+            });
+            translationLog.entries.push(...result.entries);
 
-            // Only save and cache if translation actually produced different content
-            const translationSucceeded = translatedContent !== originalContent;
-            if (translationSucceeded) {
-                fs.writeFileSync(filePath, translatedContent, 'utf-8');
+            // Finalize
+            const aborted = !!ctx.llmAbort;
+            if (!aborted) clearProgress(edir);
+            translationLog.endTime = new Date().toISOString();
+            translationLog.totalDurationMs = Date.now() - startTime;
+            const logFile = writeTranslationLog(edir, translationLog);
 
-                // Update cache
-                cache[cacheKey] = { translatedContent, model, targetLang, provider };
-                saveCache(edir, cache);
-            }
+            Tools.send('loading', 0);
+            Tools.send('loadingTag', '');
 
-            // Only mark completed if translation succeeded
-            if (translationSucceeded) {
-                completedFiles.add(fileName);
-                saveProgress(edir, { completedFiles: [...completedFiles], timestamp: new Date().toISOString() });
+            const durationSec = Math.round(translationLog.totalDurationMs / 1000);
+            const cacheNote = translationLog.entries.filter(e => e.cached).length;
+            const cacheMsg = cacheNote > 0 ? `\n캐시 사용: ${cacheNote}개 파일` : '';
+            const failMsg = result.failedFiles.length > 0
+                ? `\n번역 실패: ${result.failedFiles.length}개 파일 (${result.failedFiles.slice(0, 5).join(', ')}${result.failedFiles.length > 5 ? ' ...' : ''})`
+                : '';
+            const workerMsg = workerCount > 1 ? `\n동시 번역 파일 수: ${workerCount}` : '';
+            if (aborted) {
+                Tools.sendAlert(
+                    `번역 중단 (${result.workedFiles}/${fileList.length} 파일 처리, ${durationSec}초 소요)${failMsg}${workerMsg}`
+                );
             } else {
-                failedFiles.push(fileName);
+                const resumeNote = isResuming ? `\n(이전 진행 상태에서 재개됨)` : '';
+                Tools.sendAlert(
+                    `번역 완료! (${durationSec}초 소요)\n백업: ${backupDir}\n로그: ${path.basename(logFile)}${resumeNote}${cacheMsg}${failMsg}${workerMsg}`
+                );
             }
-
-            totalErrors += validation.filter(b => !b.lineCountMatch || !b.separatorMatch).length;
-            totalBlocks += validation.length;
-
-            const fullLogEntry: TranslationLogEntry = {
-                timestamp: new Date().toISOString(),
-                fileName,
-                cached: false,
-                ...logEntry
-            } as TranslationLogEntry;
-            translationLog.entries.push(fullLogEntry);
-            workedFiles++;
-        }
-
-        // Finalize
-        const aborted = !!ctx.llmAbort;
-        if (!aborted) clearProgress(edir);
-        translationLog.endTime = new Date().toISOString();
-        translationLog.totalDurationMs = Date.now() - startTime;
-        const logFile = writeTranslationLog(edir, translationLog);
-
-        Tools.send('loading', 0);
-        Tools.send('loadingTag', '');
-
-        const durationSec = Math.round(translationLog.totalDurationMs / 1000);
-        const cacheNote = translationLog.entries.filter(e => e.cached).length;
-        const cacheMsg = cacheNote > 0 ? `\n캐시 사용: ${cacheNote}개 파일` : '';
-        const failMsg = failedFiles.length > 0
-            ? `\n번역 실패: ${failedFiles.length}개 파일 (${failedFiles.slice(0, 5).join(', ')}${failedFiles.length > 5 ? ' ...' : ''})`
-            : '';
-        if (aborted) {
-            Tools.sendAlert(
-                `번역 중단 (${workedFiles}/${fileList.length} 파일 완료, ${durationSec}초 소요)${failMsg}`
-            );
-        } else {
-            const resumeNote = isResuming ? `\n(이전 진행 상태에서 재개됨)` : '';
-            Tools.sendAlert(
-                `번역 완료! (${durationSec}초 소요)\n백업: ${backupDir}\n로그: ${path.basename(logFile)}${resumeNote}${cacheMsg}${failMsg}`
-            );
-        }
+        });
     } catch (err) {
         Tools.sendError(
             JSON.stringify(err, Object.getOwnPropertyNames(err))
@@ -375,7 +633,7 @@ export async function retranslateFile(
 
     onProgress?.('번역 중...');
 
-    const { translatedContent, logEntry } = await translator.translateFileContent(
+    const { translatedContent, validation, logEntry } = await translator.translateFileContent(
         originalContent,
         (current, total, detail) => {
             onProgress?.(`${detail} (${current}/${total} 블록)`);
@@ -383,13 +641,14 @@ export async function retranslateFile(
     );
 
     // Check if translation actually produced different content
-    if (translatedContent === originalContent) {
+    const fileValidation = validateTranslatedFileContent(originalContent, translatedContent, validation);
+    if (translatedContent === originalContent || !fileValidation.ok) {
         const errors = (logEntry.errors as string[]) || [];
-        const reason = errors.length > 0 ? errors[0] : '번역 결과가 원본과 동일합니다';
+        const reason = errors.length > 0 ? errors[0] : (fileValidation.errors[0] || '번역 결과가 원본과 동일합니다');
         return { success: false, error: reason };
     }
 
-    fs.writeFileSync(filePath, translatedContent, 'utf-8');
+    atomicWriteTextFile(filePath, translatedContent, { encoding: 'utf-8' });
 
     cache[cacheKey] = { translatedContent, model, targetLang, provider };
     saveCache(edir, cache);
@@ -486,7 +745,7 @@ export async function retranslateBlocks(
             if (block.separator) outParts.push(block.separator);
             outParts.push(...block.lines);
         }
-        fs.writeFileSync(filePath, outParts.join('\n'), 'utf-8');
+        atomicWriteTextFile(filePath, outParts.join('\n'), { encoding: 'utf-8' });
 
         // Invalidate cache
         const cache = loadCache(edir);

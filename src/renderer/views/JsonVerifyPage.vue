@@ -142,7 +142,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { api } from '../composables/useIpc'
-import { getLlmProviderMissingConfigMessage } from '../../ts/libs/llmProviderConfig'
+import { getRendererLlmProviderUiText } from '../../types/llmProviderContract'
 
 interface VerifyIssue {
   path: string; type: string; severity: 'error' | 'warning'; message: string;
@@ -228,7 +228,7 @@ const llmButtonEnabled = computed(() => {
 const llmRepairTitle = computed(() => (
   llmReady.value
     ? '줄밀림 위치의 원본 텍스트를 LLM으로 재번역합니다'
-    : getLlmProviderMissingConfigMessage(currentProvider.value)
+    : getRendererLlmProviderUiText(currentProvider.value).missingConfigMessage
 ))
 const llmButtonText = computed(() => {
   if (!llmReady.value) return currentProvider.value === 'vertex' ? 'Vertex 설정 필요' : 'Gemini 설정 필요'
@@ -522,7 +522,7 @@ function llmRepairShift() {
   const f = files.value[currentIdx.value]
   if (!f) return
   if (!llmReady.value) {
-    statusText.value = `❌ ${getLlmProviderMissingConfigMessage(currentProvider.value)}`
+    statusText.value = `❌ ${getRendererLlmProviderUiText(currentProvider.value).missingConfigMessage}`
     statusClass.value = 'status-error'
     return
   }

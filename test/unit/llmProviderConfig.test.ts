@@ -39,13 +39,20 @@ function createSettings(overrides: Record<string, unknown> = {}) {
 }
 
 describe('sanitizeSettingsForRenderer', () => {
-  it('removes llmApiKey and llmVertexServiceAccountJson', () => {
-    const settings = createSettings();
+  it('removes all provider secret settings before renderer exposure', () => {
+    const settings = createSettings({
+      llmOpenAiApiKey: 'openai-secret',
+      llmCustomApiKey: 'custom-secret',
+      llmClaudeApiKey: 'claude-secret',
+    });
 
     const sanitized = sanitizeSettingsForRenderer(settings);
 
     expect(sanitized).not.toHaveProperty('llmApiKey');
     expect(sanitized).not.toHaveProperty('llmVertexServiceAccountJson');
+    expect(sanitized).not.toHaveProperty('llmOpenAiApiKey');
+    expect(sanitized).not.toHaveProperty('llmCustomApiKey');
+    expect(sanitized).not.toHaveProperty('llmClaudeApiKey');
     expect(sanitized).toMatchObject({
       llmProvider: 'vertex',
       llmVertexLocation: 'global',
@@ -60,6 +67,7 @@ describe('buildLlmStartWindowState', () => {
 
     expect(state).toMatchObject({
       llmSortOrder: 'size-desc',
+      llmParallelWorkers: defaultSettings.llmParallelWorkers,
       llmReady: true,
       llmProvider: 'vertex',
       llmVertexLocation: 'global',

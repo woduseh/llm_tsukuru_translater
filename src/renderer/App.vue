@@ -1,11 +1,13 @@
 <template>
   <div class="app-root">
     <router-view />
+    <AgentTerminalDrawer />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import AgentTerminalDrawer from './components/AgentTerminalDrawer.vue'
 import { api } from './composables/useIpc'
 import Swal from 'sweetalert2'
 

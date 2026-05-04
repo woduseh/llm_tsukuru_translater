@@ -14,6 +14,7 @@ export class AppContext {
   llmAbort = false;
   oPath = '';
   sourceDir = '';
+  allowedProjectRoots: string[] = [];
   WolfExtData: extData[] = [];
   WolfCache: Record<string, Buffer> = {};
   WolfMetadata: wolfMetadata = { ver: -1 };
@@ -30,6 +31,7 @@ export class AppContext {
     this.llmAbort = false;
     this.oPath = '';
     this.sourceDir = '';
+    this.allowedProjectRoots = [];
     this.WolfExtData = [];
     this.WolfCache = {};
     this.WolfMetadata = { ver: -1 };

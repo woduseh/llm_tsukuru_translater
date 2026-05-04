@@ -17,11 +17,30 @@
         <select id="llmProvider" class="text-input" v-model="settings.llmProvider">
           <option value="gemini">Gemini API</option>
           <option value="vertex">Vertex AI</option>
+          <option value="openai">OpenAI</option>
+          <option value="custom-openai">OpenAI 호환 API</option>
+          <option value="claude">Claude</option>
         </select>
       </div>
-      <div class="setting-item" v-show="!isVertexProvider">
+      <div class="setting-item" v-show="settings.llmProvider === 'gemini'">
         <label for="llmApiKey">Gemini API 키</label>
         <input type="password" id="llmApiKey" class="text-input" v-model="settings.llmApiKey" placeholder="API 키">
+      </div>
+      <div class="setting-item" v-show="settings.llmProvider === 'openai'">
+        <label for="llmOpenAiApiKey">OpenAI API 키</label>
+        <input type="password" id="llmOpenAiApiKey" class="text-input" v-model="settings.llmOpenAiApiKey" placeholder="sk-...">
+      </div>
+      <div class="setting-item" v-show="settings.llmProvider === 'custom-openai'">
+        <label for="llmCustomBaseUrl">호환 API Base URL</label>
+        <input type="text" id="llmCustomBaseUrl" class="text-input" v-model="settings.llmCustomBaseUrl" placeholder="http://localhost:1234/v1">
+      </div>
+      <div class="setting-item" v-show="settings.llmProvider === 'custom-openai'">
+        <label for="llmCustomApiKey">호환 API 키 <span class="hint">선택</span></label>
+        <input type="password" id="llmCustomApiKey" class="text-input" v-model="settings.llmCustomApiKey" placeholder="필요한 경우만 입력">
+      </div>
+      <div class="setting-item" v-show="settings.llmProvider === 'claude'">
+        <label for="llmClaudeApiKey">Claude API 키</label>
+        <input type="password" id="llmClaudeApiKey" class="text-input" v-model="settings.llmClaudeApiKey" placeholder="sk-ant-...">
       </div>
       <div class="setting-item multiline" v-show="isVertexProvider">
         <label for="llmVertexServiceAccountJson">Vertex 서비스 계정 JSON</label>
@@ -46,9 +65,12 @@
         <label for="llmModel">모델</label>
         <input type="text" id="llmModel" class="text-input" list="modelList" v-model="settings.llmModel" placeholder="모델 이름">
         <datalist id="modelList">
-          <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
-          <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+          <option v-for="model in modelSuggestions" :key="model" :value="model">{{ model }}</option>
         </datalist>
+      </div>
+      <div class="setting-item" v-show="settings.llmProvider === 'claude'">
+        <label for="llmMaxTokens">최대 토큰</label>
+        <input type="number" id="llmMaxTokens" class="text-input short" v-model.number="settings.llmMaxTokens" min="1" max="200000">
       </div>
       <div class="setting-item">
         <label for="llmSourceLang">원문 언어</label>
@@ -128,7 +150,7 @@
 import { computed, onMounted, reactive, ref, toRaw } from 'vue'
 import { api } from '../composables/useIpc'
 import { DEFAULT_LLM_VERTEX_LOCATION } from '../../types/settings'
-import { getLlmProviderConfigHint } from '../../ts/libs/llmProviderConfig'
+import { getRendererLlmProviderMetadata, getRendererLlmProviderUiText } from '../../types/llmProviderContract'
 
 const settings = reactive<Record<string, any>>({
   loadingText: false, JsonChangeLine: false, DoNotTransHangul: false, ExtractAddLine: false,
@@ -136,6 +158,8 @@ const settings = reactive<Record<string, any>>({
   formatNice: false, HideExtractAll: false, extractSomeScript: false,
   llmProvider: 'gemini',
   llmApiKey: '', llmModel: 'gemini-3.0-flash-preview',
+  llmOpenAiApiKey: '', llmCustomApiKey: '', llmCustomBaseUrl: 'http://localhost:1234/v1',
+  llmClaudeApiKey: '', llmMaxTokens: 4096,
   llmVertexServiceAccountJson: '', llmVertexLocation: DEFAULT_LLM_VERTEX_LOCATION,
   llmSourceLang: 'ja', llmTargetLang: 'ko', llmTranslationUnit: 'file',
   llmChunkSize: 30, llmMaxRetries: 2, llmMaxApiRetries: 5, llmTimeout: 600,
@@ -145,7 +169,8 @@ const settings = reactive<Record<string, any>>({
 const extractPlusText = ref('')
 const extractSomeScript2Text = ref('')
 const isVertexProvider = computed(() => settings.llmProvider === 'vertex')
-const providerConfigHint = computed(() => getLlmProviderConfigHint(settings.llmProvider))
+const providerConfigHint = computed(() => getRendererLlmProviderUiText(settings.llmProvider).configHint)
+const modelSuggestions = computed(() => getRendererLlmProviderMetadata(settings.llmProvider).modelSuggestions)
 
 const generalSettings = [
   { key: 'loadingText', label: '진행도 퍼센트 표시' },

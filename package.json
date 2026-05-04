@@ -23,7 +23,8 @@
     "harness:core": "node scripts/harness/core.cjs",
     "harness:eval": "node scripts/harness/eval.cjs",
     "harness:ui": "node scripts/harness/ui.cjs",
-    "harness:live": "node scripts/harness/live.cjs"
+    "harness:live": "node scripts/harness/live.cjs",
+    "harness:package-smoke": "node scripts/harness/package-smoke.cjs"
   },
   "author": "Jackdu",
   "license": "GPL-3.0",

@@ -1,4 +1,4 @@
-export type LlmProvider = 'gemini' | 'vertex';
+export type LlmProvider = 'gemini' | 'vertex' | 'openai' | 'custom-openai' | 'claude';
 
 export const DEFAULT_LLM_PROVIDER: LlmProvider = 'gemini';
 export const DEFAULT_LLM_VERTEX_LOCATION = 'global';
@@ -25,13 +25,19 @@ export interface AppSettings {
   language: string;
   HideExtractAll: boolean;
   llmApiKey: string;
+  llmOpenAiApiKey: string;
+  llmCustomApiKey: string;
+  llmCustomBaseUrl: string;
+  llmClaudeApiKey: string;
   llmProvider: LlmProvider;
   llmModel: string;
+  llmMaxTokens: number;
   llmCustomPrompt: string;
   llmChunkSize: number;
   llmMaxRetries: number;
   llmMaxApiRetries: number;
   llmTimeout: number;
+  llmParallelWorkers: number;
   llmTranslationUnit: string;
   llmTargetLang: string;
   llmSourceLang?: string;

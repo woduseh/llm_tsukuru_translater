@@ -13,7 +13,7 @@ import {
 import {
   parseVertexServiceAccountJson,
   type VertexServiceAccountJson,
-} from './llmProviderConfig';
+} from './vertexCredentials';
 import {
   splitIntoBlocks,
   reassembleBlocks,

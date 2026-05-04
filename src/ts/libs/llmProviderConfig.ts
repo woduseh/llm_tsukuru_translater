@@ -1,32 +1,24 @@
+import type { AppSettings } from '../../types/settings';
+import type { LlmProviderSecretSettingKey } from '../../types/llmProviderContract';
 import {
-  AppSettings,
-  DEFAULT_LLM_PROVIDER,
-  DEFAULT_LLM_VERTEX_LOCATION,
-  LlmProvider,
-} from '../../types/settings';
+  getAllProviderSecretSettingKeys,
+  getProviderRegistryEntry,
+  validateProviderReadiness,
+  type ProviderReadinessValidation,
+} from './providerRegistry';
+export {
+  parseVertexServiceAccountJson,
+  type VertexServiceAccountJson,
+} from './vertexCredentials';
 
-const VERTEX_REQUIRED_FIELDS = ['client_email', 'private_key', 'project_id'] as const;
-
-type SecretSettingKeys = 'llmApiKey' | 'llmVertexServiceAccountJson';
-
-export interface VertexServiceAccountJson {
-  client_email: string;
-  private_key: string;
-  project_id: string;
-  [key: string]: unknown;
-}
-
-export interface LlmSettingsValidation {
-  llmProvider: LlmProvider;
-  llmVertexLocation: string;
-  llmReady: boolean;
-  llmHasApiKey: boolean;
-  llmHasVertexServiceAccountJson: boolean;
-  llmValidationErrors: string[];
-}
+export type LlmSettingsValidation = ProviderReadinessValidation;
 
 export interface LlmStartWindowState extends Pick<LlmSettingsValidation, 'llmProvider' | 'llmVertexLocation' | 'llmReady' | 'llmHasApiKey' | 'llmHasVertexServiceAccountJson'> {
   llmSortOrder: string;
+  llmParallelWorkers: number;
+  llmSourceLang: string;
+  llmTargetLang: string;
+  llmCustomPrompt: string;
   themeData: Record<string, string>;
 }
 
@@ -35,19 +27,7 @@ export interface VerifyWindowState extends Pick<LlmSettingsValidation, 'llmProvi
   themeData: Record<string, string>;
 }
 
-type SanitizedSettings<T extends Record<string, unknown>> = Omit<T, SecretSettingKeys>;
-
-function hasConfiguredText(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function normalizeLlmProvider(value: unknown): LlmProvider {
-  return value === 'vertex' ? 'vertex' : DEFAULT_LLM_PROVIDER;
-}
-
-function getVertexLocation(value: unknown): string {
-  return hasConfiguredText(value) ? value.trim() : DEFAULT_LLM_VERTEX_LOCATION;
-}
+type SanitizedSettings<T extends Record<string, unknown>> = Omit<T, LlmProviderSecretSettingKey>;
 
 function getProviderMetadata(settings: AppSettings): Pick<LlmSettingsValidation, 'llmProvider' | 'llmVertexLocation' | 'llmReady' | 'llmHasApiKey' | 'llmHasVertexServiceAccountJson'> {
   const validation = validateLlmSettings(settings);
@@ -61,82 +41,32 @@ function getProviderMetadata(settings: AppSettings): Pick<LlmSettingsValidation,
 }
 
 export function getLlmProviderConfigHint(provider: unknown): string {
-  return normalizeLlmProvider(provider) === 'vertex'
-    ? 'Google Cloud 서비스 계정 JSON 전체를 붙여넣고 Vertex 위치는 기본값 global을 사용하세요.'
-    : 'Gemini API 키를 입력하면 번역, 재번역, JSON 검증 복구에 그대로 사용됩니다.';
+  return getProviderRegistryEntry(provider).configHint;
 }
 
 export function getLlmProviderMissingConfigMessage(provider: unknown): string {
-  return normalizeLlmProvider(provider) === 'vertex'
-    ? 'Vertex AI 설정이 완료되지 않았습니다. 메인 설정에서 서비스 계정 JSON, 위치, 모델을 확인해주세요.'
-    : 'Gemini API 설정이 완료되지 않았습니다. 메인 설정에서 API 키와 모델을 확인해주세요.';
+  return getProviderRegistryEntry(provider).missingConfigMessage;
 }
 
 export function sanitizeSettingsForRenderer<T extends Record<string, unknown>>(settings: T): SanitizedSettings<T> {
-  const { llmApiKey: _llmApiKey, llmVertexServiceAccountJson: _llmVertexServiceAccountJson, ...safeSettings } = settings;
+  const safeSettings: Record<string, unknown> = { ...settings };
+  for (const key of getAllProviderSecretSettingKeys()) {
+    delete safeSettings[key];
+  }
   return safeSettings as SanitizedSettings<T>;
 }
 
-export function parseVertexServiceAccountJson(serviceAccountJson: string): VertexServiceAccountJson {
-  if (!hasConfiguredText(serviceAccountJson)) {
-    throw new Error('Vertex service account JSON is required.');
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(serviceAccountJson.trim());
-  } catch {
-    throw new Error('Vertex service account JSON could not be parsed.');
-  }
-
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('Vertex service account JSON must be an object.');
-  }
-
-  const credentials = parsed as Record<string, unknown>;
-  for (const field of VERTEX_REQUIRED_FIELDS) {
-    if (!hasConfiguredText(credentials[field])) {
-      throw new Error(`Vertex service account JSON is missing ${field}.`);
-    }
-  }
-
-  return credentials as VertexServiceAccountJson;
-}
-
 export function validateLlmSettings(settings: AppSettings): LlmSettingsValidation {
-  const llmProvider = normalizeLlmProvider(settings.llmProvider);
-  const llmVertexLocation = getVertexLocation(settings.llmVertexLocation);
-  const llmHasApiKey = hasConfiguredText(settings.llmApiKey);
-  const llmHasVertexServiceAccountJson = hasConfiguredText(settings.llmVertexServiceAccountJson);
-  const llmValidationErrors: string[] = [];
-
-  if (!hasConfiguredText(settings.llmModel)) {
-    llmValidationErrors.push('LLM model is required.');
-  }
-
-  if (llmProvider === 'vertex') {
-    try {
-      parseVertexServiceAccountJson(settings.llmVertexServiceAccountJson);
-    } catch (error) {
-      llmValidationErrors.push((error as Error).message);
-    }
-  } else if (!llmHasApiKey) {
-    llmValidationErrors.push('Gemini API key is required.');
-  }
-
-  return {
-    llmProvider,
-    llmVertexLocation,
-    llmReady: llmValidationErrors.length === 0,
-    llmHasApiKey,
-    llmHasVertexServiceAccountJson,
-    llmValidationErrors,
-  };
+  return validateProviderReadiness(settings);
 }
 
 export function buildLlmStartWindowState(settings: AppSettings): LlmStartWindowState {
   return {
     llmSortOrder: settings.llmSortOrder || 'name-asc',
+    llmParallelWorkers: settings.llmParallelWorkers || 1,
+    llmSourceLang: settings.llmSourceLang || 'ja',
+    llmTargetLang: settings.llmTargetLang || 'ko',
+    llmCustomPrompt: settings.llmCustomPrompt || '',
     themeData: settings.themeData || {},
     ...getProviderMetadata(settings),
   };

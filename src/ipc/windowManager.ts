@@ -8,6 +8,7 @@ import { loadSettings, setOPath, defaultHeight } from './shared';
 import { loadRoute } from './viteHelper';
 import { AppContext } from '../appContext';
 import { PROJECT_ROOT } from '../projectRoot';
+import { rememberAllowedProjectRoot } from './llmProjectPathValidation';
 
 export function createWindow(ctx: AppContext) {
   loadSettings(ctx)
@@ -108,19 +109,25 @@ export function registerWindowHandlers(ctx: AppContext) {
       }
       let dir = qs
       if(qv === 'data'){
+        ctx.allowedProjectRoots = rememberAllowedProjectRoot(ctx.allowedProjectRoots, dir);
         ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:dir});
         ctx.mainWindow!.webContents.send('set-allowed-paths', [dir]);
       }
       else{
         if(fs.existsSync(path.join(qs, 'www', 'data'))){
-          ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:path.join(qs, 'www', 'data')});
-          ctx.mainWindow!.webContents.send('set-allowed-paths', [path.join(qs, 'www', 'data')]);
+          const projectDir = path.join(qs, 'www', 'data');
+          ctx.allowedProjectRoots = rememberAllowedProjectRoot(ctx.allowedProjectRoots, projectDir);
+          ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:projectDir});
+          ctx.mainWindow!.webContents.send('set-allowed-paths', [projectDir]);
         }
         else if(fs.existsSync(path.join(qs, 'data'))){
-          ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:path.join(qs, 'data')});
-          ctx.mainWindow!.webContents.send('set-allowed-paths', [path.join(qs, 'data')]);
+          const projectDir = path.join(qs, 'data');
+          ctx.allowedProjectRoots = rememberAllowedProjectRoot(ctx.allowedProjectRoots, projectDir);
+          ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:projectDir});
+          ctx.mainWindow!.webContents.send('set-allowed-paths', [projectDir]);
         }
         else if(fs.existsSync(path.join(qs, 'Data.wolf'))){
+          ctx.allowedProjectRoots = rememberAllowedProjectRoot(ctx.allowedProjectRoots, qs);
           ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:path.join(qs)});
           ctx.mainWindow!.webContents.send('set-allowed-paths', [path.join(qs)]);
         }

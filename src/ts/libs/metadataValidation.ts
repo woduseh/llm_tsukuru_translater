@@ -2,6 +2,44 @@ import { isBoolean, isNumber, isRecord, isString } from '../../types/guards';
 import type { ExtractedData, ExtractedDataEntry, ExtractedFileData } from '../rpgmv/types';
 import type { extData, wolfMetadata } from '../wolf/types';
 
+export interface RpgMakerApplyEntryPlan {
+  extractFile: string;
+  originFile: string;
+  path: string;
+  startLine: number;
+  endLine: number;
+  entry: ExtractedDataEntry;
+}
+
+export interface RpgMakerParallelApplyPlan {
+  entries: RpgMakerApplyEntryPlan[];
+  byOrigin: Record<string, RpgMakerApplyEntryPlan[]>;
+}
+
+export interface RpgMakerApplySafetyOptions {
+  extractTextLineCounts?: Record<string, number>;
+}
+
+export interface WolfApplyEntryPlan {
+  index: number;
+  sourceFile: string;
+  extractFile: string;
+  startOffset: number;
+  lengthOffset: number;
+  endOffset: number;
+  textLineNumbers: number[];
+  entry: extData;
+}
+
+export interface WolfParallelApplyPlan {
+  entries: WolfApplyEntryPlan[];
+  bySourceFile: Record<string, WolfApplyEntryPlan[]>;
+}
+
+export interface WolfApplySafetyOptions {
+  extractedTextLineCounts?: Record<string, number>;
+}
+
 function assertRecord(value: unknown, path: string): Record<string, unknown> {
   if (!isRecord(value)) {
     throw new Error(`${path} must be an object`);
@@ -92,6 +130,80 @@ export function validateExtractedData(value: unknown): ExtractedData {
   return { main: normalizedMain };
 }
 
+export function validateRpgMakerParallelApplySafety(
+  extractedData: ExtractedData,
+  options: RpgMakerApplySafetyOptions = {},
+): RpgMakerParallelApplyPlan {
+  const entries: RpgMakerApplyEntryPlan[] = [];
+  const byOrigin: Record<string, RpgMakerApplyEntryPlan[]> = {};
+  const rangesByOriginAndExtract = new Map<string, RpgMakerApplyEntryPlan[]>();
+  const pathsByOrigin = new Map<string, Map<string, RpgMakerApplyEntryPlan>>();
+
+  for (const [extractFile, fileData] of Object.entries(extractedData.main)) {
+    const inferredLineCount = fileData.outputText === undefined ? undefined : countSplitLines(fileData.outputText);
+    const lineCount = options.extractTextLineCounts?.[extractFile] ?? inferredLineCount;
+
+    for (const [lineKey, entry] of Object.entries(fileData.data)) {
+      const startLine = Number(lineKey);
+      if (!Number.isInteger(startLine) || startLine < 0) {
+        throw new Error(`unsafe RPG Maker apply metadata: ${extractFile}.${lineKey} line key must be a non-negative integer`);
+      }
+      if (!Number.isInteger(entry.m) || entry.m <= startLine) {
+        throw new Error(`unsafe RPG Maker apply metadata: ${extractFile}.${lineKey} has invalid line span ${startLine}-${entry.m}`);
+      }
+      if (lineCount !== undefined && entry.m > lineCount) {
+        throw new Error(`unsafe RPG Maker apply metadata: ${extractFile}.${lineKey} span ${startLine}-${entry.m} exceeds ${lineCount} text lines`);
+      }
+      if (entry.val.length === 0) {
+        throw new Error(`unsafe RPG Maker apply metadata: ${extractFile}.${lineKey} path must not be empty`);
+      }
+
+      const originFile = entry.origin ?? extractFile;
+      const planEntry: RpgMakerApplyEntryPlan = {
+        extractFile,
+        originFile,
+        path: entry.val,
+        startLine,
+        endLine: entry.m,
+        entry,
+      };
+
+      const originPaths = pathsByOrigin.get(originFile) ?? new Map<string, RpgMakerApplyEntryPlan>();
+      const existingPath = originPaths.get(entry.val);
+      if (existingPath !== undefined) {
+        throw new Error(`unsafe RPG Maker apply metadata: ${originFile} has conflicting path ${entry.val} at ${existingPath.extractFile}:${existingPath.startLine} and ${extractFile}:${startLine}`);
+      }
+      originPaths.set(entry.val, planEntry);
+      pathsByOrigin.set(originFile, originPaths);
+
+      const rangeKey = `${originFile}\0${extractFile}`;
+      const ranges = rangesByOriginAndExtract.get(rangeKey) ?? [];
+      ranges.push(planEntry);
+      rangesByOriginAndExtract.set(rangeKey, ranges);
+
+      entries.push(planEntry);
+      (byOrigin[originFile] ??= []).push(planEntry);
+    }
+  }
+
+  for (const ranges of rangesByOriginAndExtract.values()) {
+    ranges.sort((a, b) => a.startLine - b.startLine || a.endLine - b.endLine);
+    for (let index = 1; index < ranges.length; index++) {
+      const previous = ranges[index - 1];
+      const current = ranges[index];
+      if (current.startLine < previous.endLine) {
+        throw new Error(`unsafe RPG Maker apply metadata: ${current.originFile} has overlapping ${current.extractFile} ranges ${previous.startLine}-${previous.endLine} and ${current.startLine}-${current.endLine}`);
+      }
+    }
+  }
+
+  for (const originEntries of Object.values(byOrigin)) {
+    originEntries.sort((a, b) => a.extractFile.localeCompare(b.extractFile) || a.startLine - b.startLine);
+  }
+
+  return { entries, byOrigin };
+}
+
 export function validateWolfExtDataPayload(value: unknown): {
   ext: extData[];
   meta: wolfMetadata;
@@ -143,4 +255,99 @@ export function validateWolfExtDataPayload(value: unknown): {
     meta: { ver },
     cache,
   };
+}
+
+export function validateWolfParallelApplySafety(
+  ext: extData[],
+  cache: Record<string, Buffer>,
+  options: WolfApplySafetyOptions = {},
+): WolfParallelApplyPlan {
+  const entries: WolfApplyEntryPlan[] = [];
+  const bySourceFile: Record<string, WolfApplyEntryPlan[]> = {};
+
+  for (let index = 0; index < ext.length; index++) {
+    const entry = ext[index];
+    if (entry.sourceFile.length === 0) {
+      throw new Error(`unsafe Wolf apply metadata: ext.${index}.sourceFile must not be empty`);
+    }
+    if (entry.extractFile.length === 0) {
+      throw new Error(`unsafe Wolf apply metadata: ext.${index}.extractFile must not be empty`);
+    }
+
+    const source = cache[entry.sourceFile];
+    if (!Buffer.isBuffer(source)) {
+      throw new Error(`unsafe Wolf apply metadata: missing cached binary for ${entry.sourceFile}`);
+    }
+
+    const { pos1, pos2, pos3, len } = entry.str;
+    if (pos1 < 0 || pos2 < 0 || pos3 < 0 || len < 0 || pos1 + 4 !== pos2 || pos2 > pos3) {
+      throw new Error(`unsafe Wolf apply metadata: ext.${index} has invalid offsets ${pos1}-${pos2}-${pos3}`);
+    }
+    if (pos3 > source.length) {
+      throw new Error(`unsafe Wolf apply metadata: ext.${index} range ${pos1}-${pos3} exceeds ${source.length} bytes`);
+    }
+    if (pos3 - pos2 !== len) {
+      throw new Error(`unsafe Wolf apply metadata: ext.${index} length ${len} does not match offset range`);
+    }
+    if (source.readUInt32LE(pos1) !== len) {
+      throw new Error(`unsafe Wolf apply metadata: ext.${index} cached length header does not match metadata`);
+    }
+    if (!source.subarray(pos2, pos3).equals(Buffer.from(entry.str.str))) {
+      throw new Error(`unsafe Wolf apply metadata: ext.${index} cached bytes do not match metadata bytes`);
+    }
+
+    validateWolfTextLines(index, entry, options.extractedTextLineCounts?.[entry.extractFile]);
+
+    const planEntry: WolfApplyEntryPlan = {
+      index,
+      sourceFile: entry.sourceFile,
+      extractFile: entry.extractFile,
+      startOffset: pos2,
+      lengthOffset: pos1,
+      endOffset: pos3,
+      textLineNumbers: [...entry.textLineNumber],
+      entry,
+    };
+    entries.push(planEntry);
+    (bySourceFile[entry.sourceFile] ??= []).push(planEntry);
+  }
+
+  for (const sourceEntries of Object.values(bySourceFile)) {
+    sourceEntries.sort((a, b) => a.lengthOffset - b.lengthOffset || a.endOffset - b.endOffset);
+    for (let index = 1; index < sourceEntries.length; index++) {
+      const previous = sourceEntries[index - 1];
+      const current = sourceEntries[index];
+      if (current.lengthOffset < previous.endOffset) {
+        throw new Error(`unsafe Wolf apply metadata: ${current.sourceFile} has overlapping binary ranges ${previous.lengthOffset}-${previous.endOffset} and ${current.lengthOffset}-${current.endOffset}`);
+      }
+    }
+  }
+
+  return { entries, bySourceFile };
+}
+
+function countSplitLines(text: string): number {
+  return text.split('\n').length;
+}
+
+function validateWolfTextLines(index: number, entry: extData, lineCount: number | undefined): void {
+  if (entry.textLineNumber.length === 0) {
+    throw new Error(`unsafe Wolf apply metadata: ext.${index}.textLineNumber must not be empty`);
+  }
+  const firstLine = entry.textLineNumber[0];
+  if (!Number.isInteger(firstLine) || firstLine < 0) {
+    throw new Error(`unsafe Wolf apply metadata: ext.${index}.textLineNumber must contain non-negative integers`);
+  }
+  for (let lineIndex = 0; lineIndex < entry.textLineNumber.length; lineIndex++) {
+    const lineNumber = entry.textLineNumber[lineIndex];
+    if (!Number.isInteger(lineNumber) || lineNumber < 0) {
+      throw new Error(`unsafe Wolf apply metadata: ext.${index}.textLineNumber must contain non-negative integers`);
+    }
+    if (lineNumber !== firstLine + lineIndex) {
+      throw new Error(`unsafe Wolf apply metadata: ext.${index}.textLineNumber must be contiguous`);
+    }
+    if (lineCount !== undefined && lineNumber >= lineCount) {
+      throw new Error(`unsafe Wolf apply metadata: ext.${index}.textLineNumber ${lineNumber} exceeds ${lineCount} text lines`);
+    }
+  }
 }

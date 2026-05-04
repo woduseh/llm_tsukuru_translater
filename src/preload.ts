@@ -1,5 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
+import { isReceiveChannel, isSendChannel } from './types/ipc';
 
 let allowedBasePaths: string[] = [];
 
@@ -14,37 +15,15 @@ function isPathAllowed(filePath: string): boolean {
   return allowedBasePaths.some((base: string) => resolved === base || resolved.startsWith(base + path.sep));
 }
 
-const SEND_CHANNELS = [
-  'close', 'minimize', 'select_folder', 'setheight', 'extract', 'apply',
-  'changeURL', 'settings', 'applysettings', 'closesettings',
-  'openLLMSettings', 'llmSettingsApply', 'llmSettingsClose', 'abortLLM',
-  'openLLMCompare', 'llmCompareClose', 'openJsonVerify',
-  'retranslateFile', 'retranslateBlocks', 'verifyLlmRepair',
-  'openFolder', 'projectConvert', 'license', 'app_version',
-  'getextention', 'selFont', 'changeFontSize', 'updateVersion',
-  'wolf_ext', 'wolf_apply', 'gamePatcher',
-  'compareReady', 'verifyReady',
-  'llmSettingsReady', 'settingsReady', 'mainReady',
-];
-
-const RECEIVE_CHANNELS = [
-  'set_path', 'getGlobalSettings', 'loadingTag', 'loading', 'worked',
-  'check_force', 'alert', 'alert_free', 'alert2',
-  'llmTranslating', 'alertExten', 'settings', 'llmSettings',
-  'initCompare', 'retranslateProgress', 'retranslateFileDone', 'retranslateBlocksDone',
-  'initVerify', 'verifySettings', 'verifyLlmRepairProgress', 'verifyLlmRepairDone',
-  'set-allowed-paths',
-];
-
 contextBridge.exposeInMainWorld('api', {
   send: (channel: string, ...args: unknown[]) => {
-    if (SEND_CHANNELS.includes(channel)) {
+    if (isSendChannel(channel)) {
       ipcRenderer.send(channel, ...args);
     }
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   on: (channel: string, callback: (...args: any[]) => void) => {
-    if (RECEIVE_CHANNELS.includes(channel)) {
+    if (isReceiveChannel(channel)) {
       const subscription = (_event: unknown, ...args: unknown[]) => callback(...args);
       ipcRenderer.on(channel, subscription as (...args: unknown[]) => void);
       return subscription;
@@ -52,17 +31,17 @@ contextBridge.exposeInMainWorld('api', {
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   once: (channel: string, callback: (...args: any[]) => void) => {
-    if (RECEIVE_CHANNELS.includes(channel)) {
+    if (isReceiveChannel(channel)) {
       ipcRenderer.once(channel, (_event: unknown, ...args: unknown[]) => callback(...args));
     }
   },
   removeAllListeners: (channel: string) => {
-    if (RECEIVE_CHANNELS.includes(channel)) {
+    if (isReceiveChannel(channel)) {
       ipcRenderer.removeAllListeners(channel);
     }
   },
   invoke: (channel: string, ...args: unknown[]) => {
-    if (SEND_CHANNELS.includes(channel)) {
+    if (isSendChannel(channel)) {
       return ipcRenderer.invoke(channel, ...args);
     }
   }

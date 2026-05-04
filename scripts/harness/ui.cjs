@@ -10,7 +10,9 @@ const {
   makeTempDir,
   projectRoot,
   readJson,
-  resolveOutputPath,
+  relativeArtifactPath,
+  writeFatalHarnessResult,
+  writeHarnessResult,
   writeJson,
 } = require('./_shared.cjs');
 
@@ -74,21 +76,25 @@ async function main() {
 
   const result = readJson(resultPath);
   result.processExitCode = exitCode;
+  result.artifacts = {
+    ...(result.artifacts || {}),
+    workspace: relativeArtifactPath(workspace),
+    rawResult: relativeArtifactPath(resultPath),
+    scenario: relativeArtifactPath(scenarioPath),
+  };
+  result.metrics = {
+    ...(result.metrics || {}),
+    processExitCode: exitCode,
+  };
 
-  const outputPath = resolveOutputPath('harness-ui');
-  writeJson(outputPath, result);
+  writeHarnessResult('harness-ui', result);
   process.exitCode = result.status === 'passed' && exitCode === 0 ? 0 : 1;
 }
 
 main().catch((error) => {
-  const outputPath = resolveOutputPath('harness-ui');
-  writeJson(outputPath, {
-    suite: 'harness-ui',
-    status: 'failed',
-    fatal: true,
-    error: {
-      message: error.message,
-      stack: error.stack,
+  writeFatalHarnessResult('harness-ui', error, {
+    metrics: {
+      setupFailed: true,
     },
   });
   process.exitCode = 1;

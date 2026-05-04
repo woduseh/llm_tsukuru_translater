@@ -16,6 +16,11 @@
         <span class="card-title">Wolf RPG</span>
         <span class="card-sub">Wolf RPG Editor</span>
       </div>
+      <div class="card" data-harness-agent-workspace-entry @click="$router.push('/agent-workspace')">
+        <span class="card-emoji">🤖</span>
+        <span class="card-title">AI 작업공간</span>
+        <span class="card-sub">Agent Workspace</span>
+      </div>
     </div>
   </div>
 </template>
@@ -60,6 +65,8 @@ onMounted(() => {
 .card-row {
   display: flex;
   gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .card {

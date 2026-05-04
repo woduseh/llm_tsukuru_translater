@@ -18,7 +18,7 @@
           <button class="mode-tab" :class="{ active: mode === 0 }" @click="mode = 0">추출</button>
           <button class="mode-tab" :class="{ active: mode === 1 }" @click="mode = 1">적용</button>
         </div>
-        <button class="btn-run" @click="run">RUN</button>
+        <button class="btn-run" :disabled="!canRun" :title="runButtonTitle" @click="run">RUN</button>
       </div>
     </section>
 
@@ -59,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { computed, ref, reactive, onMounted, onUnmounted } from 'vue'
 import { api } from '../composables/useIpc'
 import TitleBar from '../components/TitleBar.vue'
 import Swal from 'sweetalert2'
@@ -67,6 +67,15 @@ import Swal from 'sweetalert2'
 const folderPath = ref('')
 const mode = ref(-1)
 const running = ref(false)
+const hasFolder = computed(() => folderPath.value.trim().length > 0)
+const hasMode = computed(() => mode.value === 0 || mode.value === 1)
+const canRun = computed(() => hasFolder.value && hasMode.value && !running.value)
+const runButtonTitle = computed(() => {
+  if (running.value) return '작업이 진행 중입니다'
+  if (!hasFolder.value) return '프로젝트 폴더를 먼저 선택하세요'
+  if (!hasMode.value) return '추출 또는 적용을 선택하세요'
+  return mode.value === 0 ? '추출을 시작합니다' : '적용을 시작합니다'
+})
 
 const config = reactive<Record<string, boolean>>({
   autoline: false,
@@ -96,6 +105,14 @@ function openFolder() {
 
 function run() {
   if (guardRunning()) return
+  if (!hasFolder.value) {
+    Swal.fire({ icon: 'warning', text: '프로젝트 폴더를 먼저 선택하세요.' })
+    return
+  }
+  if (!hasMode.value) {
+    Swal.fire({ icon: 'warning', text: '추출 또는 적용을 선택하세요.' })
+    return
+  }
   running.value = true
   if (mode.value === 0) {
     api.send('wolf_ext', { folder: folderPath.value, config })
@@ -113,6 +130,10 @@ function openSettings() {
 function openLLMTranslate() {
   if (guardRunning()) return
   const dir = folderPath.value.replaceAll('\\', '/')
+  if (!dir) {
+    Swal.fire({ icon: 'error', text: '프로젝트 폴더를 먼저 선택하세요.' })
+    return
+  }
   api.send('openLLMSettings', { dir, game: 'wolf' })
 }
 

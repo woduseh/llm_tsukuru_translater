@@ -8,9 +8,10 @@ const {
   loadCompiledModule,
   projectRoot,
   readJson,
-  resolveOutputPath,
   runCases,
-  writeJson,
+  writeFatalHarnessResult,
+  writeHarnessResult,
+  writeTaskManifest,
 } = require('./_shared.cjs');
 
 async function main() {
@@ -27,6 +28,7 @@ async function main() {
     cases.push({
       id: blockCase.id,
       title: blockCase.title,
+      category: 'block',
       run: async () => {
         const originalBlocks = translationCore.splitIntoBlocks(blockCase.original);
         const validation = translationCore.validateChunk(originalBlocks, blockCase.candidate);
@@ -52,8 +54,12 @@ async function main() {
     cases.push({
       id: verifyCase.id,
       title: verifyCase.title,
+      category: 'verify',
       run: async () => {
-        const issues = verify.verifyJsonIntegrity(verifyCase.orig, verifyCase.trans);
+        const stringPolicy = typeof verifyCase.orig === 'string' ? 'allow' : undefined;
+        const issues = stringPolicy
+          ? verify.verifyJsonIntegrity(verifyCase.orig, verifyCase.trans, '$', undefined, stringPolicy)
+          : verify.verifyJsonIntegrity(verifyCase.orig, verifyCase.trans);
         const types = issues.map((issue) => issue.type);
         for (const expectedType of verifyCase.expectedTypes) {
           assert(types.includes(expectedType), `${verifyCase.id}: missing expected issue type ${expectedType}`);
@@ -71,6 +77,7 @@ async function main() {
     cases.push({
       id: repairCase.id,
       title: repairCase.title,
+      category: 'repair',
       run: async () => {
         const repaired = verify.repairJson(repairCase.orig, repairCase.trans);
         assert(deepEqual(repaired, repairCase.expected), `${repairCase.id}: repaired output changed`);
@@ -82,23 +89,36 @@ async function main() {
     });
   }
 
+  const taskManifest = writeTaskManifest('harness-eval', cases, {
+    deterministic: true,
+    liveProviderRequired: false,
+    corpus: 'test/fixtures/harness/eval-corpus.json',
+  });
   const result = await runCases('harness-eval', cases);
   result.score = result.total === 0 ? 0 : Number(((result.passed / result.total) * 100).toFixed(2));
+  result.metrics = {
+    score: result.score,
+    caseCount: result.total,
+    failedCases: result.failed,
+    categories: result.cases.reduce((acc, testCase) => {
+      const category = testCase.details?.category || 'unknown';
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {}),
+  };
+  result.artifacts = { corpus: 'test/fixtures/harness/eval-corpus.json', taskManifest };
 
-  const outputPath = resolveOutputPath('harness-eval');
-  writeJson(outputPath, result);
+  writeHarnessResult('harness-eval', result);
   process.exitCode = result.failed === 0 ? 0 : 1;
 }
 
 main().catch((error) => {
-  const outputPath = resolveOutputPath('harness-eval');
-  writeJson(outputPath, {
-    suite: 'harness-eval',
-    status: 'failed',
-    fatal: true,
-    error: {
-      message: error.message,
-      stack: error.stack,
+  writeFatalHarnessResult('harness-eval', error, {
+    artifacts: {
+      corpus: 'test/fixtures/harness/eval-corpus.json',
+    },
+    metrics: {
+      setupFailed: true,
     },
   });
   process.exitCode = 1;

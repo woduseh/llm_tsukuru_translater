@@ -4,6 +4,7 @@ import {
 } from '../../types/settings';
 import { settings as defaultSettings } from '../rpgmv/datas';
 import { isBoolean, isNumber, isRecord, isString } from '../../types/guards';
+import { isKnownLlmProvider } from './providerRegistry';
 
 const BOOLEAN_KEYS = [
   'extractJs',
@@ -25,6 +26,10 @@ const BOOLEAN_KEYS = [
 const STRING_KEYS = [
   'language',
   'llmApiKey',
+  'llmOpenAiApiKey',
+  'llmCustomApiKey',
+  'llmCustomBaseUrl',
+  'llmClaudeApiKey',
   'llmModel',
   'llmCustomPrompt',
   'llmSourceLang',
@@ -45,6 +50,8 @@ const INTEGER_RANGE_RULES = {
   llmMaxRetries: { min: 0, max: 10 },
   llmMaxApiRetries: { min: 0, max: 20 },
   llmTimeout: { min: 30, max: 3600 },
+  llmMaxTokens: { min: 1, max: 200000 },
+  llmParallelWorkers: { min: 1, max: 16 },
 } as const;
 
 const TRANSLATION_UNITS = ['chunk', 'file'] as const;
@@ -119,9 +126,9 @@ function validateSettingValue(
   }
 
   if (key === 'llmProvider') {
-    return value === 'gemini' || value === 'vertex'
+    return isKnownLlmProvider(value)
       ? value
-      : invalid('gemini 또는 vertex만 허용됩니다');
+      : invalid('지원하는 LLM 제공자만 허용됩니다');
   }
 
   if (key === 'theme') {

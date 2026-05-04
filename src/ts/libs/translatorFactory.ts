@@ -1,20 +1,16 @@
+import type { AppSettings } from '../../types/settings';
 import {
-  type AppSettings,
-  DEFAULT_LLM_PROVIDER,
-  type LlmProvider,
-} from '../../types/settings';
-import type { BlockValidation, TranslationLogEntry } from './translationCore';
-import { validateLlmSettings } from './llmProviderConfig';
-import {
-  createGeminiTranslator,
+  buildProviderCacheFingerprint,
+  ClaudeTranslator,
+  createProviderTranslator,
   GeminiTranslator,
-} from './geminiTranslator';
-import {
-  createVertexTranslator,
+  getLlmProviderDisplayName,
+  normalizeLlmProvider,
+  OpenAiCompatibleTranslator,
+  validateProviderReadiness,
   VertexTranslator,
-} from './vertexTranslator';
-
-type LlmSettingsLike = Partial<AppSettings> & Record<string, unknown>;
+} from './providerRegistry';
+import type { BlockValidation, TranslationLogEntry } from './translationCore';
 
 export interface Translator {
   translateText(text: string): Promise<string>;
@@ -29,20 +25,16 @@ export interface Translator {
   }>;
 }
 
-export function normalizeLlmProvider(value: unknown): LlmProvider {
-  return value === 'vertex' ? 'vertex' : DEFAULT_LLM_PROVIDER;
-}
+type LlmSettingsLike = Partial<AppSettings> & Record<string, unknown>;
 
-export function getLlmProviderDisplayName(provider: unknown): string {
-  return normalizeLlmProvider(provider) === 'vertex' ? 'Vertex AI' : 'Gemini API';
-}
+export { getLlmProviderDisplayName, normalizeLlmProvider };
 
-export function buildTranslationCacheKey(provider: unknown, hash: string, model: string, targetLang: string): string {
-  return `${normalizeLlmProvider(provider)}_${hash}_${model}_${targetLang}`;
+export function buildTranslationCacheKey(provider: unknown, hash: string, model: string, targetLang: string, settings?: LlmSettingsLike): string {
+  return buildProviderCacheFingerprint(provider, { hash, model, targetLang, settings });
 }
 
 export function getLlmReadinessError(settings: LlmSettingsLike): string | null {
-  const validation = validateLlmSettings(settings as AppSettings);
+  const validation = validateProviderReadiness(settings);
   if (validation.llmReady) {
     return null;
   }
@@ -55,6 +47,19 @@ export function getLlmReadinessError(settings: LlmSettingsLike): string | null {
     return validation.llmHasVertexServiceAccountJson
       ? `Vertex AI 서비스 계정 JSON을 확인해주세요: ${validation.llmValidationErrors[0]}`
       : 'Vertex AI 서비스 계정 JSON이 설정되지 않았습니다.';
+  }
+  if (validation.llmProvider === 'openai') {
+    return validation.llmValidationErrors.includes('LLM model is required.')
+      ? 'LLM 모델이 설정되지 않았습니다.'
+      : 'OpenAI API 키가 설정되지 않았습니다.';
+  }
+  if (validation.llmProvider === 'custom-openai') {
+    return validation.llmValidationErrors[0] || 'OpenAI 호환 API 설정을 확인해주세요.';
+  }
+  if (validation.llmProvider === 'claude') {
+    return validation.llmValidationErrors.includes('LLM model is required.')
+      ? 'LLM 모델이 설정되지 않았습니다.'
+      : 'Claude API 키 또는 최대 토큰 설정을 확인해주세요.';
   }
 
   return 'Gemini API 키가 설정되지 않았습니다.';
@@ -73,11 +78,7 @@ export function createTranslator(
   targetLang = 'ko',
   isAborted?: () => boolean,
 ): Translator {
-  const provider = normalizeLlmProvider(settings.llmProvider);
-  if (provider === 'vertex') {
-    return createVertexTranslator(settings, sourceLang, targetLang, isAborted);
-  }
-  return createGeminiTranslator(settings, sourceLang, targetLang, isAborted);
+  return createProviderTranslator({ settings, sourceLang, targetLang, isAborted });
 }
 
-export { GeminiTranslator, VertexTranslator };
+export { ClaudeTranslator, GeminiTranslator, OpenAiCompatibleTranslator, VertexTranslator };

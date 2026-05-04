@@ -9,9 +9,10 @@ const {
   loadCompiledModule,
   makeTempDir,
   projectRoot,
-  resolveOutputPath,
   runCases,
-  writeJson,
+  writeFatalHarnessResult,
+  writeHarnessResult,
+  writeTaskManifest,
 } = require('./_shared.cjs');
 
 function buildSuccessValidation(blocks) {
@@ -140,6 +141,7 @@ async function main() {
     {
       id: 'bulk-translation-workflow',
       title: 'bulk translation workflow preserves backup, cache, and untranslated-only semantics',
+      category: 'mock-provider',
       run: async () => {
         const workspace = makeTempDir('llm-tsukuru-core-');
         const extractDir = path.join(workspace, 'Extract');
@@ -253,21 +255,29 @@ async function main() {
     },
   ];
 
+  const taskManifest = writeTaskManifest('harness-core', cases, {
+    deterministic: true,
+    liveProviderRequired: false,
+    mockProvider: {
+      id: 'deterministic-string-replacer',
+      purpose: 'Exercises bulk translation without external LLM credentials.',
+    },
+  });
   const result = await runCases('harness-core', cases);
-  const outputPath = resolveOutputPath('harness-core');
-  writeJson(outputPath, result);
+  result.metrics = {
+    caseCount: result.total,
+    failedCases: result.failed,
+    deterministicMockProvider: 'deterministic-string-replacer',
+  };
+  result.artifacts = { taskManifest };
+  writeHarnessResult('harness-core', result);
   process.exitCode = result.failed === 0 ? 0 : 1;
 }
 
 main().catch((error) => {
-  const outputPath = resolveOutputPath('harness-core');
-  writeJson(outputPath, {
-    suite: 'harness-core',
-    status: 'failed',
-    fatal: true,
-    error: {
-      message: error.message,
-      stack: error.stack,
+  writeFatalHarnessResult('harness-core', error, {
+    metrics: {
+      setupFailed: true,
     },
   });
   process.exitCode = 1;

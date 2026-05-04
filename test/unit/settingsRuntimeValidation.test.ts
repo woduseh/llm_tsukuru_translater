@@ -23,6 +23,7 @@ describe('sanitizeStoredSettings', () => {
       llmMaxRetries: 99,
       llmMaxApiRetries: -1,
       llmTimeout: 5,
+      llmParallelWorkers: 0,
       oneMapFile: 'yes',
       llmVertexLocation: '',
       unknownSetting: 'should be dropped',
@@ -36,6 +37,7 @@ describe('sanitizeStoredSettings', () => {
     expect(sanitized.llmMaxRetries).toBe(2);
     expect(sanitized.llmMaxApiRetries).toBe(5);
     expect(sanitized.llmTimeout).toBe(600);
+    expect(sanitized.llmParallelWorkers).toBe(1);
   });
 });
 
@@ -47,6 +49,7 @@ describe('applyValidatedSettingsUpdate', () => {
       llmMaxRetries: 4,
       llmMaxApiRetries: 8,
       llmTimeout: 300,
+      llmParallelWorkers: 4,
       llmVertexLocation: '',
     });
 
@@ -55,6 +58,7 @@ describe('applyValidatedSettingsUpdate', () => {
     expect(updated.llmMaxRetries).toBe(4);
     expect(updated.llmMaxApiRetries).toBe(8);
     expect(updated.llmTimeout).toBe(300);
+    expect(updated.llmParallelWorkers).toBe(4);
     expect(updated.llmVertexLocation).toBe('global');
   });
 
@@ -72,5 +76,9 @@ describe('applyValidatedSettingsUpdate', () => {
     expect(() => applyValidatedSettingsUpdate(createCurrentSettings(), {
       llmTimeout: 5000,
     })).toThrow(/llmTimeout/);
+
+    expect(() => applyValidatedSettingsUpdate(createCurrentSettings(), {
+      llmParallelWorkers: 17,
+    })).toThrow(/llmParallelWorkers/);
   });
 });
