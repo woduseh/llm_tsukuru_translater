@@ -4,7 +4,7 @@
   <main class="agent-workspace" data-harness-view="agent-workspace">
     <section class="workspace-hero">
       <div>
-        <p class="eyebrow">Agent Workspace</p>
+        <p class="eyebrow">AI 작업공간</p>
         <h1>{{ workspace.title }}</h1>
         <p>{{ workspace.subtitle }}</p>
       </div>
@@ -13,7 +13,7 @@
 
     <section class="workspace-grid">
       <div class="panel navigator">
-        <h2>Command presets</h2>
+        <h2>명령 프리셋</h2>
         <button
           v-for="preset in workspace.presets"
           :key="preset.id"
@@ -23,14 +23,14 @@
         >
           <strong>{{ preset.title }}</strong>
           <span>{{ preset.description }}</span>
-          <small>{{ preset.risk }} · {{ preset.estimated }}</small>
+          <small>{{ riskLevelLabel(preset.risk) }} · {{ preset.estimated }}</small>
         </button>
       </div>
 
       <div class="panel terminal-pane">
         <div class="panel-heading">
-          <h2>Agent presets</h2>
-          <span>Preview/no auto-run</span>
+          <h2>에이전트 프리셋</h2>
+          <span>미리보기 / 자동 실행 안 함</span>
         </div>
         <div class="agent-preset-tabs">
           <button
@@ -58,13 +58,13 @@
             type="button"
             @click="useStarterPrompt(prompt)"
           >
-            {{ prompt.action === 'copy' ? 'Copy' : 'Suggest' }} · {{ prompt.title }}
+            {{ prompt.action === 'copy' ? '복사' : '제안' }} · {{ prompt.title }}
           </button>
         </div>
         <pre v-if="selectedPrompt" class="prompt-preview">{{ selectedPrompt }}</pre>
         <div class="panel-heading terminal-heading">
-          <h2>Terminal sessions</h2>
-          <span>Native PTY / degraded fallback</span>
+          <h2>터미널 세션</h2>
+          <span>내장 PTY / 대체 안내</span>
         </div>
         <div class="workspace-tabs">
           <button
@@ -85,16 +85,16 @@
       </div>
 
       <div class="panel context-pane">
-        <h2>Activity & approvals</h2>
+        <h2>활동 및 승인</h2>
         <ol class="timeline">
           <li v-for="item in workspace.timeline" :key="item.id" :data-status="item.status">
-            <span>{{ item.status }}</span>
+            <span>{{ timelineStatusLabel(item.status) }}</span>
             {{ item.title }}
           </li>
         </ol>
         <div class="approval-card">
-          <strong>Approval center placeholder</strong>
-          <p>No write or execute action can run from this scaffold.</p>
+          <strong>승인 센터</strong>
+          <p>쓰기 또는 실행 승인이 필요하면 이곳에 표시됩니다.</p>
         </div>
         <div class="mcp-states">
           <div v-for="state in workspace.mcpStatusCards" :key="state.status" :data-mcp-state="state.status">
@@ -120,6 +120,7 @@ import {
   mcpStatusLabel,
   sessionStateLabel,
   type AgentCliPreset,
+  type CommandRiskLevel,
   type AgentStarterPrompt,
 } from '../agentWorkspaceModel'
 
@@ -143,16 +144,36 @@ async function useStarterPrompt(prompt: AgentStarterPrompt) {
     await navigator.clipboard.writeText(prompt.prompt)
   }
 }
+
+function riskLevelLabel(risk: CommandRiskLevel): string {
+  const labels: Record<CommandRiskLevel, string> = {
+    safe: '안전',
+    review: '검토',
+    write: '쓰기',
+    dangerous: '고위험',
+  }
+  return labels[risk]
+}
+
+function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
+  const labels = {
+    ready: '준비됨',
+    waiting: '대기',
+    mocked: '미리보기',
+  } satisfies Record<'ready' | 'waiting' | 'mocked', string>
+  return labels[status]
+}
 </script>
 
 <style scoped>
 .agent-workspace {
   flex: 1;
   overflow: auto;
-  padding: 20px 24px 72px;
+  padding: 20px 24px 32px;
   display: flex;
   flex-direction: column;
   gap: 18px;
+  min-width: 0;
 }
 
 .workspace-hero {
@@ -172,9 +193,11 @@ async function useStarterPrompt(prompt: AgentStarterPrompt) {
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(190px, 0.85fr) minmax(260px, 1.4fr) minmax(200px, 1fr);
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.45fr) minmax(0, 0.95fr);
+  grid-template-areas: "navigator terminal context";
   gap: 14px;
   min-height: 0;
+  align-items: start;
 }
 
 .panel {
@@ -183,14 +206,20 @@ async function useStarterPrompt(prompt: AgentStarterPrompt) {
   border-radius: var(--radius-lg);
   padding: 14px;
   min-height: 280px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .panel h2 { font-size: 14px; margin-bottom: 10px; }
-.panel-heading { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
-.panel-heading span { font-size: 11px; opacity: 0.55; }
+.panel-heading { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; min-width: 0; }
+.panel-heading span { font-size: 11px; opacity: 0.78; overflow-wrap: anywhere; }
 .terminal-heading { margin-top: 14px; }
 
-.navigator { display: flex; flex-direction: column; gap: 8px; }
+.navigator { grid-area: navigator; }
+.terminal-pane { grid-area: terminal; }
+.context-pane { grid-area: context; }
+.navigator, .context-pane { display: flex; flex-direction: column; gap: 8px; }
+.terminal-pane { display: flex; flex-direction: column; min-height: clamp(520px, 72vh, 840px); }
 .preset {
   text-align: left;
   background: var(--Highlight1);
@@ -203,12 +232,16 @@ async function useStarterPrompt(prompt: AgentStarterPrompt) {
   gap: 4px;
   font-family: inherit;
   cursor: default;
+  min-width: 0;
 }
-.preset span { font-size: 11px; opacity: 0.62; line-height: 1.35; }
-.preset small { font-size: 10px; opacity: 0.46; }
+.preset strong, .preset span, .preset small { overflow-wrap: anywhere; }
+.preset span { font-size: 11px; opacity: 0.82; line-height: 1.35; }
+.preset small { font-size: 10px; opacity: 0.72; }
 
 .agent-preset-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .agent-preset-tabs button {
+  flex: 1 1 128px;
+  min-width: 0;
   background: var(--Highlight3);
   color: var(--mainColor);
   border: var(--border);
@@ -218,7 +251,7 @@ async function useStarterPrompt(prompt: AgentStarterPrompt) {
   text-align: left;
 }
 .agent-preset-tabs button.active { border-color: rgba(124,111,219,0.7); background: rgba(124,111,219,0.16); }
-.agent-preset-tabs span { display: block; margin-top: 2px; font-size: 10px; opacity: 0.55; }
+.agent-preset-tabs span { display: block; margin-top: 2px; font-size: 10px; opacity: 0.76; overflow-wrap: anywhere; }
 
 .command-preview, .prompt-preview {
   background: #0f1018;
@@ -226,10 +259,11 @@ async function useStarterPrompt(prompt: AgentStarterPrompt) {
   border-radius: var(--radius-md);
   padding: 10px;
   font-size: 12px;
+  min-width: 0;
 }
 .command-preview { display: flex; flex-direction: column; gap: 7px; }
-.command-preview code, .prompt-preview { font-family: Consolas, 'Courier New', monospace; white-space: pre-wrap; }
-.command-preview p { opacity: 0.62; line-height: 1.4; }
+.command-preview code, .prompt-preview { font-family: Consolas, 'Courier New', monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.command-preview p { opacity: 0.82; line-height: 1.4; overflow-wrap: anywhere; }
 .starter-prompts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .starter-prompts button {
   background: var(--Highlight1);
@@ -242,6 +276,8 @@ async function useStarterPrompt(prompt: AgentStarterPrompt) {
 
 .workspace-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .workspace-tabs button {
+  flex: 1 1 110px;
+  min-width: 0;
   background: var(--Highlight3);
   color: var(--mainColor);
   border: var(--border);
@@ -250,27 +286,59 @@ async function useStarterPrompt(prompt: AgentStarterPrompt) {
   font-family: inherit;
 }
 .workspace-tabs button.active { border-color: rgba(124,111,219,0.7); background: rgba(124,111,219,0.16); }
-.workspace-tabs span { margin-left: 8px; font-size: 10px; opacity: 0.55; }
+.workspace-tabs span { margin-left: 8px; font-size: 10px; opacity: 0.76; }
 
 .terminal-placeholder {
-  min-height: 168px;
+  flex: 1;
+  min-height: clamp(360px, 50vh, 680px);
   border-radius: var(--radius-md);
   background: #0f1018;
-  padding: 16px;
+  padding: 10px;
   color: #d7ddff;
+  min-width: 0;
+  overflow: hidden;
 }
-.terminal-placeholder p { margin-top: 8px; opacity: 0.68; font-size: 12px; line-height: 1.5; }
+.terminal-placeholder p { margin-top: 8px; opacity: 0.82; font-size: 12px; line-height: 1.5; }
 
 .timeline { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .timeline li { padding: 9px; background: var(--Highlight1); border-radius: var(--radius-sm); font-size: 12px; }
-.timeline span { margin-right: 8px; opacity: 0.55; text-transform: uppercase; font-size: 10px; }
+.timeline span { margin-right: 8px; opacity: 0.78; font-size: 10px; }
 .approval-card { margin-top: 14px; padding: 12px; border: 1px dashed rgba(124,111,219,0.45); border-radius: var(--radius-md); }
-.approval-card p { margin-top: 6px; font-size: 12px; opacity: 0.62; }
+.approval-card p { margin-top: 6px; font-size: 12px; opacity: 0.82; }
 .mcp-states { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .mcp-states div { padding: 9px; border-radius: var(--radius-sm); background: var(--Highlight1); }
-.mcp-states p, .safety-list { margin-top: 4px; font-size: 11px; line-height: 1.45; opacity: 0.62; }
+.mcp-states p, .safety-list { margin-top: 4px; font-size: 11px; line-height: 1.45; opacity: 0.82; }
 .safety-list { padding-left: 18px; }
 .safety-list li + li { margin-top: 4px; }
+
+@media (max-width: 1200px) {
+  .workspace-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "terminal terminal"
+      "navigator context";
+  }
+  .terminal-pane {
+    min-height: clamp(460px, 62vh, 720px);
+  }
+}
+
+@media (max-width: 900px) {
+  .workspace-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "terminal"
+      "navigator"
+      "context";
+  }
+  .terminal-placeholder {
+    min-height: 360px;
+  }
+}
 
 @media (max-width: 840px) {
   .workspace-grid { grid-template-columns: 1fr; }

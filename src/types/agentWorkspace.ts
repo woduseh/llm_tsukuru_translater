@@ -19,7 +19,8 @@ export type TerminalErrorCode =
   | 'session-not-found'
   | 'input-too-large'
   | 'paste-confirmation-required'
-  | 'pty-spawn-failed';
+  | 'pty-spawn-failed'
+  | 'process-exited-early';
 export type AuditEntryKind = 'tool-call' | 'approval' | 'file-read' | 'file-write' | 'failure' | 'handoff';
 export type AgentResultStatus = 'ok' | 'needs-approval' | 'failed';
 

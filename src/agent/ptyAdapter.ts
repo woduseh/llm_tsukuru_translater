@@ -118,8 +118,11 @@ export class FakePtyAdapter implements PtyAdapter {
     return this.available ? undefined : (this.unavailableReason || 'Fake PTY unavailable');
   }
 
-  spawn(): PtyProcess {
+  lastSpawnOptions?: PtySpawnOptions;
+
+  spawn(options: PtySpawnOptions): PtyProcess {
     if (!this.available) throw new Error(this.getUnavailableReason());
+    this.lastSpawnOptions = options;
     return new FakePtyProcess(this.script);
   }
 }

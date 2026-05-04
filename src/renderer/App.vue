@@ -1,15 +1,20 @@
 <template>
   <div class="app-root">
     <router-view />
-    <AgentTerminalDrawer />
+    <AgentTerminalDrawer v-if="showGlobalTerminalDrawer" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import AgentTerminalDrawer from './components/AgentTerminalDrawer.vue'
 import { api } from './composables/useIpc'
 import Swal from 'sweetalert2'
+import { AGENT_WORKSPACE_ROUTE } from './agentWorkspaceModel'
+
+const route = useRoute()
+const showGlobalTerminalDrawer = computed(() => route.path !== AGENT_WORKSPACE_ROUTE)
 
 // Global alert handler shared across all pages
 onMounted(() => {

@@ -19,7 +19,7 @@
       <div class="card" data-harness-agent-workspace-entry @click="$router.push('/agent-workspace')">
         <span class="card-emoji">🤖</span>
         <span class="card-title">AI 작업공간</span>
-        <span class="card-sub">Agent Workspace</span>
+        <span class="card-sub">터미널 · 에이전트 도구</span>
       </div>
     </div>
   </div>

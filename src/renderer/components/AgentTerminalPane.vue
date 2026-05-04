@@ -1,11 +1,17 @@
 <template>
-  <section class="terminal-pane" data-harness-agent-terminal-pane>
+  <section class="terminal-pane" :class="{ compact: props.compact }" data-harness-agent-terminal-pane>
     <header class="terminal-toolbar">
       <div>
         <strong>{{ title }}</strong>
         <span>{{ statusLabel }}</span>
       </div>
       <div class="terminal-actions">
+        <button type="button" :disabled="!recentOutput" @click="copyLastError">오류 복사</button>
+        <button type="button" :disabled="!recentOutput" @click="copyOutput">출력 복사</button>
+        <button type="button" :aria-pressed="followOutput" @click="followOutput = !followOutput">
+          {{ followOutput ? '자동 스크롤' : '수동 스크롤' }}
+        </button>
+        <button type="button" @click="clearTerminal">지우기</button>
         <button type="button" :disabled="starting || isRunning" @click="startSession">시작</button>
         <button type="button" :disabled="!activeSessionId || !isRunning" @click="killSession">종료</button>
       </div>
@@ -13,10 +19,11 @@
 
     <div class="terminal-details" aria-live="polite">
       <span>{{ capabilityLabel }}</span>
-      <span v-if="sessionSummary">cwd: {{ sessionSummary.cwdLabel }}</span>
-      <span v-if="sessionSummary">seq: {{ sessionSummary.latestSequence }}</span>
-      <span v-if="sessionSummary?.truncationCount">truncated: {{ sessionSummary.truncationCount }}</span>
+      <span v-if="sessionSummary">폴더: {{ sessionSummary.cwdLabel }}</span>
+      <span v-if="sessionSummary">이벤트: {{ sessionSummary.latestSequence }}</span>
+      <span v-if="sessionSummary?.truncationCount">잘림: {{ sessionSummary.truncationCount }}</span>
     </div>
+    <p class="terminal-helper">터미널에 입력하려면 검은 출력 영역을 클릭한 뒤 키보드로 입력하세요.</p>
 
     <div
       ref="terminalHost"
@@ -61,6 +68,9 @@ const capability = ref<TerminalCapability | null>(null)
 const message = ref('')
 const messageKind = ref<'info' | 'error'>('info')
 const starting = ref(false)
+const recentOutput = ref('')
+const lastErrorOutput = ref('')
+const followOutput = ref(true)
 let unsubscribeEvent: (() => void) | null = null
 let resizeObserver: ResizeObserver | null = null
 let flushTimer: number | null = null
@@ -111,6 +121,8 @@ async function refreshSessions() {
     activeSessionId.value = ''
     lastSequence.value = 0
     terminal.value?.clear()
+    recentOutput.value = ''
+    lastErrorOutput.value = ''
   }
 }
 
@@ -188,6 +200,8 @@ async function replaySnapshot() {
   })
   applyOperationResult(result)
   terminal.value?.clear()
+  recentOutput.value = ''
+  lastErrorOutput.value = ''
   for (const event of result.snapshot?.events ?? []) {
     appendEvent(event)
   }
@@ -203,11 +217,15 @@ function appendEvent(event: TerminalEvent) {
   lastSequence.value = event.sequence
   if (event.kind === 'stdout' || event.kind === 'stderr' || event.kind === 'truncated' || event.kind === 'started' || event.kind === 'error') {
     const prefix = event.kind === 'error' ? '\r\n[오류] ' : event.kind === 'truncated' ? '\r\n[잘림] ' : ''
-    pendingOutput += `${prefix}${event.data ?? ''}`
+    const chunk = `${prefix}${event.data ?? ''}`
+    pendingOutput += chunk
+    rememberOutput(chunk, event.kind === 'stderr' || event.kind === 'error' || event.kind === 'truncated')
     scheduleFlush()
   }
   if (event.kind === 'exit') {
-    pendingOutput += `\r\n${event.data ?? '세션이 종료되었습니다.'}\r\n`
+    const chunk = `\r\n${event.data ?? '세션이 종료되었습니다.'}\r\n`
+    pendingOutput += chunk
+    if (event.exitCode && event.exitCode !== 0) rememberOutput(chunk, true)
     scheduleFlush()
   }
 }
@@ -215,10 +233,16 @@ function appendEvent(event: TerminalEvent) {
 function scheduleFlush() {
   if (flushTimer !== null) return
   flushTimer = window.setTimeout(() => {
-    terminal.value?.write(pendingOutput)
-    pendingOutput = ''
-    flushTimer = null
-  }, 25)
+      terminal.value?.write(pendingOutput)
+      if (followOutput.value) terminal.value?.scrollToBottom()
+      pendingOutput = ''
+      flushTimer = null
+    }, 25)
+}
+
+function rememberOutput(chunk: string, errorLike = false) {
+  recentOutput.value = `${recentOutput.value}${chunk}`.slice(-32000)
+  if (errorLike) lastErrorOutput.value = `${lastErrorOutput.value}${chunk}`.slice(-12000)
 }
 
 async function handlePaste(event: ClipboardEvent) {
@@ -272,6 +296,28 @@ function applyOperationResult(result: TerminalOperationResult) {
   }
 }
 
+async function copyLastError() {
+  await copyText(lastErrorOutput.value || recentOutput.value)
+}
+
+async function copyOutput() {
+  await copyText(recentOutput.value)
+}
+
+function clearTerminal() {
+  terminal.value?.clear()
+  recentOutput.value = ''
+  lastErrorOutput.value = ''
+  message.value = ''
+}
+
+async function copyText(text: string) {
+  if (!text || !navigator.clipboard) return
+  await navigator.clipboard.writeText(text)
+  messageKind.value = 'info'
+  message.value = '터미널 출력이 클립보드에 복사되었습니다.'
+}
+
 function terminalTitle(sessionKind: TerminalSessionKind): string {
   if (sessionKind === 'codex') return 'Codex CLI'
   if (sessionKind === 'claude') return 'Claude CLI'
@@ -302,6 +348,7 @@ function stateLabel(state: string): string {
   gap: 8px;
   min-height: 0;
   height: 100%;
+  min-width: 0;
 }
 
 .terminal-toolbar {
@@ -309,11 +356,12 @@ function stateLabel(state: string): string {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .terminal-toolbar > div:first-child { display: flex; flex-direction: column; gap: 2px; }
-.terminal-toolbar span, .terminal-details { font-size: 11px; opacity: 0.65; }
-.terminal-actions { display: flex; gap: 6px; }
+.terminal-toolbar span, .terminal-details, .terminal-helper { font-size: 11px; opacity: 0.78; }
+.terminal-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .terminal-actions button {
   background: var(--Highlight1);
   color: var(--mainColor);
@@ -329,26 +377,51 @@ function stateLabel(state: string): string {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
 }
 .terminal-details span {
   padding: 3px 7px;
   background: rgba(255,255,255,0.05);
   border-radius: 999px;
+  overflow-wrap: anywhere;
+}
+
+.terminal-helper {
+  margin: 0;
+  line-height: 1.35;
 }
 
 .terminal-host {
   flex: 1;
-  min-height: 130px;
+  min-height: 320px;
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: #0f1018;
   padding: 4px;
+  min-width: 0;
+}
+
+.terminal-pane.compact .terminal-host {
+  min-height: 220px;
+}
+
+:deep(.xterm),
+:deep(.xterm-screen),
+:deep(.xterm-viewport) {
+  height: 100%;
+}
+
+:deep(.xterm-viewport) {
+  overflow-y: auto !important;
 }
 
 .terminal-message {
   font-size: 12px;
   line-height: 1.45;
-  opacity: 0.78;
+  opacity: 0.9;
+  max-height: 92px;
+  overflow: auto;
+  white-space: pre-wrap;
 }
 .terminal-message[data-kind="error"] { color: #ff9c9c; }
 </style>

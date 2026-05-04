@@ -36,6 +36,8 @@ describe('agent workspace UI scaffold model', () => {
     expect(workspace.presets.find((preset) => preset.id === 'safe-apply-plan')?.approvalRequired).toBe(true)
     expect(workspace.agentPresets.map((preset) => preset.id)).toEqual(['codex', 'claude', 'generic'])
     expect(workspace.agentPresets[0].commandPreview).toContain('codex')
+    expect(workspace.agentPresets[0].command.args).not.toContain('--cwd')
+    expect(workspace.agentPresets[0].command.args).toEqual(['-c', 'features={}'])
     expect(workspace.agentPresets[0].executable.detectionStatus).toBe('unknown')
   })
 
@@ -44,25 +46,25 @@ describe('agent workspace UI scaffold model', () => {
     const allPrompts = workspace.agentPresets.flatMap((preset) => preset.starterPrompts.map((prompt) => prompt.prompt))
 
     expect(createCommandPreview('codex', ['--cwd', 'C:\\Game Project'])).toBe('codex --cwd "C:\\Game Project"')
-    expect(allPrompts.join('\n')).toContain('Do not run destructive commands')
-    expect(allPrompts.join('\n')).toContain('preserve line numbers')
-    expect(workspace.safetyGuidance.join('\n')).toContain('Do not paste full source dumps or secrets')
+    expect(allPrompts.join('\n')).toContain('파괴적인 명령은 실행하지 마')
+    expect(allPrompts.join('\n')).toContain('줄 번호')
+    expect(workspace.safetyGuidance.join('\n')).toContain('비밀값')
   })
 
   it('exposes MCP enabled/degraded/disconnected UX states and setup guidance', () => {
     const workspace = createAgentWorkspaceViewModel()
 
     expect(workspace.mcpStatusCards.map((state) => state.status)).toEqual(['enabled', 'degraded', 'disconnected'])
-    expect(mcpStatusLabel('degraded')).toBe('MCP degraded')
-    expect(providerNotReadyGuidance()).toContain('Provider is not ready')
-    expect(providerNotReadyGuidance()).toContain('credentials there only')
-    expect(noProjectGuidance()).toContain('No project is selected')
+    expect(mcpStatusLabel('degraded')).toBe('MCP 제한 모드')
+    expect(providerNotReadyGuidance()).toContain('번역 제공자')
+    expect(providerNotReadyGuidance()).toContain('설정 화면')
+    expect(noProjectGuidance()).toContain('선택된 프로젝트가 없습니다')
   })
 
   it('renders supported session states through stable labels', () => {
-    expect(sessionStateLabel('created')).toBe('Created')
-    expect(sessionStateLabel('running')).toBe('Running')
-    expect(sessionStateLabel('failed')).toBe('Failed')
+    expect(sessionStateLabel('created')).toBe('생성됨')
+    expect(sessionStateLabel('running')).toBe('실행 중')
+    expect(sessionStateLabel('failed')).toBe('실패')
   })
 
   it('keeps terminal output non-persistent by default while tracking latest transient event', () => {

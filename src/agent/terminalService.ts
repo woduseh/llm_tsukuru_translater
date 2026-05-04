@@ -20,6 +20,7 @@ import {
   TerminalSnapshot,
   TerminalSnapshotRequest,
 } from '../types/agentWorkspace';
+import { createTerminalCommandPreview, managedTerminalPresetForKind } from '../terminalCommandPresets';
 import { redactSecretLikeValues } from './contractsValidation';
 import { NativePtyAdapter, PtyAdapter, PtyProcess } from './ptyAdapter';
 
@@ -31,6 +32,7 @@ const LARGE_PASTE_CHARS = 2000;
 const DEFAULT_COLS = 100;
 const DEFAULT_ROWS = 30;
 const MAX_SESSIONS = 4;
+const EARLY_EXIT_FAILURE_MS = 2000;
 
 interface TerminalSessionInternal {
   sessionId: string;
@@ -143,7 +145,7 @@ export class TerminalService {
       executable: resolved.executable,
       executableLabel: resolved.executable,
       args: resolved.args,
-      commandPreview: [resolved.executable, ...resolved.args].join(' '),
+      commandPreview: createTerminalCommandPreview(resolved.executable, resolved.args),
       outputRetention: request.persistOutput ? 'persisted' : 'ephemeral',
       persistOutput: request.persistOutput === true,
       bridgeAttached: false,
@@ -171,8 +173,18 @@ export class TerminalService {
       session.disposers.push(proc.onData((data) => this.handleData(session, data)));
       session.disposers.push(proc.onExit((event) => {
         session.exitCode = event.exitCode;
-        session.state = session.state === 'killed' ? 'killed' : 'exited';
+        const earlyFailure = session.state !== 'killed'
+          && event.exitCode !== 0
+          && Date.now() - session.createdAt <= EARLY_EXIT_FAILURE_MS;
+        session.state = session.state === 'killed' ? 'killed' : earlyFailure ? 'failed' : 'exited';
         this.releaseProcessOwnership(session);
+        if (earlyFailure) {
+          this.recordEvent(session, {
+            kind: 'error',
+            errorCode: 'process-exited-early',
+            data: earlyExitGuidance(session, event.exitCode),
+          });
+        }
         this.recordEvent(session, {
           kind: 'exit',
           exitCode: event.exitCode,
@@ -284,11 +296,14 @@ export class TerminalService {
       return { executable, args: sanitizeArgs(request.args ?? []), cwd, ownerRoot: resolvedCwd.ownerRoot };
     }
 
-    if (request.kind === 'codex') {
-      return { executable: findExecutable(['codex.cmd', 'codex.exe', 'codex']), args: ['--cwd', cwd], cwd, ownerRoot: resolvedCwd.ownerRoot };
-    }
-    if (request.kind === 'claude') {
-      return { executable: findExecutable(['claude.cmd', 'claude.exe', 'claude']), args: [], cwd, ownerRoot: resolvedCwd.ownerRoot };
+    const preset = managedTerminalPresetForKind(request.kind);
+    if (preset) {
+      return {
+        executable: findExecutable(preset.executableNames),
+        args: sanitizeArgs(preset.args),
+        cwd,
+        ownerRoot: resolvedCwd.ownerRoot,
+      };
     }
     const shell = findExecutable(process.platform === 'win32' ? ['pwsh.exe', 'powershell.exe', 'cmd.exe'] : ['pwsh', 'bash', 'sh']);
     const args = path.basename(shell).toLowerCase().includes('powershell') || path.basename(shell).toLowerCase() === 'pwsh.exe'
@@ -499,6 +514,51 @@ function labelForKind(kind: TerminalSessionKind): string {
   if (kind === 'claude') return 'Claude';
   if (kind === 'custom') return 'Custom';
   return 'PowerShell';
+}
+
+function earlyExitGuidance(session: TerminalSessionInternal, exitCode: number): string {
+  const output = session.events.map((event) => event.data ?? '').join('\n');
+  const cwdHint = `작업 폴더: ${session.cwdLabel}`;
+  const commandHint = `실행 명령: ${session.commandPreview}`;
+  if (session.kind === 'codex' && /unexpected argument ['"]?--cwd/i.test(output)) {
+    return [
+      'Codex CLI가 지원하지 않는 --cwd 인자를 거부했습니다.',
+      '앱은 이제 --cwd를 넘기지 않고 터미널 작업 폴더(cwd)로 프로젝트를 지정합니다.',
+      cwdHint,
+      commandHint,
+      '다시 시작하거나 PowerShell 세션에서 codex --version을 확인하세요.',
+    ].join('\n');
+  }
+  if (session.kind === 'codex' && /config\.toml[\s\S]*features[\s\S]*expected a boolean|invalid type:\s*string[\s\S]*expected a boolean[\s\S]*features/i.test(output)) {
+    return [
+      'Codex 사용자 설정(config.toml)의 features 값이 문자열이라 Codex가 시작되지 못했습니다.',
+      '앱은 기본 실행에 -c features={} 호환 옵션을 적용하지만, 기존 세션 출력이라면 다시 시작해 보세요.',
+      '계속 실패하면 ~/.codex/config.toml의 [features] 항목에서 "true", "false", URL 같은 문자열 값을 true/false boolean 값으로 고쳐야 합니다.',
+      cwdHint,
+      commandHint,
+    ].join('\n');
+  }
+  if (session.kind === 'codex') {
+    return [
+      `Codex CLI가 시작 직후 종료되었습니다. exitCode=${exitCode}`,
+      cwdHint,
+      commandHint,
+      'Codex 설치 상태와 codex --version 결과를 확인하거나 PowerShell 세션으로 프로젝트 폴더에서 직접 실행해 보세요.',
+    ].join('\n');
+  }
+  if (session.kind === 'claude') {
+    return [
+      `Claude CLI가 시작 직후 종료되었습니다. exitCode=${exitCode}`,
+      cwdHint,
+      commandHint,
+      'Claude CLI 설치 상태와 claude --version 결과를 확인하거나 PowerShell 세션으로 프로젝트 폴더에서 직접 실행해 보세요.',
+    ].join('\n');
+  }
+  return [
+    `터미널 프로세스가 시작 직후 종료되었습니다. exitCode=${exitCode}`,
+    cwdHint,
+    commandHint,
+  ].join('\n');
 }
 
 function clampDimension(value: unknown, fallback: number, min: number, max: number): number {

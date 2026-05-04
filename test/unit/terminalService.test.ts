@@ -159,6 +159,104 @@ describe('TerminalService', () => {
     expect(created.session?.cwdLabel).toBe(secondRoot);
   });
 
+  it('launches Codex in the trusted cwd without adding unsupported --cwd args', () => {
+    const projectRoot = makeProject('codex-cwd');
+    const originalPath = process.env.PATH;
+    const binDir = makeExecutableDir('codex-bin', ['codex.cmd', 'codex.exe', 'codex']);
+    process.env.PATH = `${binDir}${path.delimiter}${originalPath || ''}`;
+    try {
+      const ctx = new AppContext();
+      ctx.terminalProjectRoots = [projectRoot];
+      const adapter = new FakePtyAdapter();
+      const service = new TerminalService(ctx, { ptyAdapter: adapter });
+
+      const created = service.create({
+        schemaVersion: 1,
+        requestId: 'req-codex-cwd',
+        kind: 'codex',
+        cwd: projectRoot,
+      });
+
+      expect(created.ok).toBe(true);
+      expect(adapter.lastSpawnOptions?.cwd).toBe(projectRoot);
+      expect(adapter.lastSpawnOptions?.args).toEqual(['-c', 'features={}']);
+      expect(created.session?.commandPreview).not.toContain('--cwd');
+      expect(created.session?.commandPreview).toContain('features={}');
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
+  it('marks early non-zero Codex exits as failed with actionable guidance', async () => {
+    const projectRoot = makeProject('codex-early-exit');
+    const originalPath = process.env.PATH;
+    const binDir = makeExecutableDir('codex-fail-bin', ['codex.cmd', 'codex.exe', 'codex']);
+    process.env.PATH = `${binDir}${path.delimiter}${originalPath || ''}`;
+    try {
+      const ctx = new AppContext();
+      ctx.terminalProjectRoots = [projectRoot];
+      const service = new TerminalService(ctx, {
+        ptyAdapter: new FakePtyAdapter({
+          script: [
+            { kind: 'stdout', data: "error: unexpected argument '--cwd' found\r\n" },
+            { kind: 'exit', exitCode: 2 },
+          ],
+        }),
+      });
+
+      const created = service.create({
+        schemaVersion: 1,
+        requestId: 'req-codex-early-exit',
+        kind: 'codex',
+        cwd: projectRoot,
+      });
+      await delay(20);
+
+      const snapshot = service.snapshot({ schemaVersion: 1, sessionId: created.session!.sessionId });
+      expect(snapshot.snapshot?.session.state).toBe('failed');
+      expect(snapshot.snapshot?.events.some((event) => event.kind === 'error' && event.errorCode === 'process-exited-early')).toBe(true);
+      expect(snapshot.snapshot?.events.map((event) => event.data).join('\n')).toContain('Codex CLI가 지원하지 않는 --cwd');
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
+  it('explains Codex config.toml features type errors instead of generic install guidance', async () => {
+    const projectRoot = makeProject('codex-config-error');
+    const originalPath = process.env.PATH;
+    const binDir = makeExecutableDir('codex-config-bin', ['codex.cmd', 'codex.exe', 'codex']);
+    process.env.PATH = `${binDir}${path.delimiter}${originalPath || ''}`;
+    try {
+      const ctx = new AppContext();
+      ctx.terminalProjectRoots = [projectRoot];
+      const service = new TerminalService(ctx, {
+        ptyAdapter: new FakePtyAdapter({
+          script: [
+            { kind: 'stdout', data: 'Error loading config.toml: invalid type: string "http://localhost:39464/mcp", expected a boolean\r\nin `features`\r\n' },
+            { kind: 'exit', exitCode: 1 },
+          ],
+        }),
+      });
+
+      const created = service.create({
+        schemaVersion: 1,
+        requestId: 'req-codex-config-error',
+        kind: 'codex',
+        cwd: projectRoot,
+      });
+      await delay(20);
+
+      const snapshot = service.snapshot({ schemaVersion: 1, sessionId: created.session!.sessionId });
+      const output = snapshot.snapshot?.events.map((event) => event.data).join('\n') ?? '';
+      expect(snapshot.snapshot?.session.state).toBe('failed');
+      expect(output).toContain('Codex 사용자 설정(config.toml)의 features 값');
+      expect(output).toContain('-c features={}');
+      expect(output).not.toContain('Codex 설치 상태');
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
   it('persists only redacted terminal transcripts when explicitly enabled', async () => {
     const projectRoot = makeProject('persisted');
     const ctx = new AppContext();
@@ -242,6 +340,15 @@ describe('TerminalService', () => {
 function makeProject(name: string): string {
   const dir = path.join(tmpRoot, name);
   fs.mkdirSync(dir, { recursive: true });
+  return fs.realpathSync.native(dir);
+}
+
+function makeExecutableDir(name: string, executableNames: string[]): string {
+  const dir = path.join(tmpRoot, name);
+  fs.mkdirSync(dir, { recursive: true });
+  for (const executableName of executableNames) {
+    fs.writeFileSync(path.join(dir, executableName), '', 'utf8');
+  }
   return fs.realpathSync.native(dir);
 }
 
