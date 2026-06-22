@@ -19,12 +19,35 @@
           :key="preset.id"
           type="button"
           class="preset"
+          :class="{ active: preset.id === activeCommandPresetId }"
           :data-risk="preset.risk"
+          :aria-pressed="preset.id === activeCommandPresetId"
+          @click="selectCommandPreset(preset)"
         >
           <strong>{{ preset.title }}</strong>
           <span>{{ preset.description }}</span>
           <small>{{ riskLevelLabel(preset.risk) }} · {{ preset.estimated }}</small>
         </button>
+
+        <div v-if="activeCommandPreset" class="preset-detail" :data-risk="activeCommandPreset.risk">
+          <strong>{{ activeCommandPreset.title }}</strong>
+          <p>{{ activeCommandPreset.description }}</p>
+          <div class="preset-badges">
+            <span>{{ riskLevelLabel(activeCommandPreset.risk) }}</span>
+            <span>{{ activeCommandPreset.estimated }}</span>
+            <span v-if="activeCommandPreset.projectRequired">프로젝트 필요</span>
+            <span v-if="activeCommandPreset.providerRequired">제공자 필요</span>
+            <span v-if="activeCommandPreset.approvalRequired">승인 필요</span>
+          </div>
+          <div class="preset-detail-actions">
+            <button v-if="recommendedPrompt" type="button" @click="useStarterPrompt(recommendedPrompt)">
+              추천 프롬프트 사용
+            </button>
+            <button v-if="activeCommandPreset.id === 'power-terminal'" type="button" @click="focusShellTerminal">
+              셸 터미널로 이동
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="panel terminal-pane">
@@ -48,7 +71,9 @@
         <div class="command-preview">
           <strong>{{ activeAgentPreset.description }}</strong>
           <code>{{ activeAgentPreset.commandPreview }}</code>
-          <p>{{ activeAgentPreset.executable.detectionMessage }}</p>
+          <p class="exe-status" :data-exe-status="activeAgentPreset.executable.detectionStatus">
+            {{ activeAgentPreset.executable.detectionMessage }}
+          </p>
           <p>{{ activeAgentPreset.mcpMessage }}</p>
         </div>
         <div class="starter-prompts">
@@ -85,7 +110,28 @@
       </div>
 
       <div class="panel context-pane">
-        <h2>활동 및 승인</h2>
+        <h2>환경 상태</h2>
+        <ul v-if="liveStatus" class="env-status">
+          <li :data-ok="liveStatus.project.selected">
+            <span class="env-key">프로젝트</span>
+            <span class="env-val">{{ liveStatus.project.label }}</span>
+          </li>
+          <li :data-ok="liveStatus.provider.ready">
+            <span class="env-key">제공자</span>
+            <span class="env-val">{{ liveStatus.provider.message }}</span>
+          </li>
+          <li :data-ok="liveStatus.terminal.available">
+            <span class="env-key">터미널</span>
+            <span class="env-val">{{ liveStatus.terminal.message }}</span>
+          </li>
+          <li :data-ok="liveStatus.mcp.readonlyServerAvailable">
+            <span class="env-key">MCP</span>
+            <span class="env-val">{{ liveStatus.mcp.message }}</span>
+          </li>
+        </ul>
+        <p v-else class="env-status-loading">환경 상태 확인 중…</p>
+
+        <h2 class="timeline-heading">활동 및 승인</h2>
         <ol class="timeline">
           <li v-for="item in workspace.timeline" :key="item.id" :data-status="item.status">
             <span>{{ timelineStatusLabel(item.status) }}</span>
@@ -111,28 +157,139 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import TitleBar from '../components/TitleBar.vue'
 import AgentTerminalPane from '../components/AgentTerminalPane.vue'
 import { api } from '../composables/useIpc'
 import {
   createAgentWorkspaceViewModel,
+  createExecutableDetectionHint,
+  deriveAgentTimeline,
+  derivePresetMcpStatus,
   mcpStatusLabel,
   sessionStateLabel,
   type AgentCliPreset,
+  type AgentCommandPreset,
   type CommandRiskLevel,
   type AgentStarterPrompt,
 } from '../agentWorkspaceModel'
+import type { AgentExecutableDetectionResult } from '../../agent/agentExecutableDetection'
+import type { AgentWorkspaceStatus } from '../../agent/agentWorkspaceStatus'
 
 const workspace = reactive(createAgentWorkspaceViewModel())
 const activeAgentPresetId = ref<AgentCliPreset['id']>(workspace.agentPresets[0].id)
+const activeCommandPresetId = ref('')
 const selectedPrompt = ref('')
+const liveStatus = ref<AgentWorkspaceStatus | null>(null)
+
+// Maps each command preset to the starter prompt that best fits its workflow.
+const COMMAND_PRESET_PROMPT: Record<string, string | undefined> = {
+  'guided-translation': 'first-translation',
+  'quality-review': 'quality-review',
+  'repair-line-shift': 'safe-apply',
+  'safe-apply-plan': 'safe-apply',
+  'power-terminal': undefined,
+}
 const activeSession = computed(() => {
   return workspace.drawer.sessions.find((session) => session.id === workspace.drawer.activeSessionId) ?? workspace.drawer.sessions[0]
 })
 const activeAgentPreset = computed(() => {
   return workspace.agentPresets.find((preset) => preset.id === activeAgentPresetId.value) ?? workspace.agentPresets[0]
 })
+const activeCommandPreset = computed(() => {
+  return workspace.presets.find((preset) => preset.id === activeCommandPresetId.value) ?? null
+})
+const recommendedPrompt = computed(() => {
+  const preset = activeCommandPreset.value
+  if (!preset) return null
+  const promptId = COMMAND_PRESET_PROMPT[preset.id]
+  if (!promptId) return null
+  return activeAgentPreset.value.starterPrompts.find((prompt) => prompt.id === promptId) ?? null
+})
+
+function selectCommandPreset(preset: AgentCommandPreset) {
+  activeCommandPresetId.value = activeCommandPresetId.value === preset.id ? '' : preset.id
+}
+
+function focusShellTerminal() {
+  const shellSession = workspace.drawer.sessions.find((session) => session.kind === 'shell')
+  if (shellSession) workspace.drawer.activeSessionId = shellSession.id
+}
+
+let statusUnsub: (() => void) | null = null
+let refreshing = false
+
+onMounted(async () => {
+  await refreshAll()
+  // Re-derive when terminal sessions change (capability may flip) and when the
+  // window regains focus (the user may have selected a project elsewhere).
+  statusUnsub = api.terminal.onSessions(() => { void refreshAll() })
+  window.addEventListener('focus', handleWindowFocus)
+})
+
+onUnmounted(() => {
+  if (statusUnsub) statusUnsub()
+  window.removeEventListener('focus', handleWindowFocus)
+})
+
+function handleWindowFocus() {
+  void refreshAll()
+}
+
+async function refreshAll() {
+  if (refreshing) return
+  refreshing = true
+  try {
+    await Promise.all([detectExecutables(), refreshStatus()])
+    applyLiveMcpStatus()
+  } finally {
+    refreshing = false
+  }
+}
+
+function applyLiveMcpStatus() {
+  const readonlyServerAvailable = liveStatus.value?.mcp.readonlyServerAvailable ?? false
+  const projectSelected = liveStatus.value?.project.selected ?? false
+  for (const preset of workspace.agentPresets) {
+    preset.mcpStatus = derivePresetMcpStatus(preset.id, {
+      readonlyServerAvailable,
+      executableAvailable: preset.executable.detectionStatus === 'available',
+      projectSelected,
+    })
+  }
+}
+
+async function refreshStatus() {
+  try {
+    const status = (await api.invoke('getAgentWorkspaceStatus')) as AgentWorkspaceStatus | undefined
+    if (!status) return
+    liveStatus.value = status
+    workspace.timeline = deriveAgentTimeline({
+      projectSelected: status.project.selected,
+      providerReady: status.provider.ready,
+    })
+  } catch {
+    // Best-effort; the default (waiting) timeline stays in place on failure.
+  }
+}
+
+async function detectExecutables() {
+  try {
+    const payload = workspace.agentPresets.map((preset) => ({
+      id: preset.id,
+      executableNames: preset.executable.executableNames,
+    }))
+    const result = (await api.invoke('detectAgentExecutables', payload)) as AgentExecutableDetectionResult | undefined
+    if (!result || !Array.isArray(result.results)) return
+    for (const entry of result.results) {
+      const preset = workspace.agentPresets.find((candidate) => candidate.id === entry.id)
+      if (!preset) continue
+      preset.executable = createExecutableDetectionHint(preset.executable.executableNames, entry.status)
+    }
+  } catch {
+    // Detection is best-effort; leave the default "not yet probed" hint on failure.
+  }
+}
 
 function openSettings() {
   api.send('settings')
@@ -231,10 +388,45 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   flex-direction: column;
   gap: 4px;
   font-family: inherit;
-  cursor: default;
+  cursor: pointer;
   min-width: 0;
 }
+.preset:hover { border-color: rgba(124,111,219,0.5); }
+.preset.active { border-color: rgba(124,111,219,0.7); background: rgba(124,111,219,0.16); }
 .preset strong, .preset span, .preset small { overflow-wrap: anywhere; }
+
+.preset-detail {
+  margin-top: 6px;
+  padding: 11px;
+  border: 1px solid rgba(124,111,219,0.4);
+  border-radius: var(--radius-md);
+  background: rgba(124,111,219,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.preset-detail strong { font-size: 13px; }
+.preset-detail p { font-size: 11px; opacity: 0.85; line-height: 1.4; overflow-wrap: anywhere; }
+.preset-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+.preset-badges span {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  opacity: 0.9;
+}
+.preset-detail-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.preset-detail-actions button {
+  background: var(--Highlight1);
+  color: var(--mainColor);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
 .preset span { font-size: 11px; opacity: 0.82; line-height: 1.35; }
 .preset small { font-size: 10px; opacity: 0.72; }
 
@@ -264,6 +456,19 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
 .command-preview { display: flex; flex-direction: column; gap: 7px; }
 .command-preview code, .prompt-preview { font-family: Consolas, 'Courier New', monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .command-preview p { opacity: 0.82; line-height: 1.4; overflow-wrap: anywhere; }
+.exe-status { position: relative; padding-left: 14px; }
+.exe-status::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8a8f9c;
+}
+.exe-status[data-exe-status="available"]::before { background: #5fd08a; }
+.exe-status[data-exe-status="missing"]::before { background: #ff9c9c; }
 .starter-prompts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .starter-prompts button {
   background: var(--Highlight1);
@@ -299,6 +504,34 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   overflow: hidden;
 }
 .terminal-placeholder p { margin-top: 8px; opacity: 0.82; font-size: 12px; line-height: 1.5; }
+
+.env-status { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.env-status li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 7px 9px 7px 20px;
+  position: relative;
+  background: var(--Highlight1);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  min-width: 0;
+}
+.env-status li::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 11px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff9c9c;
+}
+.env-status li[data-ok="true"]::before { background: #5fd08a; }
+.env-key { flex: 0 0 auto; font-weight: 700; opacity: 0.85; }
+.env-val { flex: 1 1 auto; opacity: 0.82; overflow-wrap: anywhere; }
+.env-status-loading { font-size: 11px; opacity: 0.7; }
+.timeline-heading { margin-top: 14px; }
 
 .timeline { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .timeline li { padding: 9px; background: var(--Highlight1); border-radius: var(--radius-sm); font-size: 12px; }

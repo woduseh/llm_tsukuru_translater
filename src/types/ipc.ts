@@ -11,6 +11,7 @@ export const SEND_CHANNELS = [
    'compareReady', 'verifyReady',
    'llmSettingsReady', 'settingsReady', 'mainReady',
    'terminalCreate', 'terminalInput', 'terminalResize', 'terminalKill', 'terminalList', 'terminalSnapshot',
+   'detectAgentExecutables', 'getAgentWorkspaceStatus',
 ] as const;
 
 export const RECEIVE_CHANNELS = [

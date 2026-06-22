@@ -132,7 +132,7 @@ function run() {
     Swal.fire({ icon: 'warning', text: '추출 또는 적용을 선택하세요.' })
     return
   }
-  const dir = window.nodeBuffer.toBase64(folderPath.value.replace('\\', '/'))
+  const dir = window.nodeBuffer.toBase64(folderPath.value.replaceAll('\\', '/'))
   if (mode.value === 0) {
     running.value = true
     api.send('extract', { dir, ...config })
@@ -329,7 +329,7 @@ onMounted(() => {
       cancelButtonText: '취소',
     })
     if (isConfirmed) {
-      const dir = window.nodeBuffer.toBase64(folderPath.value.replace('\\', '/'))
+      const dir = window.nodeBuffer.toBase64(folderPath.value.replaceAll('\\', '/'))
       api.send('extract', { dir, ...config, force: true })
     } else {
       running.value = false

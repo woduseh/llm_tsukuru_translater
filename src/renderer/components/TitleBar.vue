@@ -1,5 +1,5 @@
 <template>
-  <div class="titlebar" :style="{ WebkitAppRegion: 'drag' }">
+  <div class="titlebar">
     <div class="progress-bar" :style="{ width: progressWidth }"></div>
     <div class="loading-text" v-show="progress > 0">
       {{ loadingTag }}{{ loadingTag ? ' · ' : '' }}{{ progress.toFixed(1) }}% {{ estimatedTime }}

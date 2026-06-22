@@ -1,0 +1,30 @@
+# Normalize line endings to avoid noisy whole-file diffs across OSes.
+# Text files are stored as LF in the repo and checked out as LF.
+* text=auto eol=lf
+
+# Scripts that must keep CRLF on Windows.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Treat known binary assets as binary (never normalize/diff).
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.icns  binary
+*.node  binary
+*.exe   binary
+*.dll   binary
+*.lib   binary
+*.pdb   binary
+*.dat   binary
+*.bin   binary
+*.pak   binary
+*.blockmap binary
+*.zip   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary

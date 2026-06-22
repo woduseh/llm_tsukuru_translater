@@ -8,6 +8,7 @@ import { registerSettingsHandlers } from './src/ipc/settingsHandler';
 import { registerTranslateHandlers } from './src/ipc/translateHandler';
 import { registerToolsHandlers } from './src/ipc/toolsHandler';
 import { registerTerminalHandlers } from './src/ipc/terminalHandler';
+import { registerAgentHandlers } from './src/ipc/agentHandler';
 import { registerWolfHandlers } from './src/ts/wolf/main';
 import { initFontIPC } from './src/ts/rpgmv/fonts';
 import { initExtentions } from './src/ts/libs/extentions';
@@ -24,6 +25,7 @@ registerSettingsHandlers(ctx);
 registerTranslateHandlers(ctx);
 registerToolsHandlers(ctx);
 registerTerminalHandlers(ctx, terminalService);
+registerAgentHandlers(ctx);
 registerWolfHandlers(ctx);
 initFontIPC();
 

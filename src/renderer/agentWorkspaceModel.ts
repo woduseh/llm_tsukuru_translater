@@ -77,6 +77,19 @@ export interface McpStatusCard {
   description: string
 }
 
+export type TimelineStatus = 'ready' | 'waiting' | 'mocked'
+
+export interface AgentTimelineStep {
+  id: string
+  title: string
+  status: TimelineStatus
+}
+
+export interface AgentWorkspaceLiveSignals {
+  projectSelected: boolean
+  providerReady: boolean
+}
+
 export interface AgentWorkspaceViewModel {
   route: string
   title: string
@@ -86,7 +99,7 @@ export interface AgentWorkspaceViewModel {
   mcpStatusCards: McpStatusCard[]
   safetyGuidance: string[]
   drawer: AgentTerminalDrawerState
-  timeline: Array<{ id: string; title: string; status: 'ready' | 'waiting' | 'mocked' }>
+  timeline: AgentTimelineStep[]
 }
 
 export const SESSION_STATE_LABELS: Record<AgentTerminalSessionState, string> = {
@@ -377,6 +390,49 @@ export function noProjectGuidance(): string {
   return '선택된 프로젝트가 없습니다. 에이전트 작업을 실행하기 전에 RPG Maker MV/MZ 또는 Wolf RPG 프로젝트를 선택하세요.'
 }
 
+/**
+ * Derive timeline step states from live workspace signals. Steps light up as
+ * their prerequisites are met: project selection unlocks extraction preview,
+ * and a ready provider unlocks the quality/approval/apply steps.
+ */
+export function deriveAgentTimeline(signals: AgentWorkspaceLiveSignals): AgentTimelineStep[] {
+  const ready = (condition: boolean): TimelineStatus => (condition ? 'ready' : 'waiting')
+  const projectReady = signals.projectSelected
+  const fullyReady = signals.projectSelected && signals.providerReady
+  return [
+    { id: 'project-selected', title: '프로젝트 선택', status: ready(projectReady) },
+    { id: 'extract-preview', title: '추출 미리보기', status: ready(projectReady) },
+    { id: 'quality-review', title: '품질 점검', status: ready(fullyReady) },
+    { id: 'approval-gate', title: '승인 대기', status: ready(fullyReady) },
+    { id: 'safe-apply', title: '안전 적용', status: ready(fullyReady) },
+  ]
+}
+
+export interface AgentMcpSignals {
+  /** The in-process read-only MCP server can be constructed. */
+  readonlyServerAvailable: boolean
+  /** The preset's CLI executable was found on PATH. */
+  executableAvailable: boolean
+  /** A trusted project root is currently selected. */
+  projectSelected: boolean
+}
+
+/**
+ * Derive a CLI preset's live MCP connection status from real signals.
+ * The generic shell never auto-attaches MCP; managed CLIs reach 'enabled'
+ * only when their executable is present and a project is selected, and fall
+ * back to 'degraded' (guidance/preview only) while prerequisites are missing.
+ */
+export function derivePresetMcpStatus(
+  presetId: AgentCliPreset['id'],
+  signals: AgentMcpSignals,
+): McpConnectionStatus {
+  if (presetId === 'generic') return 'disconnected'
+  if (!signals.readonlyServerAvailable) return 'disconnected'
+  if (signals.executableAvailable && signals.projectSelected) return 'enabled'
+  return 'degraded'
+}
+
 export function createAgentWorkspaceViewModel(cwdLabel?: string): AgentWorkspaceViewModel {
   return {
     route: AGENT_WORKSPACE_ROUTE,
@@ -387,13 +443,7 @@ export function createAgentWorkspaceViewModel(cwdLabel?: string): AgentWorkspace
     mcpStatusCards: MCP_STATUS_CARDS,
     safetyGuidance: AGENT_SAFETY_GUIDANCE,
     drawer: createAgentTerminalDrawerState(cwdLabel),
-    timeline: [
-      { id: 'project-selected', title: '프로젝트 선택', status: 'waiting' },
-      { id: 'extract-preview', title: '추출 미리보기', status: 'mocked' },
-      { id: 'quality-review', title: '품질 점검', status: 'mocked' },
-      { id: 'approval-gate', title: '승인 대기', status: 'ready' },
-      { id: 'safe-apply', title: '안전 적용', status: 'waiting' },
-    ],
+    timeline: deriveAgentTimeline({ projectSelected: false, providerReady: false }),
   }
 }
 

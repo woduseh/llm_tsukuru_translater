@@ -299,7 +299,7 @@ function loadFiles(dir: string) {
       if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1)
       if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
       const orig = JSON.parse(origData), trans = JSON.parse(transData)
-      const issues: VerifyIssue[] = window.verify.verifyJsonIntegrity(orig, trans)
+      const issues = window.verify.verifyJsonIntegrity(orig, trans) as VerifyIssue[]
       files.value.push({
         name, origPath, transPath, issues,
         errorCount: issues.filter(i => i.severity === 'error').length,
@@ -406,7 +406,7 @@ function refreshFileIssues(idx: number) {
     if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1)
     if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
     const orig = JSON.parse(origData), trans = JSON.parse(transData)
-    const issues: VerifyIssue[] = window.verify.verifyJsonIntegrity(orig, trans)
+    const issues = window.verify.verifyJsonIntegrity(orig, trans) as VerifyIssue[]
     f.issues = issues
     f.errorCount = issues.filter(i => i.severity === 'error').length
     f.warningCount = issues.filter(i => i.severity === 'warning').length

@@ -17,3 +17,7 @@ audit_report.html
 /main.js
 /src/**/*.js
 /vitest.config.js
+
+# test scratch output (created by the vitest suite at run time)
+/artifacts/unit/
+/test/.tmp-*/

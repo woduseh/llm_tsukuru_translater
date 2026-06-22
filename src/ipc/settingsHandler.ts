@@ -26,6 +26,9 @@ export function registerSettingsHandlers(ctx: AppContext) {
       icon: path.join(PROJECT_ROOT, 'res', 'icon.png'),
     })
     ctx.settingsWindow.setMenu(null)
+    // Unlock the parent page on any close path (native X, Alt+F4, programmatic),
+    // not only when the in-page 취소/적용 buttons fire applysettings/closesettings.
+    ctx.settingsWindow.on('closed', () => worked(ctx))
     loadRoute(ctx.settingsWindow, '/settings')
     ctx.settingsWindow.webContents.on('did-finish-load', function () {
       ctx.settingsWindow!.show();
