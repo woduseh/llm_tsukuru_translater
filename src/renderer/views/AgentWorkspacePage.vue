@@ -105,7 +105,7 @@
           </button>
         </div>
         <div class="terminal-placeholder">
-          <AgentTerminalPane :key="activeSession.id" :kind="activeSession.kind" :title="activeSession.label" />
+          <AgentTerminalPane :key="activeSession.id" :kind="activeSession.kind" :title="activeSession.label" :compact="true" />
         </div>
       </div>
 
@@ -326,34 +326,43 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
 .agent-workspace {
   flex: 1;
   overflow: auto;
-  padding: 20px 24px 32px;
+  padding: 16px 18px 24px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   min-width: 0;
 }
 
 .workspace-hero {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px;
+  padding: 12px 16px;
   background: linear-gradient(135deg, rgba(124,111,219,0.18), rgba(42,43,61,0.72));
   border: var(--border);
   border-radius: var(--radius-lg);
 }
 
 .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 1.4px; opacity: 0.5; }
-.workspace-hero h1 { margin: 4px 0; font-size: 24px; }
-.workspace-hero p:last-child { opacity: 0.68; font-size: 13px; }
+.workspace-hero h1 { margin: 2px 0; font-size: 20px; }
+.workspace-hero p:last-child { opacity: 0.68; font-size: 12px; }
 
+/* Base layout is tuned for the app's fixed 800px-wide window: two info
+   columns up top, the agent/terminal section full-width below. */
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.45fr) minmax(0, 0.95fr);
-  grid-template-areas: "navigator terminal context";
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "navigator context"
+    "terminal terminal";
+  gap: 12px;
   min-height: 0;
+  /* Do not let the flex parent compress the grid below its content height;
+     otherwise the auto row tracks shrink and the taller column overflows
+     into the row below it (panels overlap). The parent scrolls instead. */
+  flex-shrink: 0;
   align-items: start;
 }
 
@@ -376,7 +385,7 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
 .terminal-pane { grid-area: terminal; }
 .context-pane { grid-area: context; }
 .navigator, .context-pane { display: flex; flex-direction: column; gap: 8px; }
-.terminal-pane { display: flex; flex-direction: column; min-height: clamp(520px, 72vh, 840px); }
+.terminal-pane { display: flex; flex-direction: column; min-height: 0; }
 .preset {
   text-align: left;
   background: var(--Highlight1);
@@ -495,7 +504,8 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
 
 .terminal-placeholder {
   flex: 1;
-  min-height: clamp(360px, 50vh, 680px);
+  height: 300px;
+  min-height: 300px;
   border-radius: var(--radius-md);
   background: #0f1018;
   padding: 10px;
@@ -503,6 +513,9 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   min-width: 0;
   overflow: hidden;
 }
+/* Let the embedded terminal flex within the placeholder instead of forcing
+   its own (taller) min-height, which would overflow and clip the toolbar. */
+.terminal-placeholder :deep(.terminal-host) { min-height: 0; }
 .terminal-placeholder p { margin-top: 8px; opacity: 0.82; font-size: 12px; line-height: 1.5; }
 
 .env-status { list-style: none; display: flex; flex-direction: column; gap: 6px; }
@@ -544,36 +557,31 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
 .safety-list { padding-left: 18px; }
 .safety-list li + li { margin-top: 4px; }
 
-@media (max-width: 1200px) {
+/* Roomy three-column layout for wide windows (only if the window is ever
+   made resizable); never triggers in the default 800px window. */
+@media (min-width: 1200px) {
   .workspace-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas:
-      "terminal terminal"
-      "navigator context";
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.45fr) minmax(0, 0.95fr);
+    grid-template-areas: "navigator terminal context";
   }
-  .terminal-pane {
-    min-height: clamp(460px, 62vh, 720px);
+  .terminal-placeholder {
+    height: clamp(360px, 48vh, 560px);
+    min-height: 0;
   }
 }
 
-@media (max-width: 900px) {
+/* Very narrow windows: stack everything in a single column. */
+@media (max-width: 680px) {
   .workspace-hero {
     align-items: flex-start;
     flex-direction: column;
   }
   .workspace-grid {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 1fr;
     grid-template-areas:
-      "terminal"
       "navigator"
-      "context";
+      "context"
+      "terminal";
   }
-  .terminal-placeholder {
-    min-height: 360px;
-  }
-}
-
-@media (max-width: 840px) {
-  .workspace-grid { grid-template-columns: 1fr; }
 }
 </style>
