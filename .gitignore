@@ -6,6 +6,7 @@ dist/
 dist-renderer/
 dist-main/
 *.txt
+!test/fixtures/harness/ui/compare-project/**/*.txt
 *.js.map
 *.css.map
 debug_crash.log
