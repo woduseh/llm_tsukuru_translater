@@ -48,27 +48,44 @@ export class WorkspaceService {
 
   constructor(projectRoot: string) {
     this.projectRoot = path.resolve(projectRoot);
+    if (!fs.existsSync(this.projectRoot)) {
+      throw new Error(`Agent project root does not exist: ${this.projectRoot}`);
+    }
+    if (!fs.statSync(this.projectRoot).isDirectory()) {
+      throw new Error(`Agent project root is not a directory: ${this.projectRoot}`);
+    }
     this.workspaceRoot = path.join(this.projectRoot, AGENT_WORKSPACE_DIRECTORY);
   }
 
-  ensureWorkspace(options: Omit<WorkspaceServiceOptions, 'projectRoot'> = {}): AgentWorkspaceDescriptor {
-    fs.mkdirSync(this.projectRoot, { recursive: true });
-    fs.mkdirSync(this.workspaceRoot, { recursive: true });
-    for (const dir of AGENT_WORKSPACE_SUBDIRECTORIES) {
-      fs.mkdirSync(path.join(this.workspaceRoot, dir), { recursive: true });
-    }
+  describeWorkspace(options: Omit<WorkspaceServiceOptions, 'projectRoot'> = {}): AgentWorkspaceDescriptor {
     const manifest = this.createManifest(options);
-    const manifestPath = path.join(this.workspaceRoot, 'agent-project.json');
-    const manifestMirrorPath = path.join(this.workspaceRoot, 'manifests', 'agent-project.json');
-    atomicWriteJsonFile(manifestPath, manifest, 2);
-    atomicWriteJsonFile(manifestMirrorPath, manifest, 2);
     return {
       projectRoot: this.projectRoot,
       workspaceRoot: this.workspaceRoot,
-      manifestPath,
-      manifestMirrorPath,
+      manifestPath: path.join(this.workspaceRoot, 'agent-project.json'),
+      manifestMirrorPath: path.join(this.workspaceRoot, 'manifests', 'agent-project.json'),
       manifest,
     };
+  }
+
+  ensureWorkspaceDirectories(subdirectories: readonly (typeof AGENT_WORKSPACE_SUBDIRECTORIES)[number][] = []): void {
+    fs.mkdirSync(this.workspaceRoot, { recursive: true });
+    for (const dir of subdirectories) {
+      fs.mkdirSync(path.join(this.workspaceRoot, dir), { recursive: true });
+    }
+  }
+
+  writeManifest(options: Omit<WorkspaceServiceOptions, 'projectRoot'> = {}): AgentWorkspaceDescriptor {
+    const descriptor = this.describeWorkspace(options);
+    this.ensureWorkspaceDirectories(['manifests']);
+    atomicWriteJsonFile(descriptor.manifestPath, descriptor.manifest, 2);
+    atomicWriteJsonFile(descriptor.manifestMirrorPath, descriptor.manifest, 2);
+    return descriptor;
+  }
+
+  ensureWorkspace(options: Omit<WorkspaceServiceOptions, 'projectRoot'> = {}): AgentWorkspaceDescriptor {
+    this.ensureWorkspaceDirectories(AGENT_WORKSPACE_SUBDIRECTORIES);
+    return this.writeManifest(options);
   }
 
   createManifest(options: Omit<WorkspaceServiceOptions, 'projectRoot'> = {}): AgentProjectManifest {

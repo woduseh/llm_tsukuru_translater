@@ -120,6 +120,7 @@ export class JobService {
     });
     job.events.push(event.eventId);
     const jobPath = path.join(this.jobsRoot, `${job.jobId}.json`);
+    fs.mkdirSync(this.jobsRoot, { recursive: true });
     atomicWriteJsonFile(jobPath, job, 2);
     const artifact = this.options.artifactService.writeJsonArtifact('job', job.jobId, job as unknown as JsonObject, job.jobId);
     if (!job.artifactPaths.includes(artifact.path)) {

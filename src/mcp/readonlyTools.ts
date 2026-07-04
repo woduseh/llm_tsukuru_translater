@@ -8,7 +8,7 @@ import {
   AGENT_SKILL_RECIPES,
   createSafeRecipePayload,
   createTranslationWorkflowPayload,
-  explainReadonlyTool,
+  explainTool,
   type AgentSkillGuideTopic,
 } from '../agent/agentSkillGuide';
 import { redactSecretLikeValues } from '../agent/contractsValidation';
@@ -25,31 +25,37 @@ import { LLM_PROVIDER_SECRET_SETTING_KEYS } from '../types/llmProviderContract';
 import { listProviderRegistryEntries, validateProviderReadiness } from '../ts/libs/providerRegistry';
 import { scanProjectTranslationProfile } from '../ts/libs/projectProfile';
 
-export type ReadonlyToolHandler = (args: JsonObject, context: ReadonlyToolContext) => JsonObject;
+export type McpToolHandler = (args: JsonObject, context: McpToolContext) => JsonObject;
 
-export interface ReadonlyToolContext {
+export interface McpToolContext {
   requestId: string;
   service: AgentService;
   settings?: Partial<AppSettings> & Record<string, unknown>;
+  toolDefinitions: McpToolDefinition[];
 }
 
-interface RegisteredReadonlyTool {
+interface RegisteredMcpTool {
   definition: McpToolDefinition;
-  handler: ReadonlyToolHandler;
+  handler: McpToolHandler;
 }
 
-export class McpReadonlyToolRegistry {
-  private readonly tools = new Map<string, RegisteredReadonlyTool>();
+export class McpToolRegistry {
+  private readonly tools = new Map<string, RegisteredMcpTool>();
 
   constructor(
     private readonly service: AgentService,
-    private readonly options: { settings?: Partial<AppSettings> & Record<string, unknown> } = {},
+    private readonly options: {
+      settings?: Partial<AppSettings> & Record<string, unknown>;
+      allowedTiers?: readonly PermissionTier[];
+      excludedTools?: readonly string[];
+    } = {},
   ) {}
 
-  register(definition: McpToolDefinition, handler: ReadonlyToolHandler): void {
-    if (definition.permissionTier !== 'readonly') {
-      throw new Error(`MCP read-only registry cannot register ${definition.name} with ${definition.permissionTier}`);
+  register(definition: McpToolDefinition, handler: McpToolHandler): void {
+    if (this.options.allowedTiers && !this.options.allowedTiers.includes(definition.permissionTier)) {
+      throw new Error(`MCP registry cannot register ${definition.name} with ${definition.permissionTier}`);
     }
+    if (this.options.excludedTools?.includes(definition.name)) return;
     this.tools.set(definition.name, { definition, handler });
   }
 
@@ -61,7 +67,12 @@ export class McpReadonlyToolRegistry {
     const tool = this.tools.get(name);
     if (!tool) return failureEnvelope(requestId, name, 'readonly', `Unknown MCP tool: ${name}`);
     try {
-      const payload = tool.handler(args, { requestId, service: this.service, settings: this.options.settings });
+      const payload = tool.handler(args, {
+        requestId,
+        service: this.service,
+        settings: this.options.settings,
+        toolDefinitions: this.listTools(),
+      });
       return okEnvelope(requestId, name, tool.definition.permissionTier, payload);
     } catch (error) {
       return failureEnvelope(requestId, name, tool.definition.permissionTier, error instanceof Error ? error.message : String(error));
@@ -69,18 +80,45 @@ export class McpReadonlyToolRegistry {
   }
 }
 
+export class McpReadonlyToolRegistry extends McpToolRegistry {}
+export class McpOfflineToolRegistry extends McpToolRegistry {}
+
 export function createMcpReadonlyToolRegistry(
   service: AgentService,
   options: { settings?: Partial<AppSettings> & Record<string, unknown> } = {},
 ): McpReadonlyToolRegistry {
-  const registry = new McpReadonlyToolRegistry(service, options);
-  for (const tool of createReadonlyToolDefinitions()) {
-    registry.register(tool.definition, tool.handler);
+  const registry = new McpReadonlyToolRegistry(service, {
+    ...options,
+    allowedTiers: ['readonly'],
+  });
+  for (const tool of createAgentToolDefinitions()) {
+    if (tool.definition.permissionTier === 'readonly') registry.register(tool.definition, tool.handler);
   }
   return registry;
 }
 
-export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
+export function createMcpOfflineToolRegistry(service: AgentService): McpOfflineToolRegistry {
+  const registry = new McpOfflineToolRegistry(service, {
+    allowedTiers: ['readonly', 'workspace-write'],
+    excludedTools: ['settings.get_sanitized', 'provider.readiness', 'harness.latest'],
+  });
+  for (const tool of createAgentToolDefinitions()) registry.register(tool.definition, tool.handler);
+  return registry;
+}
+
+export function createMcpKernelToolRegistry(
+  service: AgentService,
+  options: { settings?: Partial<AppSettings> & Record<string, unknown> } = {},
+): McpToolRegistry {
+  const registry = new McpToolRegistry(service, {
+    ...options,
+    allowedTiers: ['readonly', 'workspace-write'],
+  });
+  for (const tool of createAgentToolDefinitions()) registry.register(tool.definition, tool.handler);
+  return registry;
+}
+
+export function createAgentToolDefinitions(): RegisteredMcpTool[] {
   return [
     {
       definition: {
@@ -90,7 +128,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         permissionTier: 'readonly',
         inputSchema: { type: 'object', additionalProperties: false },
       },
-      handler: (_args, { service }) => {
+      handler: (_args, { service, toolDefinitions }) => {
         const refreshed = service.refreshManifest();
         return toJsonObject({
           projectRoot: refreshed.projectRoot,
@@ -99,7 +137,10 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
           engine: refreshed.manifest.engine,
           currentJobs: refreshed.manifest.currentJobs,
           lastFailures: refreshed.manifest.lastFailures,
-          availableReadonlyTools: createReadonlyToolDefinitions().map((tool) => tool.definition.name),
+          availableTools: toolDefinitions.map((tool) => ({
+            name: tool.name,
+            permissionTier: tool.permissionTier,
+          })),
         });
       },
     },
@@ -254,7 +295,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'batch.plan',
         title: 'Plan translation batches',
         description: 'Creates a dry-run batch manifest artifact/ref from translation inventory/filter/scope.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.batch.plan(args as unknown as BatchPlanOptions) as unknown as JsonObject,
@@ -264,7 +305,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'corpus.sample',
         title: 'Sample translation corpus',
         description: 'Returns bounded redacted samples by deterministic, random, longest, control-code, untranslated, or failure-hotspot strategy.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.corpus.sample(args as unknown as CorpusSampleOptions) as unknown as JsonObject,
@@ -274,7 +315,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'alignment.inspect',
         title: 'Inspect translation alignment',
         description: 'Builds a dry-run alignment map/ref for source and target .txt files, checking separators, empty lines, control codes, and metadata spans when provided.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.alignment.inspect(args as unknown as AlignmentInspectOptions) as unknown as JsonObject,
@@ -284,7 +325,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'alignment.find_breaks',
         title: 'Find alignment breaks',
         description: 'Returns deterministic alignment invariant breaks without changing files.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.alignment.findBreaks(args as unknown as AlignmentInspectOptions),
@@ -294,7 +335,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'alignment.score',
         title: 'Score translation alignment',
         description: 'Returns an alignment confidence score from line-count, separator, empty-line, speaker-label, and RPG control-code invariants.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.alignment.score(args as unknown as AlignmentInspectOptions),
@@ -304,7 +345,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'alignment.explain',
         title: 'Explain alignment result',
         description: 'Explains the most important alignment breaks and safe repair constraints.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.alignment.explain(args as unknown as AlignmentInspectOptions),
@@ -314,7 +355,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'qa.score_file',
         title: 'Score translated file QA',
         description: 'Scores deterministic QA dimensions for a translated .txt file using alignment, glossary, memory, and metadata checks.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.qa.scoreFile(args as unknown as QaScoreFileOptions) as unknown as JsonObject,
@@ -324,7 +365,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'qa.score_batch',
         title: 'Score translated batch QA',
         description: 'Scores multiple translated files and returns an aggregate deterministic QA gate summary.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.qa.scoreBatch(args as unknown as QaBatchScoreOptions),
@@ -334,7 +375,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'qa.explain_score',
         title: 'Explain QA score',
         description: 'Explains top deterministic QA findings and suggested next tool calls for a score or score ref.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.qa.explainScore(args as unknown as QaExplainScoreOptions),
@@ -357,7 +398,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'qa.suggest_next_calls',
         title: 'Suggest QA next calls',
         description: 'Returns deterministic next suggested MCP calls for a QA score, score ref, or file input.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.qa.suggestNextCalls(args as unknown as QaExplainScoreOptions),
@@ -365,9 +406,9 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
     {
       definition: {
         name: 'qa.threshold_gate',
-        title: 'Gate apply preview by QA threshold',
-        description: 'Returns a deterministic pass/block gate for apply preview scaffolding without changing actual apply execution.',
-        permissionTier: 'readonly',
+        title: 'Evaluate QA threshold',
+        description: 'Returns a deterministic pass/block quality gate for app-side review.',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.qa.thresholdGate(args as unknown as QaThresholdGateOptions),
@@ -377,7 +418,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'qa.compare_versions',
         title: 'Compare QA score versions',
         description: 'Scores candidate target versions against the same source and reports the best deterministic QA result.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.qa.compareVersions(args as unknown as QaCompareVersionsOptions),
@@ -387,7 +428,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'patch.propose',
         title: 'Propose dry-run translation patch',
         description: 'Creates a dry-run-only same-line replacement or virtual-note patch/ref. No files are modified.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.patch.propose(args as unknown as PatchProposeOptions) as unknown as JsonObject,
@@ -407,7 +448,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'patch.preview',
         title: 'Preview dry-run translation patch',
         description: 'Returns before/after same-line hunks for a dry-run patch without modifying files.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => {
@@ -420,7 +461,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'repair.loop_plan',
         title: 'Plan auto repair loop',
         description: 'Builds a dry-run auto-repair plan from QA scoring, alignment findings, patch planning, and hard-stop rules.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.repair.loopPlan(args as unknown as RepairLoopOptions) as unknown as JsonObject,
@@ -429,8 +470,8 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
       definition: {
         name: 'repair.loop_run',
         title: 'Run auto repair loop simulation',
-        description: 'Runs the auto-repair loop in dry-run simulation mode; no project files are modified and patch.apply remains separate approval-gated infrastructure.',
-        permissionTier: 'readonly',
+        description: 'Runs the auto-repair loop in dry-run simulation mode and writes analysis artifacts only; project files are not modified.',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.repair.loopRun(args as unknown as RepairLoopOptions) as unknown as JsonObject,
@@ -450,7 +491,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'repair.loop_stop',
         title: 'Stop auto repair loop scaffold',
         description: 'Marks a job-backed repair loop scaffold as stopped; no external process or project file is modified.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.repair.loopStop(args as { loopId?: string; jobId?: string; reason?: string }),
@@ -490,7 +531,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'glossary.propose_entries',
         title: 'Propose glossary entries from corpus sample',
         description: 'Returns bounded glossary entry suggestions from a deterministic corpus sample; does not persist them.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: {
           type: 'object',
           properties: {
@@ -569,7 +610,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'job.graph_create',
         title: 'Create dry-run job graph',
         description: 'Creates a persisted dry-run-only DAG manifest/ref for agent workflow nodes without executing project mutations.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.jobGraphs.create(args as unknown as JobGraphCreateInput) as unknown as JsonObject,
@@ -638,7 +679,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'workflow.dry_run',
         title: 'Dry-run workflow',
         description: 'Executes dependency ordering only and writes a dry-run artifact/ref; no extract, translate, apply, memory, or glossary mutation is performed.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.workflows.dryRun(args as unknown as WorkflowComposeInput | { graphId: string; ttlMs?: number }),
@@ -648,7 +689,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'workflow.explain',
         title: 'Explain workflow',
         description: 'Explains workflow order, limitations, and next suggested read-only calls.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.workflows.explain(args as unknown as WorkflowComposeInput | JobGraphCreateInput | { graphId: string }),
@@ -658,7 +699,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
         name: 'workflow.save_recipe',
         title: 'Save workflow recipe',
         description: 'Saves a project-workspace recipe artifact/ref for a valid dry-run workflow graph.',
-        permissionTier: 'readonly',
+        permissionTier: 'workspace-write',
         inputSchema: { type: 'object', additionalProperties: true },
       },
       handler: (args, { service }) => service.workflows.saveRecipe(args as unknown as { recipeId?: string; title?: string; workflow?: WorkflowComposeInput; graph?: JobGraphCreateInput; ttlMs?: number }) as unknown as JsonObject,
@@ -677,7 +718,7 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
       definition: {
         name: 'help.translation_workflow',
         title: 'Agent translation workflow guide',
-        description: 'Returns bounded guidance for first translation, review, safe apply, repair, recovery, and provider setup.',
+        description: 'Returns bounded guidance for project analysis, app-run translation, quality review, recovery, and provider setup.',
         permissionTier: 'readonly',
         inputSchema: { type: 'object', additionalProperties: false },
       },
@@ -686,8 +727,8 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
     {
       definition: {
         name: 'help.explain_tool',
-        title: 'Explain read-only MCP tool',
-        description: 'Explains a registered read-only MCP tool and its safe usage without executing it.',
+        title: 'Explain MCP tool',
+        description: 'Explains a registered MCP tool, its permission tier, and its safe usage without executing it.',
         permissionTier: 'readonly',
         inputSchema: {
           type: 'object',
@@ -698,11 +739,11 @@ export function createReadonlyToolDefinitions(): RegisteredReadonlyTool[] {
           additionalProperties: false,
         },
       },
-      handler: (args) => {
+      handler: (args, { toolDefinitions }) => {
         if (typeof args.toolName !== 'string' || args.toolName.trim() === '') {
           throw new Error('help.explain_tool requires a non-empty string toolName.');
         }
-        return explainReadonlyTool(args.toolName, createReadonlyToolDefinitions().map((tool) => tool.definition));
+        return explainTool(args.toolName, toolDefinitions);
       },
     },
     {
@@ -866,7 +907,7 @@ function failureEnvelope(requestId: string, toolName: string, permissionTier: Pe
       schemaVersion: 1,
       failureId: `failure-${requestId}`,
       requestId,
-      stage: 'mcp-readonly-tool',
+      stage: 'mcp-tool',
       message: String(redacted.value.message),
       retryable: false,
       createdAt: new Date().toISOString(),

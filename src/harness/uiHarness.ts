@@ -185,6 +185,24 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       route: location.hash,
     }))()`);
 
+    ctx.terminalProjectRoots = [scenario.compareDir];
+    ctx.currentTerminalProjectRoot = scenario.compareDir;
+    await mainWindow.webContents.executeJavaScript(`location.hash = '#/agent-workspace'`, true);
+    const agentWorkspaceWindow = await waitForWindow('/agent-workspace', stepTimeoutMs);
+    await waitForSelector(agentWorkspaceWindow, '[data-harness-view="agent-workspace"]', stepTimeoutMs);
+    await waitForSelector(agentWorkspaceWindow, '[data-harness-agent-env-status]', stepTimeoutMs);
+    await waitForSelector(agentWorkspaceWindow, '[data-harness-agent-mcp-connect]', stepTimeoutMs);
+    await waitForSelector(agentWorkspaceWindow, '[data-harness-agent-cli-presets]', stepTimeoutMs);
+    await waitForSelector(agentWorkspaceWindow, '[data-harness-agent-terminal-surface]', stepTimeoutMs);
+    const agentWorkspace = await snapshot(agentWorkspaceWindow, `(() => ({
+      route: location.hash,
+      heading: document.querySelector('[data-harness-view="agent-workspace"] h1')?.textContent?.trim(),
+      environmentItems: document.querySelectorAll('[data-harness-agent-env-status] li').length,
+      cliPresetCount: document.querySelectorAll('[data-harness-agent-cli-presets] button').length,
+      mcpConnectPresent: Boolean(document.querySelector('[data-harness-agent-mcp-connect]')),
+      terminalSurfacePresent: Boolean(document.querySelector('[data-harness-agent-terminal-surface]')),
+    }))()`);
+
     const llmSettingsMissing = await openLlmSettingsSnapshot(ctx, false, scenario.compareDir, stepTimeoutMs);
     const llmSettingsReady = await openLlmSettingsSnapshot(ctx, true, scenario.compareDir, stepTimeoutMs);
 
@@ -225,13 +243,14 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       completedAt: new Date().toISOString(),
       cases: [
         { id: 'home-window', title: 'home window exposes stable harness state', status: 'passed', durationMs: 0, details: home },
+        { id: 'agent-workspace', title: 'agent workspace exposes stable environment, MCP, preset, and terminal state', status: 'passed', durationMs: 0, details: agentWorkspace },
         { id: 'llm-settings-missing', title: 'LLM settings reports missing provider readiness', status: 'passed', durationMs: 0, details: llmSettingsMissing },
         { id: 'llm-settings-ready', title: 'LLM settings reports ready provider state', status: 'passed', durationMs: 0, details: llmSettingsReady },
         { id: 'compare-window', title: 'compare window summarizes fixture mismatches', status: 'passed', durationMs: 0, details: compare },
         { id: 'json-verify-window', title: 'JSON verify window summarizes fixture issues', status: 'passed', durationMs: 0, details: verify },
       ],
       metrics: {
-        windowCount: 5,
+        caseCount: 6,
         deterministic: true,
       },
       artifacts: {
@@ -240,6 +259,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       reproCommand: 'npm run harness:ui',
       snapshots: {
         home,
+        agentWorkspace,
         llmSettingsMissing,
         llmSettingsReady,
         compare,

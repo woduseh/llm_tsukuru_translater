@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AgentService } from '../../src/agent';
-import { createMcpReadonlyToolRegistry } from '../../src/mcp';
+import { AgentService } from '../../src/agent/agentService';
+import { createMcpOfflineToolRegistry } from '../../src/mcp';
 import type { JsonObject } from '../../src/types/agentWorkspace';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'jobGraphWorkflows');
@@ -89,7 +89,7 @@ describe('job graph and workflow scaffolds', () => {
 
   it('composes workflows and saves/lists recipes through MCP tools', () => {
     const service = new AgentService({ projectRoot: makeProject('mcp') });
-    const registry = createMcpReadonlyToolRegistry(service);
+    const registry = createMcpOfflineToolRegistry(service);
 
     const compose = registry.callTool('workflow.compose', { preset: 'repair-loop', workflowId: 'repair-flow' });
     expect(compose.status).toBe('ok');

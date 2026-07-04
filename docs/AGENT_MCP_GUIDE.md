@@ -1,59 +1,49 @@
 # Agent MCP Guide
 
-This guide is the product-facing scaffold for safe agent-assisted translation. It is intentionally read-only by default: agents may inspect bounded metadata, offer command previews, and draft starter prompts, but they must not run destructive commands or apply changes without an explicit preview and approval step.
+The offline MCP server protects game and translation source files. It may write bounded analysis artifacts under `.llm-tsukuru-agent/`, but it does not expose translation or apply execution. Run those actions through the app UI.
 
 ## Safety invariants
 
-- Preview before any run, apply, overwrite, or destructive operation.
+- Keep MCP writes under `.llm-tsukuru-agent/`.
 - Never dump full source files, translated scripts, credentials, or provider secrets into prompts, logs, MCP responses, or terminal output.
 - Preserve `.txt` line-number alignment with `.extracteddata` metadata.
 - Preserve RPG Maker separators such as `--- 101 ---`, control codes, escape sequences, and intentional empty lines.
-- Use read-only MCP context first; require explicit approval before future write or execute actions.
+- Use the app UI for extraction, translation, comparison, verification, and apply actions.
 
 ## Recipes
 
-### First translation
+### Translation preflight
 
-1. Use `project.context_snapshot` and `project.translation_inventory` to understand project state without file contents.
-2. Check `provider.readiness`; if the provider is not ready, open settings instead of retrying blindly.
-3. Run extraction in the app UI and verify generated `.txt` and `.extracteddata` counts.
-4. Translate a small batch first.
-5. Use `quality.review_file`, the compare window, and an apply preview before approving writes.
+1. Use `project.context_snapshot` and `project.translation_inventory` to inspect project state without returning file contents.
+2. Use `provider.list` to review supported providers.
+3. Configure credentials and confirm readiness in the app settings UI.
+4. Run extraction and a small translation batch in the app.
+5. Review representative results with `quality.review_file` or `qa.score_file`.
 
 ### Quality review
 
 1. Locate candidate translated `.txt` files with `project.translation_inventory`.
-2. Use `quality.review_file` for separator, blank-line, and control-code invariants.
-3. Use the compare window for human review of meaning, tone, placeholders, and omissions.
-4. Record bounded summaries only; do not paste whole files.
+2. Use `quality.review_file` for a non-persistent structural review.
+3. Use `qa.score_file` when a durable QA artifact in `.llm-tsukuru-agent/` is useful.
+4. Use the compare window for human review of meaning, tone, placeholders, and omissions.
 
-### Safe apply
-
-1. Confirm translated text and matching `.extracteddata` are present.
-2. Review `project.get_quality_rules` and recent `harness.latest` results.
-3. Generate a preview artifact listing target files and expected write scope.
-4. Ask for explicit approval after preview review.
-5. Verify results after apply before packaging changes.
-
-### Line-shift repair
+### Line-shift diagnosis
 
 1. Use `quality.review_file` to find separator, empty-line, and control-code anomalies.
-2. Compare nearby separators and line counts against original extracted text.
-3. Restore deleted blank lines and separators before changing wording.
-4. Keep every metadata-bound text span on its original line range.
-5. Re-run review and compare before applying.
+2. Use `alignment.inspect` or `alignment.explain` for bounded alignment artifacts.
+3. Summarize affected lines without modifying source or translated files.
+4. Continue review in the app compare and verification surfaces.
 
 ### Failed translation recovery
 
-1. Inspect bounded failure summaries and `harness.latest`.
-2. Use `provider.readiness` to separate configuration issues from transient failures.
-3. Retry only the failed batch when possible.
-4. Preserve already verified output and keep secrets redacted.
+1. Inspect `project.context_snapshot` and `project.translation_inventory`.
+2. Review only representative failed files with `quality.review_file`.
+3. Check provider configuration in the app settings UI.
+4. Retry only the failed batch from the app when possible.
 
 ### Provider setup
 
 1. Use `provider.list` to choose a supported provider and model.
 2. Enter credentials only in the app settings UI.
-3. Use `provider.readiness` to check sanitized readiness.
-4. Run a small sample before starting a large batch.
-
+3. Confirm readiness in the app UI.
+4. Run a small app translation sample before starting a large batch.

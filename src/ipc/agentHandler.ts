@@ -3,11 +3,15 @@ import type { AppContext } from '../appContext';
 import { detectAgentExecutables } from '../agent/agentExecutableDetection';
 import { buildAgentWorkspaceStatus } from '../agent/agentWorkspaceStatus';
 import { getLlmReadinessError } from '../ts/libs/translatorFactory';
+import fs from 'fs';
+import path from 'path';
+import { PROJECT_ROOT } from '../projectRoot';
+import { buildMcpConnectionCommands } from '../agent/mcpConnection';
 
 /**
- * Handlers for the agent workspace surfaces that need main-process capabilities
- * (PATH probing, live readiness, etc.). All handlers are read-only and never
- * spawn a process or mutate project files.
+ * Handlers for agent workspace surfaces that need main-process capabilities.
+ * Status handlers are read-only; MCP setup performs a user-initiated copy under
+ * .llm-tsukuru-agent and never spawns a process or modifies game data.
  */
 export function registerAgentHandlers(ctx: AppContext): void {
   ipcMain.handle('detectAgentExecutables', (_event, items: unknown) => {
@@ -22,6 +26,36 @@ export function registerAgentHandlers(ctx: AppContext): void {
       providerReadyError: getLlmReadinessError(ctx.settings),
       terminalCapabilityStatus: capability?.status,
       terminalReason: capability?.reason,
+      mcpServerBundleAvailable: fs.existsSync(path.join(PROJECT_ROOT, 'res', 'mcp-agent-server.cjs')),
     });
+  });
+
+  // Copies the bundled project-protecting MCP server to a stable path inside the
+  // selected project and returns CLI registration commands. This user-initiated
+  // setup write is scoped to the trusted workspace and never spawns anything.
+  ipcMain.handle('prepareAgentMcpConnection', () => {
+    const projectRoot = ctx.currentTerminalProjectRoot
+      || ctx.terminalProjectRoots[ctx.terminalProjectRoots.length - 1]
+      || '';
+    if (!projectRoot) {
+      return { ok: false, reason: '먼저 프로젝트 폴더를 선택하세요.' };
+    }
+    const bundleSource = path.join(PROJECT_ROOT, 'res', 'mcp-agent-server.cjs');
+    if (!fs.existsSync(bundleSource)) {
+      return { ok: false, reason: 'MCP 서버 번들을 찾을 수 없습니다. 앱을 다시 빌드하세요 (npm run build:mcp).' };
+    }
+    const destFile = path.join(projectRoot, '.llm-tsukuru-agent', 'mcp-agent-server.cjs');
+    try {
+      fs.mkdirSync(path.dirname(destFile), { recursive: true });
+      fs.copyFileSync(bundleSource, destFile);
+    } catch (error) {
+      return { ok: false, reason: `서버 파일 복사 실패: ${(error as Error).message}` };
+    }
+    return {
+      ok: true,
+      serverPath: destFile,
+      projectRoot,
+      commands: buildMcpConnectionCommands(destFile, projectRoot),
+    };
   });
 }

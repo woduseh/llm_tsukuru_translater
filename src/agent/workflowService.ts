@@ -11,7 +11,7 @@ import { JOB_GRAPH_NODE_TYPES, JobGraphService, validateGraphNodes } from './job
 export interface WorkflowComposeInput {
   workflowId?: string;
   title?: string;
-  preset?: 'translation-review' | 'safe-apply' | 'repair-loop' | 'memory-glossary';
+  preset?: 'translation-review' | 'repair-loop' | 'memory-glossary';
   nodes?: JobGraphNodeInput[];
   metadata?: JsonObject;
 }
@@ -93,7 +93,8 @@ export class WorkflowService {
       nodes: graph.nodes.map((node) => ({ nodeId: node.nodeId, type: node.type, dependsOn: node.dependsOn })),
       limitations: [
         'This scaffold performs dry-runs only.',
-        'Extract, translate, apply, memory, and glossary mutations require future approval-mutation tools.',
+        'Run extraction, translation, verification, and apply actions through the app UI.',
+        'Workflow nodes do not mutate project content.',
       ],
       nextSuggestedCalls: validation.valid ? ['workflow.dry_run', 'job.graph_status', 'job.graph_artifacts'] : ['workflow.validate'],
     } as unknown as JsonObject;
@@ -141,13 +142,6 @@ export class WorkflowService {
 }
 
 function presetNodes(preset: NonNullable<WorkflowComposeInput['preset']>): JobGraphNodeInput[] {
-  if (preset === 'safe-apply') {
-    return [
-      { nodeId: 'qa', type: 'qa' },
-      { nodeId: 'verify', type: 'verify', dependsOn: ['qa'] },
-      { nodeId: 'apply', type: 'apply', dependsOn: ['verify'] },
-    ];
-  }
   if (preset === 'repair-loop') {
     return [
       { nodeId: 'qa', type: 'qa' },
@@ -165,22 +159,16 @@ function presetNodes(preset: NonNullable<WorkflowComposeInput['preset']>): JobGr
     ];
   }
   return [
-    { nodeId: 'extract', type: 'extract' },
-    { nodeId: 'sample', type: 'sample', dependsOn: ['extract'] },
-    { nodeId: 'translate', type: 'translate', dependsOn: ['sample'] },
-    { nodeId: 'qa', type: 'qa', dependsOn: ['translate'] },
+    { nodeId: 'sample', type: 'sample' },
+    { nodeId: 'qa', type: 'qa', dependsOn: ['sample'] },
     { nodeId: 'align', type: 'align', dependsOn: ['qa'] },
-    { nodeId: 'repair', type: 'repair', dependsOn: ['align'] },
-    { nodeId: 'patch', type: 'patch', dependsOn: ['repair'] },
-    { nodeId: 'verify', type: 'verify', dependsOn: ['patch'] },
-    { nodeId: 'apply', type: 'apply', dependsOn: ['verify'] },
+    { nodeId: 'verify', type: 'verify', dependsOn: ['align'] },
   ];
 }
 
 function presetTitle(preset: NonNullable<WorkflowComposeInput['preset']>): string {
   const titles: Record<NonNullable<WorkflowComposeInput['preset']>, string> = {
     'translation-review': 'Translation review workflow',
-    'safe-apply': 'Safe apply workflow',
     'repair-loop': 'Repair loop workflow',
     'memory-glossary': 'Memory and glossary workflow',
   };

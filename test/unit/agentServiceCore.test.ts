@@ -17,6 +17,32 @@ afterEach(() => {
 });
 
 describe('agent workspace service scaffold', () => {
+  it('constructs and refreshes AgentService without materializing workspace files', () => {
+    const projectRoot = makeDir('lazy-workspace');
+    const workspaceRoot = path.join(projectRoot, '.llm-tsukuru-agent');
+    const service = new AgentService({ projectRoot, engine: 'rpg-maker-mv' });
+
+    expect(fs.existsSync(workspaceRoot)).toBe(false);
+    const refreshed = service.refreshManifest();
+    expect(refreshed.manifest.engine.name).toBe('rpg-maker-mv');
+    expect(fs.existsSync(workspaceRoot)).toBe(false);
+
+    const written = service.writeManifest();
+    expect(fs.existsSync(written.manifestPath)).toBe(true);
+    expect(fs.existsSync(written.manifestMirrorPath)).toBe(true);
+  });
+
+  it('rejects missing project roots and file paths instead of creating them', () => {
+    const parent = makeDir('invalid-root');
+    const missing = path.join(parent, 'missing-project');
+    const filePath = path.join(parent, 'project.txt');
+    fs.writeFileSync(filePath, 'not a directory', 'utf-8');
+
+    expect(() => new WorkspaceService(missing)).toThrow(/does not exist/);
+    expect(fs.existsSync(missing)).toBe(false);
+    expect(() => new AgentService({ projectRoot: filePath })).toThrow(/not a directory/);
+  });
+
   it('creates the bounded .llm-tsukuru-agent layout and manifest', () => {
     const projectRoot = makeDir('workspace');
     const descriptor = new WorkspaceService(projectRoot).ensureWorkspace({ engine: 'rpg-maker-mv' });

@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AgentService, type AgentProvenance } from '../../src/agent';
-import { createMcpReadonlyToolRegistry } from '../../src/mcp';
+import { AgentService } from '../../src/agent/agentService';
+import type { AgentProvenance } from '../../src/agent/glossaryService';
+import { createMcpOfflineToolRegistry } from '../../src/mcp';
 import type { JsonObject } from '../../src/types/agentWorkspace';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'qaScoringGates');
@@ -101,28 +102,8 @@ describe('deterministic QA scoring gates', () => {
     expect(gate.nextSuggestedCalls).toEqual(expect.arrayContaining(['qa.explain_score', 'patch.propose']));
   });
 
-  it('adds QA gate scaffolding to apply preview without changing apply execution', () => {
-    const service = new AgentService({
-      projectRoot: makeProject('apply-preview', ['--- 101 ---', 'Hello'], ['--- 999 ---', 'Hello']),
-    });
-
-    const gate = service.qa.thresholdGate({
-      sourcePath: 'Source\\Map001.txt',
-      targetPath: 'Translated\\Map001.txt',
-      threshold: 0.9,
-      includeApplyPreviewScaffold: true,
-    });
-    const preview = gate.applyPreview as JsonObject;
-    const qaGate = preview.qaGate as JsonObject;
-
-    expect(preview.dryRunOnly).toBe(true);
-    expect(preview.applyExecutionChanged).toBe(false);
-    expect(qaGate.gate).toBe('blocked');
-    expect(qaGate.qualityScore).toBe(gate.qualityScore);
-  });
-
   it('wires QA score and gate tools through the MCP read-only registry', () => {
-    const registry = createMcpReadonlyToolRegistry(new AgentService({
+    const registry = createMcpOfflineToolRegistry(new AgentService({
       projectRoot: makeProject('mcp', ['--- 101 ---', 'Hello \\V[1]'], ['--- 101 ---', '안녕 \\V[1]']),
     }));
 

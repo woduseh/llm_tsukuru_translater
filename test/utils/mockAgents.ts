@@ -1,4 +1,4 @@
-import type { AgentResultEnvelope, GoldenWorkflowTranscript, JsonObject } from '../types/agentWorkspace';
+import type { AgentResultEnvelope, GoldenWorkflowTranscript, JsonObject } from '../../src/types/agentWorkspace';
 import { MockMcpClient, MockMcpServer } from './mockMcp';
 
 export type MockAgentScenario = 'well-behaved' | 'malicious-path' | 'approval-replay';

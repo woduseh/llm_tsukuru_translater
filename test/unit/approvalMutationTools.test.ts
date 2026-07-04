@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AgentService } from '../../src/agent';
+import { AgentService } from '../../src/agent/agentService';
 import { ApprovalService } from '../../src/agent/approvalService';
 import { AgentEventBus } from '../../src/agent/eventBus';
 import { createMcpMutationToolRegistry } from '../../src/mcp';

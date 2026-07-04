@@ -12,15 +12,16 @@ import {
   validateGoldenWorkflowTranscript,
   validateTerminalEvent,
 } from '../../src/agent/contractsValidation';
-import { runGoldenWorkflow } from '../../src/agent/mockAgents';
+import { runGoldenWorkflow } from '../utils/mockAgents';
 import {
   ProtocolLightMcpClient,
   ProtocolLightMcpServer,
   createMcpMutationToolRegistry,
   createMcpReadonlyToolRegistry,
 } from '../../src/mcp';
-import { applyTerminalEvent, createAgentTerminalDrawerState, createMockTerminalEvent } from '../../src/renderer/agentWorkspaceModel';
-import type { FailureArtifact, JsonObject } from '../../src/types/agentWorkspace';
+import { applyTerminalEvent } from '../../src/renderer/agentWorkspaceModel';
+import { createMockTerminalEvent } from '../utils/terminalFixtures';
+import type { FailureArtifact, JsonObject, TerminalSessionSummary } from '../../src/types/agentWorkspace';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'securityHarnessGates');
 let sequence = 0;
@@ -84,18 +85,18 @@ describe('security harness gates', () => {
     const server = new ProtocolLightMcpServer(createMcpReadonlyToolRegistry(service));
     const client = new ProtocolLightMcpClient(server);
 
-    expect(server.handle({} as never).error).toMatchObject({ code: -32600 });
-    expect(server.handle({ jsonrpc: '2.0', id: 'bad-call', method: 'tools/call', params: { name: 7 } as never }).error)
+    expect(server.handle({} as never)?.error).toMatchObject({ code: -32600 });
+    expect(server.handle({ jsonrpc: '2.0', id: 'bad-call', method: 'tools/call', params: { name: 7 } as never })?.error)
       .toMatchObject({ code: -32602 });
-    expect(server.handle({ jsonrpc: '2.0', id: 'bad-method', method: 'resources/list' }).error)
+    expect(server.handle({ jsonrpc: '2.0', id: 'bad-method', method: 'resources/list' })?.error)
       .toMatchObject({ code: -32601 });
 
     const unknown = client.callTool('project.delete_everything').result as JsonObject;
-    expect(unknown.status).toBe('failed');
+    expect(unknown.isError).toBe(true);
     expect(JSON.stringify(unknown)).not.toContain('Hello \\V[1]');
 
     const invalidArgs = client.callTool('quality.review_file', { path: 42 as never }).result as JsonObject;
-    expect(invalidArgs.status).toBe('failed');
+    expect(invalidArgs.isError).toBe(true);
     expect(JSON.stringify(invalidArgs)).not.toContain('api_key=secret-value');
   });
 
@@ -218,34 +219,42 @@ describe('security harness gates', () => {
   });
 
   it('captures a terminal drawer snapshot with redacted, non-persistent output defaults', () => {
-    const drawer = createAgentTerminalDrawerState('C:\\Games\\Fixture');
-    const session = drawer.sessions[0];
-    const event = createMockTerminalEvent(session.id, 1, 'stdout', '[REDACTED]');
+    const session: TerminalSessionSummary = {
+      schemaVersion: 1,
+      sessionId: 'term-fixture',
+      label: 'Codex',
+      kind: 'codex',
+      state: 'running',
+      cwdLabel: 'C:\\Games\\Fixture',
+      outputRetention: 'ephemeral',
+      persistOutput: false,
+      latestSequence: 0,
+      bridgeAttached: false,
+      redactionCount: 0,
+      truncationCount: 0,
+    };
+    const event = createMockTerminalEvent(session.sessionId, 1, 'stdout', '[REDACTED]');
     const updated = applyTerminalEvent(session, event);
 
     expect(validateTerminalEvent(event).ok).toBe(true);
     expect({
-      isOpen: drawer.isOpen,
-      activeSessionId: drawer.activeSessionId,
+      activeSessionId: session.sessionId,
       session: {
-        id: updated.id,
+        id: updated.sessionId,
         state: updated.state,
         outputRetention: updated.outputRetention,
         persistOutput: updated.persistOutput,
-        latestEventRedacted: updated.latestEvent?.redacted,
-        latestEventData: updated.latestEvent?.data,
+        latestSequence: updated.latestSequence,
       },
     }).toMatchInlineSnapshot(`
       {
-        "activeSessionId": "codex",
-        "isOpen": false,
+        "activeSessionId": "term-fixture",
         "session": {
-          "id": "codex",
-          "latestEventData": "[REDACTED]",
-          "latestEventRedacted": true,
+          "id": "term-fixture",
+          "latestSequence": 1,
           "outputRetention": "ephemeral",
           "persistOutput": false,
-          "state": "created",
+          "state": "running",
         },
       }
     `);

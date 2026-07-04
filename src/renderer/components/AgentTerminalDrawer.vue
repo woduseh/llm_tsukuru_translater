@@ -1,7 +1,7 @@
 <template>
-  <aside class="agent-terminal" :class="{ open: drawer.isOpen }" data-harness-agent-terminal>
+  <aside class="agent-terminal" :class="{ open: isOpen }" data-harness-agent-terminal>
     <button
-      v-if="!drawer.isOpen"
+      v-if="!isOpen"
       class="agent-chip"
       type="button"
       data-harness-agent-terminal-collapsed
@@ -9,7 +9,7 @@
       @click="openDrawer"
     >
       Agent
-      <span>{{ activeSession.label }}</span>
+      <span>{{ activeSession?.label ?? '세션 없음' }}</span>
     </button>
 
     <div v-else class="drawer" :class="{ large: isLarge }" data-harness-agent-terminal-open @keydown.esc="closeDrawer">
@@ -26,29 +26,41 @@
         </div>
       </header>
 
-      <nav class="session-tabs" role="tablist" aria-label="에이전트 터미널 세션">
+      <nav v-if="sessions.length" class="session-tabs" role="tablist" aria-label="에이전트 터미널 세션">
         <button
-          v-for="session in drawer.sessions"
-          :key="session.id"
+          v-for="session in sessions"
+          :key="session.sessionId"
           type="button"
           role="tab"
-          :aria-selected="session.id === drawer.activeSessionId"
-          :aria-controls="`agent-terminal-panel-${session.id}`"
-          :class="{ active: session.id === drawer.activeSessionId }"
+          :aria-selected="session.sessionId === activeSessionId"
+          :aria-controls="`agent-terminal-panel-${session.sessionId}`"
+          :class="{ active: session.sessionId === activeSessionId }"
           :data-session-state="session.state"
-          @click="drawer.activeSessionId = session.id"
+          @click="activeSessionId = session.sessionId"
         >
           {{ session.label }}
           <span>{{ sessionStateLabel(session.state) }}</span>
         </button>
       </nav>
 
-      <section class="terminal-body" :id="`agent-terminal-panel-${activeSession.id}`" role="tabpanel">
+      <div v-else class="empty-sessions">
+        <p>실행 중이거나 이전에 실행한 터미널 세션이 없습니다.</p>
+        <div>
+          <button type="button" :disabled="launchBusy" @click="launchKind('codex')">Codex 시작</button>
+          <button type="button" :disabled="launchBusy" @click="launchKind('claude')">Claude 시작</button>
+          <button type="button" :disabled="launchBusy" @click="launchKind('shell')">셸 시작</button>
+        </div>
+        <p v-if="launchMessage" class="launch-message">{{ launchMessage }}</p>
+      </div>
+
+      <section v-if="activeSession" class="terminal-body" :id="`agent-terminal-panel-${activeSession.sessionId}`" role="tabpanel">
         <AgentTerminalPane
-          :key="activeSession.id"
-          :kind="activeSession.kind"
+          :key="activeSession.sessionId"
+          :session="activeSession"
+          :launch-kind="activeSession.kind"
           :title="activeSession.label"
           compact
+          @launch="launchKind"
         />
       </section>
     </div>
@@ -56,31 +68,49 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import AgentTerminalPane from './AgentTerminalPane.vue'
-import {
-  createAgentTerminalDrawerState,
-  sessionStateLabel,
-  setTerminalDrawerOpen,
-} from '../agentWorkspaceModel'
+import { chooseActiveTerminalSessionId, sessionStateLabel } from '../agentWorkspaceModel'
+import { useTerminalSessions } from '../composables/useTerminalSessions'
+import type { TerminalSessionKind } from '../../types/agentWorkspace'
 
-const props = defineProps<{
-  cwdLabel?: string
-}>()
-
-const drawer = reactive(createAgentTerminalDrawerState(props.cwdLabel))
+const { sessions, refresh, launch } = useTerminalSessions()
+const isOpen = ref(false)
 const isLarge = ref(false)
+const launchBusy = ref(false)
+const launchMessage = ref('')
+const activeSessionId = ref('')
 
 const activeSession = computed(() => {
-  return drawer.sessions.find((session) => session.id === drawer.activeSessionId) ?? drawer.sessions[0]
+  return sessions.value.find((session) => session.sessionId === activeSessionId.value) ?? null
 })
 
-function openDrawer() {
-  Object.assign(drawer, setTerminalDrawerOpen(drawer, true))
+watch(sessions, (next) => {
+  activeSessionId.value = chooseActiveTerminalSessionId(next, activeSessionId.value)
+}, { immediate: true })
+
+async function launchKind(kind: TerminalSessionKind) {
+  launchBusy.value = true
+  launchMessage.value = ''
+  try {
+    const result = await launch(kind)
+    if (result.session) {
+      activeSessionId.value = result.session.sessionId
+    } else if (!result.ok) {
+      launchMessage.value = result.message ?? '터미널을 시작하지 못했습니다.'
+    }
+  } finally {
+    launchBusy.value = false
+  }
+}
+
+async function openDrawer() {
+  isOpen.value = true
+  await refresh()
 }
 
 function closeDrawer() {
-  Object.assign(drawer, setTerminalDrawerOpen(drawer, false))
+  isOpen.value = false
 }
 </script>
 
@@ -183,6 +213,25 @@ function closeDrawer() {
 
 .session-tabs button.active { opacity: 1; border-color: rgba(124,111,219,0.65); }
 .session-tabs span { margin-left: 8px; font-size: 10px; opacity: 0.78; }
+
+.empty-sessions {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  color: var(--mainColor);
+}
+
+.empty-sessions div { display: flex; flex-wrap: wrap; gap: 8px; }
+.empty-sessions .launch-message { color: #fca5a5; }
+.empty-sessions button {
+  background: var(--Highlight1);
+  color: var(--mainColor);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-family: inherit;
+  cursor: pointer;
+}
 
 .terminal-body {
   padding: 8px 10px 10px;

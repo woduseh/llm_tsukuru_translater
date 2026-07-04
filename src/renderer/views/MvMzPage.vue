@@ -64,6 +64,7 @@
   <div class="page-tabs">
     <div class="page-tab active">MV/MZ</div>
     <div class="page-tab" @click="$router.push('/wolf')">Wolf RPG</div>
+    <div class="page-tab" @click="$router.push('/agent-workspace')">AI 작업공간</div>
   </div>
 </template>
 

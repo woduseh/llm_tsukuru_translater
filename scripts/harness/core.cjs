@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 
 const {
   assert,
@@ -8,8 +9,10 @@ const {
   defaultExport,
   loadCompiledModule,
   makeTempDir,
+  npmCommand,
   projectRoot,
   runCases,
+  runCommand,
   writeFatalHarnessResult,
   writeHarnessResult,
   writeTaskManifest,
@@ -24,6 +27,135 @@ function buildSuccessValidation(blocks) {
     lineCountMatch: true,
     separatorMatch: true,
   }));
+}
+
+async function runBundledMcpConversation(projectDir, timeoutMs = 10000) {
+  const bundlePath = path.join(projectRoot, 'res', 'mcp-agent-server.cjs');
+  const child = spawn(process.execPath, [bundlePath, '--project', projectDir], {
+    cwd: projectRoot,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+  let stdoutBuffer = '';
+  let stderr = '';
+  let exited = false;
+  const pending = new Map();
+  const unmatchedResponses = [];
+
+  const rejectPending = (error) => {
+    for (const waiter of pending.values()) waiter.reject(error);
+    pending.clear();
+  };
+
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (chunk) => {
+    stdoutBuffer += chunk;
+    while (stdoutBuffer.includes('\n')) {
+      const newlineIndex = stdoutBuffer.indexOf('\n');
+      const line = stdoutBuffer.slice(0, newlineIndex).trim();
+      stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
+      if (!line) continue;
+      let response;
+      try {
+        response = JSON.parse(line);
+      } catch (error) {
+        rejectPending(new Error(`MCP server emitted invalid JSON: ${line.slice(0, 300)}`));
+        continue;
+      }
+      const waiter = pending.get(String(response.id));
+      if (waiter) {
+        pending.delete(String(response.id));
+        waiter.resolve(response);
+      } else {
+        unmatchedResponses.push(response);
+      }
+    }
+  });
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk) => {
+    stderr = `${stderr}${chunk}`.slice(-8000);
+  });
+  child.on('error', rejectPending);
+  child.on('exit', (code, signal) => {
+    exited = true;
+    if (pending.size > 0) {
+      rejectPending(new Error(`MCP server exited early with code=${code} signal=${signal}; stderr=${stderr}`));
+    }
+  });
+
+  const request = (id, method, params = {}) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pending.delete(String(id));
+      reject(new Error(`Timed out waiting for MCP ${method}; stderr=${stderr}`));
+    }, timeoutMs);
+    pending.set(String(id), {
+      resolve: (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      reject: (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    });
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+  });
+
+  const stop = async () => {
+    if (!child.stdin.destroyed) child.stdin.end();
+    if (exited) return;
+    await Promise.race([
+      new Promise((resolve) => child.once('exit', resolve)),
+      new Promise((resolve) => setTimeout(resolve, 1000)),
+    ]);
+    if (!exited) child.kill();
+  };
+
+  try {
+    child.stdin.write('not-json\n');
+    const initialized = await request(1, 'initialize', {
+      protocolVersion: '2025-06-18',
+      capabilities: {},
+      clientInfo: { name: 'harness-core', version: '1' },
+    });
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized', params: {} })}\n`);
+    const listed = await request(2, 'tools/list');
+    const called = await request(3, 'tools/call', {
+      name: 'project.context_snapshot',
+      arguments: {},
+    });
+    return { initialized, listed, called, stderr, unmatchedResponses };
+  } finally {
+    await stop();
+  }
+}
+
+async function runBundledMcpStartupFailure(projectPath, timeoutMs = 5000) {
+  const bundlePath = path.join(projectRoot, 'res', 'mcp-agent-server.cjs');
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [bundlePath, '--project', projectPath], {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    let stderr = '';
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk) => {
+      stderr = `${stderr}${chunk}`.slice(-8000);
+    });
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error(`Invalid project MCP process did not exit; stderr=${stderr}`));
+    }, timeoutMs);
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      resolve({ code, stderr });
+    });
+  });
 }
 
 async function main() {
@@ -52,6 +184,39 @@ async function main() {
           assert(fs.existsSync(path.join(projectRoot, docPath)), `missing ${docPath}`);
         }
         return { requiredDocs };
+      },
+    },
+    {
+      id: 'bundled-mcp-stdio',
+      title: 'bundled MCP server completes a real stdio handshake and tool call',
+      run: async () => {
+        runCommand(npmCommand(), ['run', 'build:mcp']);
+        const workspace = makeTempDir('llm-tsukuru-mcp-bundle-');
+        try {
+          const response = await runBundledMcpConversation(workspace);
+          assert(response.initialized.result?.protocolVersion === '2025-06-18', 'MCP protocol negotiation changed');
+          assert(response.unmatchedResponses.some((item) => item.error?.code === -32700), 'malformed JSON did not return a parse error');
+          const tools = response.listed.result?.tools;
+          assert(Array.isArray(tools) && tools.length > 0, 'MCP tool list is empty');
+          assert(!tools.some((tool) => ['settings.get_sanitized', 'provider.readiness', 'harness.latest'].includes(tool.name)), 'offline-only exclusions changed');
+          assert(tools.every((tool) => typeof tool.annotations?.readOnlyHint === 'boolean'), 'MCP readOnlyHint annotations are missing');
+          assert(response.called.result?.isError === false, 'project.context_snapshot failed');
+          const text = response.called.result?.content?.[0]?.text;
+          const payload = JSON.parse(text);
+          assert(payload.projectRoot === workspace, 'context snapshot returned the wrong project root');
+          assert(fs.readdirSync(workspace).length === 0, 'readonly server startup or context call wrote into the project');
+          const missingProject = path.join(workspace, 'missing-project');
+          const startupFailure = await runBundledMcpStartupFailure(missingProject);
+          assert(startupFailure.code !== 0, 'missing --project path should fail startup');
+          assert(!fs.existsSync(missingProject), 'missing --project path was created');
+          return {
+            protocolVersion: response.initialized.result.protocolVersion,
+            toolCount: tools.length,
+            contextProjectRoot: payload.projectRoot,
+          };
+        } finally {
+          fs.rmSync(workspace, { recursive: true, force: true });
+        }
       },
     },
     {

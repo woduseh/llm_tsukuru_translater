@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AgentService } from '../../src/agent';
-import { createMcpReadonlyToolRegistry } from '../../src/mcp';
+import { AgentService } from '../../src/agent/agentService';
+import { createMcpOfflineToolRegistry } from '../../src/mcp';
 import type { JsonObject, TranslationPatch } from '../../src/types/agentWorkspace';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'alignmentPatchKernel');
@@ -97,7 +97,7 @@ describe('alignment and patch dry-run kernel', () => {
 
   it('wires alignment and patch dry-run tools through the MCP read-only registry', () => {
     const projectRoot = makeProject('mcp', ['--- 101 ---', 'Hello \\V[1]'], ['--- 101 ---', 'Hello \\V[1]']);
-    const registry = createMcpReadonlyToolRegistry(new AgentService({ projectRoot }));
+    const registry = createMcpOfflineToolRegistry(new AgentService({ projectRoot }));
 
     expect(registry.listTools().map((tool) => tool.name)).toEqual(expect.arrayContaining([
       'alignment.inspect',

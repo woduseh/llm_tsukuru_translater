@@ -12,7 +12,7 @@
           {{ followOutput ? '자동 스크롤' : '수동 스크롤' }}
         </button>
         <button type="button" @click="clearTerminal">지우기</button>
-        <button type="button" :disabled="starting || isRunning" @click="startSession">시작</button>
+        <button type="button" :disabled="isRunning" @click="startSession">새로 시작</button>
         <button type="button" :disabled="!activeSessionId || !isRunning" @click="killSession">종료</button>
       </div>
     </header>
@@ -53,21 +53,22 @@ import type {
 } from '../../types/agentWorkspace'
 
 const props = defineProps<{
-  kind?: TerminalSessionKind
+  session?: TerminalSessionSummary | null
+  launchKind?: TerminalSessionKind
   title?: string
   compact?: boolean
+}>()
+const emit = defineEmits<{
+  launch: [kind: TerminalSessionKind]
 }>()
 
 const terminalHost = ref<HTMLElement | null>(null)
 const terminal = ref<Terminal | null>(null)
 const fitAddon = ref<FitAddon | null>(null)
-const sessionSummary = ref<TerminalSessionSummary | null>(null)
-const activeSessionId = ref('')
 const lastSequence = ref(0)
 const capability = ref<TerminalCapability | null>(null)
 const message = ref('')
 const messageKind = ref<'info' | 'error'>('info')
-const starting = ref(false)
 const recentOutput = ref('')
 const lastErrorOutput = ref('')
 const followOutput = ref(true)
@@ -76,11 +77,12 @@ let resizeObserver: ResizeObserver | null = null
 let flushTimer: number | null = null
 let pendingOutput = ''
 
-const kind = computed<TerminalSessionKind>(() => props.kind ?? 'shell')
-const title = computed(() => props.title ?? terminalTitle(kind.value))
+const sessionSummary = computed(() => props.session ?? null)
+const activeSessionId = computed(() => props.session?.sessionId ?? '')
+const kind = computed<TerminalSessionKind>(() => props.launchKind ?? props.session?.kind ?? 'shell')
+const title = computed(() => props.title ?? props.session?.label ?? terminalTitle(kind.value))
 const isRunning = computed(() => sessionSummary.value?.state === 'running' || sessionSummary.value?.state === 'idle')
 const statusLabel = computed(() => {
-  if (starting.value) return '시작 중'
   if (sessionSummary.value) return stateLabel(sessionSummary.value.state)
   return '대기 중'
 })
@@ -93,7 +95,7 @@ const capabilityLabel = computed(() => {
 onMounted(async () => {
   mountTerminal()
   unsubscribeEvent = api.terminal.onEvent(handleTerminalEvent)
-  await refreshSessions()
+  await replaySnapshot()
 })
 
 onUnmounted(() => {
@@ -104,27 +106,13 @@ onUnmounted(() => {
   fitAddon.value?.dispose()
 })
 
-watch(() => props.kind, async () => {
-  await refreshSessions()
+watch(() => props.session?.sessionId, async () => {
+  lastSequence.value = 0
+  terminal.value?.clear()
+  recentOutput.value = ''
+  lastErrorOutput.value = ''
+  await replaySnapshot()
 })
-
-async function refreshSessions() {
-  const result = await api.terminal.list()
-  applyOperationResult(result)
-  const existing = result.sessions?.find((session) => session.kind === kind.value && ['running', 'idle', 'starting'].includes(session.state))
-  if (existing) {
-    sessionSummary.value = existing
-    activeSessionId.value = existing.sessionId
-    await replaySnapshot()
-  } else {
-    sessionSummary.value = null
-    activeSessionId.value = ''
-    lastSequence.value = 0
-    terminal.value?.clear()
-    recentOutput.value = ''
-    lastErrorOutput.value = ''
-  }
-}
 
 function mountTerminal() {
   if (!terminalHost.value || terminal.value) return
@@ -162,27 +150,7 @@ function mountTerminal() {
 }
 
 async function startSession() {
-  starting.value = true
-  message.value = ''
-  terminal.value?.clear()
-  try {
-    const result = await api.terminal.create({
-      schemaVersion: 1,
-      requestId: `renderer-${Date.now()}`,
-      kind: kind.value,
-      cols: terminal.value?.cols,
-      rows: terminal.value?.rows,
-    })
-    applyOperationResult(result)
-    if (result.ok && result.session) {
-      sessionSummary.value = result.session
-      activeSessionId.value = result.session.sessionId
-      lastSequence.value = result.session.latestSequence
-      terminal.value?.focus()
-    }
-  } finally {
-    starting.value = false
-  }
+  emit('launch', kind.value)
 }
 
 async function killSession() {
@@ -281,10 +249,6 @@ function fitTerminal() {
 
 function applyOperationResult(result: TerminalOperationResult) {
   capability.value = result.capability ?? capability.value
-  if (result.session) {
-    sessionSummary.value = result.session
-    activeSessionId.value = result.session.sessionId
-  }
   if (!result.ok) {
     messageKind.value = 'error'
     message.value = result.message || '터미널 작업에 실패했습니다.'
@@ -304,11 +268,26 @@ async function copyOutput() {
   await copyText(recentOutput.value)
 }
 
-function clearTerminal() {
+async function clearTerminal() {
   terminal.value?.clear()
   recentOutput.value = ''
   lastErrorOutput.value = ''
   message.value = ''
+  // xterm's clear() keeps the active prompt row, so a live shell still shows the
+  // last line. Ask the running PTY to clear its own screen (Ctrl+L / form feed),
+  // which makes the shell redraw a clean prompt at the top.
+  if (activeSessionId.value && isRunning.value) {
+    try {
+      const result = await api.terminal.input({
+        schemaVersion: 1,
+        sessionId: activeSessionId.value,
+        data: '\f',
+      })
+      applyOperationResult(result)
+    } catch {
+      // Best-effort: the screen buffer is already cleared on the renderer side.
+    }
+  }
 }
 
 async function copyText(text: string) {

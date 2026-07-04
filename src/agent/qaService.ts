@@ -39,7 +39,6 @@ export interface QaThresholdGateOptions extends QaScoreFileOptions {
   score?: QaScoreResult;
   threshold?: number;
   blockOnErrors?: boolean;
-  includeApplyPreviewScaffold?: boolean;
 }
 
 export interface QaExplainScoreOptions extends QaScoreFileOptions {
@@ -206,7 +205,7 @@ export class QaService {
       confidence: score.confidence,
       summary: topFindings.length === 0
         ? 'QA score is high and no deterministic gate findings were detected.'
-        : `${topFindings.length} representative QA finding(s) need review before apply.`,
+        : `${topFindings.length} representative QA finding(s) need review in the app.`,
       dimensions: score.dimensions as unknown as JsonObject[],
       topFindings: topFindings as unknown as JsonObject[],
       nextSuggestedCalls: score.nextSuggestedCalls,
@@ -242,9 +241,8 @@ export class QaService {
       threshold,
       blockingFindings: blockingFindings.slice(0, 20) as unknown as JsonObject[],
       qaRef: score.qaRef as unknown as JsonObject,
-      nextSuggestedCalls: blocked ? ['qa.explain_score', 'patch.propose', 'qa.score_file'] : ['patch.preview', 'approval.request_apply'],
+      nextSuggestedCalls: blocked ? ['qa.explain_score', 'patch.propose', 'qa.score_file'] : ['quality.review_file', 'project.translation_inventory'],
     };
-    if (input.includeApplyPreviewScaffold) result.applyPreview = this.createApplyPreviewScaffold(score, threshold, blocked);
     return result;
   }
 
@@ -261,24 +259,6 @@ export class QaService {
       versions: versions as unknown as JsonObject[],
       threshold: normalizeThreshold(input.threshold),
       nextSuggestedCalls: ['qa.threshold_gate', 'qa.explain_score'],
-    };
-  }
-
-  createApplyPreviewScaffold(score: QaScoreResult, threshold = 0.9, blocked = score.qualityScore < threshold): JsonObject {
-    return {
-      schemaVersion: 1,
-      dryRunOnly: true,
-      applyExecutionChanged: false,
-      targetPath: score.targetPath,
-      qaGate: {
-        gate: blocked ? 'blocked' : 'passed',
-        qualityScore: score.qualityScore,
-        threshold,
-        qaRef: score.qaRef,
-      } as unknown as JsonObject,
-      message: blocked
-        ? 'Apply preview is gated by deterministic QA. Repair findings and re-score before execution.'
-        : 'QA gate passed for preview scaffolding. Actual apply execution remains unchanged.',
     };
   }
 

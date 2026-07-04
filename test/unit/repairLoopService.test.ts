@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AgentService } from '../../src/agent';
-import { createMcpReadonlyToolRegistry } from '../../src/mcp';
+import { AgentService } from '../../src/agent/agentService';
+import { createMcpOfflineToolRegistry } from '../../src/mcp';
 import type { JsonObject } from '../../src/types/agentWorkspace';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'repairLoopService');
@@ -87,7 +87,7 @@ describe('auto repair loop scaffolds', () => {
 
   it('reports findings, planned actions, artifacts, and MCP next calls', () => {
     const service = new AgentService({ projectRoot: makeProject('report', ['Hello adventurer'], ['Hello adventurer']) });
-    const registry = createMcpReadonlyToolRegistry(service);
+    const registry = createMcpOfflineToolRegistry(service);
 
     expect(registry.listTools().map((tool) => tool.name)).toEqual(expect.arrayContaining([
       'repair.loop_plan',

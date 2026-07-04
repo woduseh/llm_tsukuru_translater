@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AgentService } from '../../src/agent';
-import { createMcpReadonlyToolRegistry } from '../../src/mcp';
+import { AgentService } from '../../src/agent/agentService';
+import { createMcpOfflineToolRegistry } from '../../src/mcp';
 import type { AgentResultEnvelope, JsonObject } from '../../src/types/agentWorkspace';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'dataRefsBatchCorpus');
@@ -39,7 +39,7 @@ describe('data refs, batch planning, and corpus sampling kernels', () => {
   it('plans dry-run batches from inventory with limits and exposes the manifest through MCP refs', () => {
     const projectRoot = makeProject('batch');
     const service = new AgentService({ projectRoot });
-    const registry = createMcpReadonlyToolRegistry(service);
+    const registry = createMcpOfflineToolRegistry(service);
 
     const plan = registry.callTool('batch.plan', {
       limits: { maxFiles: 3, maxTotalLines: 8, maxLinesPerBatch: 4, maxBatches: 2 },

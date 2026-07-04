@@ -1,12 +1,16 @@
-import type { AgentEvent } from '../agent/eventBus'
-import type { TerminalEvent, TerminalEventKind, TerminalSessionKind, TerminalSessionState } from '../types/agentWorkspace'
+import type {
+  TerminalEvent,
+  TerminalEventKind,
+  TerminalSessionKind,
+  TerminalSessionState,
+  TerminalSessionSummary,
+} from '../types/agentWorkspace'
 import { MANAGED_TERMINAL_PRESETS, createTerminalCommandPreview } from '../terminalCommandPresets'
 
 export const AGENT_WORKSPACE_ROUTE = '/agent-workspace'
 
 export type AgentTerminalKind = TerminalSessionKind
 export type AgentTerminalSessionState = TerminalSessionState
-export type TerminalOutputRetention = 'ephemeral' | 'persisted'
 export type CommandRiskLevel = 'safe' | 'review' | 'write' | 'dangerous'
 export type AgentExecutableStatus = 'unknown' | 'available' | 'missing'
 export type McpConnectionStatus = 'enabled' | 'degraded' | 'disconnected'
@@ -41,31 +45,12 @@ export interface AgentCliPreset {
   mcpMessage: string
 }
 
-export interface AgentTerminalSession {
-  id: string
-  label: string
-  kind: AgentTerminalKind
-  cwdLabel: string
-  state: AgentTerminalSessionState
-  outputRetention: TerminalOutputRetention
-  persistOutput: boolean
-  latestEvent?: TerminalEvent
-  exitCode?: number
-}
-
-export interface AgentTerminalDrawerState {
-  isOpen: boolean
-  activeSessionId: string
-  sessions: AgentTerminalSession[]
-  activity: AgentEvent[]
-}
-
 export interface AgentCommandPreset {
   id: string
   title: string
   description: string
   risk: CommandRiskLevel
-  approvalRequired: boolean
+  confirmationRequired: boolean
   projectRequired: boolean
   providerRequired: boolean
   estimated: string
@@ -87,7 +72,7 @@ export interface AgentTimelineStep {
 
 export interface AgentWorkspaceLiveSignals {
   projectSelected: boolean
-  providerReady: boolean
+  mcpServerAvailable: boolean
 }
 
 export interface AgentWorkspaceViewModel {
@@ -98,7 +83,6 @@ export interface AgentWorkspaceViewModel {
   agentPresets: AgentCliPreset[]
   mcpStatusCards: McpStatusCard[]
   safetyGuidance: string[]
-  drawer: AgentTerminalDrawerState
   timeline: AgentTimelineStep[]
 }
 
@@ -124,63 +108,34 @@ export const TERMINAL_EVENT_LABELS: Record<TerminalEventKind, string> = {
 }
 
 export const MCP_STATUS_LABELS: Record<McpConnectionStatus, string> = {
-  enabled: 'MCP 연결됨',
-  degraded: 'MCP 제한 모드',
-  disconnected: 'MCP 연결 안 됨',
-}
-
-export function createDefaultTerminalSessions(cwdLabel = '프로젝트 미선택'): AgentTerminalSession[] {
-  return [
-    createTerminalSession('codex', 'Codex', 'codex', cwdLabel),
-    createTerminalSession('claude', 'Claude', 'claude', cwdLabel),
-    createTerminalSession('shell', '셸', 'shell', cwdLabel),
-  ]
-}
-
-export function createTerminalSession(
-  id: string,
-  label: string,
-  kind: AgentTerminalKind,
-  cwdLabel: string,
-): AgentTerminalSession {
-  return {
-    id,
-    label,
-    kind,
-    cwdLabel,
-    state: 'created',
-    outputRetention: 'ephemeral',
-    persistOutput: false,
-  }
-}
-
-export function createAgentTerminalDrawerState(cwdLabel?: string): AgentTerminalDrawerState {
-  const sessions = createDefaultTerminalSessions(cwdLabel)
-  return {
-    isOpen: false,
-    activeSessionId: sessions[0].id,
-    sessions,
-    activity: [],
-  }
-}
-
-export function setTerminalDrawerOpen(state: AgentTerminalDrawerState, isOpen: boolean): AgentTerminalDrawerState {
-  return { ...state, isOpen }
+  enabled: 'MCP 연결 준비됨',
+  degraded: 'MCP 준비 필요',
+  disconnected: 'MCP 사용 안 함',
 }
 
 export function sessionStateLabel(state: AgentTerminalSessionState): string {
   return SESSION_STATE_LABELS[state]
 }
 
-export function updateTerminalSessionState(
-  session: AgentTerminalSession,
-  nextState: AgentTerminalSessionState,
-  exitCode?: number,
-): AgentTerminalSession {
-  return { ...session, state: nextState, exitCode }
+export function mergeTerminalSession(
+  sessions: TerminalSessionSummary[],
+  next: TerminalSessionSummary,
+): TerminalSessionSummary[] {
+  const index = sessions.findIndex((session) => session.sessionId === next.sessionId)
+  if (index < 0) return [...sessions, next]
+  return sessions.map((session, candidateIndex) => (candidateIndex === index ? next : session))
 }
 
-export function applyTerminalEvent(session: AgentTerminalSession, event: TerminalEvent): AgentTerminalSession {
+export function chooseActiveTerminalSessionId(
+  sessions: TerminalSessionSummary[],
+  currentSessionId = '',
+): string {
+  if (sessions.some((session) => session.sessionId === currentSessionId)) return currentSessionId
+  const active = [...sessions].reverse().find((session) => ['starting', 'running', 'idle', 'reconnecting'].includes(session.state))
+  return active?.sessionId ?? sessions[sessions.length - 1]?.sessionId ?? ''
+}
+
+export function applyTerminalEvent(session: TerminalSessionSummary, event: TerminalEvent): TerminalSessionSummary {
   const nextState = event.kind === 'started'
     ? 'running'
     : event.kind === 'exit'
@@ -192,22 +147,22 @@ export function applyTerminalEvent(session: AgentTerminalSession, event: Termina
   return {
     ...session,
     state: nextState,
-    latestEvent: event,
+    latestSequence: Math.max(session.latestSequence, event.sequence),
     exitCode: event.exitCode ?? session.exitCode,
   }
 }
 
-export function shouldPersistTerminalOutput(session: AgentTerminalSession): boolean {
+export function shouldPersistTerminalOutput(session: TerminalSessionSummary): boolean {
   return session.persistOutput && session.outputRetention === 'persisted'
 }
 
 export const AGENT_COMMAND_PRESETS: AgentCommandPreset[] = [
   {
     id: 'guided-translation',
-    title: '안전 번역 마법사',
-    description: '추출, 번역, 비교, 검증, 안전 적용 단계를 순서대로 확인합니다.',
+    title: '번역 준비 점검',
+    description: '프로젝트 구조와 번역 입력을 분석한 뒤 앱에서 번역할 준비가 되었는지 확인합니다.',
     risk: 'safe',
-    approvalRequired: false,
+    confirmationRequired: false,
     projectRequired: true,
     providerRequired: false,
     estimated: '설정 5분',
@@ -215,9 +170,9 @@ export const AGENT_COMMAND_PRESETS: AgentCommandPreset[] = [
   {
     id: 'quality-review',
     title: '번역 품질 점검',
-    description: '읽기 전용 점검으로 품질, 줄 정렬, 적용 위험을 요약합니다.',
+    description: '품질과 줄 정렬 위험을 분석하고 전용 작업공간에 결과를 기록합니다.',
     risk: 'review',
-    approvalRequired: false,
+    confirmationRequired: false,
     projectRequired: true,
     providerRequired: false,
     estimated: '1-3분',
@@ -227,27 +182,17 @@ export const AGENT_COMMAND_PRESETS: AgentCommandPreset[] = [
     title: '줄 정렬 문제 찾기',
     description: '추출 텍스트의 줄 밀림과 메타데이터 불일치를 안전하게 점검합니다.',
     risk: 'review',
-    approvalRequired: false,
+    confirmationRequired: false,
     projectRequired: true,
     providerRequired: false,
     estimated: '2-4분',
-  },
-  {
-    id: 'safe-apply-plan',
-    title: '안전 적용 계획 만들기',
-    description: '쓰기 작업 전 미리보기와 승인 단계를 먼저 준비합니다.',
-    risk: 'write',
-    approvalRequired: true,
-    projectRequired: true,
-    providerRequired: false,
-    estimated: '3-5분',
   },
   {
     id: 'power-terminal',
     title: '고급 터미널',
     description: '프로젝트 폴더에서 내장 터미널을 엽니다. 사용자 명령은 항상 직접 확인해야 합니다.',
     risk: 'dangerous',
-    approvalRequired: true,
+    confirmationRequired: true,
     projectRequired: false,
     providerRequired: false,
     estimated: '즉시',
@@ -256,28 +201,28 @@ export const AGENT_COMMAND_PRESETS: AgentCommandPreset[] = [
 
 const DEFAULT_STARTER_PROMPTS: AgentStarterPrompt[] = [
   {
-    id: 'first-translation',
-    title: '첫 번역',
+    id: 'project-overview',
+    title: '프로젝트 개요',
     action: 'send',
-    prompt: '안전한 첫 번역을 단계별로 도와줘. 먼저 읽기 전용 프로젝트 컨텍스트, 제공자 준비 상태, 작은 배치, 품질 점검, 비교, 적용 미리보기를 확인해. 파괴적인 명령은 실행하지 마.',
+    prompt: 'project.context_snapshot과 project.translation_inventory로 현재 프로젝트 구조와 번역 입력을 간결하게 요약해줘. 게임 파일을 수정하지 말고 전체 원문 덤프는 피해야 해.',
   },
   {
     id: 'quality-review',
     title: '품질 점검',
     action: 'send',
-    prompt: '현재 번역을 안전하게 점검해. 읽기 전용 MCP 요약만 사용하고 줄 번호, 구분선, 제어 코드, 빈 줄을 보존해. 전체 원문 덤프는 피해야 해.',
+    prompt: '현재 번역을 점검해. 필요하면 QA 산출물을 프로젝트 전용 작업공간에 기록해도 되지만 게임과 번역 원본은 수정하지 마. 줄 번호, 구분선, 제어 코드, 빈 줄을 확인하고 전체 원문 덤프는 피해야 해.',
   },
   {
-    id: 'safe-apply',
-    title: '안전 적용 계획',
-    action: 'copy',
-    prompt: '미리보기 산출물과 명시적 승인 단계를 포함한 안전 적용 계획을 만들어줘. .txt 줄 수나 .extracteddata 정렬이 의심스러우면 중단해.',
+    id: 'line-shift',
+    title: '줄 정렬 진단',
+    action: 'send',
+    prompt: 'alignment 도구로 원문과 번역문의 줄 수, 구분선, 빈 줄, 제어 코드 차이를 진단해줘. 분석 산출물은 .llm-tsukuru-agent에만 기록하고 원본 파일은 수정하지 마.',
   },
   {
-    id: 'recovery',
-    title: '실패한 번역 복구',
+    id: 'provider-setup',
+    title: '제공자 설정 안내',
     action: 'copy',
-    prompt: '정제된 제공자 준비 상태와 제한된 실패 산출물을 확인해 실패한 번역을 복구해줘. 실패한 배치만 재시도하고 인증 정보는 절대 노출하지 마.',
+    prompt: 'provider.list로 지원 제공자를 설명하고, 실제 자격 증명과 준비 상태는 앱 설정 화면에서 확인하도록 안내해줘. 인증 정보는 채팅이나 터미널에 요청하지 마.',
   },
 ]
 
@@ -288,7 +233,7 @@ export const AGENT_CLI_PRESETS: AgentCliPreset[] = [
     description: MANAGED_TERMINAL_PRESETS.codex.description,
     terminalKind: 'codex',
     executableNames: MANAGED_TERMINAL_PRESETS.codex.executableNames,
-    command: { executable: 'codex', args: MANAGED_TERMINAL_PRESETS.codex.args },
+    command: { executable: MANAGED_TERMINAL_PRESETS.codex.executable, args: MANAGED_TERMINAL_PRESETS.codex.args },
     mcpStatus: 'degraded',
     mcpMessage: MANAGED_TERMINAL_PRESETS.codex.mcpMessage,
   }),
@@ -298,7 +243,7 @@ export const AGENT_CLI_PRESETS: AgentCliPreset[] = [
     description: MANAGED_TERMINAL_PRESETS.claude.description,
     terminalKind: 'claude',
     executableNames: MANAGED_TERMINAL_PRESETS.claude.executableNames,
-    command: { executable: 'claude', args: MANAGED_TERMINAL_PRESETS.claude.args },
+    command: { executable: MANAGED_TERMINAL_PRESETS.claude.executable, args: MANAGED_TERMINAL_PRESETS.claude.args },
     mcpStatus: 'degraded',
     mcpMessage: MANAGED_TERMINAL_PRESETS.claude.mcpMessage,
   }),
@@ -315,7 +260,8 @@ export const AGENT_CLI_PRESETS: AgentCliPreset[] = [
 ]
 
 export const AGENT_SAFETY_GUIDANCE = [
-  '실행/적용 전에는 반드시 미리보기와 승인 단계를 거칩니다.',
+  'MCP 분석 산출물은 .llm-tsukuru-agent 작업공간에만 기록합니다.',
+  '실제 번역과 적용은 앱 화면에서 사용자가 직접 실행합니다.',
   '전체 원문 덤프나 비밀값을 에이전트, 로그, 프롬프트, 터미널 출력에 붙여넣지 않습니다.',
   '줄 번호 정렬, 구분선, 제어 코드, 이스케이프 시퀀스, 빈 줄을 보존합니다.',
 ]
@@ -324,12 +270,12 @@ export const MCP_STATUS_CARDS: McpStatusCard[] = [
   {
     status: 'enabled',
     label: MCP_STATUS_LABELS.enabled,
-    description: '읽기 전용 도구와 프로젝트/제공자 안내를 사용할 수 있습니다.',
+    description: 'CLI 등록 명령을 만들 수 있습니다. 등록 후 프로젝트 분석과 전용 작업공간 QA 기록을 사용할 수 있습니다.',
   },
   {
     status: 'degraded',
     label: MCP_STATUS_LABELS.degraded,
-    description: '안내와 명령 미리보기는 가능하지만 프로젝트, 제공자, 실행 파일 중 일부가 준비되지 않았습니다.',
+    description: '프로젝트, 서버 번들, CLI 실행 파일 중 일부가 준비되지 않았습니다.',
   },
   {
     status: 'disconnected',
@@ -391,26 +337,23 @@ export function noProjectGuidance(): string {
 }
 
 /**
- * Derive timeline step states from live workspace signals. Steps light up as
- * their prerequisites are met: project selection unlocks extraction preview,
- * and a ready provider unlocks the quality/approval/apply steps.
+ * Derive analysis readiness from the selected project and bundled MCP server.
  */
 export function deriveAgentTimeline(signals: AgentWorkspaceLiveSignals): AgentTimelineStep[] {
   const ready = (condition: boolean): TimelineStatus => (condition ? 'ready' : 'waiting')
   const projectReady = signals.projectSelected
-  const fullyReady = signals.projectSelected && signals.providerReady
+  const analysisReady = signals.projectSelected && signals.mcpServerAvailable
   return [
     { id: 'project-selected', title: '프로젝트 선택', status: ready(projectReady) },
-    { id: 'extract-preview', title: '추출 미리보기', status: ready(projectReady) },
-    { id: 'quality-review', title: '품질 점검', status: ready(fullyReady) },
-    { id: 'approval-gate', title: '승인 대기', status: ready(fullyReady) },
-    { id: 'safe-apply', title: '안전 적용', status: ready(fullyReady) },
+    { id: 'mcp-ready', title: 'MCP 준비', status: ready(analysisReady) },
+    { id: 'project-analysis', title: '프로젝트 분석', status: ready(analysisReady) },
+    { id: 'quality-review', title: '품질 점검', status: ready(analysisReady) },
   ]
 }
 
 export interface AgentMcpSignals {
-  /** The in-process read-only MCP server can be constructed. */
-  readonlyServerAvailable: boolean
+  /** The bundled offline MCP server is available. */
+  serverAvailable: boolean
   /** The preset's CLI executable was found on PATH. */
   executableAvailable: boolean
   /** A trusted project root is currently selected. */
@@ -418,50 +361,28 @@ export interface AgentMcpSignals {
 }
 
 /**
- * Derive a CLI preset's live MCP connection status from real signals.
- * The generic shell never auto-attaches MCP; managed CLIs reach 'enabled'
- * only when their executable is present and a project is selected, and fall
- * back to 'degraded' (guidance/preview only) while prerequisites are missing.
+ * Derive whether the app can prepare an MCP registration command. This does
+ * not claim that an external CLI has executed the command or connected.
  */
 export function derivePresetMcpStatus(
   presetId: AgentCliPreset['id'],
   signals: AgentMcpSignals,
 ): McpConnectionStatus {
   if (presetId === 'generic') return 'disconnected'
-  if (!signals.readonlyServerAvailable) return 'disconnected'
+  if (!signals.serverAvailable) return 'disconnected'
   if (signals.executableAvailable && signals.projectSelected) return 'enabled'
   return 'degraded'
 }
 
-export function createAgentWorkspaceViewModel(cwdLabel?: string): AgentWorkspaceViewModel {
+export function createAgentWorkspaceViewModel(): AgentWorkspaceViewModel {
   return {
     route: AGENT_WORKSPACE_ROUTE,
     title: 'AI 작업공간',
-    subtitle: '터미널, 에이전트 프리셋, 활동 기록, 승인 상태를 한곳에서 다루는 작업 공간입니다.',
+    subtitle: '외부 CLI, 프로젝트 분석 도구, 내장 터미널을 한곳에서 다루는 작업 공간입니다.',
     presets: AGENT_COMMAND_PRESETS,
     agentPresets: AGENT_CLI_PRESETS,
     mcpStatusCards: MCP_STATUS_CARDS,
     safetyGuidance: AGENT_SAFETY_GUIDANCE,
-    drawer: createAgentTerminalDrawerState(cwdLabel),
-    timeline: deriveAgentTimeline({ projectSelected: false, providerReady: false }),
+    timeline: deriveAgentTimeline({ projectSelected: false, mcpServerAvailable: false }),
   }
-}
-
-export function createMockTerminalEvent(
-  sessionId: string,
-  sequence: number,
-  kind: TerminalEventKind,
-  data?: string,
-): TerminalEvent {
-  const event: TerminalEvent = {
-    schemaVersion: 1,
-    sessionId,
-    sequence,
-    kind,
-    timestamp: new Date().toISOString(),
-    data,
-    redacted: true,
-  }
-  if (kind === 'exit') event.exitCode = 0
-  return event
 }

@@ -1,5 +1,5 @@
-import type { AgentResultEnvelope, JsonObject, McpToolDefinition, PermissionTier } from '../types/agentWorkspace';
-import { redactSecretLikeValues } from './contractsValidation';
+import type { AgentResultEnvelope, JsonObject, McpToolDefinition, PermissionTier } from '../../src/types/agentWorkspace';
+import { redactSecretLikeValues } from '../../src/agent/contractsValidation';
 
 export type MockToolHandler = (input: JsonObject, context: MockMcpContext) => JsonObject;
 

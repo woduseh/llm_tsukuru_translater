@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AgentService, type AgentProvenance } from '../../src/agent';
+import { AgentService } from '../../src/agent/agentService';
+import type { AgentProvenance } from '../../src/agent/glossaryService';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'glossaryMemoryService');
 let sequence = 0;

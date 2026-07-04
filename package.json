@@ -1,6 +1,6 @@
 {
   "name": "llm-tsukuru-translater",
-  "version": "3.1.4",
+  "version": "3.2.0",
   "description": "LLM Tsukuru Translater",
   "main": "dist-main/main.js",
   "scripts": {
@@ -12,9 +12,9 @@
     "dev": "npm-run-all --parallel dev:renderer dev:electron",
     "build:ts": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build --config vite.renderer.config.ts",
-    "prebuild": "npm run build:renderer && npm run build:ts",
-    "prestart": "npm run build:renderer && npm run build:ts",
-    "build": "electron-builder --windows portable nsis:x64",
+    "prebuild": "npm run build:renderer && npm run build:ts && npm run build:mcp",
+    "prestart": "npm run build:renderer && npm run build:ts && npm run build:mcp",
+    "build": "electron-builder --windows zip:x64 nsis:x64",
     "build2": "electron-builder --windows portable",
     "lint": "eslint \"src/**/*.ts\" \"main.ts\"",
     "test": "vitest run",
@@ -24,7 +24,8 @@
     "harness:eval": "node scripts/harness/eval.cjs",
     "harness:ui": "node scripts/harness/ui.cjs",
     "harness:live": "node scripts/harness/live.cjs",
-    "harness:package-smoke": "node scripts/harness/package-smoke.cjs"
+    "harness:package-smoke": "node scripts/harness/package-smoke.cjs",
+    "build:mcp": "node scripts/build-mcp-server.mjs"
   },
   "author": "Jackdu",
   "license": "GPL-3.0",
@@ -42,6 +43,7 @@
     "cross-env": "^10.1.0",
     "electron": "^40.6.1",
     "electron-builder": "^26.8.1",
+    "esbuild": "^0.27.3",
     "eslint": "^10.0.2",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.9.3",

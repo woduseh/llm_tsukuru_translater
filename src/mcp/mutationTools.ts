@@ -6,7 +6,7 @@ import type { AgentResultEnvelope, AuditEntry, JsonObject, McpToolDefinition, Pe
 import type { AppSettings } from '../types/settings';
 import { atomicWriteJsonFile } from '../ts/libs/atomicFile';
 import { redactSecretLikeValues } from '../agent/contractsValidation';
-import { createMcpReadonlyToolRegistry, McpReadonlyToolRegistry } from './readonlyTools';
+import { createMcpKernelToolRegistry, McpToolRegistry } from './readonlyTools';
 
 type MutationHandler = (args: JsonObject, context: MutationToolContext) => AgentResultEnvelope;
 
@@ -22,14 +22,14 @@ interface RegisteredMutationTool {
 }
 
 export class McpMutationToolRegistry {
-  private readonly readonlyRegistry: McpReadonlyToolRegistry;
+  private readonly baseRegistry: McpToolRegistry;
   private readonly mutationTools = new Map<string, RegisteredMutationTool>();
 
   constructor(
     private readonly service: AgentService,
     private readonly options: { settings?: Partial<AppSettings> & Record<string, unknown>; sessionId?: string } = {},
   ) {
-    this.readonlyRegistry = createMcpReadonlyToolRegistry(service, { settings: options.settings });
+    this.baseRegistry = createMcpKernelToolRegistry(service, { settings: options.settings });
   }
 
   register(definition: McpToolDefinition, handler: MutationHandler): void {
@@ -38,12 +38,12 @@ export class McpMutationToolRegistry {
   }
 
   listTools(): McpToolDefinition[] {
-    return [...this.readonlyRegistry.listTools(), ...Array.from(this.mutationTools.values()).map((tool) => tool.definition)];
+    return [...this.baseRegistry.listTools(), ...Array.from(this.mutationTools.values()).map((tool) => tool.definition)];
   }
 
   callTool(name: string, args: JsonObject = {}, requestId = createRequestId(name)): AgentResultEnvelope {
     const mutationTool = this.mutationTools.get(name);
-    if (!mutationTool) return this.readonlyRegistry.callTool(name, args, requestId);
+    if (!mutationTool) return this.baseRegistry.callTool(name, args, requestId);
     try {
       return mutationTool.handler(args, { requestId, service: this.service, sessionId: this.options.sessionId });
     } catch (error) {

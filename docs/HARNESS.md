@@ -53,6 +53,7 @@ They validate:
 - JSON verification and repair behavior
 - bulk translation workflow behavior with a mocked translator
 - fixture corpus scoring for structure and repair cases
+- the packaged MCP agent server initialization, tool list, and project context response
 
 `harness:core` and `harness:eval` also write `*-task-manifest.json` files, which list deterministic case ids and fixture inputs. The core manifest records the mock-provider scaffold used by the bulk translation workflow.
 
@@ -64,6 +65,7 @@ They validate:
 - LLM settings window
 - compare window
 - JSON verify window
+- agent workspace environment, MCP connection, CLI presets, and terminal surface
 
 The UI harness uses stable `data-*` attributes and DOM text instead of pixel-based visual tests.
 

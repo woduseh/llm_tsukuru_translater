@@ -40,10 +40,18 @@ export class AgentService {
   readonly memory: MemoryService;
   readonly qa: QaService;
   readonly repair: RepairLoopService;
+  private readonly manifestOptions: Omit<AgentServiceOptions, 'projectRoot' | 'eventHistoryLimit' | 'sessionId'>;
 
   constructor(options: AgentServiceOptions) {
     this.workspace = new WorkspaceService(options.projectRoot);
-    this.descriptor = this.workspace.ensureWorkspace(options);
+    this.manifestOptions = {
+      engine: options.engine,
+      providerMetadata: options.providerMetadata,
+      availableTools: options.availableTools,
+      currentJobs: options.currentJobs,
+      lastFailures: options.lastFailures,
+    };
+    this.descriptor = this.workspace.describeWorkspace(this.manifestOptions);
     this.eventBus = new AgentEventBus({ workspaceRoot: this.descriptor.workspaceRoot, maxHistory: options.eventHistoryLimit });
     this.artifacts = new ArtifactService({ workspaceRoot: this.descriptor.workspaceRoot, eventBus: this.eventBus });
     this.dataRefs = new DataRefService({ projectRoot: this.descriptor.projectRoot, workspaceRoot: this.descriptor.workspaceRoot });
@@ -111,7 +119,15 @@ export class AgentService {
   }
 
   refreshManifest(): AgentWorkspaceDescriptor {
-    return this.workspace.ensureWorkspace({
+    return this.workspace.describeWorkspace({
+      ...this.manifestOptions,
+      currentJobs: this.jobs.listCurrentJobSummaries(),
+    });
+  }
+
+  writeManifest(): AgentWorkspaceDescriptor {
+    return this.workspace.writeManifest({
+      ...this.manifestOptions,
       currentJobs: this.jobs.listCurrentJobSummaries(),
     });
   }

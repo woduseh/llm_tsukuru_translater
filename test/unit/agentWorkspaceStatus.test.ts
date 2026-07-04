@@ -49,9 +49,9 @@ describe('buildAgentWorkspaceStatus', () => {
     expect(degraded.terminal.message).toBe('프로젝트 폴더를 선택하세요.');
   });
 
-  it('always exposes the read-only MCP server as available', () => {
+  it('exposes the bundled MCP server as available by default', () => {
     const status = buildAgentWorkspaceStatus({ projectRoots: [], providerReadyError: null });
-    expect(status.mcp.readonlyServerAvailable).toBe(true);
+    expect(status.mcp.serverAvailable).toBe(true);
     expect(status.schemaVersion).toBe(1);
   });
 });
@@ -61,20 +61,20 @@ describe('deriveAgentTimeline', () => {
     Object.fromEntries(steps.map((step) => [step.id, step.status]));
 
   it('keeps every step waiting when nothing is ready', () => {
-    const steps = byId(deriveAgentTimeline({ projectSelected: false, providerReady: false }));
+    const steps = byId(deriveAgentTimeline({ projectSelected: false, mcpServerAvailable: false }));
     expect(Object.values(steps).every((status) => status === 'waiting')).toBe(true);
   });
 
-  it('unlocks project and extract steps once a project is selected', () => {
-    const steps = byId(deriveAgentTimeline({ projectSelected: true, providerReady: false }));
+  it('keeps analysis waiting until both project and MCP server are ready', () => {
+    const steps = byId(deriveAgentTimeline({ projectSelected: true, mcpServerAvailable: false }));
     expect(steps['project-selected']).toBe('ready');
-    expect(steps['extract-preview']).toBe('ready');
+    expect(steps['mcp-ready']).toBe('waiting');
+    expect(steps['project-analysis']).toBe('waiting');
     expect(steps['quality-review']).toBe('waiting');
-    expect(steps['safe-apply']).toBe('waiting');
   });
 
-  it('unlocks all steps when project and provider are ready', () => {
-    const steps = byId(deriveAgentTimeline({ projectSelected: true, providerReady: true }));
+  it('unlocks all analysis steps when project and MCP server are ready', () => {
+    const steps = byId(deriveAgentTimeline({ projectSelected: true, mcpServerAvailable: true }));
     expect(Object.values(steps).every((status) => status === 'ready')).toBe(true);
   });
 });
@@ -82,28 +82,28 @@ describe('deriveAgentTimeline', () => {
 describe('derivePresetMcpStatus', () => {
   it('keeps the generic shell disconnected regardless of signals', () => {
     expect(derivePresetMcpStatus('generic', {
-      readonlyServerAvailable: true, executableAvailable: true, projectSelected: true,
+      serverAvailable: true, executableAvailable: true, projectSelected: true,
     })).toBe('disconnected');
   });
 
-  it('is disconnected when the read-only MCP server is unavailable', () => {
+  it('is disconnected when the MCP server is unavailable', () => {
     expect(derivePresetMcpStatus('codex', {
-      readonlyServerAvailable: false, executableAvailable: true, projectSelected: true,
+      serverAvailable: false, executableAvailable: true, projectSelected: true,
     })).toBe('disconnected');
   });
 
   it('is enabled when the executable is present and a project is selected', () => {
     expect(derivePresetMcpStatus('codex', {
-      readonlyServerAvailable: true, executableAvailable: true, projectSelected: true,
+      serverAvailable: true, executableAvailable: true, projectSelected: true,
     })).toBe('enabled');
   });
 
   it('is degraded when only some prerequisites are met', () => {
     expect(derivePresetMcpStatus('claude', {
-      readonlyServerAvailable: true, executableAvailable: true, projectSelected: false,
+      serverAvailable: true, executableAvailable: true, projectSelected: false,
     })).toBe('degraded');
     expect(derivePresetMcpStatus('claude', {
-      readonlyServerAvailable: true, executableAvailable: false, projectSelected: true,
+      serverAvailable: true, executableAvailable: false, projectSelected: true,
     })).toBe('degraded');
   });
 });

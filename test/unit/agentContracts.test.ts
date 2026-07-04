@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { MockMcpClient, MockMcpServer } from '../../src/agent/mockMcp';
-import { runGoldenWorkflow } from '../../src/agent/mockAgents';
+import { MockMcpClient, MockMcpServer } from '../utils/mockMcp';
+import { runGoldenWorkflow } from '../utils/mockAgents';
 import { SandboxManager, SandboxPathError, SandboxReadLimitError } from '../../src/agent/sandboxManager';
 import {
   redactSecretLikeValues,

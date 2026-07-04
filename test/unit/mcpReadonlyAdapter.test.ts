@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AgentService } from '../../src/agent';
+import { AgentService } from '../../src/agent/agentService';
 import { AGENT_SKILL_RECIPES } from '../../src/agent/agentSkillGuide';
-import { issueAppBridgeToken, ProtocolLightMcpClient, ProtocolLightMcpServer, createMcpReadonlyToolRegistry, validateAppBridgeToken } from '../../src/mcp';
-import { validateAgentResultEnvelope } from '../../src/agent/contractsValidation';
-import type { AgentResultEnvelope, JsonObject } from '../../src/types/agentWorkspace';
+import {
+  issueAppBridgeToken,
+  ProtocolLightMcpClient,
+  ProtocolLightMcpServer,
+  createMcpOfflineToolRegistry,
+  createMcpReadonlyToolRegistry,
+  validateAppBridgeToken,
+} from '../../src/mcp';
+import type { JsonObject } from '../../src/types/agentWorkspace';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'mcpReadonlyAdapter');
 let sequence = 0;
@@ -24,8 +30,8 @@ describe('MCP read-only adapter scaffold', () => {
     const client = new ProtocolLightMcpClient(new ProtocolLightMcpServer(createMcpReadonlyToolRegistry(service)));
 
     expect(client.initialize().result).toMatchObject({
-      protocolVersion: 'protocol-light',
-      serverInfo: { sdk: 'not-installed' },
+      protocolVersion: '2025-06-18',
+      serverInfo: { name: 'llm-tsukuru-translater' },
     });
 
     const list = client.listTools().result as JsonObject;
@@ -41,17 +47,14 @@ describe('MCP read-only adapter scaffold', () => {
        'harness.latest',
        'artifacts.read_ref',
        'batch.estimate',
-       'batch.plan',
-       'corpus.sample',
        'help.translation_workflow',
        'help.explain_tool',
        'help.safe_recipe',
       ]));
 
-    const call = client.callTool('project.context_snapshot').result as AgentResultEnvelope;
-    expect(call.status).toBe('ok');
-    expect(call.permissionTier).toBe('readonly');
-    expect(validateAgentResultEnvelope(call).ok).toBe(true);
+    const call = client.callTool('project.context_snapshot').result as JsonObject;
+    expect(call.isError).toBe(false);
+    expect(readToolPayload(call).projectRoot).toBe(projectRoot);
   });
 
   it('rejects invalid file args and path traversal without returning file contents', () => {
@@ -117,15 +120,15 @@ describe('MCP read-only adapter scaffold', () => {
 
   it('exposes safe agent guidance recipes without nonexistent tool references', () => {
     const projectRoot = makeProject('help');
-    const registry = createMcpReadonlyToolRegistry(new AgentService({ projectRoot }));
+    const registry = createMcpOfflineToolRegistry(new AgentService({ projectRoot }));
     const toolNames = new Set(registry.listTools().map((tool) => tool.name));
 
     const workflow = registry.callTool('help.translation_workflow');
     expect(workflow.status).toBe('ok');
-    expect(JSON.stringify(workflow.payload)).toContain('Preview before any run');
+    expect(JSON.stringify(workflow.payload)).toContain('Run translation and apply through the app UI');
     expect(JSON.stringify(workflow.payload)).not.toContain('api_key=');
 
-    const recipe = registry.callTool('help.safe_recipe', { recipeId: 'safe_apply' });
+    const recipe = registry.callTool('help.safe_recipe', { recipeId: 'quality_review' });
     expect(recipe.status).toBe('ok');
     expect(JSON.stringify(recipe.payload)).toContain('.extracteddata');
 
@@ -133,7 +136,7 @@ describe('MCP read-only adapter scaffold', () => {
     expect(explained.status).toBe('ok');
     expect((explained.payload as JsonObject).permissionTier).toBe('readonly');
 
-    const referencedTools = new Set(AGENT_SKILL_RECIPES.flatMap((guide) => guide.readonlyTools));
+    const referencedTools = new Set(AGENT_SKILL_RECIPES.flatMap((guide) => guide.tools));
     for (const referencedTool of referencedTools) {
       expect(toolNames.has(referencedTool), `${referencedTool} should be registered`).toBe(true);
     }
@@ -173,4 +176,9 @@ function makeDir(prefix: string): string {
   fs.mkdirSync(dir, { recursive: true });
   cleanupDirs.push(dir);
   return dir;
+}
+
+function readToolPayload(result: JsonObject): JsonObject {
+  const content = result.content as JsonObject[];
+  return JSON.parse(String(content[0].text)) as JsonObject;
 }
