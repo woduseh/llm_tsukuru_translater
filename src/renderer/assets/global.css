@@ -1,8 +1,3 @@
-@font-face {
-  font-family: 'NotoSansKR';
-  src: url('../../html/main/styles/fonts/NotoSansKR.otf');
-}
-
 * {
   margin: 0;
   padding: 0;
@@ -18,7 +13,7 @@
   --Selected: #7c6fdb;
   --Accent: #7c6fdb;
   --AccentHover: #9d93e6;
-  --font: 'NotoSansKR';
+  --font: 'Segoe UI', 'Malgun Gothic', system-ui, sans-serif;
   --radius-sm: 8px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -33,7 +28,7 @@
 body {
   background: var(--Background);
   color: var(--mainColor);
-  font-family: var(--font), -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font);
   overflow: hidden;
   height: 100vh;
   display: flex;

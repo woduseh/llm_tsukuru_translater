@@ -7,7 +7,7 @@ The harness stack exists to make the repository self-checking for both humans an
 - `harness:core`: deterministic checks against compiled main-process modules and translation workflow semantics
 - `harness:eval`: curated fixture corpus scored by structural and repair metrics
 - `harness:ui`: Electron smoke harness that opens real windows and inspects stable UI state
-- `harness:live`: optional real-provider smoke run for Gemini or Vertex
+- `harness:live`: optional real-provider smoke run for Gemini, Vertex, OpenAI, OpenAI-compatible APIs, or Claude
 - `harness:package-smoke`: Windows packaging smoke scaffold; validates packaging config by default and only inspects built artifacts when explicitly opted in
 
 All harnesses write versioned JSON summaries under `artifacts/harness/` by default.
@@ -67,7 +67,7 @@ They validate:
 - JSON verify window
 - agent workspace environment, MCP connection, CLI presets, and terminal surface
 
-The UI harness uses stable `data-*` attributes and DOM text instead of pixel-based visual tests.
+The UI harness uses stable `data-*` attributes and DOM text instead of pixel-based visual tests. It asserts the fixture contract for route and heading state, agent environment and preset counts, provider readiness, compare mismatch/untranslated counts, and JSON verification issue counts.
 
 ## Live Harness
 
@@ -77,18 +77,21 @@ Environment variables:
 
 - Gemini: `GEMINI_API_KEY`, `LLM_HARNESS_MODEL`
 - Vertex: `VERTEX_SERVICE_ACCOUNT_JSON`, `VERTEX_LOCATION`, `LLM_HARNESS_MODEL`
-- Optional selector: `LLM_HARNESS_PROVIDER=gemini|vertex`
+- OpenAI: `OPENAI_API_KEY`, `LLM_HARNESS_MODEL`
+- OpenAI-compatible: `CUSTOM_OPENAI_BASE_URL`, optional `CUSTOM_OPENAI_API_KEY`, `LLM_HARNESS_MODEL`
+- Claude: `CLAUDE_API_KEY`, optional `CLAUDE_MAX_TOKENS`, `LLM_HARNESS_MODEL`
+- Selector: `LLM_HARNESS_PROVIDER=gemini|vertex|openai|custom-openai|claude`
 
 ## Packaged Windows Smoke Scaffold
 
 `harness:package-smoke` is intentionally lightweight because producing the portable zip and NSIS installer is expensive for routine agent validation.
 
-- Default mode: validates `package.json` packaging invariants (`asar`, Windows `zip`/`nsis` targets, and compiled-only file globs), writes `artifacts/harness/harness-package-smoke.json`, and exits cleanly as `skipped` when the scaffold is healthy.
+- Default mode: validates `package.json` packaging invariants (`asar`, Windows `zip`/`nsis` targets, compiled-only file globs, and resolvable renderer CSS assets), writes `artifacts/harness/harness-package-smoke.json`, and exits cleanly as `skipped` when the scaffold is healthy.
 - Opt-in mode: after a packaging build has already been produced, run `LLM_TSUKURU_PACKAGE_SMOKE=1 npm run harness:package-smoke` to verify that both `.zip` and `.exe` artifacts exist in the configured output directory.
 - TODO before release: extend the opt-in mode to launch the portable artifact in a disposable profile and assert the same stable UI markers used by `harness:ui`.
 
 ## CI
 
-- `.github/workflows/ci.yml` runs deterministic harnesses on PRs and pushes.
+- `.github/workflows/ci.yml` runs core, eval, UI, and default package-smoke harnesses on PRs and pushes.
 - `.github/workflows/harness-live.yml` provides a manual live-provider workflow.
 - CI uploads `artifacts/harness/` so failures remain inspectable after the job ends.

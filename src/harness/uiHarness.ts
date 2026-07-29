@@ -121,6 +121,23 @@ async function snapshot(win: BrowserWindow, source: string): Promise<unknown> {
   return win.webContents.executeJavaScript(source, true);
 }
 
+function assertSnapshotValues(
+  label: string,
+  value: unknown,
+  expected: Record<string, string | number | boolean>,
+): void {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} snapshot is not an object`);
+  }
+
+  const actual = value as Record<string, unknown>;
+  for (const [key, expectedValue] of Object.entries(expected)) {
+    if (actual[key] !== expectedValue) {
+      throw new Error(`${label}.${key} expected ${JSON.stringify(expectedValue)}, received ${JSON.stringify(actual[key])}`);
+    }
+  }
+}
+
 function emit(channel: string, ...args: unknown[]): void {
   ipcMain.emit(channel, {} as Electron.IpcMainEvent, ...args);
 }
@@ -184,6 +201,11 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       subtitle: document.querySelector('[data-harness-view="home"] .subtitle')?.textContent?.trim(),
       route: location.hash,
     }))()`);
+    assertSnapshotValues('home', home, {
+      heading: 'Tsukuru Extractor',
+      subtitle: 'RPG Maker 번역 도구',
+      route: '#/',
+    });
 
     ctx.terminalProjectRoots = [scenario.compareDir];
     ctx.currentTerminalProjectRoot = scenario.compareDir;
@@ -202,9 +224,33 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       mcpConnectPresent: Boolean(document.querySelector('[data-harness-agent-mcp-connect]')),
       terminalSurfacePresent: Boolean(document.querySelector('[data-harness-agent-terminal-surface]')),
     }))()`);
+    assertSnapshotValues('agentWorkspace', agentWorkspace, {
+      route: '#/agent-workspace',
+      heading: 'AI 작업공간',
+      environmentItems: 4,
+      cliPresetCount: 3,
+      mcpConnectPresent: true,
+      terminalSurfacePresent: true,
+    });
 
     const llmSettingsMissing = await openLlmSettingsSnapshot(ctx, false, scenario.compareDir, stepTimeoutMs);
     const llmSettingsReady = await openLlmSettingsSnapshot(ctx, true, scenario.compareDir, stepTimeoutMs);
+    assertSnapshotValues('llmSettingsMissing', llmSettingsMissing, {
+      llmReady: 'false',
+      provider: 'gemini',
+      parallelWorkers: '4',
+      guidelinePanelPresent: true,
+      generateGuidelineDisabled: true,
+      applyGuidelineDisabled: true,
+    });
+    assertSnapshotValues('llmSettingsReady', llmSettingsReady, {
+      llmReady: 'true',
+      provider: 'gemini',
+      parallelWorkers: '4',
+      guidelinePanelPresent: true,
+      generateGuidelineDisabled: true,
+      applyGuidelineDisabled: true,
+    });
 
     emit('openLLMCompare', scenario.compareDir);
     const compareWindow = await waitForWindow('/llm-compare', stepTimeoutMs);
@@ -220,6 +266,12 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
         summary: Array.from(document.querySelectorAll('.summary > span')).map((node) => node.textContent?.trim()),
       };
     })()`);
+    assertSnapshotValues('compare', compare, {
+      fileCount: '2',
+      mismatchCount: '1',
+      untranslatedCount: '1',
+      loading: 'false',
+    });
 
     emit('openJsonVerify', scenario.verifyDir);
     const verifyWindow = await waitForWindow('/json-verify', stepTimeoutMs);
@@ -235,6 +287,12 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
         summary: Array.from(document.querySelectorAll('.summary > span')).map((node) => node.textContent?.trim()),
       };
     })()`);
+    assertSnapshotValues('verify', verify, {
+      fileCount: '2',
+      totalIssues: '1',
+      errorFiles: '1',
+      warningFiles: '0',
+    });
 
     const result: UiHarnessResult = {
       schemaVersion: 1,

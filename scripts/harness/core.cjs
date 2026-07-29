@@ -171,7 +171,7 @@ async function main() {
   const cases = [
     {
       id: 'docs-entrypoints',
-      title: 'agent and harness docs exist',
+      title: 'required agent and harness documentation entrypoints exist',
       run: async () => {
         const requiredDocs = [
           'AGENTS.md',

@@ -12,6 +12,39 @@ function readPackageJson() {
   return JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
 }
 
+function findMissingRendererCssAssets() {
+  const cssRoot = path.join(projectRoot, 'src', 'renderer');
+  const missing = [];
+  const pending = [cssRoot];
+
+  while (pending.length > 0) {
+    const current = pending.pop();
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const entryPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        pending.push(entryPath);
+        continue;
+      }
+      if (!entry.isFile() || path.extname(entry.name) !== '.css') continue;
+
+      const css = fs.readFileSync(entryPath, 'utf8');
+      for (const match of css.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)) {
+        const reference = match[2].trim();
+        if (/^(?:data:|https?:|#)/i.test(reference)) continue;
+        const assetPath = path.resolve(path.dirname(entryPath), reference.split(/[?#]/, 1)[0]);
+        if (!fs.existsSync(assetPath)) {
+          missing.push({
+            source: path.relative(projectRoot, entryPath),
+            reference,
+          });
+        }
+      }
+    }
+  }
+
+  return missing;
+}
+
 function main() {
   const packageJson = readPackageJson();
   const config = packageJson.build || {};
@@ -19,6 +52,7 @@ function main() {
   const outputDir = path.join(projectRoot, config.directories?.output || 'dist');
   const targets = config.win?.target || [];
   const targetNames = targets.map((target) => (typeof target === 'string' ? target : target.target)).filter(Boolean);
+  const missingRendererCssAssets = findMissingRendererCssAssets();
 
   const baseChecks = [
     { id: 'app-id', ok: typeof config.appId === 'string' && config.appId.length > 0 },
@@ -33,6 +67,11 @@ function main() {
       id: 'xterm-dependencies',
       ok: Boolean(packageJson.dependencies?.['@xterm/xterm'] && packageJson.dependencies?.['@xterm/addon-fit']),
     },
+    {
+      id: 'renderer-css-assets-resolve',
+      ok: missingRendererCssAssets.length === 0,
+      details: { missing: missingRendererCssAssets },
+    },
   ];
 
   const cases = baseChecks.map((check) => ({
@@ -40,6 +79,7 @@ function main() {
     title: `packaging config: ${check.id}`,
     status: check.ok ? 'passed' : 'failed',
     durationMs: 0,
+    ...(check.details ? { details: check.details } : {}),
     ...(check.ok ? {} : { error: { message: `Packaging config check failed: ${check.id}` } }),
   }));
 

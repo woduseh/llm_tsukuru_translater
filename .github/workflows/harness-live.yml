@@ -27,6 +27,11 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           VERTEX_SERVICE_ACCOUNT_JSON: ${{ secrets.VERTEX_SERVICE_ACCOUNT_JSON }}
           VERTEX_LOCATION: ${{ vars.VERTEX_LOCATION }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CUSTOM_OPENAI_API_KEY: ${{ secrets.CUSTOM_OPENAI_API_KEY }}
+          CUSTOM_OPENAI_BASE_URL: ${{ vars.CUSTOM_OPENAI_BASE_URL }}
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          CLAUDE_MAX_TOKENS: ${{ vars.CLAUDE_MAX_TOKENS }}
 
       - name: Upload live harness artifacts
         uses: actions/upload-artifact@v4

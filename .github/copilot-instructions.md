@@ -10,29 +10,34 @@ Electron 40 desktop app (Windows) for extracting, translating, and applying text
 npm install
 npm start                  # builds renderer (Vite), then launches Electron
 npm run dev                # Vite dev server + Electron with HMR (parallel)
-npm run build              # production build (Windows x64 portable + NSIS installer)
+npm run build              # production build (Windows x64 ZIP + NSIS installer)
+npm run build2             # Windows portable executable
 npm run build:renderer     # Vite build only → dist-renderer/
-npm test                   # vitest run (all ~324 tests)
+npm run typecheck          # main-process tsc + renderer vue-tsc
+npm test                   # vitest run
 npx vitest run test/unit/edtool.test.ts          # single test file
 npx vitest run -t "round-trip"                   # tests matching name pattern
 npm run test:watch         # vitest in watch mode
 npm run test:coverage      # vitest with v8 coverage
-npm run lint               # eslint on src/**/*.ts and main.ts
-npx tsc --noEmit           # type-check without emitting
+npm run lint               # eslint on main/process TypeScript and renderer Vue SFCs
+npm run harness:core
+npm run harness:eval
+npm run harness:ui
+npm run harness:package-smoke
 ```
 
 ## Architecture
 
 ### Build Pipeline
 
-Main-process TypeScript files (`main.ts`, `src/ipc/*.ts`, `src/ts/**/*.ts`, `src/utils.ts`, `src/appContext.ts`, `src/preload.ts`) are compiled by `tsc` during the `prestart` and `prebuild` npm scripts. The generated `.js` files are **not committed to git** — they are gitignored via `/main.js` and `/src/**/*.js` patterns.
+Main-process TypeScript files (`main.ts`, `src/ipc/`, `src/ts/`, `src/agent/`, `src/mcp/`, and shared main-process modules) are compiled into `dist-main/` by `tsc` during the `prestart` and `prebuild` npm scripts. Generated JavaScript is not committed.
 
 This convention does NOT apply to renderer code (`src/renderer/**`) — those are Vue SFCs compiled by Vite.
 
 ### Two TypeScript Configs
 
 - `tsconfig.json` — Main process (CommonJS, `target: ES2018`, `strict: true`). Excludes `src/renderer/`, `test/`, `dist-renderer/`.
-- `tsconfig.renderer.json` — Renderer/Vite. Used by `vite.renderer.config.ts` for Vue SFC compilation.
+- `tsconfig.renderer.json` — Renderer/Vue type-check configuration used by `vue-tsc`.
 
 ### Process Model
 
@@ -43,6 +48,8 @@ main.ts (Electron main)
 ├── src/ipc/translateHandler.ts — LLM translate, settings, compare windows
 ├── src/ipc/toolsHandler.ts     — LLM compare, JSON verify, project convert
 ├── src/ipc/settingsHandler.ts  — settings window
+├── src/ipc/agentHandler.ts     — agent environment and MCP connection guidance
+├── src/ipc/terminalHandler.ts  — managed terminal lifecycle and events
 ├── src/ipc/shared.ts           — shared IPC utilities
 └── src/ipc/viteHelper.ts       — loadRoute() for hash-based SPA routing
 
@@ -54,8 +61,11 @@ src/renderer/ (Vue 3 SPA, built by Vite → dist-renderer/)
 ├── views/LlmSettingsPage.vue   — LLM translation config
 ├── views/LlmComparePage.vue    — translation comparison (sub-window)
 ├── views/JsonVerifyPage.vue    — JSON verification (sub-window)
+├── views/AgentWorkspacePage.vue — agent environment, MCP, CLI presets, terminal
 └── views/HomePage.vue          — landing/home page
 
+src/agent/ — project analysis kernel, QA/workspace services, and terminal runtime
+src/mcp/ — project-protecting offline MCP stdio server and tool registries
 src/preload.ts — contextBridge with channel whitelists (SEND_CHANNELS, RECEIVE_CHANNELS)
 ```
 
@@ -90,7 +100,7 @@ Follow this pattern for any new sub-window.
 Core workflow: **Extract → Translate → Apply**
 
 1. **Extract** (`extract/`): Reads game `data/*.json` → produces `.txt` files + `.extracteddata` (zlib-compressed JSON metadata via `edtool.ts`)
-2. **Translate** (`translator.ts` + `libs/geminiTranslator.ts`): Translates `.txt` via Gemini LLM API
+2. **Translate** (`translator.ts` + provider registry): Translates `.txt` through Gemini, Vertex AI, OpenAI, OpenAI-compatible, or Claude providers
 3. **Apply** (`apply.ts`): Reads translated `.txt` + `.extracteddata` → reconstructs JSON with translations
 
 ### `.extracteddata` Structure
