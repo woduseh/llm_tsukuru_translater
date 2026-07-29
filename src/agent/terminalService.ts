@@ -20,6 +20,7 @@ import {
   TerminalSnapshot,
   TerminalSnapshotRequest,
 } from '../types/agentWorkspace';
+import { TerminalOutputSanitizer, stripTerminalFormatting } from '../terminalOutput';
 import { createTerminalCommandPreview, managedTerminalPresetForKind } from '../terminalCommandPresets';
 import { redactSecretLikeValues } from './contractsValidation';
 import { NativePtyAdapter, PtyAdapter, PtyProcess } from './ptyAdapter';
@@ -55,6 +56,7 @@ interface TerminalSessionInternal {
   exitCode?: number;
   process?: PtyProcess;
   events: TerminalEvent[];
+  outputSanitizer: TerminalOutputSanitizer;
   ringBufferBytes: number;
   disposers: Array<() => void>;
   createdAt: number;
@@ -153,6 +155,7 @@ export class TerminalService {
       truncationCount: 0,
       latestSequence: 0,
       events: [],
+      outputSanitizer: new TerminalOutputSanitizer(),
       ringBufferBytes: 0,
       disposers: [],
       createdAt: Date.now(),
@@ -343,7 +346,7 @@ export class TerminalService {
       bounded = buffer.subarray(0, MAX_OUTPUT_CHUNK_BYTES).toString('utf8');
       omittedBytes = rawBytes - MAX_OUTPUT_CHUNK_BYTES;
     }
-    const redacted = redactTerminalText(stripUnsafeTerminalSequences(bounded), knownSecretsFromSettings(this.ctx));
+    const redacted = redactTerminalText(session.outputSanitizer.push(bounded), knownSecretsFromSettings(this.ctx));
     session.redactionCount += redacted.redactions.length;
     if (omittedBytes > 0) session.truncationCount += 1;
     this.recordEvent(session, {
@@ -420,7 +423,10 @@ export class TerminalService {
       session: this.toSummary(session),
       createdAt: new Date(session.createdAt).toISOString(),
       updatedAt: new Date(session.lastActivityAt).toISOString(),
-      events: session.events,
+      events: session.events.map((event) => ({
+        ...event,
+        data: event.data === undefined ? undefined : stripTerminalFormatting(event.data),
+      })),
       retention: {
         redactedOnly: true,
         inputPersisted: false,
@@ -635,12 +641,6 @@ export function redactTerminalText(text: string, exactSecrets: string[] = []): {
 
 function containsSecretLikeValue(text: string): boolean {
   return redactTerminalText(text).text !== text;
-}
-
-function stripUnsafeTerminalSequences(value: string): string {
-  return value
-    .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
-    .replace(/\x1b\[[?=]?[0-9;]*[A-Za-z]/g, '');
 }
 
 function killProcessTree(pid: number): void {

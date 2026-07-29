@@ -264,7 +264,7 @@ describe('TerminalService', () => {
     ctx.settings.llmApiKey = 'persist-secret';
     const service = new TerminalService(ctx, {
       ptyAdapter: new FakePtyAdapter({
-        script: [{ kind: 'stdout', data: 'token=persist-secret' }],
+        script: [{ kind: 'stdout', data: '\x1b[2K\x1b[1Gtoken=persist-secret' }],
       }),
     });
 
@@ -282,6 +282,7 @@ describe('TerminalService', () => {
     const transcript = fs.readFileSync(transcriptPath, 'utf8');
     expect(transcript).not.toContain('persist-secret');
     expect(transcript).toContain('[REDACTED]');
+    expect(transcript).not.toContain('\\u001b');
   });
 
   it('persists transcripts to the session owner root even if context roots change before kill', async () => {
@@ -334,6 +335,40 @@ describe('TerminalService', () => {
     expect(result.text).not.toContain('exact-secret-value');
     expect(result.text).not.toContain('Bearer abc');
     expect(result.redactions.length).toBeGreaterThan(0);
+  });
+
+  it('preserves safe PowerShell redraw sequences while blocking terminal control strings', async () => {
+    const projectRoot = makeProject('interactive-output');
+    const ctx = new AppContext();
+    ctx.terminalProjectRoots = [projectRoot];
+    ctx.settings.llmApiKey = 'interactive-secret';
+    const service = new TerminalService(ctx, {
+      ptyAdapter: new FakePtyAdapter({
+        script: [{
+          kind: 'stdout',
+          data: 'abcdef\x1b[2K\x1b[1Gabc\x1b]52;c;dGVzdA==\x07 token=interactive-secret',
+        }],
+      }),
+    });
+
+    const created = service.create({
+      schemaVersion: 1,
+      requestId: 'req-interactive-output',
+      kind: 'shell',
+      cwd: projectRoot,
+    });
+    await delay(20);
+
+    const snapshot = service.snapshot({
+      schemaVersion: 1,
+      sessionId: created.session!.sessionId,
+    });
+    const output = snapshot.snapshot?.events.map((event) => event.data ?? '').join('') ?? '';
+
+    expect(output).toContain('\x1b[2K\x1b[1G');
+    expect(output).not.toContain('\x1b]52;');
+    expect(output).not.toContain('interactive-secret');
+    expect(output).toContain('[REDACTED]');
   });
 });
 

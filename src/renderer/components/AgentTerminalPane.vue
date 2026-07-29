@@ -44,6 +44,7 @@ import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api } from '../composables/useIpc'
+import { stripTerminalFormatting } from '../../terminalOutput'
 import type {
   TerminalCapability,
   TerminalEvent,
@@ -209,8 +210,9 @@ function scheduleFlush() {
 }
 
 function rememberOutput(chunk: string, errorLike = false) {
-  recentOutput.value = `${recentOutput.value}${chunk}`.slice(-32000)
-  if (errorLike) lastErrorOutput.value = `${lastErrorOutput.value}${chunk}`.slice(-12000)
+  const plainText = stripTerminalFormatting(chunk)
+  recentOutput.value = `${recentOutput.value}${plainText}`.slice(-32000)
+  if (errorLike) lastErrorOutput.value = `${lastErrorOutput.value}${plainText}`.slice(-12000)
 }
 
 async function handlePaste(event: ClipboardEvent) {
