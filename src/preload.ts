@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
 import { isReceiveChannel, isSendChannel } from './types/ipc';
+import { isProtectedAgentBridgePath } from './agent/agentBridgeContracts';
 
 let allowedBasePaths: string[] = [];
 
@@ -12,6 +13,7 @@ ipcRenderer.on('set-allowed-paths', (_event: unknown, paths: string[]) => {
 function isPathAllowed(filePath: string): boolean {
   if (allowedBasePaths.length === 0) return false;
   const resolved = path.resolve(filePath);
+  if (isProtectedAgentBridgePath(resolved)) return false;
   return allowedBasePaths.some((base: string) => resolved === base || resolved.startsWith(base + path.sep));
 }
 
@@ -61,6 +63,18 @@ contextBridge.exposeInMainWorld('api', {
       const listener = (_event: unknown, payload: unknown) => callback(payload);
       ipcRenderer.on('terminalSessions', listener);
       return () => ipcRenderer.removeListener('terminalSessions', listener);
+    },
+  },
+  approvals: {
+    submit: (request: unknown) => ipcRenderer.invoke('mutationApprovalSubmit', request),
+    list: (request: unknown) => ipcRenderer.invoke('mutationApprovalList', request),
+    get: (request: unknown) => ipcRenderer.invoke('mutationApprovalGet', request),
+    approve: (request: unknown) => ipcRenderer.invoke('mutationApprovalApprove', request),
+    deny: (request: unknown) => ipcRenderer.invoke('mutationApprovalDeny', request),
+    onChanged: (callback: (payload: unknown) => void) => {
+      const listener = (_event: unknown, payload: unknown) => callback(payload);
+      ipcRenderer.on('approvalQueueChanged', listener);
+      return () => ipcRenderer.removeListener('approvalQueueChanged', listener);
     },
   }
 });

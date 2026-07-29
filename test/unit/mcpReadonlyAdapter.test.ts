@@ -108,7 +108,7 @@ describe('MCP read-only adapter scaffold', () => {
     expect(JSON.stringify(latest)).not.toContain('super-secret-token');
   });
 
-  it('validates app bridge placeholder tokens by hash and never exposes token records', () => {
+  it('validates app bridge loopback tokens by hash and never exposes token records', () => {
     const issued = issueAppBridgeToken(60_000, new Date('2025-01-01T00:00:00.000Z'));
 
     expect(issued.token).not.toBe(issued.record.tokenHash);

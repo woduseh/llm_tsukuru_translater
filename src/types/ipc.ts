@@ -11,7 +11,9 @@ export const SEND_CHANNELS = [
    'compareReady', 'verifyReady',
    'llmSettingsReady', 'settingsReady', 'mainReady',
    'terminalCreate', 'terminalInput', 'terminalResize', 'terminalKill', 'terminalList', 'terminalSnapshot',
-   'detectAgentExecutables', 'getAgentWorkspaceStatus',
+   'detectAgentExecutables', 'getAgentWorkspaceStatus', 'prepareAgentMcpConnection',
+   'mutationApprovalSubmit', 'mutationApprovalList', 'mutationApprovalGet',
+   'mutationApprovalApprove', 'mutationApprovalDeny',
 ] as const;
 
 export const RECEIVE_CHANNELS = [
@@ -21,7 +23,7 @@ export const RECEIVE_CHANNELS = [
   'initCompare', 'retranslateProgress', 'retranslateFileDone', 'retranslateBlocksDone',
   'initVerify', 'verifySettings', 'verifyLlmRepairProgress', 'verifyLlmRepairDone',
   'set-allowed-paths',
-  'terminalEvent', 'terminalSessions',
+  'terminalEvent', 'terminalSessions', 'approvalQueueChanged',
 ] as const;
 
 export type SendChannel = typeof SEND_CHANNELS[number];

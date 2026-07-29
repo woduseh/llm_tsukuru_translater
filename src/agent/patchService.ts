@@ -109,10 +109,10 @@ export class PatchService {
             message: 'Replacement text contains a newline. Line-count-changing patches require a future alignment proof and are rejected by this dry-run kernel.',
           });
         }
-        if (isSeparator(operation.originalText ?? '') && operation.originalText !== operation.replacementText) {
+        if (isRpgSeparatorLine(operation.originalText ?? '') && operation.originalText !== operation.replacementText) {
           findings.push({ severity: 'error', code: 'separator-replacement', opId: operation.opId, message: 'Separator lines must not be changed by same-line patches.' });
         }
-        if (controlCodes(operation.originalText ?? '').join('\u0000') !== controlCodes(operation.replacementText ?? '').join('\u0000')) {
+        if (extractRpgControlCodes(operation.originalText ?? '').join('\u0000') !== extractRpgControlCodes(operation.replacementText ?? '').join('\u0000')) {
           findings.push({ severity: 'error', code: 'control-code-drift', opId: operation.opId, message: 'Replacement must preserve RPG control code sequence.' });
         }
       } else if (operation.kind === 'virtual-note') {
@@ -226,11 +226,11 @@ function normalizeOperation(operation: TranslationPatchOperation, targetPath: st
   };
 }
 
-function isSeparator(line: string): boolean {
+export function isRpgSeparatorLine(line: string): boolean {
   return /^---\s*[^-]+?\s*---$/.test(line);
 }
 
-function controlCodes(line: string): string[] {
+export function extractRpgControlCodes(line: string): string[] {
   return line.match(/\\{1,2}[A-Za-z]+(?:\[[^\]\r\n]{0,24}\])?|\\[{}$|.!<>^]/g) ?? [];
 }
 

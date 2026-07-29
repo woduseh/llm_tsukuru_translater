@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 describe('appContext', () => {
   let appCtx: any;
@@ -88,5 +88,23 @@ describe('appContext', () => {
       expect(appCtx.WolfExtData).toBe(data);
       expect(appCtx.WolfExtData).toHaveLength(2);
     });
+  });
+
+  it('disposes approval runtime state and rotates the app session on reset', async () => {
+    const { AppContext } = await import('../../src/appContext');
+    const ctx = new AppContext();
+    const dispose = vi.fn();
+    const stop = vi.fn().mockResolvedValue(undefined);
+    const previousSessionId = ctx.agentAppSessionId;
+    ctx.mutationApprovalRuntime = { dispose } as never;
+    ctx.agentBridgeServer = { stop } as never;
+
+    ctx.reset();
+
+    expect(stop).toHaveBeenCalledOnce();
+    expect(ctx.agentBridgeServer).toBeNull();
+    expect(dispose).toHaveBeenCalledWith('context-reset');
+    expect(ctx.mutationApprovalRuntime).toBeNull();
+    expect(ctx.agentAppSessionId).not.toBe(previousSessionId);
   });
 });

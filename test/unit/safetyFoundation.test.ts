@@ -37,6 +37,19 @@ describe('atomic file writes', () => {
     expect(listAtomicTemps(dir)).toEqual([]);
   });
 
+  it('preserves an explicitly requested file mode across replacement', () => {
+    const dir = makeSandboxDir();
+    const targetPath = path.join(dir, 'mode.txt');
+    fs.writeFileSync(targetPath, 'before', 'utf-8');
+    fs.chmodSync(targetPath, 0o640);
+    const expectedMode = fs.statSync(targetPath).mode & 0o777;
+
+    atomicWriteTextFile(targetPath, 'after', { mode: expectedMode });
+
+    expect(fs.readFileSync(targetPath, 'utf-8')).toBe('after');
+    expect(fs.statSync(targetPath).mode & 0o777).toBe(expectedMode);
+  });
+
   it('removes stale temp files only for the target file pattern', () => {
     const dir = makeSandboxDir();
     const targetPath = path.join(dir, 'state.json');

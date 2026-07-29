@@ -27,6 +27,18 @@
 - Sub-windows must follow the existing ready-signal pattern before data is sent.
 - Compare and verify views must expose enough stable state for automation to assert health.
 - Settings and verify screens must never leak secrets into renderer-safe payloads.
+- Approval previews must show every bounded material line change before an explicit per-request decision.
+
+## Agent Bridge Rules
+
+- The approval bridge must bind only to `127.0.0.1` and require bearer, app-session, bridge-session, and project-hash bindings.
+- Bearer and confirmation tokens must never enter renderer state, copied command text, MCP results, logs, or audit metadata.
+- The renderer file bridge must deny the protected rendezvous-manifest directory even though it can access other approved `userData` files.
+- External MCP clients may submit proposals and read sanitized status only; they cannot approve, deny, or directly write project files.
+- A missing, stale, cross-project, oversized, unauthenticated, or rate-limited bridge request must fail closed.
+- App approval may execute only the exact project, path, source bytes, arguments, and preview that were bound to that one pending request.
+- Approved writes must preserve UTF-8 BOM presence, every CRLF/LF separator, final-newline state, file mode where supported, separators, empty lines, control codes, and total line count.
+- Post-write verification must compare exact expected bytes and restore the exact in-memory preimage atomically before reporting a recoverable verification failure.
 
 ## CI Rules
 

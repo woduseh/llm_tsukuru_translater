@@ -1,11 +1,11 @@
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
-import { redactSecretLikeValues } from '../agent/contractsValidation';
+import { redactSecretLikeValues } from './contractsValidation';
 
 export interface AppBridgeTokenRecord {
   tokenHash: string;
   createdAt: string;
   expiresAt: string;
-  bridgeKind: 'placeholder';
+  bridgeKind: 'loopback-v1';
   redactedToken: '[REDACTED]';
 }
 
@@ -22,13 +22,17 @@ export function issueAppBridgeToken(ttlMs = 10 * 60 * 1000, now = new Date()): A
       tokenHash: hashBridgeToken(token),
       createdAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + ttlMs).toISOString(),
-      bridgeKind: 'placeholder',
+      bridgeKind: 'loopback-v1',
       redactedToken: '[REDACTED]',
     },
   };
 }
 
-export function validateAppBridgeToken(record: AppBridgeTokenRecord, candidateToken: string, now = new Date()): boolean {
+export function validateAppBridgeToken(
+  record: AppBridgeTokenRecord,
+  candidateToken: string,
+  now = new Date(),
+): boolean {
   if (!candidateToken || now.getTime() > Date.parse(record.expiresAt)) return false;
   const candidateHash = hashBridgeToken(candidateToken);
   const expected = Buffer.from(record.tokenHash, 'hex');

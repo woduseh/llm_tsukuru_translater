@@ -1,8 +1,11 @@
 import { BrowserWindow } from 'electron';
+import * as crypto from 'crypto';
 import { AppSettings } from './types/settings';
 import { ExtractedFileData } from './ts/rpgmv/types';
 import type { extData, wolfMetadata } from './ts/wolf/types';
 import type { TerminalService } from './agent/terminalService';
+import type { MutationApprovalRuntime } from './agent/mutationApprovalRuntime';
+import type { AgentBridgeServer } from './agent/agentBridgeServer';
 
 export class AppContext {
   mainWindow: BrowserWindow | null = null;
@@ -19,12 +22,18 @@ export class AppContext {
   terminalProjectRoots: string[] = [];
   currentTerminalProjectRoot = '';
   terminalService: TerminalService | null = null;
+  agentAppSessionId = `app-${crypto.randomUUID()}`;
+  mutationApprovalRuntime: MutationApprovalRuntime | null = null;
+  agentBridgeServer: AgentBridgeServer | null = null;
   WolfExtData: extData[] = [];
   WolfCache: Record<string, Buffer> = {};
   WolfMetadata: wolfMetadata = { ver: -1 };
 
   /** Reset all state to defaults. Used for test isolation. */
   reset(): void {
+    void this.agentBridgeServer?.stop();
+    this.agentBridgeServer = null;
+    this.mutationApprovalRuntime?.dispose('context-reset');
     this.mainWindow = null;
     this.settingsWindow = null;
     this.settings = {} as AppSettings;
@@ -39,6 +48,8 @@ export class AppContext {
     this.terminalProjectRoots = [];
     this.currentTerminalProjectRoot = '';
     this.terminalService = null;
+    this.agentAppSessionId = `app-${crypto.randomUUID()}`;
+    this.mutationApprovalRuntime = null;
     this.WolfExtData = [];
     this.WolfCache = {};
     this.WolfMetadata = { ver: -1 };

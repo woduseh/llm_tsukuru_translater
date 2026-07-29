@@ -49,7 +49,7 @@ export function validateApprovalRequest(value: unknown): ValidationResult<Approv
     optionalString(obj, 'confirmToken', errors);
     optionalString(obj, 'sessionId', errors);
     requireIsoDate(obj, 'expiresAt', errors);
-    requireEnum(obj, 'status', ['pending', 'granted', 'denied', 'expired'], errors);
+    requireEnum(obj, 'status', ['pending', 'granted', 'denied', 'expired', 'stale', 'cancelled'], errors);
   });
   return toResult(value, errors);
 }

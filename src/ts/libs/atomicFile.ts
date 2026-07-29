@@ -7,6 +7,7 @@ export type AtomicWritePhase = 'cleanup' | 'write' | 'replace';
 
 export interface AtomicWriteOptions {
   encoding?: BufferEncoding;
+  mode?: number;
   cleanupStaleTempFiles?: boolean;
   staleTempMaxAgeMs?: number;
   nowMs?: number;
@@ -62,6 +63,7 @@ export function atomicWriteTextFile(
   try {
     fd = fs.openSync(tempPath, 'wx', 0o666);
     fs.writeFileSync(fd, content, { encoding });
+    if (options.mode !== undefined) fs.fchmodSync(fd, options.mode);
     fs.fsyncSync(fd);
     fs.closeSync(fd);
     fd = undefined;

@@ -11,7 +11,7 @@ The app is an Electron 40 desktop tool for translating RPG Maker MV/MZ and Wolf 
 - `src/ts/wolf/` contains the Wolf RPG extract/apply pipeline.
 - `src/ts/libs/` contains shared translation, provider, file, and validation utilities.
 - `src/agent/` contains the analysis kernel, project-protecting workspace services, QA, and terminal runtime.
-- `src/mcp/` exposes the offline stdio MCP surface used by external Codex or Claude CLIs.
+- `src/mcp/` exposes the offline stdio MCP surface and the authenticated app-bridge proxy used by external Codex or Claude CLIs.
 - `src/harness/` contains the in-app Electron UI smoke runtime.
 
 ## Core Translation Flow
@@ -34,7 +34,7 @@ Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-speci
 - `src/ipc/translateHandler.ts`: LLM settings, bulk translation, retranslate actions
 - `src/ipc/toolsHandler.ts`: compare window, JSON verify window, verify-side LLM repair
 - `src/ipc/settingsHandler.ts`: settings persistence and renderer-safe settings payloads
-- `src/ipc/agentHandler.ts`: agent environment status and MCP connection guidance
+- `src/ipc/agentHandler.ts`: agent environment status, approval IPC, and MCP connection guidance
 - `src/ipc/terminalHandler.ts`: managed terminal lifecycle and terminal events
 - `src/preload.ts`: channel whitelist and secure bridge APIs
 
@@ -45,14 +45,19 @@ Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-speci
 - `LlmSettingsPage.vue`: translation-launch window
 - `LlmComparePage.vue`: block mismatch and untranslated review
 - `JsonVerifyPage.vue`: structural verification, repair, and LLM shift repair
-- `AgentWorkspacePage.vue`: environment status, MCP setup, CLI presets, and real terminal sessions
+- `AgentWorkspacePage.vue`: approval queue, environment status, MCP setup, CLI presets, and real terminal sessions
 
 ## Agent and MCP Boundaries
 
 - Translation and apply execution remain app UI responsibilities.
 - The bundled offline MCP server may read project structure and translation quality state.
 - MCP writes are restricted to bounded analysis artifacts under `.llm-tsukuru-agent/`.
-- The offline MCP surface does not expose source-project mutation, translation, or apply tools.
+- When launched without an app bridge, the offline MCP surface does not expose a working source-project mutation path.
+- The Electron main process owns one `MutationApprovalRuntime` and one HTTP bridge bound to `127.0.0.1` for the selected project.
+- The per-process rendezvous manifest lives under Electron `userData/llm-tsukuru-agent-bridge/`, is blocked from renderer file APIs, and contains a rotating bearer plus app/project/bridge bindings.
+- MCP registration commands contain only `--bridge-manifest <path>`. The stdio adapter derives the project from its copied bundle, verifies the project hash, and exposes proxy `patch.apply` plus read-only `approval.status`.
+- `patch.apply` only submits a bounded proposal. External agents cannot approve or deny it; an explicit app-UI approval lets the main-process runtime execute that one bound patch.
+- The mutation executor revalidates the canonical project, source bytes, argument/preview hashes, original lines, separators, empty lines, and RPG control codes before a same-directory atomic replacement. It preserves BOM, per-line CRLF/LF separators, final-newline state, and file mode, then re-reads the result and atomically restores the exact preimage if verification fails.
 - Renderer terminal sessions come from the main-process `TerminalService`; the renderer does not create placeholder sessions.
 
 ## Harness Boundaries

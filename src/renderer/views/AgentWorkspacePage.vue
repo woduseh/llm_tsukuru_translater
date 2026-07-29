@@ -11,6 +11,8 @@
       <button type="button" class="btn-secondary" @click="$router.push('/')">홈으로</button>
     </section>
 
+    <AgentApprovalQueue :focus-approval-id="focusApprovalId" />
+
     <section class="workspace-grid">
       <div class="panel navigator">
         <h2>명령 프리셋</h2>
@@ -155,16 +157,16 @@
               {{ mcpConnectBusy ? '준비 중…' : '연결 명령 생성' }}
             </button>
           </div>
-          <p v-if="!mcpConnection" class="mcp-connect-hint">프로젝트 폴더를 선택한 뒤 누르면 Codex·Claude CLI에 분석 도구를 연결합니다. 산출물은 .llm-tsukuru-agent에만 기록되고 게임 파일은 수정하지 않습니다.</p>
+          <p v-if="!mcpConnection" class="mcp-connect-hint">프로젝트 폴더를 선택한 뒤 누르면 Codex·Claude CLI에 분석 도구와 변경 제안 도구를 연결합니다. 제안은 앱 승인 큐에서 직접 승인해야 하며 CLI가 파일을 바로 수정할 수는 없습니다.</p>
           <p v-else-if="!mcpConnection.ok" class="mcp-connect-error">{{ mcpConnection.reason }}</p>
           <template v-else>
             <label>Codex
-              <div class="mcp-cmd"><code>{{ mcpConnection.commands?.codex }}</code><button type="button" @click="copyCommand(mcpConnection.commands?.codex ?? '')">복사</button></div>
+              <div class="mcp-cmd"><code data-harness-mcp-command="codex">{{ mcpConnection.commands?.codex }}</code><button type="button" @click="copyCommand(mcpConnection.commands?.codex ?? '')">복사</button></div>
             </label>
             <label>Claude
-              <div class="mcp-cmd"><code>{{ mcpConnection.commands?.claude }}</code><button type="button" @click="copyCommand(mcpConnection.commands?.claude ?? '')">복사</button></div>
+              <div class="mcp-cmd"><code data-harness-mcp-command="claude">{{ mcpConnection.commands?.claude }}</code><button type="button" @click="copyCommand(mcpConnection.commands?.claude ?? '')">복사</button></div>
             </label>
-            <p class="mcp-connect-hint">해당 CLI에서 한 번 실행하면 등록돼요.</p>
+            <p class="mcp-connect-hint">해당 CLI에서 한 번 실행하면 등록돼요. 연결 정보는 현재 앱 세션과 선택한 프로젝트에만 유효합니다.</p>
           </template>
         </div>
 
@@ -190,9 +192,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import TitleBar from '../components/TitleBar.vue'
 import AgentTerminalPane from '../components/AgentTerminalPane.vue'
+import AgentApprovalQueue from '../components/AgentApprovalQueue.vue'
 import { api } from '../composables/useIpc'
 import {
   createAgentWorkspaceViewModel,
@@ -208,12 +212,15 @@ import {
   type AgentStarterPrompt,
 } from '../agentWorkspaceModel'
 import { useTerminalSessions } from '../composables/useTerminalSessions'
+import { useMutationApprovals } from '../composables/useMutationApprovals'
 import type { AgentExecutableDetectionResult } from '../../agent/agentExecutableDetection'
 import type { AgentWorkspaceStatus } from '../../agent/agentWorkspaceStatus'
 import type { TerminalSessionKind } from '../../types/agentWorkspace'
 
 const workspace = reactive(createAgentWorkspaceViewModel())
+const route = useRoute()
 const { sessions: terminalSessions, launch } = useTerminalSessions()
+const { refresh: refreshApprovals } = useMutationApprovals()
 const activeAgentPresetId = ref<AgentCliPreset['id']>(workspace.agentPresets[0].id)
 const activeCommandPresetId = ref('')
 const selectedPrompt = ref('')
@@ -221,6 +228,10 @@ const liveStatus = ref<AgentWorkspaceStatus | null>(null)
 const activeSessionId = ref('')
 const launchBusy = ref(false)
 const launchMessage = ref('')
+const focusApprovalId = computed(() => {
+  const value = route.query.approval
+  return typeof value === 'string' ? value : ''
+})
 
 interface McpConnectionResult {
   ok: boolean
@@ -272,7 +283,8 @@ async function focusShellTerminal() {
 let refreshing = false
 
 onMounted(async () => {
-  await refreshAll()
+  await Promise.all([refreshAll(), refreshApprovals()])
+  await focusRequestedApproval()
   window.addEventListener('focus', handleWindowFocus)
 })
 
@@ -283,6 +295,10 @@ onUnmounted(() => {
 watch(terminalSessions, (next) => {
   activeSessionId.value = chooseActiveTerminalSessionId(next, activeSessionId.value)
 }, { immediate: true })
+
+watch(focusApprovalId, () => {
+  void focusRequestedApproval()
+})
 
 async function launchKind(kind: TerminalSessionKind) {
   launchBusy.value = true
@@ -298,6 +314,18 @@ async function launchKind(kind: TerminalSessionKind) {
 
 function handleWindowFocus() {
   void refreshAll()
+  void refreshApprovals()
+}
+
+async function focusRequestedApproval() {
+  if (!focusApprovalId.value) return
+  await nextTick()
+  const card = document.getElementById(`approval-${focusApprovalId.value}`)
+  if (!(card instanceof HTMLElement)) return
+  const details = card.querySelector('details')
+  if (details instanceof HTMLDetailsElement) details.open = true
+  card.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  card.focus({ preventScroll: true })
 }
 
 async function refreshAll() {

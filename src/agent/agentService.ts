@@ -19,6 +19,7 @@ import { AgentWorkspaceDescriptor, WorkspaceService, type WorkspaceServiceOption
 export interface AgentServiceOptions extends WorkspaceServiceOptions {
   eventHistoryLimit?: number;
   sessionId?: string;
+  approvalAuditMode?: 'full-redacted' | 'metadata-only';
 }
 
 export class AgentService {
@@ -40,7 +41,7 @@ export class AgentService {
   readonly memory: MemoryService;
   readonly qa: QaService;
   readonly repair: RepairLoopService;
-  private readonly manifestOptions: Omit<AgentServiceOptions, 'projectRoot' | 'eventHistoryLimit' | 'sessionId'>;
+  private readonly manifestOptions: Omit<AgentServiceOptions, 'projectRoot' | 'eventHistoryLimit' | 'sessionId' | 'approvalAuditMode'>;
 
   constructor(options: AgentServiceOptions) {
     this.workspace = new WorkspaceService(options.projectRoot);
@@ -68,7 +69,12 @@ export class AgentService {
       artifacts: this.artifacts,
       dataRefs: this.dataRefs,
     });
-    this.approvals = new ApprovalService({ eventBus: this.eventBus, sessionId: options.sessionId, auditRoot: this.descriptor.workspaceRoot });
+    this.approvals = new ApprovalService({
+      eventBus: this.eventBus,
+      sessionId: options.sessionId,
+      auditRoot: this.descriptor.workspaceRoot,
+      auditMode: options.approvalAuditMode,
+    });
     this.files = new AgentSafeFileSystem({
       projectRoot: this.descriptor.projectRoot,
       allowedRoots: [this.descriptor.projectRoot, this.descriptor.workspaceRoot],

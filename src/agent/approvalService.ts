@@ -24,6 +24,7 @@ export interface ApprovalServiceOptions {
   now?: () => Date;
   sessionId?: string;
   auditRoot?: string;
+  auditMode?: 'full-redacted' | 'metadata-only';
 }
 
 export interface ApprovalPlanInput {
@@ -186,24 +187,41 @@ export class ApprovalService {
       action: input.action,
       status: input.status,
       paths: input.paths ?? [],
-      args: redactSecretLikeValues(input.args).value,
+      ...(this.options.auditMode === 'metadata-only'
+        ? {}
+        : { args: redactSecretLikeValues(input.args).value }),
       argsHash: hashArgs(input.args),
     });
   }
 
   private writeAudit(action: string, approval: ApprovalRequest, args: JsonObject, status: string): void {
-    const redactedApproval = {
-      ...approval,
-      ...(approval.confirmToken ? { confirmToken: '[REDACTED]' } : {}),
-    } as unknown as JsonObject;
+    const approvalAudit = this.options.auditMode === 'metadata-only'
+      ? {
+          schemaVersion: 1,
+          approvalId: approval.approvalId,
+          requestId: approval.requestId,
+          toolName: approval.toolName,
+          permissionTier: approval.permissionTier,
+          planOperation: approval.planOperation ?? '',
+          affectedPaths: approval.affectedPaths,
+          argsHash: approval.argsHash ?? '',
+          expiresAt: approval.expiresAt,
+          status: approval.status,
+        }
+      : {
+          ...approval,
+          ...(approval.confirmToken ? { confirmToken: '[REDACTED]' } : {}),
+        };
     this.appendAudit({
       schemaVersion: 1,
       timestamp: this.now().toISOString(),
       kind: 'approval',
       action,
       status,
-      approval: redactedApproval,
-      args: redactSecretLikeValues(args).value,
+      approval: approvalAudit as unknown as JsonObject,
+      ...(this.options.auditMode === 'metadata-only'
+        ? {}
+        : { args: redactSecretLikeValues(args).value }),
       argsHash: hashArgs(args),
     });
   }

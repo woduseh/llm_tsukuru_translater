@@ -15,10 +15,10 @@ function quote(value: string): string {
 
 export function buildMcpConnectionCommands(
   serverPath: string,
-  projectRoot: string,
+  bridgeManifestPath: string,
   serverName = 'llm-tsukuru',
 ): McpConnectionCommands {
-  const launch = `node ${quote(serverPath)} --project ${quote(projectRoot)}`;
+  const launch = `node ${quote(serverPath)} --bridge-manifest ${quote(bridgeManifestPath)}`;
   return {
     serverName,
     // codex mcp add <name> -- <command...>

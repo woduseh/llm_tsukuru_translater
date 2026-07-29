@@ -54,6 +54,7 @@ They validate:
 - bulk translation workflow behavior with a mocked translator
 - fixture corpus scoring for structure and repair cases
 - the packaged MCP agent server initialization, tool list, and project context response
+- the bundled stdio MCP submit → app-owned approve/apply → applied-status round trip with exact target-byte verification
 
 `harness:core` and `harness:eval` also write `*-task-manifest.json` files, which list deterministic case ids and fixture inputs. The core manifest records the mock-provider scaffold used by the bulk translation workflow.
 
@@ -65,9 +66,11 @@ They validate:
 - LLM settings window
 - compare window
 - JSON verify window
-- agent workspace environment, MCP connection, CLI presets, and terminal surface
+- agent workspace approval queue, environment, manifest-based MCP connection, CLI presets, and terminal surface
 
-The UI harness uses stable `data-*` attributes and DOM text instead of pixel-based visual tests. It asserts the fixture contract for route and heading state, agent environment and preset counts, provider readiness, compare mismatch/untranslated counts, and JSON verification issue counts.
+The UI harness uses stable `data-*` attributes and DOM text instead of pixel-based visual tests. It asserts the fixture contract for route and heading state, approval reachability and keyboard focus, explicit approval to applied-state transition with exact CRLF/control-code-preserving file bytes, manifest-based MCP commands without bearer exposure, agent environment and preset counts, provider readiness, compare mismatch/untranslated counts, and JSON verification issue counts.
+
+After building a Windows unpacked or installed app, set `LLM_TSUKURU_UI_HARNESS_EXECUTABLE` to its `.exe` path and run `npm run harness:ui` to execute the same deterministic flow against the packaged runtime instead of the development Electron binary.
 
 ## Live Harness
 

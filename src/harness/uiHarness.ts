@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { AppContext } from '../appContext';
+import { AgentBridgeServer } from '../agent/agentBridgeServer';
+import { MutationApprovalRuntime } from '../agent/mutationApprovalRuntime';
 import log from '../logger';
 
 interface UiHarnessScenario {
@@ -209,13 +211,86 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
 
     ctx.terminalProjectRoots = [scenario.compareDir];
     ctx.currentTerminalProjectRoot = scenario.compareDir;
-    await mainWindow.webContents.executeJavaScript(`location.hash = '#/agent-workspace'`, true);
+    const approvalTargetPath = path.join(scenario.compareDir, 'Harness', 'Approval.txt');
+    const approvalOriginalBytes = Buffer.from('--- 101 ---\r\nHello \\V[1]\r\n', 'utf-8');
+    const approvalExpectedBytes = Buffer.from('--- 101 ---\r\n안녕하세요 \\V[1]\r\n', 'utf-8');
+    fs.mkdirSync(path.dirname(approvalTargetPath), { recursive: true });
+    fs.writeFileSync(approvalTargetPath, approvalOriginalBytes);
+    ctx.mutationApprovalRuntime = new MutationApprovalRuntime({
+      projectRoot: scenario.compareDir,
+      appSessionId: ctx.agentAppSessionId,
+      onChanged: (queueSnapshot) => {
+        if (ctx.mainWindow && !ctx.mainWindow.isDestroyed()) {
+          ctx.mainWindow.webContents.send('approvalQueueChanged', queueSnapshot);
+        }
+      },
+    });
+    ctx.agentBridgeServer = new AgentBridgeServer({
+      runtime: ctx.mutationApprovalRuntime,
+      userDataPath: app.getPath('userData'),
+    });
+    const bridgeManifest = await ctx.agentBridgeServer.start();
+    const approval = ctx.mutationApprovalRuntime.submit({
+      schemaVersion: 1,
+      requestId: 'ui-harness-approval',
+      idempotencyKey: 'ui-harness-approval-v1',
+      toolName: 'patch.apply',
+      patch: {
+        schemaVersion: 1,
+        patchId: 'ui-harness-patch',
+        createdAt: new Date().toISOString(),
+        dryRunOnly: true,
+        targetPath: 'Harness/Approval.txt',
+        operations: [{
+          opId: 'replace-greeting',
+          kind: 'replace-line',
+          targetPath: 'Harness/Approval.txt',
+          lineNumber: 2,
+          originalText: 'Hello \\V[1]',
+          replacementText: '안녕하세요 \\V[1]',
+        }],
+        invariantPolicy: {
+          preserveLineCount: true,
+          requiresAlignmentProofForLineCountChange: true,
+        },
+      },
+    }, 'renderer');
+
+    await waitForSelector(mainWindow, '[data-harness-approval-banner]', stepTimeoutMs);
+    await waitForAttributeValue(
+      mainWindow,
+      '[data-harness-approval-banner]',
+      'data-pending-count',
+      '1',
+      stepTimeoutMs,
+    );
+    const approvalBanner = await snapshot(mainWindow, `(() => ({
+      pendingCount: document.querySelector('[data-harness-approval-banner]')?.getAttribute('data-pending-count'),
+      accessibleFromHome: Boolean(document.querySelector('[data-harness-approval-banner]')),
+    }))()`);
+    assertSnapshotValues('approvalBanner', approvalBanner, {
+      pendingCount: '1',
+      accessibleFromHome: true,
+    });
+
+    await mainWindow.webContents.executeJavaScript(
+      `document.querySelector('[data-harness-approval-banner]')?.click()`,
+      true,
+    );
     const agentWorkspaceWindow = await waitForWindow('/agent-workspace', stepTimeoutMs);
     await waitForSelector(agentWorkspaceWindow, '[data-harness-view="agent-workspace"]', stepTimeoutMs);
     await waitForSelector(agentWorkspaceWindow, '[data-harness-agent-env-status]', stepTimeoutMs);
     await waitForSelector(agentWorkspaceWindow, '[data-harness-agent-mcp-connect]', stepTimeoutMs);
     await waitForSelector(agentWorkspaceWindow, '[data-harness-agent-cli-presets]', stepTimeoutMs);
     await waitForSelector(agentWorkspaceWindow, '[data-harness-agent-terminal-surface]', stepTimeoutMs);
+    await waitForSelector(agentWorkspaceWindow, '[data-harness-approval-queue]', stepTimeoutMs);
+    await waitForSelector(agentWorkspaceWindow, '[data-harness-approval-request]', stepTimeoutMs);
+    await waitForSelector(agentWorkspaceWindow, '[data-harness-approval-preview-operation]', stepTimeoutMs);
+    await agentWorkspaceWindow.webContents.executeJavaScript(
+      `document.querySelector('[data-harness-agent-mcp-connect] button')?.click()`,
+      true,
+    );
+    await waitForSelector(agentWorkspaceWindow, '[data-harness-mcp-command="codex"]', stepTimeoutMs);
     const agentWorkspace = await snapshot(agentWorkspaceWindow, `(() => ({
       route: location.hash,
       heading: document.querySelector('[data-harness-view="agent-workspace"] h1')?.textContent?.trim(),
@@ -223,15 +298,69 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       cliPresetCount: document.querySelectorAll('[data-harness-agent-cli-presets] button').length,
       mcpConnectPresent: Boolean(document.querySelector('[data-harness-agent-mcp-connect]')),
       terminalSurfacePresent: Boolean(document.querySelector('[data-harness-agent-terminal-surface]')),
+      approvalPendingCount: document.querySelector('[data-harness-approval-pending-count]')?.textContent?.trim(),
+      approvalStatus: document.querySelector('[data-harness-approval-request]')?.getAttribute('data-approval-status'),
+      approvalPreviewRows: document.querySelectorAll('[data-harness-approval-preview-operation]').length,
+      approvalApprovePresent: Boolean(document.querySelector('[data-harness-approval-approve]')),
+      approvalDenyPresent: Boolean(document.querySelector('[data-harness-approval-deny]')),
+      focusedApprovalId: document.activeElement?.getAttribute('data-approval-id'),
+      focusedDetailsOpen: Boolean(document.activeElement?.querySelector('details')?.open),
+      summaryKeyboardReachable: document.querySelector('[data-harness-approval-request] summary')?.tabIndex === 0,
+      mcpCommandCount: document.querySelectorAll('[data-harness-mcp-command]').length,
+      mcpUsesBridgeManifest: Array.from(document.querySelectorAll('[data-harness-mcp-command]')).every(
+        (node) => node.textContent?.includes('--bridge-manifest'),
+      ),
+      mcpExposesBearer: Array.from(document.querySelectorAll('[data-harness-mcp-command]')).some(
+        (node) => node.textContent?.includes(${JSON.stringify(bridgeManifest.token)}),
+      ),
     }))()`);
     assertSnapshotValues('agentWorkspace', agentWorkspace, {
-      route: '#/agent-workspace',
+      route: `#/agent-workspace?approval=${approval.approvalId}`,
       heading: 'AI 작업공간',
       environmentItems: 4,
       cliPresetCount: 3,
       mcpConnectPresent: true,
       terminalSurfacePresent: true,
+      approvalPendingCount: '1',
+      approvalStatus: 'pending',
+      approvalPreviewRows: 1,
+      approvalApprovePresent: true,
+      approvalDenyPresent: true,
+      focusedApprovalId: approval.approvalId,
+      focusedDetailsOpen: true,
+      summaryKeyboardReachable: true,
+      mcpCommandCount: 2,
+      mcpUsesBridgeManifest: true,
+      mcpExposesBearer: false,
     });
+
+    await agentWorkspaceWindow.webContents.executeJavaScript(
+      `document.querySelector('[data-harness-approval-approve]')?.click()`,
+      true,
+    );
+    await waitForAttributeValue(
+      agentWorkspaceWindow,
+      '[data-harness-approval-request]',
+      'data-approval-status',
+      'applied',
+      stepTimeoutMs,
+    );
+    const approvalApplied = await snapshot(agentWorkspaceWindow, `(() => ({
+      approvalPendingCount: document.querySelector('[data-harness-approval-pending-count]')?.textContent?.trim(),
+      approvalStatus: document.querySelector('[data-harness-approval-request]')?.getAttribute('data-approval-status'),
+      resultText: document.querySelector('[data-harness-approval-request] .request-result.success')?.textContent?.trim(),
+      approvalApprovePresent: Boolean(document.querySelector('[data-harness-approval-approve]')),
+      approvalDenyPresent: Boolean(document.querySelector('[data-harness-approval-deny]')),
+    }))()`);
+    assertSnapshotValues('approvalApplied', approvalApplied, {
+      approvalPendingCount: '0',
+      approvalStatus: 'applied',
+      approvalApprovePresent: false,
+      approvalDenyPresent: false,
+    });
+    if (!fs.readFileSync(approvalTargetPath).equals(approvalExpectedBytes)) {
+      throw new Error('UI approval did not apply the exact expected bytes');
+    }
 
     const llmSettingsMissing = await openLlmSettingsSnapshot(ctx, false, scenario.compareDir, stepTimeoutMs);
     const llmSettingsReady = await openLlmSettingsSnapshot(ctx, true, scenario.compareDir, stepTimeoutMs);
@@ -301,14 +430,16 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       completedAt: new Date().toISOString(),
       cases: [
         { id: 'home-window', title: 'home window exposes stable harness state', status: 'passed', durationMs: 0, details: home },
+        { id: 'approval-banner', title: 'pending approval is visible and reachable outside Agent Workspace', status: 'passed', durationMs: 0, details: approvalBanner },
         { id: 'agent-workspace', title: 'agent workspace exposes stable environment, MCP, preset, and terminal state', status: 'passed', durationMs: 0, details: agentWorkspace },
+        { id: 'approval-apply', title: 'approved UI patch is applied with exact preserved bytes', status: 'passed', durationMs: 0, details: approvalApplied },
         { id: 'llm-settings-missing', title: 'LLM settings reports missing provider readiness', status: 'passed', durationMs: 0, details: llmSettingsMissing },
         { id: 'llm-settings-ready', title: 'LLM settings reports ready provider state', status: 'passed', durationMs: 0, details: llmSettingsReady },
         { id: 'compare-window', title: 'compare window summarizes fixture mismatches', status: 'passed', durationMs: 0, details: compare },
         { id: 'json-verify-window', title: 'JSON verify window summarizes fixture issues', status: 'passed', durationMs: 0, details: verify },
       ],
       metrics: {
-        caseCount: 6,
+        caseCount: 8,
         deterministic: true,
       },
       artifacts: {
@@ -317,7 +448,9 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       reproCommand: 'npm run harness:ui',
       snapshots: {
         home,
+        approvalBanner,
         agentWorkspace,
+        approvalApplied,
         llmSettingsMissing,
         llmSettingsReady,
         compare,

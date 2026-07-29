@@ -1,5 +1,12 @@
 import { onUnmounted } from 'vue'
 import type {
+  MutationApprovalApproveRequest,
+  MutationApprovalDenyRequest,
+  MutationApprovalGetRequest,
+  MutationApprovalListRequest,
+  MutationApprovalOperationResult,
+  MutationApprovalQueueSnapshot,
+  PatchApplyProposalRequest,
   TerminalEvent,
   TerminalInputRequest,
   TerminalKillRequest,
@@ -27,6 +34,14 @@ interface ElectronApi {
     snapshot: (request: TerminalSnapshotRequest) => Promise<TerminalOperationResult>
     onEvent: (callback: (event: TerminalEvent) => void) => () => void
     onSessions: (callback: (result: TerminalOperationResult) => void) => () => void
+  }
+  approvals: {
+    submit: (request: PatchApplyProposalRequest) => Promise<MutationApprovalOperationResult>
+    list: (request: MutationApprovalListRequest) => Promise<MutationApprovalOperationResult>
+    get: (request: MutationApprovalGetRequest) => Promise<MutationApprovalOperationResult>
+    approve: (request: MutationApprovalApproveRequest) => Promise<MutationApprovalOperationResult>
+    deny: (request: MutationApprovalDenyRequest) => Promise<MutationApprovalOperationResult>
+    onChanged: (callback: (snapshot: MutationApprovalQueueSnapshot) => void) => () => void
   }
 }
 
@@ -73,6 +88,7 @@ export const api = {
   removeAllListeners: (channel: string) => window.api.removeAllListeners(channel),
   invoke: (channel: string, ...args: unknown[]) => window.api.invoke(channel, ...args),
   terminal: window.api.terminal,
+  approvals: window.api.approvals,
 }
 
 /** Register an IPC listener that auto-cleans on component unmount */

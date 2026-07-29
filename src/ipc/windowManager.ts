@@ -8,6 +8,8 @@ import { loadSettings, setOPath, defaultHeight } from './shared';
 import { loadRoute } from './viteHelper';
 import { AppContext } from '../appContext';
 import { PROJECT_ROOT } from '../projectRoot';
+import { MutationApprovalRuntime } from '../agent/mutationApprovalRuntime';
+import { AgentBridgeServer } from '../agent/agentBridgeServer';
 import { rememberAllowedProjectRoot } from './llmProjectPathValidation';
 
 export function createWindow(ctx: AppContext) {
@@ -109,25 +111,25 @@ export function registerWindowHandlers(ctx: AppContext) {
       }
       let dir = qs
       if(qv === 'data'){
-        rememberTrustedProjectPaths(ctx, dir, inferTerminalProjectRoot(dir));
+        await rememberTrustedProjectPaths(ctx, dir, inferTerminalProjectRoot(dir));
         ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:dir});
         ctx.mainWindow!.webContents.send('set-allowed-paths', [dir]);
       }
       else{
         if(fs.existsSync(path.join(qs, 'www', 'data'))){
           const projectDir = path.join(qs, 'www', 'data');
-          rememberTrustedProjectPaths(ctx, projectDir, qs);
+          await rememberTrustedProjectPaths(ctx, projectDir, qs);
           ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:projectDir});
           ctx.mainWindow!.webContents.send('set-allowed-paths', [projectDir]);
         }
         else if(fs.existsSync(path.join(qs, 'data'))){
           const projectDir = path.join(qs, 'data');
-          rememberTrustedProjectPaths(ctx, projectDir, qs);
+          await rememberTrustedProjectPaths(ctx, projectDir, qs);
           ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:projectDir});
           ctx.mainWindow!.webContents.send('set-allowed-paths', [projectDir]);
         }
         else if(fs.existsSync(path.join(qs, 'Data.wolf'))){
-          rememberTrustedProjectPaths(ctx, qs, qs);
+          await rememberTrustedProjectPaths(ctx, qs, qs);
           ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:path.join(qs)});
           ctx.mainWindow!.webContents.send('set-allowed-paths', [path.join(qs)]);
         }
@@ -139,14 +141,50 @@ export function registerWindowHandlers(ctx: AppContext) {
   });
 }
 
-function rememberTrustedProjectPaths(ctx: AppContext, dataRoot: string, terminalRoot: string): void {
+async function rememberTrustedProjectPaths(
+  ctx: AppContext,
+  dataRoot: string,
+  terminalRoot: string,
+): Promise<void> {
   const previousCurrentRoot = ctx.currentTerminalProjectRoot;
-  if (previousCurrentRoot && path.resolve(previousCurrentRoot).toLowerCase() !== path.resolve(terminalRoot).toLowerCase()) {
+  const projectChanged = Boolean(
+    previousCurrentRoot
+    && path.resolve(previousCurrentRoot).toLowerCase() !== path.resolve(terminalRoot).toLowerCase(),
+  );
+  if (projectChanged) {
     ctx.terminalService?.disposeAll('project-change');
+    await ctx.agentBridgeServer?.stop();
+    ctx.agentBridgeServer = null;
+    ctx.mutationApprovalRuntime?.dispose('project-change');
+    ctx.mutationApprovalRuntime = null;
   }
   ctx.allowedProjectRoots = rememberAllowedProjectRoot(ctx.allowedProjectRoots, dataRoot);
   ctx.terminalProjectRoots = rememberAllowedProjectRoot(ctx.terminalProjectRoots, terminalRoot);
   ctx.currentTerminalProjectRoot = terminalRoot;
+  if (!ctx.mutationApprovalRuntime) {
+    ctx.mutationApprovalRuntime = new MutationApprovalRuntime({
+      projectRoot: terminalRoot,
+      appSessionId: ctx.agentAppSessionId,
+      onChanged: (snapshot) => {
+        if (ctx.mainWindow && !ctx.mainWindow.isDestroyed()) {
+          ctx.mainWindow.webContents.send('approvalQueueChanged', snapshot);
+        }
+      },
+    });
+  }
+  if (!ctx.agentBridgeServer) {
+    const bridge = new AgentBridgeServer({
+      runtime: ctx.mutationApprovalRuntime,
+      userDataPath: app.getPath('userData'),
+    });
+    try {
+      await bridge.start();
+      ctx.agentBridgeServer = bridge;
+    } catch {
+      await bridge.stop();
+      ctx.agentBridgeServer = null;
+    }
+  }
 }
 
 function inferTerminalProjectRoot(dataRoot: string): string {

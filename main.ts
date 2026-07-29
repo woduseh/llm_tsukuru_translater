@@ -46,6 +46,10 @@ app.on('window-all-closed', function () {
 })
 
 app.on('before-quit', () => {
+  void ctx.agentBridgeServer?.stop();
+  ctx.agentBridgeServer = null;
+  ctx.mutationApprovalRuntime?.dispose('app-before-quit');
+  ctx.mutationApprovalRuntime = null;
   terminalService.disposeAll('app-before-quit');
 })
 

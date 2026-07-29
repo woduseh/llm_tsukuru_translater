@@ -16,9 +16,9 @@ const {
   writeJson,
 } = require('./_shared.cjs');
 
-async function runElectronHarness(env, timeoutMs) {
+async function runElectronHarness(env, timeoutMs, executablePath) {
   return new Promise((resolve, reject) => {
-    const child = spawn(electron, ['.'], {
+    const child = spawn(executablePath || electron, executablePath ? [] : ['.'], {
       cwd: projectRoot,
       stdio: 'inherit',
       env,
@@ -43,6 +43,11 @@ async function runElectronHarness(env, timeoutMs) {
 
 async function main() {
   buildAppIfNeeded();
+  const configuredExecutable = process.env.LLM_TSUKURU_UI_HARNESS_EXECUTABLE;
+  const executablePath = configuredExecutable ? path.resolve(configuredExecutable) : undefined;
+  if (executablePath && !fs.existsSync(executablePath)) {
+    throw new Error(`Packaged UI harness executable does not exist: ${executablePath}`);
+  }
 
   const workspace = makeTempDir('llm-tsukuru-ui-');
   const fixturesRoot = path.join(projectRoot, 'test', 'fixtures', 'harness', 'ui');
@@ -68,7 +73,7 @@ async function main() {
     LLM_TSUKURU_UI_HARNESS_SCENARIO: scenarioPath,
     LLM_TSUKURU_UI_HARNESS_RESULT: resultPath,
     LLM_TSUKURU_UI_HARNESS_TIMEOUT_MS: '45000',
-  }, timeoutMs);
+  }, timeoutMs, executablePath);
 
   if (!fs.existsSync(resultPath)) {
     throw new Error('UI harness did not write a result file');
@@ -85,7 +90,11 @@ async function main() {
   result.metrics = {
     ...(result.metrics || {}),
     processExitCode: exitCode,
+    executionMode: executablePath ? 'packaged' : 'development',
   };
+  result.artifacts.executable = executablePath
+    ? path.relative(projectRoot, executablePath)
+    : require.resolve('electron');
 
   writeHarnessResult('harness-ui', result);
   process.exitCode = result.status === 'passed' && exitCode === 0 ? 0 : 1;

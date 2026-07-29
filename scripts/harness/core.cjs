@@ -29,9 +29,20 @@ function buildSuccessValidation(blocks) {
   }));
 }
 
-async function runBundledMcpConversation(projectDir, timeoutMs = 10000) {
-  const bundlePath = path.join(projectRoot, 'res', 'mcp-agent-server.cjs');
-  const child = spawn(process.execPath, [bundlePath, '--project', projectDir], {
+async function runBundledMcpConversation(projectDir, options = {}) {
+  const timeoutMs = options.timeoutMs || 10000;
+  const sourceBundlePath = path.join(projectRoot, 'res', 'mcp-agent-server.cjs');
+  const bundlePath = options.bridgeManifestPath
+    ? path.join(projectDir, '.llm-tsukuru-agent', 'mcp-agent-server.cjs')
+    : sourceBundlePath;
+  if (options.bridgeManifestPath) {
+    fs.mkdirSync(path.dirname(bundlePath), { recursive: true });
+    fs.copyFileSync(sourceBundlePath, bundlePath);
+  }
+  const args = options.bridgeManifestPath
+    ? [bundlePath, '--bridge-manifest', options.bridgeManifestPath]
+    : [bundlePath, '--project', projectDir];
+  const child = spawn(process.execPath, args, {
     cwd: projectRoot,
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
@@ -124,7 +135,22 @@ async function runBundledMcpConversation(projectDir, timeoutMs = 10000) {
       name: 'project.context_snapshot',
       arguments: {},
     });
-    return { initialized, listed, called, stderr, unmatchedResponses };
+    let bridge;
+    if (options.patch) {
+      const submitted = await request(4, 'tools/call', {
+        name: 'patch.apply',
+        arguments: { patch: options.patch },
+      });
+      const submittedPayload = JSON.parse(submitted.result?.content?.[0]?.text || '{}');
+      const approvalId = submittedPayload.payload?.approvalId;
+      if (options.onSubmitted) await options.onSubmitted(approvalId);
+      const status = await request(5, 'tools/call', {
+        name: 'approval.status',
+        arguments: { approvalId },
+      });
+      bridge = { submitted, submittedPayload, status };
+    }
+    return { initialized, listed, called, bridge, stderr, unmatchedResponses };
   } finally {
     await stop();
   }
@@ -167,6 +193,8 @@ async function main() {
   const verify = loadCompiledModule('src/ts/rpgmv/verify.js');
   const translatorModule = loadCompiledModule('src/ts/rpgmv/translator.js');
   const projectTools = defaultExport(loadCompiledModule('src/ts/libs/projectTools.js'));
+  const { AgentBridgeServer } = loadCompiledModule('src/agent/agentBridgeServer.js');
+  const { MutationApprovalRuntime } = loadCompiledModule('src/agent/mutationApprovalRuntime.js');
 
   const cases = [
     {
@@ -215,6 +243,74 @@ async function main() {
             contextProjectRoot: payload.projectRoot,
           };
         } finally {
+          fs.rmSync(workspace, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      id: 'bundled-mcp-app-bridge',
+      title: 'bundled MCP submits and observes one app-owned approved patch application',
+      run: async () => {
+        const workspace = makeTempDir('llm-tsukuru-mcp-bridge-');
+        const userDataPath = path.join(workspace, 'user-data');
+        const translatedDir = path.join(workspace, 'Translated');
+        const targetPath = path.join(translatedDir, 'Map001.txt');
+        fs.mkdirSync(translatedDir, { recursive: true });
+        fs.mkdirSync(userDataPath, { recursive: true });
+        fs.writeFileSync(targetPath, '--- 101 ---\nHello\n', 'utf8');
+        const expected = Buffer.from('--- 101 ---\n안녕하세요\n', 'utf8');
+        const runtime = new MutationApprovalRuntime({
+          projectRoot: workspace,
+          appSessionId: 'app-core-harness',
+          bridgeSessionId: 'bridge-core-harness',
+        });
+        const bridgeServer = new AgentBridgeServer({ runtime, userDataPath });
+        try {
+          await bridgeServer.start();
+          const patch = {
+            schemaVersion: 1,
+            patchId: 'core-harness-patch',
+            createdAt: '2026-07-29T00:00:00.000Z',
+            dryRunOnly: true,
+            targetPath: 'Translated/Map001.txt',
+            operations: [{
+              opId: 'replace-line-1',
+              kind: 'replace-line',
+              targetPath: 'Translated/Map001.txt',
+              lineNumber: 2,
+              originalText: 'Hello',
+              replacementText: '안녕하세요',
+            }],
+            invariantPolicy: {
+              preserveLineCount: true,
+              requiresAlignmentProofForLineCountChange: true,
+            },
+          };
+          const response = await runBundledMcpConversation(workspace, {
+            bridgeManifestPath: bridgeServer.manifestPath,
+            patch,
+            onSubmitted: async (approvalId) => {
+              assert(typeof approvalId === 'string' && approvalId.length > 0, 'bridge did not return an approval ID');
+              const applied = await runtime.approve({ schemaVersion: 1, approvalId });
+              assert(applied.status === 'applied', 'app runtime did not apply the approved patch');
+            },
+          });
+          const tools = response.listed.result?.tools;
+          assert(tools.some((tool) => tool.name === 'patch.apply'), 'patch.apply proxy is missing');
+          assert(tools.some((tool) => tool.name === 'approval.status'), 'approval.status proxy is missing');
+          assert(response.bridge.submitted.result?.isError === false, 'patch proposal was reported as an MCP error');
+          assert(response.bridge.submittedPayload.status === 'needs-approval', 'proposal did not request approval');
+          const statusPayload = JSON.parse(response.bridge.status.result?.content?.[0]?.text || '{}');
+          assert(statusPayload.status === 'applied', 'terminal applied status was not returned');
+          assert(fs.readFileSync(targetPath).equals(expected), 'approved bridge patch was not applied exactly');
+          return {
+            proxyTools: ['patch.apply', 'approval.status'],
+            submittedStatus: response.bridge.submittedPayload.status,
+            terminalStatus: statusPayload.status,
+            targetApplied: true,
+          };
+        } finally {
+          await bridgeServer.stop();
           fs.rmSync(workspace, { recursive: true, force: true });
         }
       },

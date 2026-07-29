@@ -5,7 +5,7 @@ export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue
 export type JsonObject = { [key: string]: JsonValue };
 
 export type PermissionTier = 'readonly' | 'workspace-write' | 'approval-required' | 'dangerous';
-export type ApprovalStatus = 'pending' | 'granted' | 'denied' | 'expired';
+export type ApprovalStatus = 'pending' | 'granted' | 'denied' | 'expired' | 'stale' | 'cancelled';
 export type TerminalEventKind = 'stdout' | 'stderr' | 'exit' | 'started' | 'error' | 'truncated';
 export type TerminalSessionKind = 'codex' | 'claude' | 'shell' | 'custom';
 export type TerminalSessionState = 'created' | 'starting' | 'running' | 'idle' | 'exited' | 'failed' | 'killed' | 'unavailable' | 'reconnecting';
@@ -56,6 +56,120 @@ export interface ApprovalRequest {
   sessionId?: string;
   expiresAt: string;
   status: ApprovalStatus;
+}
+
+export type MutationApprovalStatus =
+  | 'pending'
+  | 'applying'
+  | 'applied'
+  | 'denied'
+  | 'expired'
+  | 'stale'
+  | 'failed'
+  | 'cancelled';
+
+export interface MutationApprovalPreviewLine {
+  opId: string;
+  lineNumber: number;
+  before: string;
+  after: string;
+}
+
+export interface MutationApprovalPreview {
+  schemaVersion: 1;
+  targetPath: string;
+  operations: MutationApprovalPreviewLine[];
+  serializedBytes: number;
+}
+
+export interface MutationApprovalInvariantSummary {
+  schemaVersion: 1;
+  lineCountPreserved: true;
+  separatorsPreserved: true;
+  emptyLinesPreserved: true;
+  controlCodesPreserved: true;
+}
+
+export interface MutationApprovalResultView {
+  schemaVersion: 1;
+  applied: true;
+  targetPath: string;
+  operationsApplied: number;
+}
+
+export interface MutationApprovalFailureView {
+  schemaVersion: 1;
+  code: string;
+  message: string;
+  retryable: boolean;
+}
+
+interface MutationApprovalViewBase {
+  schemaVersion: 1;
+  approvalId: string;
+  requestId: string;
+  toolName: 'patch.apply';
+  status: MutationApprovalStatus;
+  requestSource: 'mcp' | 'renderer';
+  projectLabel: string;
+  affectedPaths: string[];
+  preview: MutationApprovalPreview;
+  invariants: MutationApprovalInvariantSummary;
+  createdAt: string;
+  expiresAt: string;
+  result?: MutationApprovalResultView;
+  failure?: MutationApprovalFailureView;
+}
+
+export interface MutationApprovalRendererView extends MutationApprovalViewBase {
+  denialNote?: string;
+}
+
+export type MutationApprovalBridgeView = MutationApprovalViewBase;
+
+export interface PatchApplyProposalRequest {
+  schemaVersion: 1;
+  requestId: string;
+  idempotencyKey: string;
+  toolName: 'patch.apply';
+  patch: TranslationPatch;
+}
+
+export interface MutationApprovalListRequest {
+  schemaVersion: 1;
+  statuses?: MutationApprovalStatus[];
+}
+
+export interface MutationApprovalGetRequest {
+  schemaVersion: 1;
+  approvalId: string;
+}
+
+export interface MutationApprovalApproveRequest {
+  schemaVersion: 1;
+  approvalId: string;
+}
+
+export interface MutationApprovalDenyRequest {
+  schemaVersion: 1;
+  approvalId: string;
+  note?: string;
+}
+
+export interface MutationApprovalQueueSnapshot {
+  schemaVersion: 1;
+  approvals: MutationApprovalRendererView[];
+  pendingCount: number;
+}
+
+export interface MutationApprovalOperationResult {
+  schemaVersion: 1;
+  ok: boolean;
+  approval?: MutationApprovalRendererView;
+  approvals?: MutationApprovalRendererView[];
+  snapshot?: MutationApprovalQueueSnapshot;
+  errorCode?: string;
+  message?: string;
 }
 
 export interface TerminalEvent {

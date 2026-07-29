@@ -23,8 +23,12 @@ describe('IPC channel contract', () => {
   it('keeps channel allowlists stable and type-guarded for preload and renderer agents', () => {
     expect(SEND_CHANNELS).toContain('llmSettingsApply');
     expect(SEND_CHANNELS).toContain('verifyReady');
+    expect(SEND_CHANNELS).toContain('prepareAgentMcpConnection');
+    expect(SEND_CHANNELS).toContain('mutationApprovalApprove');
+    expect(SEND_CHANNELS).toContain('mutationApprovalDeny');
     expect(RECEIVE_CHANNELS).toContain('llmSettings');
     expect(RECEIVE_CHANNELS).toContain('verifyLlmRepairDone');
+    expect(RECEIVE_CHANNELS).toContain('approvalQueueChanged');
 
     expect(isSendChannel('openLLMCompare')).toBe(true);
     expect(isSendChannel('unknown-channel')).toBe(false);

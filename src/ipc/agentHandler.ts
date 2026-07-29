@@ -7,6 +7,11 @@ import fs from 'fs';
 import path from 'path';
 import { PROJECT_ROOT } from '../projectRoot';
 import { buildMcpConnectionCommands } from '../agent/mcpConnection';
+import {
+  MutationApprovalRuntimeError,
+  type MutationApprovalRuntime,
+} from '../agent/mutationApprovalRuntime';
+import type { MutationApprovalOperationResult } from '../types/agentWorkspace';
 
 /**
  * Handlers for agent workspace surfaces that need main-process capabilities.
@@ -40,6 +45,10 @@ export function registerAgentHandlers(ctx: AppContext): void {
     if (!projectRoot) {
       return { ok: false, reason: '먼저 프로젝트 폴더를 선택하세요.' };
     }
+    const bridge = ctx.agentBridgeServer;
+    if (!bridge?.isReady() || !fs.existsSync(bridge.manifestPath)) {
+      return { ok: false, reason: '앱 로컬 승인 브리지가 준비되지 않았습니다. 프로젝트를 다시 선택하세요.' };
+    }
     const bundleSource = path.join(PROJECT_ROOT, 'res', 'mcp-agent-server.cjs');
     if (!fs.existsSync(bundleSource)) {
       return { ok: false, reason: 'MCP 서버 번들을 찾을 수 없습니다. 앱을 다시 빌드하세요 (npm run build:mcp).' };
@@ -53,9 +62,80 @@ export function registerAgentHandlers(ctx: AppContext): void {
     }
     return {
       ok: true,
-      serverPath: destFile,
-      projectRoot,
-      commands: buildMcpConnectionCommands(destFile, projectRoot),
+      commands: buildMcpConnectionCommands(destFile, bridge.manifestPath),
     };
   });
+
+  ipcMain.handle('mutationApprovalSubmit', (_event, request: unknown) => {
+    return handleMutationApproval(ctx.mutationApprovalRuntime, (runtime) => ({
+      approval: runtime.submit(request, 'renderer'),
+    }));
+  });
+
+  ipcMain.handle('mutationApprovalList', (_event, request: unknown) => {
+    return handleMutationApproval(ctx.mutationApprovalRuntime, (runtime) => {
+      const approvals = runtime.list(request);
+      return {
+        approvals,
+        snapshot: {
+          schemaVersion: 1,
+          approvals,
+          pendingCount: approvals.filter((approval) => approval.status === 'pending').length,
+        },
+      };
+    });
+  });
+
+  ipcMain.handle('mutationApprovalGet', (_event, request: unknown) => {
+    return handleMutationApproval(ctx.mutationApprovalRuntime, (runtime) => ({
+      approval: runtime.get(request),
+    }));
+  });
+
+  ipcMain.handle('mutationApprovalApprove', async (_event, request: unknown) => {
+    return handleMutationApprovalAsync(ctx.mutationApprovalRuntime, async (runtime) => ({
+      approval: await runtime.approve(request),
+    }));
+  });
+
+  ipcMain.handle('mutationApprovalDeny', (_event, request: unknown) => {
+    return handleMutationApproval(ctx.mutationApprovalRuntime, (runtime) => ({
+      approval: runtime.deny(request),
+    }));
+  });
+}
+
+function handleMutationApproval(
+  runtime: MutationApprovalRuntime | null,
+  action: (runtime: MutationApprovalRuntime) => Omit<MutationApprovalOperationResult, 'schemaVersion' | 'ok'>,
+): MutationApprovalOperationResult {
+  if (!runtime) return mutationApprovalFailure('runtime-unavailable', '먼저 프로젝트 폴더를 선택하세요.');
+  try {
+    return { schemaVersion: 1, ok: true, ...action(runtime) };
+  } catch (error) {
+    return mutationApprovalErrorResult(error);
+  }
+}
+
+async function handleMutationApprovalAsync(
+  runtime: MutationApprovalRuntime | null,
+  action: (runtime: MutationApprovalRuntime) => Promise<Omit<MutationApprovalOperationResult, 'schemaVersion' | 'ok'>>,
+): Promise<MutationApprovalOperationResult> {
+  if (!runtime) return mutationApprovalFailure('runtime-unavailable', '먼저 프로젝트 폴더를 선택하세요.');
+  try {
+    return { schemaVersion: 1, ok: true, ...await action(runtime) };
+  } catch (error) {
+    return mutationApprovalErrorResult(error);
+  }
+}
+
+function mutationApprovalErrorResult(error: unknown): MutationApprovalOperationResult {
+  if (error instanceof MutationApprovalRuntimeError) {
+    return mutationApprovalFailure(error.code, error.message);
+  }
+  return mutationApprovalFailure('internal-error', '승인 요청을 안전하게 처리하지 못했습니다.');
+}
+
+function mutationApprovalFailure(errorCode: string, message: string): MutationApprovalOperationResult {
+  return { schemaVersion: 1, ok: false, errorCode, message };
 }
