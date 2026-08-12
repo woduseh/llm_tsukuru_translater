@@ -278,7 +278,7 @@ onMounted(() => {
 .hint { font-size: 11px; opacity: 0.4; }
 .tag {
   font-size: 10px; padding: 1px 5px; border-radius: 4px;
-  background: rgba(124,111,219,0.15); color: var(--accent);
+  background: rgba(84,200,232,0.14); color: var(--Healthy);
 }
 textarea {
   width: 100%; min-height: 60px; background: var(--Highlight1);
@@ -310,8 +310,8 @@ summary { font-size: 13px; cursor: pointer; opacity: 0.7; }
   background: var(--Highlight1); border: var(--border); color: var(--mainColor);
 }
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), #6c5ce7);
-  border: none; color: #fff;
+  background: var(--Accent);
+  border: 1px solid #ffc24e; color: #12181b;
 }
-.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:hover { background: var(--AccentHover); }
 </style>

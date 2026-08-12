@@ -1,71 +1,63 @@
 <template>
   <TitleBar :show-settings="true" :show-abort-btn="true" @settings="openSettings" />
-
-  <div class="app-content">
-    <!-- Folder selection -->
-    <section>
-      <label class="section-label" @click="openFolder">프로젝트 폴더</label>
-      <div class="folder-row">
-        <input type="text" v-model="folderPath" class="input" placeholder="data 폴더 경로를 선택하세요">
-        <button class="btn-secondary" @click="selectFolder">찾아보기</button>
-      </div>
-    </section>
-
-    <!-- Mode + Run -->
-    <section>
-      <div class="mode-row">
-        <div class="mode-tabs">
-          <button class="mode-tab" :class="{ active: mode === 0 }" @click="mode = 0">추출</button>
-          <button class="mode-tab" :class="{ active: mode === 1 }" @click="mode = 1">적용</button>
+  <main class="project-console app-content" data-harness-view="mvmz" :data-project-state="hasFolder ? 'ready' : 'empty'">
+    <nav class="console-rail" aria-label="프로젝트 메뉴">
+      <button type="button" @click="$router.push('/')">홈</button>
+      <button type="button" class="active" aria-current="page">MV/MZ</button>
+      <button type="button" @click="$router.push('/wolf')">Wolf</button>
+      <button type="button" @click="$router.push('/agent-workspace')">AI</button>
+    </nav>
+    <section class="console-body">
+      <header class="project-header">
+        <div>
+          <span>RPG MAKER MV / MZ</span>
+          <h1>{{ hasFolder ? '프로젝트 작업공간' : '프로젝트를 선택하세요' }}</h1>
         </div>
-        <button class="btn-run" :disabled="!canRun" :title="runButtonTitle" @click="run">RUN</button>
+        <button type="button" class="btn-secondary" @click="selectFolder">{{ hasFolder ? '프로젝트 변경' : '폴더 선택' }}</button>
+        <div class="project-path">
+          <button v-if="hasFolder" type="button" @click="openFolder">폴더 열기</button>
+          <span>{{ folderPath || '게임의 data 폴더를 선택하면 작업을 시작할 수 있습니다.' }}</span>
+        </div>
+      </header>
+
+      <div class="pipeline" aria-label="번역 작업 단계">
+        <button type="button" :class="{ current: !hasFolder || mode === 0 }" @click="hasFolder ? mode = 0 : selectFolder()"><b>1</b><span>추출<small>{{ !hasFolder ? '폴더 필요' : mode === 0 ? '선택됨' : '준비' }}</small></span></button>
+        <button type="button" :disabled="!hasFolder" @click="openLLMTranslate"><b>2</b><span>번역<small>{{ hasFolder ? '실행 가능' : '대기' }}</small></span></button>
+        <button type="button" :disabled="!hasFolder" @click="openLLMCompare"><b>3</b><span>검수<small>{{ hasFolder ? '비교 열기' : '대기' }}</small></span></button>
+        <button type="button" :class="{ current: mode === 1 }" :disabled="!hasFolder" @click="mode = 1"><b>4</b><span>적용<small>{{ mode === 1 ? '선택됨' : '대기' }}</small></span></button>
+      </div>
+
+      <div class="work-grid">
+        <section class="current-task">
+          <p class="eyebrow">현재 작업</p>
+          <h2 data-harness-current-task>{{ !hasFolder ? '프로젝트 폴더 선택' : mode === 1 ? '번역 적용' : '텍스트 추출' }}</h2>
+          <p>{{ !hasFolder ? '게임의 data 폴더를 선택하면 추출 옵션과 번역 도구가 활성화됩니다.' : mode === 1 ? '검수를 마친 번역문을 게임 데이터에 적용합니다.' : '게임 데이터에서 번역할 텍스트와 구조 정보를 추출합니다.' }}</p>
+          <button v-if="!hasFolder" type="button" class="btn-run" data-harness-primary-action @click="selectFolder">폴더 선택하기</button>
+          <button v-else class="btn-run" data-harness-primary-action :disabled="!canRun" :title="runButtonTitle" @click="run">
+            {{ running ? '작업 진행 중' : mode === 1 ? '번역 적용 시작' : '텍스트 추출 시작' }}
+          </button>
+          <button v-if="hasFolder" type="button" class="review-link" @click="openJsonVerify">JSON 구조 검증 열기</button>
+        </section>
+
+        <aside class="task-options">
+          <div class="options-heading">
+            <div><span>작업 설정</span><strong>{{ !hasFolder ? '폴더 선택 후 설정' : mode === 1 ? '적용 옵션' : '추출 옵션' }}</strong></div>
+          </div>
+          <div v-show="mode !== 1" class="options-grid">
+            <button v-for="opt in extractOptions" :key="opt.key" class="option-btn" :class="{ active: config[opt.key] }" :disabled="!hasFolder" :aria-pressed="Boolean(config[opt.key])" @click="config[opt.key] = !config[opt.key]">{{ opt.label }}</button>
+          </div>
+          <div v-show="mode === 1" class="options-grid apply-options">
+            <button v-for="opt in applyOptions" :key="opt.key" class="option-btn" :class="{ active: config[opt.key] }" :disabled="!hasFolder" :aria-pressed="Boolean(config[opt.key])" @click="config[opt.key] = !config[opt.key]">{{ opt.label }}</button>
+          </div>
+          <div class="secondary-tools">
+            <button type="button" @click="openVersionUp">버전 업</button>
+            <button type="button" @click="openFontConfig">폰트</button>
+            <button type="button" @click="convertProject">프로젝트 변환</button>
+          </div>
+        </aside>
       </div>
     </section>
-
-    <!-- Extract options -->
-    <section v-show="mode === 0">
-      <div class="options-grid">
-        <button v-for="opt in extractOptions" :key="opt.key"
-          class="option-btn" :class="{ active: config[opt.key] }"
-          @click="config[opt.key] = !config[opt.key]">
-          {{ opt.label }}
-        </button>
-      </div>
-    </section>
-
-    <!-- Apply options -->
-    <section v-show="mode === 1">
-      <div class="options-grid">
-        <button v-for="opt in applyOptions" :key="opt.key"
-          class="option-btn" :class="{ active: config[opt.key] }"
-          @click="config[opt.key] = !config[opt.key]">
-          {{ opt.label }}
-        </button>
-      </div>
-    </section>
-
-    <!-- Tools -->
-    <section>
-      <label class="section-label">도구</label>
-      <div class="tools-primary">
-        <button class="tool-btn primary" @click="openLLMTranslate">번역</button>
-        <button class="tool-btn primary" @click="openLLMCompare">번역 비교</button>
-        <button class="tool-btn primary" @click="openJsonVerify">JSON 검증</button>
-      </div>
-      <div class="tools-secondary">
-        <button class="tool-btn secondary" @click="openVersionUp">버전 업</button>
-        <button class="tool-btn secondary" @click="openFontConfig">폰트</button>
-        <button class="tool-btn secondary" @click="convertProject">프로젝트 변환</button>
-      </div>
-    </section>
-  </div>
-
-  <!-- Page tabs -->
-  <div class="page-tabs">
-    <div class="page-tab active">MV/MZ</div>
-    <div class="page-tab" @click="$router.push('/wolf')">Wolf RPG</div>
-    <div class="page-tab" @click="$router.push('/agent-workspace')">AI 작업공간</div>
-  </div>
+  </main>
 </template>
 
 <script setup lang="ts">
@@ -276,6 +268,7 @@ onMounted(() => {
     if (tt && tt.type) {
       if (tt.type === 'folder_input') {
         folderPath.value = tt.dir
+        if (mode.value === -1) mode.value = 0
       }
       // Handle version-up modal folder selects
       const el = document.getElementById(tt.type) as HTMLInputElement | null
@@ -344,3 +337,51 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.project-console { display: grid; grid-template-columns: 70px 1fr; }
+.console-rail { background: #0b1114; border-right: var(--border); padding: 13px 8px; display: flex; flex-direction: column; gap: 7px; }
+.console-rail button { min-height: 42px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 800; cursor: pointer; }
+.console-rail button:hover { color: var(--mainColor); background: #162027; }
+.console-rail button.active { background: #1c272d; color: var(--Accent); border-left: 3px solid var(--Accent); }
+.console-rail button:last-child { margin-top: auto; }
+.console-body { min-width: 0; display: flex; flex-direction: column; }
+.project-header { position: relative; min-height: 94px; padding: 14px 18px 12px; border-bottom: var(--border); }
+.project-header > div:first-child span { color: var(--Healthy); font-size: 10px; font-weight: 900; letter-spacing: .9px; }
+.project-header h1 { margin-top: 3px; font-size: 20px; }
+.project-header > .btn-secondary { position: absolute; top: 15px; right: 18px; }
+.project-path { margin-top: 11px; display: flex; gap: 9px; align-items: center; min-width: 0; color: var(--muted); font-size: 12px; }
+.project-path span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-path button { padding: 3px 7px; border: var(--border); border-radius: 4px; background: transparent; color: var(--Healthy); cursor: pointer; font-size: 11px; }
+.pipeline { height: 66px; display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: var(--border); }
+.pipeline button { display: flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-right: var(--border); background: transparent; color: var(--muted); cursor: pointer; }
+.pipeline button:last-child { border-right: 0; }
+.pipeline button:not(:disabled):hover { background: #151f24; color: var(--mainColor); }
+.pipeline button.current { box-shadow: inset 0 2px var(--Accent); color: var(--mainColor); background: #171b18; }
+.pipeline button:disabled { opacity: .42; cursor: default; }
+.pipeline b { display: grid; place-items: center; width: 27px; height: 27px; border: 1px solid #526068; border-radius: 50%; }
+.pipeline .current b { border-color: var(--Accent); color: var(--Accent); }
+.pipeline span, .pipeline small { display: block; text-align: left; }
+.pipeline span { font-weight: 800; }
+.pipeline small { margin-top: 1px; color: var(--subtle); font-size: 11px; font-weight: 600; }
+.work-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.05fr .95fr; }
+.current-task, .task-options { min-width: 0; padding: 17px 18px; }
+.current-task { border-right: var(--border); }
+.eyebrow { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .9px; }
+.current-task h2 { margin-top: 8px; font-size: 24px; }
+.current-task > p:nth-of-type(2) { min-height: 44px; margin-top: 7px; color: var(--muted); font-size: 12px; }
+.current-task .btn-run { width: 100%; margin: 18px 0 0; padding: 12px; }
+.review-link { width: 100%; margin-top: 8px; padding: 9px; border: var(--border); border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+.review-link:hover:not(:disabled) { color: var(--mainColor); border-color: #4b5b63; }
+.review-link:disabled { opacity: .35; cursor: default; }
+.options-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: var(--border); }
+.options-heading span, .options-heading strong { display: block; }
+.options-heading span { color: var(--muted); font-size: 10px; }
+.options-heading strong { margin-top: 2px; }
+.task-options .options-grid { margin-top: 12px; grid-template-columns: repeat(2, 1fr); }
+.task-options .option-btn { min-height: 34px; font-size: 11px; }
+.apply-options { grid-template-columns: 1fr !important; }
+.secondary-tools { margin-top: 12px; padding-top: 10px; border-top: var(--border); display: flex; flex-wrap: wrap; gap: 6px; }
+.secondary-tools button { padding: 5px 8px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; }
+.secondary-tools button:hover { color: var(--Healthy); }
+</style>

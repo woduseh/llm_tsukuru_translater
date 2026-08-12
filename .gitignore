@@ -21,6 +21,7 @@ audit_report.html
 
 # test scratch output (created by the vitest suite at run time)
 /artifacts/unit/
+/artifacts/ui-audit-*/
 /test/.tmp-*/
 
 # generated MCP server bundle and harness output

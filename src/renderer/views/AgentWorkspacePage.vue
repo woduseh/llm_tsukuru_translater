@@ -447,7 +447,7 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   justify-content: space-between;
   gap: 16px;
   padding: 12px 16px;
-  background: linear-gradient(135deg, rgba(124,111,219,0.18), rgba(42,43,61,0.72));
+  background: #151e23;
   border: var(--border);
   border-radius: var(--radius-lg);
 }
@@ -507,16 +507,16 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   cursor: pointer;
   min-width: 0;
 }
-.preset:hover { border-color: rgba(124,111,219,0.5); }
-.preset.active { border-color: rgba(124,111,219,0.7); background: rgba(124,111,219,0.16); }
+.preset:hover { border-color: #4b5b63; }
+.preset.active { border-color: rgba(255,176,32,.65); background: rgba(255,176,32,.08); }
 .preset strong, .preset span, .preset small { overflow-wrap: anywhere; }
 
 .preset-detail {
   margin-top: 6px;
   padding: 11px;
-  border: 1px solid rgba(124,111,219,0.4);
+  border: 1px solid rgba(255,176,32,.4);
   border-radius: var(--radius-md);
-  background: rgba(124,111,219,0.08);
+  background: rgba(255,176,32,.06);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -558,7 +558,7 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   font-family: inherit;
   text-align: left;
 }
-.agent-preset-tabs button.active { border-color: rgba(124,111,219,0.7); background: rgba(124,111,219,0.16); }
+.agent-preset-tabs button.active { border-color: rgba(255,176,32,.65); background: rgba(255,176,32,.08); }
 .agent-preset-tabs span { display: block; margin-top: 2px; font-size: 10px; opacity: 0.76; overflow-wrap: anywhere; }
 
 .command-preview, .prompt-preview {
@@ -616,7 +616,7 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   padding: 8px 10px;
   font-family: inherit;
 }
-.workspace-tabs button.active { border-color: rgba(124,111,219,0.7); background: rgba(124,111,219,0.16); }
+.workspace-tabs button.active { border-color: rgba(255,176,32,.65); background: rgba(255,176,32,.08); }
 .workspace-tabs span { margin-left: 8px; font-size: 10px; opacity: 0.76; }
 .terminal-empty {
   display: flex;
@@ -624,7 +624,7 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   align-items: center;
   gap: 8px;
   padding: 14px;
-  border: 1px dashed rgba(124,111,219,0.4);
+  border: 1px dashed rgba(84,200,232,.4);
   border-radius: var(--radius-md);
 }
 .terminal-empty p { flex: 1 1 100%; opacity: 0.8; }
@@ -713,9 +713,9 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
 .mcp-connect {
   margin-top: 14px;
   padding: 12px;
-  border: 1px solid rgba(124,111,219,0.4);
+  border: 1px solid rgba(84,200,232,.35);
   border-radius: var(--radius-md);
-  background: rgba(124,111,219,0.06);
+  background: rgba(84,200,232,.05);
   display: flex;
   flex-direction: column;
   gap: 8px;

@@ -10,8 +10,9 @@ Electron 40 desktop app (Windows) for extracting, translating, and applying text
 npm install
 npm start                  # builds renderer (Vite), then launches Electron
 npm run dev                # Vite dev server + Electron with HMR (parallel)
-npm run build              # production build (Windows x64 ZIP + NSIS installer)
-npm run build2             # Windows portable executable
+npm run dist:portable      # Windows portable executable
+npm run dist:installer     # Windows NSIS installer
+npm run dist:all           # portable + installer
 npm run build:renderer     # Vite build only → dist-renderer/
 npm run typecheck          # main-process tsc + renderer vue-tsc
 npm test                   # vitest run
@@ -30,7 +31,7 @@ npm run harness:package-smoke
 
 ### Build Pipeline
 
-Main-process TypeScript files (`main.ts`, `src/ipc/`, `src/ts/`, `src/agent/`, `src/mcp/`, and shared main-process modules) are compiled into `dist-main/` by `tsc` during the `prestart` and `prebuild` npm scripts. Generated JavaScript is not committed.
+Main-process TypeScript files (`main.ts`, `src/ipc/`, `src/ts/`, `src/agent/`, `src/mcp/`, and shared main-process modules) are compiled into `dist-main/` by `tsc` during `prestart` and `build:app`. Generated JavaScript is not committed.
 
 This convention does NOT apply to renderer code (`src/renderer/**`) — those are Vue SFCs compiled by Vite.
 

@@ -24,7 +24,7 @@
         </div>
       </div>
       <div class="file-list">
-        <div v-for="item in filteredFiles" :key="item.realIdx"
+        <button v-for="item in filteredFiles" :key="item.realIdx" type="button"
           class="file-item" :class="{ active: item.realIdx === currentIdx }"
           @click="selectFile(item.realIdx)">
           <span>{{ item.file.name }}</span>
@@ -32,7 +32,7 @@
           <span v-if="item.file.mismatch" class="badge badge-error">불일치</span>
           <span v-if="item.file.untranslated" class="badge badge-untranslated">미번역</span>
           <span v-if="!item.file.mismatch && !item.file.untranslated" class="badge badge-ok">정상</span>
-        </div>
+        </button>
       </div>
     </aside>
 
@@ -651,22 +651,22 @@ function onKeydown(e: KeyboardEvent) {
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-text { font-size: 13px; color: var(--mainColor); opacity: 0.8; }
 
-.sidebar { width: 240px; border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; }
-.sidebar-header { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.sidebar { width: 240px; border-right: var(--border); background: #0c1216; display: flex; flex-direction: column; }
+.sidebar-header { padding: 12px; border-bottom: var(--border); }
 .search-input {
   width: 100%; padding: 6px 8px; background: var(--Highlight1); border: var(--border);
   border-radius: 6px; color: var(--mainColor); font-size: 12px; font-family: inherit; margin-bottom: 6px;
 }
-.filter-row { display: flex; gap: 10px; align-items: center; font-size: 11px; opacity: 0.6; }
+.filter-row { display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--muted); }
 .file-count { margin-left: auto; }
 .file-list { flex: 1; overflow-y: auto; }
 .file-item {
-  padding: 8px 10px; cursor: pointer; font-size: 12px;
+  width: 100%; padding: 9px 10px; cursor: pointer; font-size: 12px;
   display: flex; align-items: center; gap: 6px; transition: var(--transition);
-  border-bottom: 1px solid rgba(255,255,255,0.02);
+  border: 0; border-bottom: var(--border); background: transparent; color: var(--mainColor); text-align: left;
 }
-.file-item:hover { background: rgba(255,255,255,0.04); }
-.file-item.active { background: rgba(124,111,219,0.15); border-left: 3px solid var(--accent); }
+.file-item:hover { background: #151f24; }
+.file-item.active { background: #20231d; border-left: 3px solid var(--Accent); }
 .badge { font-size: 9px; padding: 1px 5px; border-radius: 4px; font-weight: 600; }
 .badge-error { background: rgba(255,85,85,0.2); color: #ff5555; }
 .badge-dirty { background: rgba(241,250,140,0.2); color: #f1fa8c; }
@@ -677,14 +677,14 @@ function onKeydown(e: KeyboardEvent) {
 
 /* Toolbar - vertical layout with 4 rows */
 .toolbar {
-  padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 8px 12px; border-bottom: var(--border); background: #10171b;
   display: flex; flex-direction: column; gap: 4px;
   flex-shrink: 0;
 }
 .toolbar-row { display: flex; align-items: center; gap: 8px; }
 .summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; white-space: nowrap; }
 .nav-buttons { display: flex; gap: 3px; align-items: center; margin-left: auto; }
-.group-label { font-size: 9px; opacity: 0.35; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; min-width: 48px; }
+.group-label { font-size: 10px; color: var(--subtle); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; min-width: 48px; }
 .nav-buttons button, .toolbar-row button {
   padding: 3px 8px; font-size: 11px; background: var(--Highlight1);
   border: var(--border); border-radius: 4px; color: var(--mainColor);
@@ -692,8 +692,8 @@ function onKeydown(e: KeyboardEvent) {
 }
 .nav-buttons button:hover, .toolbar-row button:hover { background: rgba(255,255,255,0.08); }
 .nav-buttons button:disabled, .toolbar-row button:disabled { opacity: 0.3; cursor: default; }
-.selection-count { font-size: 10px; opacity: 0.5; white-space: nowrap; }
-.save-status { font-size: 11px; opacity: 0.6; white-space: nowrap; }
+.selection-count { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.save-status { font-size: 11px; color: var(--muted); white-space: nowrap; }
 
 /* Fixed column headers */
 .blocks-header {
@@ -719,14 +719,14 @@ function onKeydown(e: KeyboardEvent) {
 .block.error-lines, .block.error-sep { border-color: rgba(255,85,85,0.3); background: rgba(255,85,85,0.05); }
 .block.missing { border-color: rgba(255,184,108,0.3); background: rgba(255,184,108,0.05); }
 .block.untranslated { border-color: rgba(139,233,253,0.25); background: rgba(139,233,253,0.04); }
-.block.selected { border-color: rgba(124,111,219,0.5); background: rgba(124,111,219,0.08); }
+.block.selected { border-color: rgba(255,176,32,.58); background: rgba(255,176,32,.07); }
 .select-indicator {
   position: absolute; top: 0; left: 0; width: 32px; height: 100%;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; opacity: 0.4; transition: var(--transition);
   background: rgba(255,255,255,0.02); border-right: 1px solid rgba(255,255,255,0.04);
 }
-.select-indicator:hover { opacity: 1; background: rgba(124,111,219,0.15); }
+.select-indicator:hover { opacity: 1; background: rgba(255,176,32,.12); }
 .select-indicator input[type="checkbox"] {
   width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent);
 }

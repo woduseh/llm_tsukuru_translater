@@ -1,5 +1,6 @@
 <template>
   <div id="container" data-harness-view="llm-settings" :data-llm-ready="llmReady ? 'true' : 'false'" :data-provider="currentProvider">
+    <p class="window-eyebrow">TRANSLATION JOB</p>
     <h2>번역</h2>
 
     <div class="form-group">
@@ -285,40 +286,41 @@ function showError(title: string, text: string) {
 
 <style scoped>
 #container {
-  padding: 20px 24px; flex: 1; overflow-y: auto;
+  padding: 22px 26px; flex: 1; overflow-y: auto;
 }
-h2 { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+.window-eyebrow { color: var(--Healthy); font-size: 11px; font-weight: 900; letter-spacing: 1.1px; }
+h2 { font-size: 24px; font-weight: 800; margin: 2px 0 20px; }
 h3 { font-size: 15px; margin: 0 0 6px; }
 .form-group { margin-bottom: 14px; }
-.form-group label { display: block; font-size: 13px; margin-bottom: 4px; opacity: 0.7; }
+.form-group label { display: block; font-size: 13px; margin-bottom: 5px; color: var(--muted); }
 .select-input {
-  width: 100%; padding: 8px 10px;
-  background: var(--Highlight1); border: var(--border); border-radius: 6px;
-  color: var(--mainColor); font-size: 13px; font-family: inherit;
+  width: 100%; padding: 9px 11px;
+  background: var(--Highlight3); border: var(--border); border-radius: 6px;
+  color: var(--mainColor); font-size: 13px;
 }
 .select-input.compact { width: auto; min-width: 210px; }
 .checkbox-group label {
   display: flex; align-items: center; gap: 8px; cursor: pointer;
 }
-.hint { font-size: 11px; opacity: 0.4; }
-.config-hint { font-size: 12px; opacity: 0.55; margin-top: 16px; }
+.hint { font-size: 12px; color: var(--subtle); }
+.config-hint { font-size: 12px; color: var(--muted); margin-top: 16px; }
 .guideline-panel {
-  margin-top: 18px; padding: 14px; border: var(--border); border-radius: 12px;
-  background: rgba(255,255,255,0.03);
+  margin-top: 20px; padding: 15px; border: var(--border); border-radius: 8px;
+  background: #131b20;
 }
-.warning { margin: 0; font-size: 12px; line-height: 1.45; opacity: 0.65; }
+.warning { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .guideline-actions {
   display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
 }
 .profile-preview {
-  margin-top: 10px; padding: 10px; border-radius: 8px; background: var(--Highlight1);
+  margin-top: 10px; padding: 10px; border-radius: 6px; background: #18252b;
   display: flex; flex-direction: column; gap: 4px; font-size: 12px;
 }
-.prompt-note { margin: 10px 0 0; font-size: 12px; opacity: 0.55; }
-.textarea-label { display: block; margin-top: 12px; margin-bottom: 6px; font-size: 12px; opacity: 0.7; }
+.prompt-note { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+.textarea-label { display: block; margin-top: 12px; margin-bottom: 6px; font-size: 12px; color: var(--muted); }
 .guideline-textarea {
   width: 100%; min-height: 180px; resize: vertical; box-sizing: border-box;
-  background: var(--Highlight1); border: var(--border); border-radius: 8px;
+  background: var(--Highlight3); border: var(--border); border-radius: 6px;
   color: var(--mainColor); padding: 10px; font-size: 12px; line-height: 1.5; font-family: inherit;
 }
 .merge-row {
@@ -327,18 +329,18 @@ h3 { font-size: 15px; margin: 0 0 6px; }
 }
 .button-bar {
   display: flex; justify-content: flex-end; gap: 8px;
-  padding: 12px 24px; border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 12px 24px; border-top: var(--border); background: #0c1216;
 }
 .btn {
-  padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  padding: 9px 20px; border-radius: 6px; font-size: 13px; font-weight: 700;
   font-family: inherit; cursor: pointer; transition: var(--transition);
   background: var(--Highlight1); border: var(--border); color: var(--mainColor);
 }
 .btn.small { padding: 7px 12px; font-size: 12px; }
 .btn.primary {
-  background: linear-gradient(135deg, var(--accent), #6c5ce7);
-  border: none; color: #fff;
+  background: var(--Accent);
+  border: 1px solid #ffc24e; color: #12181b; font-weight: 900;
 }
-.btn.primary:hover:not(:disabled) { filter: brightness(1.1); }
+.btn.primary:hover:not(:disabled) { background: var(--AccentHover); }
 .btn:disabled { opacity: 0.45; cursor: default; filter: grayscale(0.2); }
 </style>

@@ -43,7 +43,7 @@ function buildMainIfNeeded() {
 
 function buildAppIfNeeded() {
   if (process.env.LLM_TSUKURU_SKIP_BUILD === '1') return;
-  runCommand(npmCommand(), ['run', 'prebuild']);
+  runCommand(npmCommand(), ['run', 'build:app']);
 }
 
 function readJson(filePath) {

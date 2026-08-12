@@ -33,7 +33,8 @@ import { AGENT_WORKSPACE_ROUTE } from './agentWorkspaceModel'
 const route = useRoute()
 const router = useRouter()
 const { pendingApprovals, pendingCount } = useMutationApprovals()
-const showGlobalTerminalDrawer = computed(() => route.path !== AGENT_WORKSPACE_ROUTE)
+const terminalDrawerRoutes = new Set(['/', '/mvmz', '/wolf'])
+const showGlobalTerminalDrawer = computed(() => terminalDrawerRoutes.has(route.path))
 const showApprovalBanner = computed(() => route.path !== AGENT_WORKSPACE_ROUTE && pendingCount.value > 0)
 
 function openApprovalQueue() {
@@ -85,7 +86,7 @@ onMounted(() => {
   gap: 9px;
   padding: 9px 11px;
   color: var(--mainColor);
-  background: rgba(42, 43, 61, 0.96);
+  background: rgba(16, 23, 27, 0.97);
   border: 1px solid rgba(255, 190, 92, 0.6);
   border-radius: var(--radius-md);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);

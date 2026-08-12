@@ -15,10 +15,11 @@
     "typecheck": "npm-run-all typecheck:main typecheck:renderer",
     "build:ts": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build --config vite.renderer.config.ts",
-    "prebuild": "npm run build:renderer && npm run build:ts && npm run build:mcp",
-    "prestart": "npm run build:renderer && npm run build:ts && npm run build:mcp",
-    "build": "electron-builder --windows zip:x64 nsis:x64",
-    "build2": "electron-builder --windows portable",
+    "build:app": "npm run build:renderer && npm run build:ts && npm run build:mcp",
+    "prestart": "npm run build:app",
+    "dist:portable": "npm run build:app && electron-builder --windows portable:x64",
+    "dist:installer": "npm run build:app && electron-builder --windows nsis:x64",
+    "dist:all": "npm run build:app && electron-builder --windows portable:x64 nsis:x64",
     "lint": "eslint \"src/**/*.ts\" \"src/renderer/**/*.vue\" \"main.ts\"",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -108,7 +109,7 @@
     },
     "win": {
       "target": [
-        "zip",
+        "portable",
         "nsis"
       ],
       "icon": "./res/icon.ico",

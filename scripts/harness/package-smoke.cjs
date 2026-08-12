@@ -61,7 +61,7 @@ function main() {
       id: 'native-pty-unpacked',
       ok: Array.isArray(config.asarUnpack) && config.asarUnpack.some((entry) => String(entry).includes('node-pty')),
     },
-    { id: 'windows-targets', ok: targetNames.includes('zip') && targetNames.includes('nsis') },
+    { id: 'windows-targets', ok: targetNames.includes('portable') && targetNames.includes('nsis') },
     { id: 'compiled-files-only', ok: Array.isArray(config.files) && config.files.includes('dist-main/**') && config.files.includes('dist-renderer/**') },
     {
       id: 'xterm-dependencies',
@@ -117,7 +117,7 @@ function main() {
         packageJson: 'package.json',
       },
       failureHints: [
-        'Set LLM_TSUKURU_PACKAGE_SMOKE=1 after running npm run build/build2 to inspect packaged Windows artifacts.',
+        'Set LLM_TSUKURU_PACKAGE_SMOKE=1 after running npm run dist:all to inspect packaged Windows artifacts.',
       ],
       reproCommand: 'node scripts/harness/package-smoke.cjs',
     });
@@ -126,17 +126,17 @@ function main() {
   }
 
   const packagedArtifacts = fs.existsSync(outputDir)
-    ? fs.readdirSync(outputDir).filter((name) => /\.(exe|zip)$/i.test(name))
+    ? fs.readdirSync(outputDir).filter((name) => /\.exe$/i.test(name) && name.includes(packageJson.version))
     : [];
-  const hasZip = packagedArtifacts.some((name) => /\.zip$/i.test(name));
-  const hasInstaller = packagedArtifacts.some((name) => /\.exe$/i.test(name));
+  const hasPortable = packagedArtifacts.some((name) => !/\bSetup\b/i.test(name));
+  const hasInstaller = packagedArtifacts.some((name) => /\bSetup\b/i.test(name));
   cases.push({
     id: 'packaged-artifacts-present',
-    title: 'packaged Windows zip/installer artifacts are present',
-    status: hasZip && hasInstaller ? 'passed' : 'failed',
+    title: 'packaged Windows portable/installer artifacts are present',
+    status: hasPortable && hasInstaller ? 'passed' : 'failed',
     durationMs: 0,
     details: { outputDir: path.relative(projectRoot, outputDir), packagedArtifacts },
-    ...(hasZip && hasInstaller ? {} : { error: { message: 'Expected both .zip and .exe artifacts in the configured output directory.' } }),
+    ...(hasPortable && hasInstaller ? {} : { error: { message: 'Expected both portable and Setup .exe artifacts for the current version.' } }),
   });
 
   const failed = cases.filter((testCase) => testCase.status === 'failed').length;

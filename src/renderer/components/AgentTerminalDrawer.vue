@@ -132,8 +132,8 @@ function closeDrawer() {
   align-items: center;
   gap: 8px;
   padding: 9px 14px;
-  background: rgba(124,111,219,0.92);
-  color: #fff;
+  background: var(--Accent);
+  color: #11181b;
   border: none;
   border-radius: 999px;
   box-shadow: var(--shadow-md);
@@ -156,7 +156,7 @@ function closeDrawer() {
   min-height: 320px;
   max-height: 72vh;
   background: rgba(25,26,36,0.98);
-  border: 1px solid rgba(124,111,219,0.35);
+  border: 1px solid rgba(255,176,32,.4);
   border-radius: var(--radius-lg);
   box-shadow: 0 16px 36px rgba(0,0,0,0.4);
   overflow: hidden;
@@ -211,7 +211,7 @@ function closeDrawer() {
   opacity: 0.7;
 }
 
-.session-tabs button.active { opacity: 1; border-color: rgba(124,111,219,0.65); }
+.session-tabs button.active { opacity: 1; border-color: rgba(255,176,32,.65); background: #252117; }
 .session-tabs span { margin-left: 8px; font-size: 10px; opacity: 0.78; }
 
 .empty-sessions {

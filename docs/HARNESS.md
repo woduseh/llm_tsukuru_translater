@@ -87,10 +87,10 @@ Environment variables:
 
 ## Packaged Windows Smoke Scaffold
 
-`harness:package-smoke` is intentionally lightweight because producing the portable zip and NSIS installer is expensive for routine agent validation.
+`harness:package-smoke` is intentionally lightweight because producing the portable executable and NSIS installer is expensive for routine agent validation.
 
-- Default mode: validates `package.json` packaging invariants (`asar`, Windows `zip`/`nsis` targets, compiled-only file globs, and resolvable renderer CSS assets), writes `artifacts/harness/harness-package-smoke.json`, and exits cleanly as `skipped` when the scaffold is healthy.
-- Opt-in mode: after a packaging build has already been produced, run `LLM_TSUKURU_PACKAGE_SMOKE=1 npm run harness:package-smoke` to verify that both `.zip` and `.exe` artifacts exist in the configured output directory.
+- Default mode: validates `package.json` packaging invariants (`asar`, Windows `portable`/`nsis` targets, compiled-only file globs, and resolvable renderer CSS assets), writes `artifacts/harness/harness-package-smoke.json`, and exits cleanly as `skipped` when the scaffold is healthy.
+- Opt-in mode: after `npm run dist:all`, run `LLM_TSUKURU_PACKAGE_SMOKE=1 npm run harness:package-smoke` to verify that both the portable and Setup `.exe` artifacts exist for the current version.
 - TODO before release: extend the opt-in mode to launch the portable artifact in a disposable profile and assert the same stable UI markers used by `harness:ui`.
 
 ## CI

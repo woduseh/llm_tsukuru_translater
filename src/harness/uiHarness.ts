@@ -204,10 +204,57 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       route: location.hash,
     }))()`);
     assertSnapshotValues('home', home, {
-      heading: 'Tsukuru Extractor',
-      subtitle: 'RPG Maker 번역 도구',
+      heading: '번역 프로젝트를 시작하세요',
+      subtitle: '게임 엔진을 선택하면 추출부터 검수와 적용까지 한 흐름으로 이어집니다.',
       route: '#/',
     });
+
+    await mainWindow.webContents.executeJavaScript(`location.hash = '#/mvmz'`, true);
+    await waitForSelector(mainWindow, '[data-harness-view="mvmz"]', stepTimeoutMs);
+    const mvmzEmpty = await snapshot(mainWindow, `(() => {
+      const root = document.querySelector('[data-harness-view="mvmz"]');
+      const option = root?.querySelector('.option-btn');
+      const primary = root?.querySelector('[data-harness-primary-action]');
+      return {
+        projectState: root?.getAttribute('data-project-state'),
+        currentTask: root?.querySelector('[data-harness-current-task]')?.textContent?.trim(),
+        primaryAction: primary?.textContent?.trim(),
+        primaryDisabled: primary instanceof HTMLButtonElement ? primary.disabled : null,
+        optionDisabled: option instanceof HTMLButtonElement ? option.disabled : null,
+      };
+    })()`);
+    assertSnapshotValues('mvmz-empty', mvmzEmpty, {
+      projectState: 'empty',
+      currentTask: '프로젝트 폴더 선택',
+      primaryAction: '폴더 선택하기',
+      primaryDisabled: false,
+      optionDisabled: true,
+    });
+
+    await mainWindow.webContents.executeJavaScript(`location.hash = '#/wolf'`, true);
+    await waitForSelector(mainWindow, '[data-harness-view="wolf"]', stepTimeoutMs);
+    const wolfEmpty = await snapshot(mainWindow, `(() => {
+      const root = document.querySelector('[data-harness-view="wolf"]');
+      const option = root?.querySelector('.option-btn');
+      const primary = root?.querySelector('[data-harness-primary-action]');
+      return {
+        projectState: root?.getAttribute('data-project-state'),
+        currentTask: root?.querySelector('[data-harness-current-task]')?.textContent?.trim(),
+        primaryAction: primary?.textContent?.trim(),
+        primaryDisabled: primary instanceof HTMLButtonElement ? primary.disabled : null,
+        optionDisabled: option instanceof HTMLButtonElement ? option.disabled : null,
+      };
+    })()`);
+    assertSnapshotValues('wolf-empty', wolfEmpty, {
+      projectState: 'empty',
+      currentTask: '프로젝트 폴더 선택',
+      primaryAction: '폴더 선택하기',
+      primaryDisabled: false,
+      optionDisabled: true,
+    });
+
+    await mainWindow.webContents.executeJavaScript(`location.hash = '#/'`, true);
+    await waitForSelector(mainWindow, '[data-harness-view="home"]', stepTimeoutMs);
 
     ctx.terminalProjectRoots = [scenario.compareDir];
     ctx.currentTerminalProjectRoot = scenario.compareDir;
@@ -430,6 +477,8 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       completedAt: new Date().toISOString(),
       cases: [
         { id: 'home-window', title: 'home window exposes stable harness state', status: 'passed', durationMs: 0, details: home },
+        { id: 'mvmz-empty-state', title: 'MV/MZ empty state leads with project selection', status: 'passed', durationMs: 0, details: mvmzEmpty },
+        { id: 'wolf-empty-state', title: 'Wolf empty state leads with project selection', status: 'passed', durationMs: 0, details: wolfEmpty },
         { id: 'approval-banner', title: 'pending approval is visible and reachable outside Agent Workspace', status: 'passed', durationMs: 0, details: approvalBanner },
         { id: 'agent-workspace', title: 'agent workspace exposes stable environment, MCP, preset, and terminal state', status: 'passed', durationMs: 0, details: agentWorkspace },
         { id: 'approval-apply', title: 'approved UI patch is applied with exact preserved bytes', status: 'passed', durationMs: 0, details: approvalApplied },
@@ -439,7 +488,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
         { id: 'json-verify-window', title: 'JSON verify window summarizes fixture issues', status: 'passed', durationMs: 0, details: verify },
       ],
       metrics: {
-        caseCount: 8,
+        caseCount: 10,
         deterministic: true,
       },
       artifacts: {
@@ -448,6 +497,8 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       reproCommand: 'npm run harness:ui',
       snapshots: {
         home,
+        mvmzEmpty,
+        wolfEmpty,
         approvalBanner,
         agentWorkspace,
         approvalApplied,

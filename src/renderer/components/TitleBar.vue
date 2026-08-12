@@ -1,5 +1,6 @@
 <template>
   <div class="titlebar">
+    <div class="app-identity">Tsukuru Console</div>
     <div class="progress-bar" :style="{ width: progressWidth }"></div>
     <div class="loading-text" v-show="progress > 0">
       {{ loadingTag }}{{ loadingTag ? ' · ' : '' }}{{ progress.toFixed(1) }}% {{ estimatedTime }}
@@ -13,12 +14,8 @@
       v-if="showSettings"
       class="settings-btn"
       @click="$emit('settings')"
-    >
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-        <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
-        <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.421 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.421-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
-      </svg>
-    </button>
+      aria-label="설정 열기"
+    >설정</button>
     <div class="icon minimize" @click="api.send('minimize')">&#x2013;</div>
     <div class="icon close" @click="api.send('close')">&times;</div>
   </div>
@@ -120,20 +117,21 @@ onUnmounted(() => {
   -webkit-app-region: drag;
   user-select: none;
   height: 38px;
-  background: var(--Highlight2);
+  background: #0a0f12;
   display: flex;
   align-items: center;
   position: relative;
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  border-bottom: 1px solid #263137;
 }
+.app-identity { margin-left: 14px; font-size: 12px; font-weight: 800; letter-spacing: .2px; }
 .progress-bar {
   position: absolute; left: 0; top: 0; height: 38px; width: 0;
-  background: linear-gradient(90deg, rgba(124,111,219,0.25), rgba(124,111,219,0.08));
+  background: rgba(255,176,32,.22);
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .loading-text {
-  position: absolute; left: 14px;
+  position: absolute; left: 140px;
   font-size: 11px; opacity: 0.6; font-weight: 500; z-index: 1;
 }
 .icon {
@@ -150,21 +148,21 @@ onUnmounted(() => {
 .settings-btn {
   -webkit-app-region: no-drag;
   position: absolute; right: 80px; top: 0;
-  width: 40px; height: 38px;
+  width: 52px; height: 38px;
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; opacity: 0.45; transition: var(--transition);
+  cursor: pointer; color: var(--muted); transition: var(--transition);
   background: transparent; border: none; color: var(--mainColor); z-index: 2;
 }
-.settings-btn:hover { opacity: 1; background: rgba(255,255,255,0.06); }
+.settings-btn:hover { color: var(--mainColor); background: #172027; }
 .abort-btn {
   -webkit-app-region: no-drag;
-  position: absolute; right: 128px; top: 7px; height: 24px;
+  position: absolute; right: 140px; top: 7px; height: 24px;
   padding: 0 14px;
-  background: linear-gradient(135deg, #e53935, #c62828);
+  background: #9f3341;
   border: none; border-radius: 6px; color: #fff;
   font-family: inherit; font-size: 11px; font-weight: 600;
   cursor: pointer; z-index: 2; transition: var(--transition);
   box-shadow: 0 2px 8px rgba(229,57,53,0.3);
 }
-.abort-btn:hover { background: linear-gradient(135deg, #ef5350, #e53935); }
+.abort-btn:hover { background: #bc4051; }
 </style>

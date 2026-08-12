@@ -45,11 +45,14 @@ npm run lint
 ### 프로덕션 빌드
 
 ```bash
-# Windows x64 빌드 (ZIP + NSIS installer)
-npm run build
+# Windows 포터블 실행 파일
+npm run dist:portable
 
-# Windows portable 실행 파일
-npm run build2
+# Windows NSIS 설치 파일
+npm run dist:installer
+
+# 포터블 + 설치 파일 모두 생성
+npm run dist:all
 ```
 
 ### LLM 제공자 설정

@@ -18,7 +18,7 @@
         </div>
       </div>
       <div class="file-list">
-        <div v-for="item in filteredFiles" :key="item.realIdx"
+        <button v-for="item in filteredFiles" :key="item.realIdx" type="button"
           class="file-item" :class="{ active: item.realIdx === currentIdx }"
           @click="selectFile(item.realIdx)">
           <span>{{ item.file.name }}</span>
@@ -26,7 +26,7 @@
           <span v-if="item.file.errorCount > 0" class="badge badge-error">❌ {{ item.file.errorCount }}</span>
           <span v-if="item.file.warningCount > 0" class="badge badge-warn">⚠ {{ item.file.warningCount }}</span>
           <span v-if="item.file.issues.length === 0" class="badge badge-ok">✓</span>
-        </div>
+        </button>
       </div>
     </aside>
 
@@ -629,22 +629,22 @@ onUnmounted(() => {
 
 <style scoped>
 .verify-layout { display: flex; height: 100vh; }
-.sidebar { width: 240px; border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; }
-.sidebar-header { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.sidebar { width: 240px; border-right: var(--border); background: #0c1216; display: flex; flex-direction: column; }
+.sidebar-header { padding: 12px; border-bottom: var(--border); }
 .search-input {
   width: 100%; padding: 6px 8px; background: var(--Highlight1); border: var(--border);
   border-radius: 6px; color: var(--mainColor); font-size: 12px; font-family: inherit; margin-bottom: 6px;
 }
-.filter-row { display: flex; gap: 8px; align-items: center; font-size: 11px; opacity: 0.6; }
+.filter-row { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
 .file-count { margin-left: auto; }
 .file-list { flex: 1; overflow-y: auto; }
 .file-item {
-  padding: 8px 10px; cursor: pointer; font-size: 12px;
+  width: 100%; padding: 9px 10px; cursor: pointer; font-size: 12px;
   display: flex; align-items: center; gap: 6px; transition: var(--transition);
-  border-bottom: 1px solid rgba(255,255,255,0.02);
+  border: 0; border-bottom: var(--border); background: transparent; color: var(--mainColor); text-align: left;
 }
-.file-item:hover { background: rgba(255,255,255,0.04); }
-.file-item.active { background: rgba(124,111,219,0.15); border-left: 3px solid var(--accent); }
+.file-item:hover { background: #151f24; }
+.file-item.active { background: #20231d; border-left: 3px solid var(--Accent); }
 .badge { font-size: 9px; padding: 1px 5px; border-radius: 4px; font-weight: 600; }
 .badge-error { background: rgba(255,85,85,0.2); color: #ff5555; }
 .badge-warn { background: rgba(255,184,108,0.2); color: #ffb86c; }
@@ -653,7 +653,7 @@ onUnmounted(() => {
 
 .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .toolbar {
-  padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 9px 12px; border-bottom: var(--border); background: #10171b;
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
 .summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; }
@@ -689,7 +689,7 @@ onUnmounted(() => {
   cursor: pointer; font-family: inherit; transition: var(--transition); opacity: 0.5;
 }
 .severity-tabs button:hover { opacity: 0.8; }
-.severity-tabs button.active { opacity: 1; background: rgba(124,111,219,0.15); border-color: rgba(124,111,219,0.3); }
+.severity-tabs button.active { opacity: 1; background: rgba(255,176,32,.12); border-color: rgba(255,176,32,.35); }
 .issue-item {
   margin-bottom: 8px; padding: 10px 12px 10px 44px; border-radius: 6px;
   background: var(--Highlight1); border-left: 3px solid transparent;
@@ -697,13 +697,13 @@ onUnmounted(() => {
 }
 .issue-item.error { border-left-color: #ff5555; }
 .issue-item.warning { border-left-color: #ffb86c; }
-.issue-item.selected { background: rgba(124,111,219,0.08); border-color: rgba(124,111,219,0.5); }
+.issue-item.selected { background: rgba(255,176,32,.07); border-color: rgba(255,176,32,.55); }
 .issue-checkbox {
   position: absolute; top: 0; left: 0; width: 36px; height: 100%;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; opacity: 0.4; transition: var(--transition);
 }
-.issue-checkbox:hover { opacity: 1; background: rgba(124,111,219,0.15); border-radius: 6px 0 0 6px; }
+.issue-checkbox:hover { opacity: 1; background: rgba(255,176,32,.12); border-radius: 6px 0 0 6px; }
 .issue-checkbox input[type="checkbox"] {
   width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent);
 }
