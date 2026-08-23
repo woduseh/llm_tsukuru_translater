@@ -178,6 +178,13 @@ export interface ExtractArg {
     [key: string]: any;
 }
 
+export interface VersionUpRequest {
+    oldTranslatedDir: string;
+    oldOriginalDir: string;
+    newDir: string;
+    extractOptions: Pick<ExtractArg, 'ext_src' | 'ext_note' | 'ext_plugin' | 'ext_javascript' | 'exJson' | 'autoline'>;
+}
+
 /** File type identifiers used by the extraction pipeline */
 export type ExtractFileType =
     | 'map'

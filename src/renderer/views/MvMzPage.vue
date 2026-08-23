@@ -65,6 +65,7 @@ import { computed, ref, reactive, onMounted, onUnmounted } from 'vue'
 import { api } from '../composables/useIpc'
 import TitleBar from '../components/TitleBar.vue'
 import Swal from 'sweetalert2'
+import type { VersionUpRequest } from '../../ts/rpgmv/types'
 
 const folderPath = ref('')
 const mode = ref(-1) // -1=none, 0=extract, 1=apply
@@ -171,6 +172,16 @@ function openJsonVerify() {
 
 async function openVersionUp() {
   if (guardRunning()) return
+  const { isConfirmed } = await Swal.fire({
+    icon: 'warning',
+    title: '버전 업 전 확인',
+    text: '현재 추출 옵션으로 구버전 원문과 신버전을 다시 추출합니다. 신버전 data 폴더의 기존 Extract와 Backup은 성공 시 새 결과로 교체됩니다.',
+    showCancelButton: true,
+    confirmButtonText: '계속',
+    cancelButtonText: '취소',
+  })
+  if (!isConfirmed) return
+
   const { value: formValues } = await Swal.fire({
     title: '버전 업',
     html: `
@@ -197,11 +208,19 @@ async function openVersionUp() {
     confirmButtonText: '실행',
     cancelButtonText: '취소',
     preConfirm: () => {
-      return {
-        oldTrans: (document.getElementById('swal-old-trans') as HTMLInputElement).value,
-        oldOrig: (document.getElementById('swal-old-orig') as HTMLInputElement).value,
-        newDir: (document.getElementById('swal-new') as HTMLInputElement).value,
+      const oldTranslatedDir = (document.getElementById('swal-old-trans') as HTMLInputElement).value.trim()
+      const oldOriginalDir = (document.getElementById('swal-old-orig') as HTMLInputElement).value.trim()
+      const newDir = (document.getElementById('swal-new') as HTMLInputElement).value.trim()
+      if (!oldTranslatedDir || !oldOriginalDir || !newDir) {
+        Swal.showValidationMessage('세 폴더를 모두 선택하세요.')
+        return false
       }
+      const normalized = [oldTranslatedDir, oldOriginalDir, newDir].map((dir) => dir.replaceAll('\\', '/').toLowerCase())
+      if (new Set(normalized).size !== normalized.length) {
+        Swal.showValidationMessage('서로 다른 세 폴더를 선택하세요.')
+        return false
+      }
+      return { oldTranslatedDir, oldOriginalDir, newDir }
     },
     didOpen: (popup: HTMLElement) => {
       const bindBrowse = (btnId: string, inputId: string) => {
@@ -218,8 +237,19 @@ async function openVersionUp() {
     },
   })
   if (formValues) {
+    const request: VersionUpRequest = {
+      ...formValues,
+      extractOptions: {
+        ext_src: config.ext_src,
+        ext_note: config.ext_note,
+        ext_plugin: config.ext_plugin,
+        ext_javascript: config.ext_javascript,
+        exJson: config.exJson,
+        autoline: config.autoline,
+      },
+    }
     running.value = true
-    api.send('updateVersion', formValues)
+    api.send('updateVersion', request)
   }
 }
 
