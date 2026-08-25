@@ -10,6 +10,7 @@ import { sendError, worked } from './shared';
 import log from '../logger';
 import { AppContext } from '../appContext';
 import { migrateVersionText } from '../ts/rpgmv/versionUp';
+import { createTranslationBackup } from '../ts/rpgmv/translator';
 
 import { ExtractArg, VersionUpRequest } from '../ts/rpgmv/types';
 
@@ -17,10 +18,16 @@ export function registerExtractHandlers(ctx: AppContext) {
   const ErrorAlert = (msg: string) => sendError(ctx, msg)
 
   async function extractor(arg: ExtractArg): Promise<boolean> {
+    let extractionStash: ExtractionArtifactStash | null = null
+    const temporaryJsonPaths: string[] = []
+    let createdPluginJson = false
+    let createdExternMessageJson = false
+    let extractionDir = ''
     try {
       ctx.gb = {}
       let file
       const dir = Buffer.from(arg.dir, "base64").toString('utf8');
+      extractionDir = dir
       if(!fs.existsSync(dir)){
         ctx.mainWindow!.webContents.send('alert', {icon: 'error', message: '지정된 디렉토리가 없습니다'}); 
         if (!arg.silent) worked(ctx)
@@ -31,20 +38,17 @@ export function registerExtractHandlers(ctx: AppContext) {
         if (!arg.silent) worked(ctx)
         return false
       }
-      if(fs.existsSync(dir + '/Extract')){
-        if(!arg.force){
-          ctx.mainWindow!.webContents.send('check_force', arg); 
-          if (!arg.silent) worked(ctx)
-          return false
-        }
-        else{
-          fs.rmSync(dir + '/Extract', { recursive: true });
-          if(fs.existsSync(dir + '/Backup')){
-            fs.rmSync(dir + '/Backup', { recursive: true });
-          }
-        }
+      const hasExistingExtract = fs.existsSync(dir + '/Extract')
+      if(hasExistingExtract && !arg.force){
+        ctx.mainWindow!.webContents.send('check_force', arg);
+        if (!arg.silent) worked(ctx)
+        return false
       }
       if(arg.ext_plugin){
+          const pluginJsonPath = path.join(dir, 'ext_plugins.json')
+          if (fs.existsSync(pluginJsonPath)) {
+            throw new Error('ext_plugins.json과 임시 추출 파일 이름이 충돌합니다.')
+          }
           let jsdir = ((dir.substring(0,dir.length-5) + '/js').replaceAll('//','/'))
           if(!fs.existsSync(jsdir + '/plugins.js')){
             jsdir = path.join(path.dirname(path.dirname(path.dirname(jsdir))), 'js')
@@ -58,7 +62,8 @@ export function registerExtractHandlers(ctx: AppContext) {
           let hail = hail2.split('$plugins =')
           hail2 = hail[hail.length - 1] + '  '
           hail2 = hail2.substring(hail2.indexOf('['), hail2.lastIndexOf(']') + 1)
-          fs.writeFileSync(dir + '/ext_plugins.json', JSON.stringify(JSON.parse(hail2)), 'utf-8')
+          fs.writeFileSync(pluginJsonPath, JSON.stringify(JSON.parse(hail2)), 'utf-8')
+          createdPluginJson = true
       }
       ctx.externMsg = {}
       ctx.useExternMsg = false
@@ -66,27 +71,50 @@ export function registerExtractHandlers(ctx: AppContext) {
         const Emsg = await ExtTool.parse_externMsg(dir + '/ExternMessage.csv', !ctx.settings.ExternMsgJson) as Record<string, string>
         ctx.externMsg = Emsg
         if(ctx.settings.ExternMsgJson){
-          fs.writeFileSync(dir + '/ExternMsgcsv.json', JSON.stringify(Emsg, null, 4), 'utf-8')
+          const externMessageJsonPath = path.join(dir, 'ExternMsgcsv.json')
+          if (fs.existsSync(externMessageJsonPath)) {
+            throw new Error('ExternMsgcsv.json과 임시 추출 파일 이름이 충돌합니다.')
+          }
+          fs.writeFileSync(externMessageJsonPath, JSON.stringify(Emsg, null, 4), 'utf-8')
+          createdExternMessageJson = true
         }
         else{
           ctx.useExternMsg = true
           ctx.externMsgKeys = Object.keys(Emsg)
         }
       }
-      let tempjsons: string[] = []
       const fileList2 = fs.readdirSync(dir)
-      for(const i in fileList2){
-        const f = path.join(dir, fileList2[i])
-        const pf = path.parse(f)
-        if(f.endsWith('.json.yaml')){
-          const fname = path.join(pf.dir, pf.name)
-          const fd = JSON.stringify(yaml.load(fs.readFileSync(f, 'utf-8')))
-          fs.writeFileSync(fname, fd, 'utf-8')
-          tempjsons.push(fname)
-        }
+      const yamlConversions = fileList2
+        .filter(fileName => fileName.endsWith('.json.yaml'))
+        .map(fileName => {
+          const sourcePath = path.join(dir, fileName)
+          const parsed = path.parse(sourcePath)
+          const targetPath = path.join(parsed.dir, parsed.name)
+          if (fs.existsSync(targetPath)) {
+            throw new Error(`${fileName}의 임시 JSON 경로가 기존 ${path.basename(targetPath)}과 충돌합니다.`)
+          }
+          return {
+            targetPath,
+            content: JSON.stringify(yaml.load(fs.readFileSync(sourcePath, 'utf-8'))),
+          }
+        })
+      for (const conversion of yamlConversions) {
+        fs.writeFileSync(conversion.targetPath, conversion.content, 'utf-8')
+        temporaryJsonPaths.push(conversion.targetPath)
       }
 
       const fileList = fs.readdirSync(dir)
+
+      // Keep the prior Extract/Backup pair recoverable until every extraction
+      // and optional media-decryption step has completed successfully.
+      extractionStash = stashExtractionArtifacts(dir, [
+        'Extract',
+        'Backup',
+        'Extract_backup',
+        '.extracteddata',
+        ...(arg.decryptImg ? ['Extract_img'] : []),
+        ...(arg.decryptAudio ? ['Extract_audio'] : []),
+      ])
 
       if (! fs.existsSync(dir + '/Extract')){
         fs.mkdirSync(dir + '/Extract')
@@ -98,6 +126,13 @@ export function registerExtractHandlers(ctx: AppContext) {
 
       const max_files = fileList.length
       let worked_files = 0
+      // Finish the complete backup phase before parsing any source file. A
+      // failed copy now aborts extraction instead of producing a partial
+      // backup that is later presented as successful.
+      for (const fileName of fileList) {
+        if(path.parse(fileName).ext !== '.json') continue
+        fs.copyFileSync(path.join(dir, fileName), path.join(dir, 'Backup', fileName))
+      }
       ExtTool.init_extract(arg, ctx)
       for (const i in fileList){
         worked_files += 1
@@ -114,12 +149,6 @@ export function registerExtractHandlers(ctx: AppContext) {
           note: arg.ext_note,
           arg: arg
         }
-        let runBackup = () => {
-          try {
-            fs.copyFileSync(dir + '/' + fileName, dir + '/Backup/' + fileName) 
-          } catch (error) { log.error('Backup failed for', fileName, error) }
-        }
-        runBackup()
         if (checkIsMapFile(fileName)){
           file = fs.readFileSync(dir + '/' + fileName, 'utf8')
           await ExtTool.format_extracted(await ExtTool.extract(file, conf, 'map', ctx), 0, ctx)
@@ -156,36 +185,40 @@ export function registerExtractHandlers(ctx: AppContext) {
         main: ctx.gb
       }
       edTool.write(dir, ext_data)
-      if (fs.existsSync(dir + '/ext_plugins.json')){
-        fs.rmSync(dir + '/ext_plugins.json')
-      }
-      if (fs.existsSync(dir + '/ExternMsgcsv.json')){
-        fs.rmSync(dir + '/ExternMsgcsv.json')
-      }
-      for(const i in tempjsons){
-        fs.rmSync(tempjsons[i])
-      }
       ctx.mainWindow!.webContents.send('loading', 0);
-      ['img','audio'].forEach((type) => {
-        const ExtractImgDir = path.join(dir, `Extract_${type}`)
-        if(fs.existsSync(ExtractImgDir)){
-          fs.rmSync(ExtractImgDir, { recursive: true, force: true });
-        }
-      })
       if(arg.decryptImg){
-        await ExtTool.DecryptDir(dir, "img")
+        await ExtTool.DecryptDir(dir, 'img')
       }
       if(arg.decryptAudio){
-        await ExtTool.DecryptDir(dir, "audio")
+        await ExtTool.DecryptDir(dir, 'audio')
       }
       if(!arg.silent){
         ctx.mainWindow!.webContents.send('alert2'); 
       }
+      if (extractionStash) {
+        discardExtractionArtifactStash(extractionStash)
+        extractionStash = null
+      }
       return true
     } catch (err) {
+      if (extractionStash) {
+        try {
+          restoreExtractionArtifacts(extractionStash)
+        } catch (restoreError) {
+          log.error('Failed to restore prior extraction artifacts:', restoreError)
+        }
+      }
       log.error('Extraction failed:', err);
       ctx.mainWindow!.webContents.send('alert', {icon: 'error', message: JSON.stringify(err, Object.getOwnPropertyNames(err))}); 
       return false
+    } finally {
+      if (extractionDir) {
+        removeTemporaryExtractionFile(path.join(extractionDir, 'ext_plugins.json'), createdPluginJson)
+        removeTemporaryExtractionFile(path.join(extractionDir, 'ExternMsgcsv.json'), createdExternMessageJson)
+      }
+      for (const temporaryPath of temporaryJsonPaths) {
+        removeTemporaryExtractionFile(temporaryPath, true)
+      }
     }
   }
 
@@ -227,6 +260,7 @@ export function registerExtractHandlers(ctx: AppContext) {
       if (!newExtracted) throw new Error('신버전 데이터 추출에 실패했습니다.')
 
       const newExtractDir = path.join(request.newDir, 'Extract')
+      await createTranslationBackup(newExtractDir)
       const newFiles = readVersionTextFiles(newExtractDir)
       let migratedFiles = 0
       let replacements = 0
@@ -282,6 +316,67 @@ export function registerExtractHandlers(ctx: AppContext) {
   })
 }
 
+function removeTemporaryExtractionFile(filePath: string, createdByThisRun: boolean): void {
+  if (!createdByThisRun || !fs.existsSync(filePath)) return
+  try {
+    fs.rmSync(filePath)
+  } catch (error) {
+    log.warn('Failed to remove temporary extraction file:', filePath, error)
+  }
+}
+
+interface ExtractionArtifactStash {
+  entries: Array<{ currentPath: string; stashedPath?: string }>
+}
+
+function stashExtractionArtifacts(dataDir: string, names: string[]): ExtractionArtifactStash {
+  const stash: ExtractionArtifactStash = { entries: [] }
+  try {
+    for (const name of names) {
+      const currentPath = path.join(dataDir, name)
+      const entry: { currentPath: string; stashedPath?: string } = { currentPath }
+      stash.entries.push(entry)
+      if (fs.existsSync(currentPath)) {
+        const stashedPath = path.join(
+          dataDir,
+          `.${name}.previous-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        )
+        fs.renameSync(currentPath, stashedPath)
+        entry.stashedPath = stashedPath
+      }
+    }
+    return stash
+  } catch (error) {
+    restoreExtractionArtifacts(stash)
+    throw error
+  }
+}
+
+function restoreExtractionArtifacts(stash: ExtractionArtifactStash): void {
+  for (const entry of [...stash.entries].reverse()) {
+    if (fs.existsSync(entry.currentPath)) {
+      fs.rmSync(entry.currentPath, { recursive: true, force: true })
+    }
+    if (entry.stashedPath && fs.existsSync(entry.stashedPath)) {
+      fs.renameSync(entry.stashedPath, entry.currentPath)
+    }
+  }
+}
+
+function discardExtractionArtifactStash(stash: ExtractionArtifactStash): void {
+  for (const entry of stash.entries) {
+    try {
+      if (entry.stashedPath && fs.existsSync(entry.stashedPath)) {
+        fs.rmSync(entry.stashedPath, { recursive: true, force: true })
+      }
+    } catch (error) {
+      // A stale hidden backup is preferable to rolling back a completed
+      // extraction after another stash entry has already been discarded.
+      log.warn('Failed to remove extraction artifact stash:', entry.stashedPath, error)
+    }
+  }
+}
+
 type VersionTextFiles = Map<string, string>
 
 interface VersionUpArtifactStash {
@@ -290,7 +385,7 @@ interface VersionUpArtifactStash {
   artifactNames: string[];
 }
 
-const VERSION_UP_REPLACED_ARTIFACTS = ['Extract', 'Backup'] as const
+const VERSION_UP_REPLACED_ARTIFACTS = ['Extract', 'Backup', 'Extract_backup', '.extracteddata'] as const
 const VERSION_UP_PRESERVED_ARTIFACTS = ['Extract_img', 'Extract_audio'] as const
 const VERSION_UP_ALL_ARTIFACTS = [...VERSION_UP_REPLACED_ARTIFACTS, ...VERSION_UP_PRESERVED_ARTIFACTS] as const
 

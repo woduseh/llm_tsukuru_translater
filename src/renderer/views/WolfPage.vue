@@ -23,20 +23,19 @@
         <section class="wolf-current">
           <p>현재 작업</p>
           <h2 data-harness-current-task>{{ !hasFolder ? '프로젝트 폴더 선택' : mode === 1 ? '번역 적용' : '텍스트 추출' }}</h2>
-          <span>{{ !hasFolder ? '게임 폴더를 선택하면 추출 범위와 번역 도구가 활성화됩니다.' : mode === 1 ? '검수를 마친 번역문을 게임에 적용합니다.' : 'DB와 이벤트에서 번역할 텍스트를 추출합니다.' }}</span>
+          <span>{{ !hasFolder ? '게임 폴더를 선택하면 추출과 번역 도구가 활성화됩니다.' : mode === 1 ? '검수를 마친 번역문을 게임에 적용합니다.' : '현재 지원되는 맵 이벤트 대사를 추출합니다.' }}</span>
           <button v-if="!hasFolder" type="button" class="btn-run" data-harness-primary-action @click="selectFolder">폴더 선택하기</button>
           <button v-else class="btn-run" data-harness-primary-action :disabled="!canRun" :title="runButtonTitle" @click="run">{{ running ? '작업 진행 중' : mode === 1 ? '번역 적용 시작' : '텍스트 추출 시작' }}</button>
           <button v-if="hasFolder" type="button" class="wolf-review" @click="openLLMCompare">번역 비교 열기</button>
         </section>
         <aside class="wolf-options">
           <div class="wolf-options-head">
-            <div><span>작업 설정</span><strong>{{ !hasFolder ? '폴더 선택 후 설정' : mode === 1 ? '적용 옵션' : '추출 범위' }}</strong></div>
+            <div><span>WOLF 지원 상태</span><strong>현재 지원 범위</strong></div>
           </div>
-          <div v-show="mode !== 1" class="options-grid wolf-option-grid">
-            <button v-for="opt in extractOptions" :key="opt.key" class="option-btn" :class="{ active: config[opt.key] }" :disabled="!hasFolder" :aria-pressed="Boolean(config[opt.key])" @click="config[opt.key] = !config[opt.key]">{{ opt.label }}</button>
-          </div>
-          <div v-show="mode === 1" class="options-grid wolf-option-grid">
-            <button class="option-btn" :class="{ active: config.autoline }" :disabled="!hasFolder" :aria-pressed="Boolean(config.autoline)" @click="config.autoline = !config.autoline">자동 줄바꿈</button>
+          <div class="wolf-capability-note">
+            <p><strong>지원:</strong> 맵 이벤트 대사 추출·번역·적용</p>
+            <p><strong>미지원:</strong> DB 데이터, 커먼 이벤트, 자동 줄바꿈</p>
+            <p>적용 전 구분자·빈 줄·제어 코드·원본 binary 변경 여부를 검사합니다.</p>
           </div>
         </aside>
       </div>
@@ -45,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { api } from '../composables/useIpc'
 import TitleBar from '../components/TitleBar.vue'
 import Swal from 'sweetalert2'
@@ -63,16 +62,6 @@ const runButtonTitle = computed(() => {
   return mode.value === 0 ? '추출을 시작합니다' : '적용을 시작합니다'
 })
 
-const config = reactive<Record<string, boolean>>({
-  autoline: false,
-})
-
-const extractOptions = [
-  { key: 'ext_db', label: 'DB 데이터' },
-  { key: 'ext_ce', label: '커먼 이벤트' },
-  { key: 'ext_map', label: '맵 이벤트' },
-]
-
 function guardRunning(): boolean {
   if (running.value) {
     Swal.fire({ icon: 'error', text: '이미 다른 작업이 시행중입니다!' })
@@ -82,7 +71,7 @@ function guardRunning(): boolean {
 }
 
 function selectFolder() {
-  api.send('select_folder', 'folder_input')
+  api.send('select_folder', 'wolf_folder_input')
 }
 
 function run() {
@@ -97,9 +86,9 @@ function run() {
   }
   running.value = true
   if (mode.value === 0) {
-    api.send('wolf_ext', { folder: folderPath.value, config })
+    api.send('wolf_ext', { folder: folderPath.value, config: {} })
   } else if (mode.value === 1) {
-    api.send('wolf_apply', { folder: folderPath.value, config })
+    api.send('wolf_apply', { folder: folderPath.value })
   }
 }
 
@@ -132,7 +121,7 @@ onMounted(() => {
   api.send('setheight', 550)
 
   api.on('set_path', (tt: Record<string, string>) => {
-    if (tt && tt.type === 'folder_input') {
+    if (tt && tt.type === 'wolf_folder_input') {
       folderPath.value = tt.dir
       if (mode.value === -1) mode.value = 0
     }
@@ -219,5 +208,8 @@ onUnmounted(() => {
 .wolf-options-head { display: flex; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: var(--border); }
 .wolf-options-head span, .wolf-options-head strong { display: block; }
 .wolf-options-head span { color: var(--muted); font-size: 10px; }
-.wolf-option-grid { margin-top: 12px; grid-template-columns: 1fr; }
+.wolf-capability-note { margin-top: 14px; padding: 14px; border: var(--border); border-radius: 7px; background: rgba(255,255,255,.02); }
+.wolf-capability-note p { margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.wolf-capability-note p:last-child { margin-bottom: 0; color: var(--subtle); }
+.wolf-capability-note strong { color: var(--mainColor); }
 </style>

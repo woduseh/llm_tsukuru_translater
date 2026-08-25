@@ -6,9 +6,11 @@ import { OpenAiCompatibleTranslator } from '../../src/ts/libs/openAiCompatibleTr
 import { ClaudeTranslator } from '../../src/ts/libs/claudeTranslator';
 import {
   buildProviderCacheFingerprint,
+  buildProviderConfigFingerprint,
   createProviderTranslator,
   getAllProviderSecretSettingKeys,
   getProviderRegistryEntry,
+  LLM_CACHE_KEY_PREFIX,
   listProviderRegistryEntries,
   validateProviderReadiness,
 } from '../../src/ts/libs/providerRegistry';
@@ -49,6 +51,7 @@ describe('provider registry', () => {
       defaultModel: 'gemini-2.5-flash',
       concurrencyCap: 1,
     });
+    expect(defaultSettings.llmModel).toBe(getProviderRegistryEntry('gemini').defaultModel);
     expect(getProviderRegistryEntry('vertex')).toMatchObject({
       displayName: 'Vertex AI',
       credentialSettingKeys: ['llmVertexServiceAccountJson', 'llmVertexLocation'],
@@ -95,7 +98,7 @@ describe('provider registry', () => {
     expect(validateProviderReadiness(createSettings({ llmProvider: 'openai', llmOpenAiApiKey: '' })).llmValidationErrors).toContain('OpenAI API key is required.');
     expect(validateProviderReadiness(createSettings({ llmProvider: 'custom-openai', llmModel: 'local' })).llmReady).toBe(true);
     expect(validateProviderReadiness(createSettings({ llmProvider: 'custom-openai', llmCustomBaseUrl: '' })).llmValidationErrors).toContain('OpenAI-compatible base URL is required.');
-    expect(validateProviderReadiness(createSettings({ llmProvider: 'claude', llmModel: 'claude-3-5-haiku-latest' })).llmReady).toBe(true);
+    expect(validateProviderReadiness(createSettings({ llmProvider: 'claude', llmModel: 'claude-haiku-4-5-20251001' })).llmReady).toBe(true);
     expect(validateProviderReadiness(createSettings({ llmProvider: 'claude', llmClaudeApiKey: '' })).llmValidationErrors).toContain('Claude API key is required.');
   });
 
@@ -125,31 +128,46 @@ describe('provider registry', () => {
     })).toBeInstanceOf(OpenAiCompatibleTranslator);
 
     expect(createProviderTranslator({
-      settings: createSettings({ llmProvider: 'claude', llmModel: 'claude-3-5-haiku-latest' }),
+      settings: createSettings({ llmProvider: 'claude', llmModel: 'claude-haiku-4-5-20251001' }),
       sourceLang: 'ja',
       targetLang: 'ko',
     })).toBeInstanceOf(ClaudeTranslator);
   });
 
-  it('keeps cache fingerprints backward-compatible for existing caches', () => {
-    expect(buildProviderCacheFingerprint('gemini', {
+  it('uses versioned deterministic cache fingerprints and invalidates legacy keys', () => {
+    const geminiKey = buildProviderCacheFingerprint('gemini', {
       hash: 'abc123',
       model: 'gemini-2.5-flash',
+      sourceLang: 'ja',
       targetLang: 'ko',
       settings: createSettings({ llmProvider: 'gemini' }),
-    })).toBe('gemini_abc123_gemini-2.5-flash_ko');
-    expect(buildProviderCacheFingerprint('vertex', {
+    });
+    const sameGeminiKey = buildProviderCacheFingerprint('gemini', {
+      hash: 'abc123',
+      model: 'gemini-2.5-flash',
+      sourceLang: 'ja',
+      targetLang: 'ko',
+      settings: createSettings({ llmProvider: 'gemini' }),
+    });
+    const vertexKey = buildProviderCacheFingerprint('vertex', {
       hash: 'abc123',
       model: 'gemini-2.5-pro',
+      sourceLang: 'ja',
       targetLang: 'ko',
       settings: createSettings({ llmProvider: 'vertex' }),
-    })).toBe('vertex_abc123_gemini-2.5-pro_ko');
+    });
+
+    expect(geminiKey).toBe(sameGeminiKey);
+    expect(geminiKey).toMatch(new RegExp(`^${LLM_CACHE_KEY_PREFIX}_gemini_abc123_[a-f0-9]{64}$`));
+    expect(vertexKey).toMatch(new RegExp(`^${LLM_CACHE_KEY_PREFIX}_vertex_abc123_[a-f0-9]{64}$`));
+    expect(geminiKey).not.toBe('gemini_abc123_gemini-2.5-flash_ko');
   });
 
-  it('keeps new-provider cache fingerprints deterministic without secrets', () => {
+  it('keeps fingerprints deterministic without including or depending on secrets', () => {
     const openAiKey = buildProviderCacheFingerprint('openai', {
       hash: 'abc123',
       model: 'gpt-4o-mini',
+      sourceLang: 'ja',
       targetLang: 'ko',
       settings: createSettings({
         llmProvider: 'openai',
@@ -158,16 +176,26 @@ describe('provider registry', () => {
     });
     const claudeKey = buildProviderCacheFingerprint('claude', {
       hash: 'abc123',
-      model: 'claude-3-5-haiku-latest',
+      model: 'claude-haiku-4-5-20251001',
+      sourceLang: 'ja',
       targetLang: 'ko',
       settings: createSettings({
         llmProvider: 'claude',
         llmClaudeApiKey: 'claude-secret-that-must-not-appear',
       }),
     });
+    const openAiKeyWithRotatedSecret = buildProviderCacheFingerprint('openai', {
+      hash: 'abc123',
+      model: 'gpt-4o-mini',
+      sourceLang: 'ja',
+      targetLang: 'ko',
+      settings: createSettings({
+        llmProvider: 'openai',
+        llmOpenAiApiKey: 'rotated-secret-that-must-not-appear',
+      }),
+    });
 
-    expect(openAiKey).toBe('openai_abc123_gpt-4o-mini_ko');
-    expect(claudeKey).toBe('claude_abc123_claude-3-5-haiku-latest_ko');
+    expect(openAiKey).toBe(openAiKeyWithRotatedSecret);
     expect(openAiKey).not.toContain('openai-secret-that-must-not-appear');
     expect(claudeKey).not.toContain('claude-secret-that-must-not-appear');
     expect(openAiKey).not.toEqual(claudeKey);
@@ -177,6 +205,7 @@ describe('provider registry', () => {
     const first = buildProviderCacheFingerprint('custom-openai', {
       hash: 'abc123',
       model: 'local',
+      sourceLang: 'ja',
       targetLang: 'ko',
       settings: createSettings({
         llmProvider: 'custom-openai',
@@ -188,6 +217,7 @@ describe('provider registry', () => {
     const second = buildProviderCacheFingerprint('custom-openai', {
       hash: 'abc123',
       model: 'local',
+      sourceLang: 'ja',
       targetLang: 'ko',
       settings: createSettings({
         llmProvider: 'custom-openai',
@@ -200,5 +230,25 @@ describe('provider registry', () => {
     expect(first).not.toEqual(second);
     expect(first).not.toContain('secret-that-must-not-appear');
     expect(second).not.toContain('secret-that-must-not-appear');
+  });
+
+  it('separates fingerprints for every translation-affecting setting', () => {
+    const base = createSettings({ llmProvider: 'vertex', llmCustomPrompt: 'voice A' });
+    const fingerprint = (overrides: Record<string, unknown> = {}, sourceLang = 'ja') =>
+      buildProviderConfigFingerprint('vertex', {
+        model: 'gemini-2.5-pro',
+        sourceLang,
+        targetLang: 'ko',
+        settings: { ...base, ...overrides },
+      });
+
+    expect(fingerprint({ llmCustomPrompt: 'voice B' })).not.toBe(fingerprint());
+    expect(fingerprint({ llmVertexLocation: 'asia-northeast3' })).not.toBe(fingerprint());
+    expect(fingerprint({ llmTranslationUnit: 'file' })).not.toBe(fingerprint());
+    expect(fingerprint({ llmChunkSize: 5 })).not.toBe(fingerprint());
+    expect(fingerprint({ DoNotTransHangul: false })).not.toBe(fingerprint());
+    expect(fingerprint({}, 'en')).not.toBe(fingerprint());
+    expect(fingerprint()).not.toContain('voice A');
+    expect(fingerprint()).not.toContain(validServiceAccountJson);
   });
 });

@@ -3,6 +3,7 @@ import {
     DEFAULT_LLM_PROVIDER,
     DEFAULT_LLM_VERTEX_LOCATION,
 } from '../../types/settings'
+import { LLM_PROVIDER_METADATA } from '../../types/llmProviderContract'
 import styles from './styles'
 
 export const settings: AppSettings = {
@@ -32,7 +33,7 @@ export const settings: AppSettings = {
     llmCustomBaseUrl: 'http://localhost:1234/v1',
     llmClaudeApiKey: '',
     llmProvider: DEFAULT_LLM_PROVIDER,
-    llmModel: 'gemini-3.0-flash-preview',
+    llmModel: LLM_PROVIDER_METADATA[DEFAULT_LLM_PROVIDER].defaultModel,
     llmMaxTokens: 4096,
     llmCustomPrompt: '',
     llmChunkSize: 30,

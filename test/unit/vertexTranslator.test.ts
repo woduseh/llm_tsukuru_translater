@@ -170,7 +170,9 @@ describe('createVertexTranslator', () => {
     const result = await translator.translateFileContent('hello');
 
     expect(result.translatedContent).toBe('hello');
-    expect(result.logEntry.skippedBlocks).toBe(1);
+    expect(result.logEntry.skippedBlocks).toBe(0);
+    expect(result.logEntry.errorBlocks).toBe(1);
+    expect(result.incomplete).toBe(true);
     expect(result.logEntry.retries).toBe(0);
     expect(result.logEntry.errors?.[0]).toContain('Vertex AI authentication failed');
     expect(post).toHaveBeenCalledTimes(1);

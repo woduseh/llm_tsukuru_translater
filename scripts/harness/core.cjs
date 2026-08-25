@@ -360,12 +360,37 @@ async function main() {
             project_id: 'vertex-project',
           }),
         });
-        const cacheKey = translatorFactory.buildTranslationCacheKey('vertex', 'abc123', 'gemini-harness', 'ko');
+        const cacheSettings = {
+          llmProvider: 'vertex',
+          llmModel: 'gemini-harness',
+          llmSourceLang: 'ja',
+          llmTargetLang: 'ko',
+          llmVertexLocation: 'global',
+          llmVertexServiceAccountJson: 'private-key-must-not-enter-cache-key',
+        };
+        const cacheKey = translatorFactory.buildTranslationCacheKey(
+          'vertex',
+          'abc123',
+          'gemini-harness',
+          'ja',
+          'ko',
+          cacheSettings,
+        );
+        const repeatedCacheKey = translatorFactory.buildTranslationCacheKey(
+          'vertex',
+          'abc123',
+          'gemini-harness',
+          'ja',
+          'ko',
+          cacheSettings,
+        );
 
         assert(readyGemini === null, 'ready gemini settings should not fail');
         assert(typeof missingGemini === 'string' && missingGemini.includes('Gemini'), 'missing gemini error changed');
         assert(readyVertex.llmReady, 'vertex settings should validate');
-        assert(cacheKey === 'vertex_abc123_gemini-harness_ko', 'cache key format changed');
+        assert(cacheKey === repeatedCacheKey, 'cache key is not deterministic');
+        assert(cacheKey.startsWith('llm-cache-v2_vertex_abc123_'), 'versioned cache key format changed');
+        assert(!cacheKey.includes(cacheSettings.llmVertexServiceAccountJson), 'cache key contains a provider secret');
 
         return {
           missingGemini,

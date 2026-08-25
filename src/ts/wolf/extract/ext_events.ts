@@ -1,5 +1,6 @@
 import { lenStr } from '../../../../globals'
 import { AppContext } from '../../../appContext';
+import type { WolfExtractConfig } from '../types';
 
 interface Commands{
     numArg:number[]
@@ -27,7 +28,7 @@ function addString(str:lenStr, sourceFile:string, targetFile:string, codeStr:str
     })
 }
 
-export function extractEvent(cmds:Commands[], file:string, conf:{[key:string]:boolean}, ctx: AppContext, conf2:{[key:string]:boolean} = {}){
+export function extractEvent(cmds:Commands[], file:string, conf:WolfExtractConfig, ctx: AppContext, conf2:{commonevent?: boolean} = {}){
     _ctx = ctx;
     for(const cmd of cmds){
         const type = (cmd.numArg[0]) //Type

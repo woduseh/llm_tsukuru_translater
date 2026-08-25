@@ -13,12 +13,13 @@ import {
 } from '../agent/agentSkillGuide';
 import { redactSecretLikeValues } from '../agent/contractsValidation';
 import type { GlossarySearchOptions } from '../agent/glossaryService';
-import type { JobGraphCreateInput } from '../agent/jobGraphService';
+import { JOB_GRAPH_NODE_TYPES, type JobGraphCreateInput } from '../agent/jobGraphService';
 import type { MemorySearchOptions } from '../agent/memoryService';
 import type { PatchProposeOptions } from '../agent/patchService';
 import type { QaBatchScoreOptions, QaCompareVersionsOptions, QaExplainScoreOptions, QaScoreFileOptions, QaThresholdGateOptions } from '../agent/qaService';
 import type { RepairLoopOptions } from '../agent/repairLoopService';
 import type { WorkflowComposeInput } from '../agent/workflowService';
+import { detectAgentProjectEngine, isWolfDataPath, WOLF_PROJECT_ENGINE } from '../agent/projectEngine';
 import type { AgentResultEnvelope, AuditEntry, JsonObject, McpToolDefinition, PermissionTier, TranslationPatch } from '../types/agentWorkspace';
 import type { AppSettings } from '../types/settings';
 import { LLM_PROVIDER_SECRET_SETTING_KEYS } from '../types/llmProviderContract';
@@ -38,6 +39,80 @@ interface RegisteredMcpTool {
   definition: McpToolDefinition;
   handler: McpToolHandler;
 }
+
+const PATCH_VALIDATE_INPUT_SCHEMA: JsonObject = {
+  type: 'object',
+  properties: {
+    patch: {
+      type: 'object',
+      properties: {
+        schemaVersion: { type: 'number', enum: [1] },
+        patchId: { type: 'string' },
+        createdAt: { type: 'string' },
+        dryRunOnly: { type: 'boolean', enum: [true] },
+        targetPath: { type: 'string' },
+        operations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              opId: { type: 'string' },
+              kind: { type: 'string', enum: ['replace-line', 'virtual-note'] },
+              targetPath: { type: 'string' },
+              lineNumber: { type: 'number' },
+              originalText: { type: 'string' },
+              replacementText: { type: 'string' },
+              note: { type: 'string' },
+              alignmentProofRef: { type: 'string' },
+            },
+            required: ['opId', 'kind', 'targetPath', 'lineNumber'],
+            additionalProperties: false,
+          },
+        },
+        alignmentRef: { type: 'string' },
+        invariantPolicy: {
+          type: 'object',
+          properties: {
+            preserveLineCount: { type: 'boolean', enum: [true] },
+            requiresAlignmentProofForLineCountChange: { type: 'boolean', enum: [true] },
+          },
+          required: ['preserveLineCount', 'requiresAlignmentProofForLineCountChange'],
+          additionalProperties: false,
+        },
+      },
+      required: ['schemaVersion', 'patchId', 'createdAt', 'dryRunOnly', 'targetPath', 'operations', 'invariantPolicy'],
+      additionalProperties: false,
+    },
+  },
+  required: ['patch'],
+  additionalProperties: false,
+};
+
+const WORKFLOW_COMPOSE_INPUT_SCHEMA: JsonObject = {
+  type: 'object',
+  properties: {
+    workflowId: { type: 'string' },
+    title: { type: 'string' },
+    preset: { type: 'string', enum: ['translation-review', 'repair-loop', 'memory-glossary'] },
+    nodes: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          nodeId: { type: 'string' },
+          type: { type: 'string', enum: [...JOB_GRAPH_NODE_TYPES] },
+          title: { type: 'string' },
+          dependsOn: { type: 'array', items: { type: 'string' } },
+          input: { type: 'object', additionalProperties: true },
+        },
+        required: ['nodeId', 'type'],
+        additionalProperties: false,
+      },
+    },
+    metadata: { type: 'object', additionalProperties: true },
+  },
+  additionalProperties: false,
+};
 
 export class McpToolRegistry {
   private readonly tools = new Map<string, RegisteredMcpTool>();
@@ -66,6 +141,15 @@ export class McpToolRegistry {
   callTool(name: string, args: JsonObject = {}, requestId = createRequestId(name)): AgentResultEnvelope {
     const tool = this.tools.get(name);
     if (!tool) return failureEnvelope(requestId, name, 'readonly', `Unknown MCP tool: ${name}`);
+    const argumentErrors = validateToolArguments(args, tool.definition.inputSchema);
+    if (argumentErrors.length > 0) {
+      return failureEnvelope(
+        requestId,
+        name,
+        tool.definition.permissionTier,
+        `Invalid arguments for ${name}: ${argumentErrors.join('; ')}`,
+      );
+    }
     try {
       const payload = tool.handler(args, {
         requestId,
@@ -439,7 +523,7 @@ export function createAgentToolDefinitions(): RegisteredMcpTool[] {
         title: 'Validate translation patch invariants',
         description: 'Validates dry-run patch invariants, rejecting line-count-changing replacements unless a future alignment proof protocol is implemented.',
         permissionTier: 'readonly',
-        inputSchema: { type: 'object', additionalProperties: true },
+        inputSchema: PATCH_VALIDATE_INPUT_SCHEMA,
       },
       handler: (args, { service }) => service.patch.validate(requirePatchArg(args)) as unknown as JsonObject,
     },
@@ -657,7 +741,7 @@ export function createAgentToolDefinitions(): RegisteredMcpTool[] {
         title: 'Compose workflow graph',
         description: 'Builds a dry-run workflow DAG from a preset or supplied nodes without executing it.',
         permissionTier: 'readonly',
-        inputSchema: { type: 'object', additionalProperties: true },
+        inputSchema: WORKFLOW_COMPOSE_INPUT_SCHEMA,
       },
       handler: (args, { service }) => {
         const graph = service.workflows.compose(args as unknown as WorkflowComposeInput);
@@ -806,10 +890,14 @@ function sanitizeSettings(settings?: Partial<AppSettings> & Record<string, unkno
 }
 
 function buildTranslationInventory(projectRoot: string, maxFiles: number): JsonObject {
+  const projectEngine = detectAgentProjectEngine(projectRoot);
   const inventory = {
     projectRoot,
+    projectEngine,
+    wolfDetected: projectEngine === WOLF_PROJECT_ENGINE,
     scannedFiles: 0,
     dataJsonFiles: [] as JsonObject[],
+    wolfDataFiles: [] as JsonObject[],
     extractedTextFiles: [] as JsonObject[],
     extractedMetadataFiles: [] as JsonObject[],
     warnings: [] as string[],
@@ -818,7 +906,9 @@ function buildTranslationInventory(projectRoot: string, maxFiles: number): JsonO
     const rel = path.relative(projectRoot, filePath);
     const stat = fs.statSync(filePath);
     const lower = path.basename(filePath).toLowerCase();
-    if (lower.endsWith('.json') && (path.dirname(rel).toLowerCase().endsWith('data') || /^map\d{3}\.json$/i.test(lower))) {
+    if (isWolfDataPath(filePath)) {
+      inventory.wolfDataFiles.push({ path: rel, sizeBytes: stat.size });
+    } else if (lower.endsWith('.json') && (path.dirname(rel).toLowerCase().endsWith('data') || /^map\d{3}\.json$/i.test(lower))) {
       inventory.dataJsonFiles.push({ path: rel, sizeBytes: stat.size });
     } else if (lower.endsWith('.txt')) {
       inventory.extractedTextFiles.push({ path: rel, sizeBytes: stat.size, lineCount: countLinesBounded(filePath, 256 * 1024) });
@@ -960,6 +1050,74 @@ function countLinesBounded(filePath: string, maxBytes: number): number {
   } finally {
     fs.closeSync(fd);
   }
+}
+
+function validateToolArguments(args: JsonObject, schema: JsonObject): string[] {
+  return validateSchemaValue(args, schema, 'arguments');
+}
+
+function validateSchemaValue(value: unknown, schema: JsonObject, label: string): string[] {
+  const errors: string[] = [];
+  const expectedType = typeof schema.type === 'string' ? schema.type : undefined;
+  if (expectedType && !matchesSchemaType(value, expectedType)) {
+    return [`${label} must be ${articleFor(expectedType)} ${expectedType}`];
+  }
+
+  const enumValues = Array.isArray(schema.enum) ? schema.enum : undefined;
+  if (enumValues && !enumValues.some((candidate) => Object.is(candidate, value))) {
+    errors.push(`${label} must be one of ${enumValues.map((candidate) => JSON.stringify(candidate)).join(', ')}`);
+    return errors;
+  }
+
+  if (expectedType === 'object' && isPlainObject(value)) {
+    const properties = isPlainObject(schema.properties) ? schema.properties : {};
+    const required = Array.isArray(schema.required)
+      ? schema.required.filter((entry): entry is string => typeof entry === 'string')
+      : [];
+    for (const propertyName of required) {
+      if (!Object.prototype.hasOwnProperty.call(value, propertyName) || value[propertyName] === undefined) {
+        errors.push(`${label} is missing required property ${JSON.stringify(propertyName)}`);
+      }
+    }
+    if (schema.additionalProperties === false) {
+      for (const propertyName of Object.keys(value)) {
+        if (!Object.prototype.hasOwnProperty.call(properties, propertyName)) {
+          errors.push(`${label} has unknown property ${JSON.stringify(propertyName)}`);
+        }
+      }
+    }
+    for (const [propertyName, propertySchema] of Object.entries(properties)) {
+      if (!Object.prototype.hasOwnProperty.call(value, propertyName) || value[propertyName] === undefined) continue;
+      if (!isPlainObject(propertySchema)) continue;
+      errors.push(...validateSchemaValue(value[propertyName], propertySchema, `${label}.${propertyName}`));
+    }
+  }
+
+  if (expectedType === 'array' && Array.isArray(value) && isPlainObject(schema.items)) {
+    value.forEach((entry, index) => {
+      errors.push(...validateSchemaValue(entry, schema.items as JsonObject, `${label}[${index}]`));
+    });
+  }
+
+  return errors;
+}
+
+function matchesSchemaType(value: unknown, expectedType: string): boolean {
+  if (expectedType === 'object') return isPlainObject(value);
+  if (expectedType === 'array') return Array.isArray(value);
+  if (expectedType === 'number') return typeof value === 'number' && Number.isFinite(value);
+  if (expectedType === 'string') return typeof value === 'string';
+  if (expectedType === 'boolean') return typeof value === 'boolean';
+  if (expectedType === 'null') return value === null;
+  return true;
+}
+
+function articleFor(type: string): 'a' | 'an' {
+  return type === 'object' || type === 'array' ? 'an' : 'a';
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function numberArg(value: unknown, fallback: number): number {

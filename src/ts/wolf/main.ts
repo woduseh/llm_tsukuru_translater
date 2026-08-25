@@ -1,88 +1,52 @@
 import { ipcMain } from "electron";
-import path from 'path'
-import fs from 'fs'
 import { worked } from "../../ipc/shared";
 import { extractWolfFolder } from "./extract/extractor";
 import makeText from "./extract/makeText";
 import { wolfAppyier } from "./apply/applyWolf";
-import { getAllFileInDir } from "../../utils";
 import { wolfDecrypt } from "./extract/decrypter";
 import Tools from '../libs/projectTools';
 import { AppContext } from '../../appContext';
+import type { WolfExtractConfig } from './types';
+import { findWolfArchivesForInitialDecrypt, resolveWolfProjectPaths } from './paths';
 
 export function registerWolfHandlers(ctx: AppContext) {
-    ipcMain.on('wolf_ext', async (ev, arg:{folder:string,config:{[key:string]:boolean}}) => {
+    ipcMain.on('wolf_ext', async (_ev, arg:{folder:string,config?:WolfExtractConfig}) => {
         try {
           ctx.WolfMetadata = {
             ver:-1
           }
-          let dir = arg.folder
-          if(path.parse(dir).name !== 'data'){
-            if(fs.existsSync(path.join(dir, 'Data'))){
-              dir = path.join(dir, 'Data')
-            }
-            else if(fs.existsSync(path.join(dir, 'data'))){
-              dir = path.join(dir, 'data')
-            }
-          }
-          if(!fs.existsSync(dir)){
-            Tools.sendError('지정된 디렉토리가 없습니다');
-            worked(ctx)
-            return
-          }
-          if((path.parse(dir).name !== 'data' && (!fs.existsSync(path.join(dir, 'Data.wolf')))) && (!arg.config.force)){
-            Tools.sendError('data 폴더가 아닙니다');
-            worked(ctx)
-            return
-          }
-
-          ctx.sourceDir  = arg.folder
+          const initialPaths = resolveWolfProjectPaths(arg.folder, { allowEncryptedProject: true })
+          ctx.sourceDir = initialPaths.projectRoot
           ctx.WolfExtData = []
-          const encrypted = getAllFileInDir(path.dirname(dir), '.wolf')
+          ctx.WolfCache = {}
+          const encrypted = findWolfArchivesForInitialDecrypt(initialPaths)
           if(encrypted.length > 0){
-            const d = await wolfDecrypt(encrypted, ctx)
+            const d = await wolfDecrypt(encrypted, ctx, initialPaths)
             if(!d){
-              worked(ctx)
+              return
             }
           }
-          if(path.parse(dir).name !== 'data'){
-            if(fs.existsSync(path.join(dir, 'Data'))){
-              dir = path.join(dir, 'Data')
-            }
-            else if(fs.existsSync(path.join(dir, 'data'))){
-              dir = path.join(dir, 'data')
-            }
-          }
-          await extractWolfFolder(dir, arg.config, ctx)
-          await makeText(ctx)
+          const paths = resolveWolfProjectPaths(initialPaths.projectRoot)
+          await extractWolfFolder(paths.dataDir, arg.config ?? {}, ctx, paths.projectRoot)
+          await makeText(ctx, paths.extractRoot)
           Tools.send('alert2');
-          worked(ctx)
         }
         catch(err){
           Tools.sendError(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+        } finally {
           worked(ctx)
         }
     })
-    ipcMain.on('wolf_apply',  async (ev, arg:{folder:string,config:{[key:string]:boolean}}) => {
+    ipcMain.on('wolf_apply',  async (_ev, arg:{folder:string}) => {
       try {
-        const dir = arg.folder
-        if(!fs.existsSync(dir)){
-          Tools.sendError('지정된 디렉토리가 없습니다');
-          worked(ctx)
-          return
-        }
-        if(path.parse(dir).name !== 'data' && (!arg.config.force)){
-          Tools.sendError('data 폴더가 아닙니다');
-          worked(ctx)
-          return
-        }
-        ctx.sourceDir  = arg.folder
+        const paths = resolveWolfProjectPaths(arg.folder)
+        ctx.sourceDir = paths.projectRoot
         ctx.WolfExtData = []
-        await wolfAppyier(ctx)
+        await wolfAppyier(ctx, paths)
         Tools.send('alert2');
-        worked(ctx)
       } catch(err){
         Tools.sendError(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+      } finally {
         worked(ctx)
       }
     })

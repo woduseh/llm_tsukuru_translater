@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import {
   type AppSettings,
   DEFAULT_LLM_PROVIDER,
@@ -6,8 +7,10 @@ import {
 } from '../../types/settings';
 import {
   LLM_PROVIDER_METADATA,
+  LLM_PROVIDER_SECRET_SETTING_KEYS,
   type LlmProviderMetadataContract,
   type LlmProviderSecretSettingKey,
+  type LlmProviderSettingKey,
 } from '../../types/llmProviderContract';
 import {
   createGeminiTranslator,
@@ -45,11 +48,15 @@ export interface ProviderTranslatorFactoryArgs {
   isAborted?: () => boolean;
 }
 
-export interface ProviderCacheFingerprintArgs {
-  hash: string;
+export interface ProviderConfigFingerprintArgs {
   model: string;
+  sourceLang: string;
   targetLang: string;
-  settings?: Partial<AppSettings> & Record<string, unknown>;
+  settings: Partial<AppSettings> & Record<string, unknown>;
+}
+
+export interface ProviderCacheFingerprintArgs extends ProviderConfigFingerprintArgs {
+  hash: string;
 }
 
 export interface LlmProviderRegistryEntry extends LlmProviderMetadataContract {
@@ -62,6 +69,11 @@ export interface LlmProviderRegistryEntry extends LlmProviderMetadataContract {
 }
 
 type SettingsLike = Partial<AppSettings> & Record<string, unknown>;
+
+export const LLM_FINGERPRINT_SCHEMA_VERSION = 2;
+export const LLM_CACHE_KEY_PREFIX = `llm-cache-v${LLM_FINGERPRINT_SCHEMA_VERSION}`;
+const LLM_CONFIG_KEY_PREFIX = `llm-config-v${LLM_FINGERPRINT_SCHEMA_VERSION}`;
+const secretSettingKeys = new Set<string>(LLM_PROVIDER_SECRET_SETTING_KEYS);
 
 function hasConfiguredText(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
@@ -95,14 +107,41 @@ function completeReadiness(validation: ProviderReadinessValidation): ProviderRea
   };
 }
 
-function legacyCacheFingerprint(provider: LlmProvider, args: ProviderCacheFingerprintArgs): string {
-  return `${provider}_${args.hash}_${args.model}_${args.targetLang}`;
+function normalizeFingerprintValue(
+  key: LlmProviderSettingKey,
+  provider: LlmProvider,
+  args: ProviderConfigFingerprintArgs,
+): unknown {
+  if (key === 'llmProvider') return provider;
+  if (key === 'llmModel') return args.model.trim();
+  if (key === 'llmSourceLang') return args.sourceLang.trim();
+  if (key === 'llmTargetLang') return args.targetLang.trim();
+
+  const value = args.settings[key];
+  if (key === 'llmCustomPrompt') {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+  if (key === 'llmCustomBaseUrl') {
+    return typeof value === 'string' ? value.trim().replace(/\/+$/, '') : '';
+  }
+  if (key === 'llmVertexLocation') {
+    return getVertexLocation(value);
+  }
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  return null;
 }
 
-function scopedCacheFingerprint(provider: LlmProvider, args: ProviderCacheFingerprintArgs, scope = ''): string {
-  const parts = [provider, args.hash, args.model, args.targetLang];
-  if (scope) parts.push(scope);
-  return parts.map((part) => String(part).replace(/[\s:\/\\]+/g, '_')).join('_');
+function buildProviderConfigDigest(provider: LlmProvider, args: ProviderConfigFingerprintArgs): string {
+  const metadata = LLM_PROVIDER_METADATA[provider];
+  const configEntries = metadata.cacheKeyParts
+    .filter((key) => !secretSettingKeys.has(key))
+    .map((key) => [key, normalizeFingerprintValue(key, provider, args)] as const);
+  return crypto.createHash('sha256').update(JSON.stringify(configEntries), 'utf8').digest('hex');
+}
+
+function versionedCacheFingerprint(provider: LlmProvider, args: ProviderCacheFingerprintArgs): string {
+  return `${LLM_CACHE_KEY_PREFIX}_${provider}_${args.hash}_${buildProviderConfigDigest(provider, args)}`;
 }
 
 const providerRegistry = {
@@ -120,7 +159,7 @@ const providerRegistry = {
       return completeReadiness(validation);
     },
     cacheFingerprint(args: ProviderCacheFingerprintArgs): string {
-      return legacyCacheFingerprint('gemini', args);
+      return versionedCacheFingerprint('gemini', args);
     },
     translatorFactory(args: ProviderTranslatorFactoryArgs): Translator {
       return createGeminiTranslator(args.settings, args.sourceLang, args.targetLang, args.isAborted);
@@ -142,7 +181,7 @@ const providerRegistry = {
       return completeReadiness(validation);
     },
     cacheFingerprint(args: ProviderCacheFingerprintArgs): string {
-      return legacyCacheFingerprint('vertex', args);
+      return versionedCacheFingerprint('vertex', args);
     },
     translatorFactory(args: ProviderTranslatorFactoryArgs): Translator {
       return createVertexTranslator(args.settings, args.sourceLang, args.targetLang, args.isAborted);
@@ -162,7 +201,7 @@ const providerRegistry = {
       return completeReadiness(validation);
     },
     cacheFingerprint(args: ProviderCacheFingerprintArgs): string {
-      return scopedCacheFingerprint('openai', args);
+      return versionedCacheFingerprint('openai', args);
     },
     translatorFactory(args: ProviderTranslatorFactoryArgs): Translator {
       return createOpenAiTranslator(args.settings, args.sourceLang, args.targetLang, args.isAborted);
@@ -191,8 +230,7 @@ const providerRegistry = {
       return completeReadiness(validation);
     },
     cacheFingerprint(args: ProviderCacheFingerprintArgs): string {
-      const baseUrl = typeof args.settings?.llmCustomBaseUrl === 'string' ? args.settings.llmCustomBaseUrl.trim() : '';
-      return scopedCacheFingerprint('custom-openai', args, baseUrl);
+      return versionedCacheFingerprint('custom-openai', args);
     },
     translatorFactory(args: ProviderTranslatorFactoryArgs): Translator {
       return createCustomOpenAiTranslator(args.settings, args.sourceLang, args.targetLang, args.isAborted);
@@ -215,7 +253,7 @@ const providerRegistry = {
       return completeReadiness(validation);
     },
     cacheFingerprint(args: ProviderCacheFingerprintArgs): string {
-      return scopedCacheFingerprint('claude', args);
+      return versionedCacheFingerprint('claude', args);
     },
     translatorFactory(args: ProviderTranslatorFactoryArgs): Translator {
       return createClaudeTranslator(args.settings, args.sourceLang, args.targetLang, args.isAborted);
@@ -263,6 +301,11 @@ export function validateProviderReadiness(settings: SettingsLike): ProviderReadi
 
 export function buildProviderCacheFingerprint(provider: unknown, args: ProviderCacheFingerprintArgs): string {
   return getProviderRegistryEntry(provider).cacheFingerprint(args);
+}
+
+export function buildProviderConfigFingerprint(provider: unknown, args: ProviderConfigFingerprintArgs): string {
+  const normalizedProvider = normalizeLlmProvider(provider);
+  return `${LLM_CONFIG_KEY_PREFIX}_${normalizedProvider}_${buildProviderConfigDigest(normalizedProvider, args)}`;
 }
 
 export function createProviderTranslator(args: ProviderTranslatorFactoryArgs): Translator {

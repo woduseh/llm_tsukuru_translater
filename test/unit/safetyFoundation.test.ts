@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  AtomicFilePreimageMismatchError,
   AtomicFileWriteError,
   atomicWriteJsonFile,
   atomicWriteTextFile,
@@ -71,6 +72,26 @@ describe('atomic file writes', () => {
     const missingPath = path.join(makeSandboxDir(), 'missing', 'out.txt');
 
     expect(() => atomicWriteTextFile(missingPath, 'data')).toThrow(AtomicFileWriteError);
+  });
+
+  it('preserves a newer file when the expected preimage no longer matches', () => {
+    const dir = makeSandboxDir();
+    const targetPath = path.join(dir, 'state.json');
+    fs.writeFileSync(targetPath, 'newer edit', 'utf-8');
+
+    let thrown: unknown;
+    try {
+      atomicWriteTextFile(targetPath, 'stale replacement', {
+        expectedContent: 'older edit',
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(AtomicFileWriteError);
+    expect((thrown as AtomicFileWriteError).cause).toBeInstanceOf(AtomicFilePreimageMismatchError);
+    expect(fs.readFileSync(targetPath, 'utf-8')).toBe('newer edit');
+    expect(listAtomicTemps(dir)).toEqual([]);
   });
 });
 

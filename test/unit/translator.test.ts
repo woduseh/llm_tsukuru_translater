@@ -9,10 +9,27 @@ import {
 } from '../../src/ts/libs/translationCore';
 import { createGeminiTranslator } from '../../src/ts/libs/geminiTranslator';
 import { splitFileBlocks } from '../../src/ts/rpgmv/translator';
+import { isTranslationTextFileName } from '../../src/ts/libs/translationSyntax';
+
+describe('isTranslationTextFileName', () => {
+  it('includes the JavaScript extraction surface without admitting arbitrary scripts', () => {
+    expect(isTranslationTextFileName('Map001.txt')).toBe(true);
+    expect(isTranslationTextFileName('ext_javascript.js')).toBe(true);
+    expect(isTranslationTextFileName('plugins.js')).toBe(false);
+  });
+});
 
 // ─── splitIntoBlocks ────────────────────────────────────────────────
 
 describe('splitIntoBlocks', () => {
+  it('splits Wolf command-index separators', () => {
+    const blocks = splitIntoBlocks('--- 101-0 ---\nhello\n--- 102-3 ---\nworld');
+    expect(blocks).toEqual([
+      { separator: '--- 101-0 ---', lines: ['hello'] },
+      { separator: '--- 102-3 ---', lines: ['world'] },
+    ]);
+  });
+
   it('splits text with separator lines into blocks', () => {
     const content = 'line1\n--- 101 ---\nline2\nline3\n--- 101 ---\nline4';
     const blocks = splitIntoBlocks(content);

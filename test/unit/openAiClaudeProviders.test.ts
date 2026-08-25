@@ -98,13 +98,13 @@ describe('Claude provider', () => {
       data: { content: [{ type: 'text', text: '클로드 번역' }] },
     });
     const translator = createClaudeTranslator(createSettings({
-      llmModel: 'claude-3-5-haiku-latest',
+      llmModel: 'claude-haiku-4-5-20251001',
       llmMaxTokens: 1234,
     }), 'ja', 'ko', undefined, { httpClient: { post } });
 
     await expect(translator.translateText('原文')).resolves.toBe('클로드 번역');
     expect(post).toHaveBeenCalledWith(CLAUDE_MESSAGES_URL, expect.objectContaining({
-      model: 'claude-3-5-haiku-latest',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1234,
       system: expect.stringContaining('RPG game localization'),
       messages: [{ role: 'user', content: '<Source_Text>\n原文\n</Source_Text>' }],

@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { rmBom } from './fileIO';
+import { isSeparatorLine } from './translationSyntax';
 
 export interface ProjectProfileScanOptions {
   maxFiles?: number;
@@ -93,7 +94,6 @@ const TEXT_EXTENSIONS = new Set(['.txt']);
 const CSV_EXTENSIONS = new Set(['.csv']);
 
 const CONTROL_CODE_REGEX = /\\{1,2}[A-Za-z]+(?:\[[^\]\r\n]{0,24}\])?|\\[{}$|.!<>^]/g;
-const SEPARATOR_REGEX = /^-{3,}\s*[^-\r\n]{1,80}\s*-{3,}$/;
 const TOKEN_REGEX = /[\p{Script=Hangul}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}A-Za-z][\p{Script=Hangul}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}A-Za-z0-9_'’・ー-]{1,39}/gu;
 
 export function scanProjectTranslationProfile(rootDir: string, options: ProjectProfileScanOptions = {}): ProjectTranslationProfile {
@@ -426,7 +426,7 @@ function collectPatterns(
   for (const match of text.matchAll(CONTROL_CODE_REGEX)) {
     addPattern(controlPatterns, normalizeControlCode(match[0]), relPath, match[0], limits.maxSampleLength);
   }
-  if (SEPARATOR_REGEX.test(text)) {
+  if (isSeparatorLine(text)) {
     addPattern(separatorPatterns, normalizeSeparator(text), relPath, text, limits.maxSampleLength);
   }
 }

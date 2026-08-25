@@ -20,6 +20,7 @@
       <div class="file-list">
         <button v-for="item in filteredFiles" :key="item.realIdx" type="button"
           class="file-item" :class="{ active: item.realIdx === currentIdx }"
+          :disabled="llmRepairing || verifyWriting"
           @click="selectFile(item.realIdx)">
           <span>{{ item.file.name }}</span>
           <span v-if="item.file.repaired" class="badge badge-repaired">수정됨</span>
@@ -38,13 +39,13 @@
         </div>
         <div class="action-buttons">
           <span class="selection-count" v-if="selectedIssues.size > 0">{{ selectedIssues.size }}개 선택</span>
-          <button :disabled="selectedIssues.size === 0" @click="revertSelected" title="선택한 항목을 원본 값으로 되돌립니다">선택 되돌리기</button>
+          <button :disabled="selectedIssues.size === 0 || verifyWriting" @click="revertSelected" title="선택한 항목을 원본 값으로 되돌립니다">선택 되돌리기</button>
           <button :disabled="!llmButtonEnabled" @click="llmRepairShift" :title="llmRepairTitle">
             {{ llmButtonText }}
           </button>
-          <button :disabled="!currentHasIssues" @click="repairCurrentFile">현재 파일 수정</button>
-          <button :disabled="!anyHasIssues" @click="repairAll">전체 수정</button>
-          <button @click="close">닫기</button>
+          <button :disabled="!currentHasIssues || verifyWriting" @click="repairCurrentFile">현재 파일 수정</button>
+          <button :disabled="!anyHasIssues || verifyWriting" @click="repairAll">전체 수정</button>
+          <button :disabled="verifyWriting" @click="close">닫기</button>
         </div>
         <div class="status" :class="statusClass">{{ statusText }}</div>
       </div>
@@ -70,8 +71,8 @@
           <div class="llm-preview-header">
             <span class="llm-preview-title">🔄 LLM 재번역 미리보기 ({{ llmRepairResults.length }}건)</span>
             <div class="llm-preview-actions">
-              <button @click="applyLlmRepair">전체 적용</button>
-              <button @click="llmRepairResults = []">취소</button>
+              <button :disabled="verifyWriting" @click="applyLlmRepair">전체 적용</button>
+              <button @click="cancelLlmRepair">취소</button>
             </div>
           </div>
           <div v-for="(item, i) in llmRepairResults" :key="i" class="llm-preview-item">
@@ -163,14 +164,81 @@ const statusText = ref('')
 const statusClass = ref('')
 const selectedIssues = ref<Set<number>>(new Set())
 const llmRepairing = ref(false)
+const verifyWriting = ref(false)
 const llmProgress = ref('')
 const llmRepairResults = ref<{ path: string; origText: string; currentText: string; newText: string }[]>([])
+const llmRepairContext = ref<{
+  requestId: string
+  transPath: string
+  fileName: string
+  preimage: string
+} | null>(null)
 const loading = ref(true)
 const issueSeverityFilter = ref<'all' | 'error' | 'warning'>('all')
 const previewSamples = ref<{ orig: string; trans: string; path: string }[]>([])
 const jsonChangeLine = ref(false)
 const llmReady = ref(false)
 const currentProvider = ref('gemini')
+
+interface VerifyApplyJsonResult {
+  requestId: string
+  fileName: string
+  targetPath: string
+  success: boolean
+  error?: string
+}
+
+interface PendingVerifyWrite {
+  fileName: string
+  targetPath: string
+  resolve: (result: VerifyApplyJsonResult) => void
+  timeoutId: ReturnType<typeof setTimeout>
+}
+
+const pendingVerifyWrites = new Map<string, PendingVerifyWrite>()
+
+function requestAtomicJsonWrite(
+  file: FileEntry,
+  expectedContent: string,
+  nextContent: string,
+): Promise<VerifyApplyJsonResult> {
+  const requestId = globalThis.crypto?.randomUUID?.() ?? `verify-write-${Date.now()}-${Math.random()}`
+  return new Promise((resolve) => {
+    const timeoutId = setTimeout(() => {
+      pendingVerifyWrites.delete(requestId)
+      resolve({
+        requestId,
+        fileName: file.name,
+        targetPath: file.transPath,
+        success: false,
+        error: 'JSON Verify 저장 응답 시간을 초과했습니다.',
+      })
+    }, 30_000)
+    pendingVerifyWrites.set(requestId, {
+      fileName: file.name,
+      targetPath: file.transPath,
+      resolve,
+      timeoutId,
+    })
+    api.send('verifyApplyJson', {
+      requestId,
+      fileName: file.name,
+      targetPath: file.transPath,
+      expectedContent,
+      nextContent,
+    })
+  })
+}
+
+function onVerifyApplyJsonDone(result: VerifyApplyJsonResult) {
+  const pending = pendingVerifyWrites.get(result.requestId)
+  if (!pending
+    || pending.fileName !== result.fileName
+    || pending.targetPath !== result.targetPath) return
+  clearTimeout(pending.timeoutId)
+  pendingVerifyWrites.delete(result.requestId)
+  pending.resolve(result)
+}
 
 /**
  * Local setAtPath — avoids contextBridge structured-clone which discards mutations.
@@ -221,7 +289,7 @@ const selectedShiftCount = computed(() => {
 })
 const llmButtonEnabled = computed(() => {
   if (!llmReady.value) return false
-  if (llmRepairing.value) return false
+  if (llmRepairing.value || verifyWriting.value) return false
   if (selectedIssues.value.size > 0) return selectedShiftCount.value > 0
   return shiftIssueCount.value > 0
 })
@@ -274,52 +342,61 @@ const summaryItems = computed<SummaryItem[]>(() => {
 
 function loadFiles(dir: string) {
   loading.value = true
+  llmRepairing.value = false
+  llmRepairResults.value = []
+  llmRepairContext.value = null
   files.value = []
   currentIdx.value = 0
   selectedIssues.value = new Set()
 
-  const completedDir = window.nodePath.join(dir, 'Completed', 'data')
-  const backupDir = window.nodePath.join(dir, 'Backup')
-  let origDir: string, transDir: string
-  if (window.nodeFs.existsSync(completedDir)) {
-    origDir = window.nodeFs.existsSync(backupDir) ? backupDir : dir
-    transDir = completedDir
-  } else if (window.nodeFs.existsSync(backupDir)) {
-    origDir = backupDir; transDir = dir
-  } else { loading.value = false; return }
+  try {
+    const completedDir = window.nodePath.join(dir, 'Completed', 'data')
+    const backupDir = window.nodePath.join(dir, 'Backup')
+    let origDir: string, transDir: string
+    if (window.nodeFs.existsSync(completedDir)) {
+      origDir = window.nodeFs.existsSync(backupDir) ? backupDir : dir
+      transDir = completedDir
+    } else if (window.nodeFs.existsSync(backupDir)) {
+      origDir = backupDir; transDir = dir
+    } else { return }
 
-  const transFiles = window.nodeFs.readdirSync(transDir).filter((f: string) => f.endsWith('.json'))
-  for (const name of transFiles) {
-    const origPath = window.nodePath.join(origDir, name)
-    const transPath = window.nodePath.join(transDir, name)
-    if (!window.nodeFs.existsSync(origPath)) continue
-    try {
-      let origData = window.nodeFs.readFileSync(origPath, 'utf-8')
-      let transData = window.nodeFs.readFileSync(transPath, 'utf-8')
-      if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1)
-      if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
-      const orig = JSON.parse(origData), trans = JSON.parse(transData)
-      const issues = window.verify.verifyJsonIntegrity(orig, trans) as VerifyIssue[]
-      files.value.push({
-        name, origPath, transPath, issues,
-        errorCount: issues.filter(i => i.severity === 'error').length,
-        warningCount: issues.filter(i => i.severity === 'warning').length,
-        repaired: false
-      })
-    } catch (e) {
-      files.value.push({
-        name, origPath, transPath,
-        issues: [{ path: '$', type: 'parse_error', severity: 'error', message: `JSON 파싱 오류: ${(e as Error).message}` }],
-        errorCount: 1, warningCount: 0, repaired: false
-      })
+    const transFiles = window.nodeFs.readdirSync(transDir).filter((f: string) => f.endsWith('.json'))
+    for (const name of transFiles) {
+      const origPath = window.nodePath.join(origDir, name)
+      const transPath = window.nodePath.join(transDir, name)
+      if (!window.nodeFs.existsSync(origPath)) continue
+      try {
+        let origData = window.nodeFs.readFileSync(origPath, 'utf-8')
+        let transData = window.nodeFs.readFileSync(transPath, 'utf-8')
+        if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1)
+        if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
+        const orig = JSON.parse(origData), trans = JSON.parse(transData)
+        const issues = window.verify.verifyJsonIntegrity(orig, trans) as VerifyIssue[]
+        files.value.push({
+          name, origPath, transPath, issues,
+          errorCount: issues.filter(i => i.severity === 'error').length,
+          warningCount: issues.filter(i => i.severity === 'warning').length,
+          repaired: false
+        })
+      } catch (e) {
+        files.value.push({
+          name, origPath, transPath,
+          issues: [{ path: '$', type: 'parse_error', severity: 'error', message: `JSON 파싱 오류: ${(e as Error).message}` }],
+          errorCount: 1, warningCount: 0, repaired: false
+        })
+      }
     }
-  }
-  updateFilteredFiles()
-  loading.value = false
-  if (files.value.length > 0 && files.value[0].issues.length === 0) {
-    loadPreview(files.value[0])
-  } else {
-    previewSamples.value = []
+    updateFilteredFiles()
+    if (files.value.length > 0 && files.value[0].issues.length === 0) {
+      loadPreview(files.value[0])
+    } else {
+      previewSamples.value = []
+    }
+  } catch (error) {
+    statusText.value = `❌ 파일을 불러오지 못했습니다: ${(error as Error).message}`
+    statusClass.value = 'status-error'
+  } finally {
+    loading.value = false
   }
 }
 
@@ -339,9 +416,11 @@ function updateFilteredFiles() {
 }
 
 function selectFile(idx: number) {
+  if (llmRepairing.value || verifyWriting.value) return
   currentIdx.value = idx
   selectedIssues.value = new Set()
   llmRepairResults.value = []
+  llmRepairContext.value = null
   issueSeverityFilter.value = 'all'
   const f = files.value[idx]
   if (f && f.issues.length === 0) {
@@ -416,12 +495,14 @@ function refreshFileIssues(idx: number) {
   }
 }
 
-function revertSelected() {
+async function revertSelected() {
   const f = files.value[currentIdx.value]
   if (!f || selectedIssues.value.size === 0) return
+  verifyWriting.value = true
   try {
     let origData = window.nodeFs.readFileSync(f.origPath, 'utf-8')
-    let transData = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+    const expectedContent = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+    let transData = expectedContent
     if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1)
     if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
     const orig = JSON.parse(origData), trans = JSON.parse(transData)
@@ -437,7 +518,12 @@ function revertSelected() {
     }
     if (reverted > 0) {
       const indent = getIndent()
-      window.nodeFs.writeFileSync(f.transPath, JSON.stringify(trans, null, indent || undefined), 'utf-8')
+      const result = await requestAtomicJsonWrite(
+        f,
+        expectedContent,
+        JSON.stringify(trans, null, indent || undefined),
+      )
+      if (!result.success) throw new Error(result.error || 'JSON 저장에 실패했습니다.')
       refreshFileIssues(currentIdx.value)
       f.repaired = true
       statusText.value = `✓ ${reverted}개 항목 되돌리기 완료 (남은 문제: ${f.issues.length}개)`
@@ -451,15 +537,18 @@ function revertSelected() {
   } catch (e) {
     statusText.value = `❌ 되돌리기 실패: ${(e as Error).message}`
     statusClass.value = 'status-error'
+  } finally {
+    verifyWriting.value = false
   }
 }
 
-function repairFile(idx: number): { success: boolean; fixed: number; remaining: number; error?: string } {
+async function repairFile(idx: number): Promise<{ success: boolean; fixed: number; remaining: number; error?: string }> {
   const f = files.value[idx]
   if (f.issues.length === 0) return { success: false, fixed: 0, remaining: 0, error: '문제가 없는 파일' }
   try {
     let origData = window.nodeFs.readFileSync(f.origPath, 'utf-8')
-    let transData = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+    const expectedContent = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+    let transData = expectedContent
     if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1)
     if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
     const orig = JSON.parse(origData), trans = JSON.parse(transData)
@@ -467,7 +556,8 @@ function repairFile(idx: number): { success: boolean; fixed: number; remaining: 
     const repaired = window.verify.repairJson(orig, trans)
     const indent = getIndent()
     const output = JSON.stringify(repaired, null, indent || undefined)
-    window.nodeFs.writeFileSync(f.transPath, output, 'utf-8')
+    const writeResult = await requestAtomicJsonWrite(f, expectedContent, output)
+    if (!writeResult.success) throw new Error(writeResult.error || 'JSON 저장에 실패했습니다.')
     refreshFileIssues(idx)
     f.repaired = true
     const fixed = beforeCount - f.issues.length
@@ -475,45 +565,55 @@ function repairFile(idx: number): { success: boolean; fixed: number; remaining: 
   } catch (e) { return { success: false, fixed: 0, remaining: f.issues.length, error: (e as Error).message } }
 }
 
-function repairCurrentFile() {
-  const result = repairFile(currentIdx.value)
-  if (result.success) {
-    if (result.remaining > 0) {
-      statusText.value = `✓ ${result.fixed}개 수정 완료, ${result.remaining}개 항목은 번역 품질 문제로 자동 수정 불가`
+async function repairCurrentFile() {
+  verifyWriting.value = true
+  try {
+    const result = await repairFile(currentIdx.value)
+    if (result.success) {
+      if (result.remaining > 0) {
+        statusText.value = `✓ ${result.fixed}개 수정 완료, ${result.remaining}개 항목은 번역 품질 문제로 자동 수정 불가`
+      } else {
+        statusText.value = `✓ ${files.value[currentIdx.value].name} 수정 완료 (${result.fixed}개 문제 해결)`
+      }
+      statusClass.value = 'status-ok'
     } else {
-      statusText.value = `✓ ${files.value[currentIdx.value].name} 수정 완료 (${result.fixed}개 문제 해결)`
+      statusText.value = `❌ 수정 실패: ${result.error}`
+      statusClass.value = 'status-error'
     }
-    statusClass.value = 'status-ok'
-  } else {
-    statusText.value = `❌ 수정 실패: ${result.error}`
-    statusClass.value = 'status-error'
+    selectedIssues.value = new Set()
+    updateFilteredFiles()
+  } finally {
+    verifyWriting.value = false
   }
-  selectedIssues.value = new Set()
-  updateFilteredFiles()
 }
 
-function repairAll() {
+async function repairAll() {
+  verifyWriting.value = true
   let repaired = 0, failed = 0, totalFixed = 0, totalRemaining = 0
-  for (let i = 0; i < files.value.length; i++) {
-    if (files.value[i].issues.length > 0) {
-      const r = repairFile(i)
-      if (r.success) { repaired++; totalFixed += r.fixed; totalRemaining += r.remaining }
-      else failed++
+  try {
+    for (let i = 0; i < files.value.length; i++) {
+      if (files.value[i].issues.length > 0) {
+        const r = await repairFile(i)
+        if (r.success) { repaired++; totalFixed += r.fixed; totalRemaining += r.remaining }
+        else failed++
+      }
     }
-  }
-  if (failed === 0) {
-    if (totalRemaining > 0) {
-      statusText.value = `✓ ${repaired}개 파일, ${totalFixed}개 문제 수정 완료 (${totalRemaining}개 항목은 수동 확인 필요)`
+    if (failed === 0) {
+      if (totalRemaining > 0) {
+        statusText.value = `✓ ${repaired}개 파일, ${totalFixed}개 문제 수정 완료 (${totalRemaining}개 항목은 수동 확인 필요)`
+      } else {
+        statusText.value = `✓ ${repaired}개 파일, ${totalFixed}개 문제 모두 수정 완료`
+      }
+      statusClass.value = 'status-ok'
     } else {
-      statusText.value = `✓ ${repaired}개 파일, ${totalFixed}개 문제 모두 수정 완료`
+      statusText.value = `${repaired}개 수정, ${failed}개 실패`
+      statusClass.value = 'status-error'
     }
-    statusClass.value = 'status-ok'
-  } else {
-    statusText.value = `${repaired}개 수정, ${failed}개 실패`
-    statusClass.value = 'status-error'
+    selectedIssues.value = new Set()
+    updateFilteredFiles()
+  } finally {
+    verifyWriting.value = false
   }
-  selectedIssues.value = new Set()
-  updateFilteredFiles()
 }
 
 function close() { window.close() }
@@ -537,23 +637,52 @@ function llmRepairShift() {
   }
   if (shiftIssues.length === 0) return
 
+  let preimage: string
+  try {
+    preimage = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+  } catch (e) {
+    statusText.value = `❌ 대상 파일을 읽지 못했습니다: ${(e as Error).message}`
+    statusClass.value = 'status-error'
+    return
+  }
+
+  const requestId = `verify-repair-${Date.now()}-${Math.random().toString(16).slice(2)}`
   llmRepairing.value = true
   llmProgress.value = `0/${shiftIssues.length}`
   llmRepairResults.value = []
+  llmRepairContext.value = {
+    requestId,
+    transPath: f.transPath,
+    fileName: f.name,
+    preimage,
+  }
 
   const items = shiftIssues.map(issue => ({
     path: issue.path,
     origText: String(issue.origValue)
   }))
 
-  api.send('verifyLlmRepair', items)
+  api.send('verifyLlmRepair', { requestId, items })
 }
 
-function applyLlmRepair() {
-  const f = files.value[currentIdx.value]
-  if (!f || llmRepairResults.value.length === 0) return
+async function applyLlmRepair() {
+  const repairContext = llmRepairContext.value
+  if (!repairContext || llmRepairResults.value.length === 0) return
+  const targetIdx = files.value.findIndex(file => file.transPath === repairContext.transPath && file.name === repairContext.fileName)
+  const f = files.value[targetIdx]
+  if (!f) {
+    statusText.value = '❌ 복구 요청의 대상 파일을 더 이상 찾을 수 없습니다.'
+    statusClass.value = 'status-error'
+    cancelLlmRepair()
+    return
+  }
+  verifyWriting.value = true
   try {
-    let transData = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+    const currentPreimage = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+    if (currentPreimage !== repairContext.preimage) {
+      throw new Error('요청 이후 대상 파일이 변경되어 결과를 적용하지 않았습니다.')
+    }
+    let transData = currentPreimage
     if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
     const trans = JSON.parse(transData)
     let applied = 0
@@ -563,22 +692,36 @@ function applyLlmRepair() {
     }
     if (applied > 0) {
       const indent = getIndent()
-      window.nodeFs.writeFileSync(f.transPath, JSON.stringify(trans, null, indent || undefined), 'utf-8')
-      refreshFileIssues(currentIdx.value)
+      const result = await requestAtomicJsonWrite(
+        f,
+        repairContext.preimage,
+        JSON.stringify(trans, null, indent || undefined),
+      )
+      if (!result.success) throw new Error(result.error || 'JSON 저장에 실패했습니다.')
+      refreshFileIssues(targetIdx)
       f.repaired = true
       statusText.value = `✓ LLM 재번역 ${applied}건 적용 완료 (남은 문제: ${f.issues.length}개)`
       statusClass.value = 'status-ok'
     }
     llmRepairResults.value = []
+    llmRepairContext.value = null
     updateFilteredFiles()
   } catch (e) {
     statusText.value = `❌ LLM 적용 실패: ${(e as Error).message}`
     statusClass.value = 'status-error'
+  } finally {
+    verifyWriting.value = false
   }
+}
+
+function cancelLlmRepair() {
+  llmRepairResults.value = []
+  llmRepairContext.value = null
 }
 
 onMounted(() => {
   api.on('initVerify', (dir: string) => loadFiles(dir))
+  api.on('verifyApplyJsonDone', onVerifyApplyJsonDone)
   api.on('verifySettings', (s: unknown) => {
     const settings = s as Record<string, any>
     jsonChangeLine.value = !!settings.JsonChangeLine
@@ -591,14 +734,22 @@ onMounted(() => {
       }
     }
   })
-  api.on('verifyLlmRepairProgress', (data: { current: number; total: number; path: string }) => {
+  api.on('verifyLlmRepairProgress', (data: { requestId: string; current: number; total: number; path: string }) => {
+    if (data.requestId !== llmRepairContext.value?.requestId) return
     llmProgress.value = `${data.current}/${data.total}`
   })
-  api.on('verifyLlmRepairDone', (data: { success: boolean; results?: { path: string; origText: string; newText: string }[]; error?: string }) => {
+  api.on('verifyLlmRepairDone', (data: { requestId: string; success: boolean; results?: { path: string; origText: string; newText: string }[]; error?: string }) => {
+    const repairContext = llmRepairContext.value
+    if (!repairContext || data.requestId !== repairContext.requestId) return
     llmRepairing.value = false
     if (data.success && data.results) {
-      const f = files.value[currentIdx.value]
-      if (!f) return
+      const f = files.value.find(file => file.transPath === repairContext.transPath && file.name === repairContext.fileName)
+      if (!f) {
+        statusText.value = '❌ 복구 요청의 대상 파일을 더 이상 찾을 수 없습니다.'
+        statusClass.value = 'status-error'
+        cancelLlmRepair()
+        return
+      }
       try {
         let transData = window.nodeFs.readFileSync(f.transPath, 'utf-8')
         if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
@@ -615,6 +766,7 @@ onMounted(() => {
     } else {
       statusText.value = `❌ LLM 재번역 실패: ${data.error}`
       statusClass.value = 'status-error'
+      llmRepairContext.value = null
     }
   })
   api.send('verifyReady')
@@ -624,6 +776,9 @@ onUnmounted(() => {
   api.removeAllListeners('verifySettings')
   api.removeAllListeners('verifyLlmRepairProgress')
   api.removeAllListeners('verifyLlmRepairDone')
+  api.removeAllListeners('verifyApplyJsonDone')
+  for (const pending of pendingVerifyWrites.values()) clearTimeout(pending.timeoutId)
+  pendingVerifyWrites.clear()
 })
 </script>
 

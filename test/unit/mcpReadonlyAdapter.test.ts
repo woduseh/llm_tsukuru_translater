@@ -66,7 +66,7 @@ describe('MCP read-only adapter scaffold', () => {
 
     const invalidArgs = registry.callTool('quality.review_file', {});
     expect(invalidArgs.status).toBe('failed');
-    expect(invalidArgs.failure?.message).toContain('requires a non-empty string path');
+    expect(invalidArgs.failure?.message).toContain('missing required property "path"');
 
     const traversal = registry.callTool('quality.review_file', { path: path.join('..', path.basename(outside), 'secret.txt') });
     expect(traversal.status).toBe('failed');

@@ -33,6 +33,7 @@ const LARGE_PASTE_CHARS = 2000;
 const DEFAULT_COLS = 100;
 const DEFAULT_ROWS = 30;
 const MAX_SESSIONS = 4;
+const MAX_COMPLETED_SESSION_HISTORY = 20;
 const EARLY_EXIT_FAILURE_MS = 2000;
 
 interface TerminalSessionInternal {
@@ -57,6 +58,7 @@ interface TerminalSessionInternal {
   process?: PtyProcess;
   events: TerminalEvent[];
   outputSanitizer: TerminalOutputSanitizer;
+  secretRedactor: StreamingTerminalSecretRedactor;
   ringBufferBytes: number;
   disposers: Array<() => void>;
   createdAt: number;
@@ -156,6 +158,7 @@ export class TerminalService {
       latestSequence: 0,
       events: [],
       outputSanitizer: new TerminalOutputSanitizer(),
+      secretRedactor: new StreamingTerminalSecretRedactor(knownSecretsFromSettings(this.ctx)),
       ringBufferBytes: 0,
       disposers: [],
       createdAt: Date.now(),
@@ -181,6 +184,7 @@ export class TerminalService {
           && Date.now() - session.createdAt <= EARLY_EXIT_FAILURE_MS;
         session.state = session.state === 'killed' ? 'killed' : earlyFailure ? 'failed' : 'exited';
         this.releaseProcessOwnership(session);
+        this.flushPendingOutput(session);
         if (earlyFailure) {
           this.recordEvent(session, {
             kind: 'error',
@@ -194,6 +198,7 @@ export class TerminalService {
           data: `프로세스가 종료되었습니다. exitCode=${event.exitCode}`,
         });
         this.persistTranscriptIfNeeded(session);
+        this.evictCompletedSessions();
         this.publishSessions();
       }));
       session.state = 'running';
@@ -210,6 +215,7 @@ export class TerminalService {
         data: (error as Error).message || String(error),
         errorCode: 'pty-spawn-failed',
       });
+      this.evictCompletedSessions();
       this.publishSessions();
       return failure('pty-spawn-failed', (error as Error).message || String(error), this.getCapability(), this.toSummary(session));
     }
@@ -346,7 +352,10 @@ export class TerminalService {
       bounded = buffer.subarray(0, MAX_OUTPUT_CHUNK_BYTES).toString('utf8');
       omittedBytes = rawBytes - MAX_OUTPUT_CHUNK_BYTES;
     }
-    const redacted = redactTerminalText(session.outputSanitizer.push(bounded), knownSecretsFromSettings(this.ctx));
+    const redacted = session.secretRedactor.push(
+      session.outputSanitizer.push(bounded),
+      knownSecretsFromSettings(this.ctx),
+    );
     session.redactionCount += redacted.redactions.length;
     if (omittedBytes > 0) session.truncationCount += 1;
     this.recordEvent(session, {
@@ -399,13 +408,35 @@ export class TerminalService {
     if (typeof pid === 'number') {
       killProcessTree(pid);
     }
+    this.flushPendingOutput(session);
     this.recordEvent(session, {
       kind: 'exit',
       exitCode: session.exitCode ?? 0,
       data: `터미널 세션이 종료되었습니다. reason=${reason}`,
     });
     this.persistTranscriptIfNeeded(session);
+    this.evictCompletedSessions();
     this.publishSessions();
+  }
+
+  private flushPendingOutput(session: TerminalSessionInternal): void {
+    const redacted = session.secretRedactor.flush(knownSecretsFromSettings(this.ctx));
+    session.redactionCount += redacted.redactions.length;
+    if (!redacted.text) return;
+    this.recordEvent(session, {
+      kind: 'stdout',
+      data: redacted.text,
+    });
+  }
+
+  private evictCompletedSessions(): void {
+    const completed = Array.from(this.sessions.values())
+      .filter((session) => ['exited', 'failed', 'killed'].includes(session.state))
+      .sort((left, right) => left.lastActivityAt - right.lastActivityAt || left.createdAt - right.createdAt);
+    const removeCount = Math.max(0, completed.length - MAX_COMPLETED_SESSION_HISTORY);
+    for (const session of completed.slice(0, removeCount)) {
+      this.sessions.delete(session.sessionId);
+    }
   }
 
   private releaseProcessOwnership(session: TerminalSessionInternal): void {
@@ -626,17 +657,103 @@ function knownSecretsFromSettings(ctx: AppContext): string[] {
 }
 
 export function redactTerminalText(text: string, exactSecrets: string[] = []): { text: string; redactions: string[] } {
-  let value = text;
-  const redactions: string[] = [];
-  for (const secret of exactSecrets) {
-    if (!secret) continue;
-    if (value.includes(secret)) {
-      value = value.split(secret).join('[REDACTED]');
-      redactions.push('exact-secret');
+  const exact = redactExactTerminalSecrets(text, exactSecrets);
+  const generic = redactSecretLikeValues({ text: exact.text });
+  return {
+    text: String(generic.value.text ?? ''),
+    redactions: [...exact.redactions, ...generic.redactions],
+  };
+}
+
+interface SecretPattern {
+  value: string;
+  prefixTable: number[];
+}
+
+class StreamingTerminalSecretRedactor {
+  private pending = '';
+  private readonly patterns = new Map<string, SecretPattern>();
+
+  constructor(exactSecrets: string[] = []) {
+    this.rememberSecrets(exactSecrets);
+  }
+
+  push(text: string, exactSecrets: string[] = []): { text: string; redactions: string[] } {
+    this.rememberSecrets(exactSecrets);
+    const combined = `${this.pending}${text}`;
+    this.pending = '';
+    const exact = redactExactTerminalSecrets(combined, this.secretValues());
+    const pendingLength = this.longestPendingPrefix(exact.text);
+    const safeText = pendingLength > 0 ? exact.text.slice(0, -pendingLength) : exact.text;
+    this.pending = pendingLength > 0 ? exact.text.slice(-pendingLength) : '';
+    const generic = redactSecretLikeValues({ text: safeText });
+    return {
+      text: String(generic.value.text ?? ''),
+      redactions: [...exact.redactions, ...generic.redactions],
+    };
+  }
+
+  flush(exactSecrets: string[] = []): { text: string; redactions: string[] } {
+    this.rememberSecrets(exactSecrets);
+    const pending = this.pending;
+    this.pending = '';
+    return redactTerminalText(pending, this.secretValues());
+  }
+
+  private rememberSecrets(exactSecrets: string[]): void {
+    for (const secret of exactSecrets) {
+      if (!secret || this.patterns.has(secret)) continue;
+      this.patterns.set(secret, { value: secret, prefixTable: buildPrefixTable(secret) });
     }
   }
-  const redacted = redactSecretLikeValues({ text: value });
-  return { text: String(redacted.value.text ?? ''), redactions: [...redactions, ...redacted.redactions] };
+
+  private secretValues(): string[] {
+    return Array.from(this.patterns.keys());
+  }
+
+  private longestPendingPrefix(value: string): number {
+    let longest = 0;
+    for (const pattern of this.patterns.values()) {
+      longest = Math.max(longest, longestProperPrefixAtEnd(value, pattern));
+    }
+    return longest;
+  }
+}
+
+function redactExactTerminalSecrets(text: string, exactSecrets: string[]): { text: string; redactions: string[] } {
+  let value = text;
+  const redactions: string[] = [];
+  const secrets = Array.from(new Set(exactSecrets.filter(Boolean)))
+    .sort((left, right) => right.length - left.length);
+  for (const secret of secrets) {
+    if (!value.includes(secret)) continue;
+    value = value.split(secret).join('[REDACTED]');
+    redactions.push('exact-secret');
+  }
+  return { text: value, redactions };
+}
+
+function buildPrefixTable(pattern: string): number[] {
+  const table = new Array<number>(pattern.length).fill(0);
+  let matched = 0;
+  for (let index = 1; index < pattern.length; index += 1) {
+    while (matched > 0 && pattern[index] !== pattern[matched]) matched = table[matched - 1];
+    if (pattern[index] === pattern[matched]) matched += 1;
+    table[index] = matched;
+  }
+  return table;
+}
+
+function longestProperPrefixAtEnd(value: string, pattern: SecretPattern): number {
+  if (pattern.value.length <= 1 || value.length === 0) return 0;
+  let matched = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    while (matched > 0 && char !== pattern.value[matched]) matched = pattern.prefixTable[matched - 1];
+    if (char === pattern.value[matched]) matched += 1;
+    if (matched === pattern.value.length) matched = pattern.prefixTable[matched - 1];
+  }
+  return Math.min(matched, pattern.value.length - 1);
 }
 
 function containsSecretLikeValue(text: string): boolean {

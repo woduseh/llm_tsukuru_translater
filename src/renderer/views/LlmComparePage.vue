@@ -126,6 +126,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { api } from '../composables/useIpc'
 import { splitBlocks, checkMismatch, autoFixBlock, isBlockUntranslated, removeDuplicateHeaders, blocksToLines, checkMismatchBlocks, hasAnyUntranslatedBlock } from '../compareUtils'
 import type { Block } from '../compareUtils'
+import { haveSameTranslationLineStructure, isTranslationTextFileName } from '../../ts/libs/translationSyntax'
 
 interface FileEntry {
   name: string; origPath: string; transPath: string;
@@ -151,6 +152,28 @@ const loading = ref(true)
 const busy = ref(false)
 const busyMessage = ref('')
 let dataDir = ''
+
+interface RetranslateRequest {
+  requestId: string
+  fileName: string
+  transPath: string
+  expectedContent: string
+}
+
+interface RetranslateResult {
+  success: boolean
+  error?: string
+  requestId?: string
+  fileName?: string
+}
+
+interface RetranslateProgress {
+  requestId?: string
+  fileName?: string
+  message: string
+}
+
+let activeRetranslate: RetranslateRequest | null = null
 
 // --- Virtual scroll state ---
 const viewportEl = ref<HTMLElement | null>(null)
@@ -265,40 +288,46 @@ async function loadFiles(dir: string) {
   busy.value = true
   busyMessage.value = '파일 비교 중...'
   await yieldToUI()
-  dataDir = dir
-  const wolfExtDir = window.nodePath.join(dir, '_Extract', 'Texts')
-  const wolfBkDir = wolfExtDir + '_backup'
-  const mvExtDir = window.nodePath.join(dir, 'Extract')
-  const mvBkDir = mvExtDir + '_backup'
-  let extractDir: string, backupDir: string
-  if (window.nodeFs.existsSync(wolfExtDir) && window.nodeFs.existsSync(wolfBkDir)) {
-    extractDir = wolfExtDir; backupDir = wolfBkDir
-  } else {
-    extractDir = mvExtDir; backupDir = mvBkDir
-  }
-  files.value = []
-  if (!window.nodeFs.existsSync(extractDir) || !window.nodeFs.existsSync(backupDir)) { loading.value = false; busy.value = false; return }
+  try {
+    dataDir = dir
+    const wolfExtDir = window.nodePath.join(dir, '_Extract', 'Texts')
+    const wolfBkDir = wolfExtDir + '_backup'
+    const mvExtDir = window.nodePath.join(dir, 'Extract')
+    const mvBkDir = mvExtDir + '_backup'
+    let extractDir: string, backupDir: string
+    if (window.nodeFs.existsSync(wolfExtDir) && window.nodeFs.existsSync(wolfBkDir)) {
+      extractDir = wolfExtDir; backupDir = wolfBkDir
+    } else {
+      extractDir = mvExtDir; backupDir = mvBkDir
+    }
+    files.value = []
+    if (!window.nodeFs.existsSync(extractDir) || !window.nodeFs.existsSync(backupDir)) return
 
-  const transFiles: string[] = window.nodeFs.readdirSync(extractDir).filter((f: string) => f.endsWith('.txt'))
-  for (const name of transFiles) {
-    const origPath = window.nodePath.join(backupDir, name)
-    const transPath = window.nodePath.join(extractDir, name)
-    if (!window.nodeFs.existsSync(origPath)) continue
-    const origContent = window.nodeFs.readFileSync(origPath, 'utf-8')
-    const transContent = window.nodeFs.readFileSync(transPath, 'utf-8')
-    // Split once and reuse for both mismatch and untranslated checks
-    const ob = splitBlocks(origContent.split('\n'))
-    const tb = splitBlocks(transContent.split('\n'))
-    const mismatch = checkMismatchBlocks(ob, tb)
-    const untranslated = origContent === transContent || hasAnyUntranslatedBlock(ob, tb)
-    files.value.push({ name, origPath, transPath, mismatch, untranslated })
+    const transFiles: string[] = window.nodeFs.readdirSync(extractDir).filter(isTranslationTextFileName)
+    for (const name of transFiles) {
+      const origPath = window.nodePath.join(backupDir, name)
+      const transPath = window.nodePath.join(extractDir, name)
+      if (!window.nodeFs.existsSync(origPath)) continue
+      const origContent = window.nodeFs.readFileSync(origPath, 'utf-8')
+      const transContent = window.nodeFs.readFileSync(transPath, 'utf-8')
+      // Split once and reuse for both mismatch and untranslated checks
+      const ob = splitBlocks(origContent.split('\n'))
+      const tb = splitBlocks(transContent.split('\n'))
+      const mismatch = checkMismatchBlocks(ob, tb)
+      const untranslated = origContent === transContent || hasAnyUntranslatedBlock(ob, tb)
+      files.value.push({ name, origPath, transPath, mismatch, untranslated })
+    }
+    currentIdx.value = 0
+    selectedBlocks.value = new Set()
+    updateFilteredFiles()
+    renderBlocks()
+  } catch (error) {
+    files.value = []
+    console.error('Failed to load compare files:', error)
+  } finally {
+    loading.value = false
+    busy.value = false
   }
-  currentIdx.value = 0
-  selectedBlocks.value = new Set()
-  updateFilteredFiles()
-  renderBlocks()
-  loading.value = false
-  busy.value = false
 }
 
 function updateFilteredFiles() {
@@ -314,6 +343,11 @@ function updateFilteredFiles() {
 }
 
 async function selectFile(idx: number) {
+  if (retranslating.value) return
+  if (isDirty.value && idx !== currentIdx.value) {
+    saveStatus.value = '❌ 현재 편집 내용을 저장한 뒤 파일을 이동해 주세요'
+    return
+  }
   busy.value = true
   busyMessage.value = '파일 로딩 중...'
   await yieldToUI()
@@ -355,6 +389,7 @@ function blockClass(i: number): string {
   if (ob.sep !== tb.sep) return 'error-sep'
   const tLines = editedTransLines[i] ?? tb.lines.length
   if (ob.lines.length !== tLines) return 'error-lines'
+  if (!haveSameTranslationLineStructure(ob.lines, tb.lines)) return 'error-lines'
   if (untranslatedBlocks.value.has(i)) return 'untranslated'
   return 'ok'
 }
@@ -461,6 +496,10 @@ async function autoFixCurrentFile() {
 
 /** Auto-fix + save all Map***.txt files. Other files are skipped due to higher error risk. */
 async function autoFixAllMapFiles() {
+  if (isDirty.value) {
+    saveStatus.value = '❌ 현재 편집 내용을 저장한 뒤 전체 수정을 실행해 주세요'
+    return
+  }
   const MAP_RE = /^Map\d+\.txt$/i
   busy.value = true
   busyMessage.value = '전체 Map 파일 자동 수정 중...'
@@ -496,7 +535,7 @@ async function autoFixAllMapFiles() {
 }
 
 async function saveFile() {
-  if (files.value.length === 0) return
+  if (files.value.length === 0 || retranslating.value) return
   busy.value = true
   busyMessage.value = '저장 중...'
   await yieldToUI()
@@ -525,29 +564,84 @@ async function saveFile() {
 
 function retranslateFile() {
   if (files.value.length === 0 || !dataDir) return
-  retranslating.value = true
-  saveStatus.value = '🔄 준비 중...'
-  api.send('retranslateFile', { dir: dataDir, fileName: files.value[currentIdx.value].name })
+  const request = beginRetranslation()
+  if (!request) return
+  api.send('retranslateFile', {
+    dir: dataDir,
+    fileName: request.fileName,
+    requestId: request.requestId,
+    expectedContent: request.expectedContent,
+  })
 }
 
 function retranslateSelected() {
   if (files.value.length === 0 || !dataDir || selectedBlocks.value.size === 0) return
-  retranslating.value = true
-  saveStatus.value = '🔄 준비 중...'
   const indices = Array.from(selectedBlocks.value).sort((a, b) => a - b)
-  api.send('retranslateBlocks', { dir: dataDir, fileName: files.value[currentIdx.value].name, blockIndices: indices })
+  const request = beginRetranslation()
+  if (!request) return
+  api.send('retranslateBlocks', {
+    dir: dataDir,
+    fileName: request.fileName,
+    requestId: request.requestId,
+    expectedContent: request.expectedContent,
+    blockIndices: indices,
+  })
 }
 
 function retranslateUntranslated() {
   if (files.value.length === 0 || !dataDir || untranslatedBlocks.value.size === 0) return
-  retranslating.value = true
-  saveStatus.value = '🔄 준비 중...'
   const indices = Array.from(untranslatedBlocks.value).sort((a, b) => a - b)
-  api.send('retranslateBlocks', { dir: dataDir, fileName: files.value[currentIdx.value].name, blockIndices: indices })
+  const request = beginRetranslation()
+  if (!request) return
+  api.send('retranslateBlocks', {
+    dir: dataDir,
+    fileName: request.fileName,
+    requestId: request.requestId,
+    expectedContent: request.expectedContent,
+    blockIndices: indices,
+  })
+}
+
+function beginRetranslation(): RetranslateRequest | null {
+  if (isDirty.value) {
+    saveStatus.value = '❌ 먼저 현재 편집 내용을 저장해 주세요'
+    return null
+  }
+
+  const file = files.value[currentIdx.value]
+  if (!file || !window.nodeFs.existsSync(file.transPath)) {
+    saveStatus.value = '❌ 재번역할 파일을 찾을 수 없습니다'
+    return null
+  }
+
+  let expectedContent: string
+  try {
+    expectedContent = window.nodeFs.readFileSync(file.transPath, 'utf-8')
+  } catch {
+    saveStatus.value = '❌ 재번역할 파일을 읽을 수 없습니다'
+    return null
+  }
+
+  const request: RetranslateRequest = {
+    requestId: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
+    fileName: file.name,
+    transPath: file.transPath,
+    expectedContent,
+  }
+  activeRetranslate = request
+  retranslating.value = true
+  busy.value = true
+  busyMessage.value = `${file.name} 재번역 중...`
+  saveStatus.value = '🔄 준비 중...'
+  return request
 }
 
 function navigateFile(dir: 1 | -1) {
-  if (files.value.length === 0) return
+  if (files.value.length === 0 || retranslating.value) return
+  if (isDirty.value) {
+    saveStatus.value = '❌ 현재 편집 내용을 저장한 뒤 파일을 이동해 주세요'
+    return
+  }
   const start = currentIdx.value + dir
   for (let i = 0; i < files.value.length; i++) {
     const idx = ((start + dir * i) % files.value.length + files.value.length) % files.value.length
@@ -585,16 +679,41 @@ function navigateBlock(dir: 1 | -1) {
   }
 }
 
-function onRetranslateResult(result: { success: boolean; error?: string }) {
+function onRetranslateProgress(payload: string | RetranslateProgress) {
+  if (!activeRetranslate) return
+  if (typeof payload === 'string') {
+    saveStatus.value = `🔄 ${payload}`
+    return
+  }
+  if ((payload.requestId && payload.requestId !== activeRetranslate.requestId)
+    || (payload.fileName && payload.fileName !== activeRetranslate.fileName)) return
+  saveStatus.value = `🔄 ${payload.message}`
+}
+
+function onRetranslateResult(result: RetranslateResult) {
+  if (!activeRetranslate) return
+  if ((result.requestId && result.requestId !== activeRetranslate.requestId)
+    || (result.fileName && result.fileName !== activeRetranslate.fileName)) return
+
+  const request = activeRetranslate
+  activeRetranslate = null
   retranslating.value = false
+  busy.value = false
   if (result.success) {
-    saveStatus.value = '재번역 완료 ✓'
-    const f = files.value[currentIdx.value]
+    const fileIdx = files.value.findIndex(file => file.name === request.fileName && file.transPath === request.transPath)
+    if (fileIdx < 0) {
+      saveStatus.value = '❌ 재번역된 파일을 현재 목록에서 찾을 수 없습니다'
+      return
+    }
+    const f = files.value[fileIdx]
     const origContent = window.nodeFs.readFileSync(f.origPath, 'utf-8')
     const transContent = window.nodeFs.readFileSync(f.transPath, 'utf-8')
     f.mismatch = checkMismatch(origContent.split('\n'), transContent.split('\n'))
     f.untranslated = checkFileUntranslated(origContent, transContent)
-    updateFilteredFiles(); renderBlocks()
+    dirty[f.name] = false
+    updateFilteredFiles()
+    if (currentIdx.value === fileIdx) renderBlocks()
+    saveStatus.value = '재번역 완료 ✓'
   } else { saveStatus.value = `❌ ${result.error || '번역 실패'}` }
 }
 
@@ -602,7 +721,7 @@ let resizeObs: ResizeObserver | null = null
 
 onMounted(() => {
   api.on('initCompare', (dir: string) => loadFiles(dir))
-  api.on('retranslateProgress', (msg: string) => { saveStatus.value = `🔄 ${msg}` })
+  api.on('retranslateProgress', onRetranslateProgress)
   api.on('retranslateFileDone', onRetranslateResult)
   api.on('retranslateBlocksDone', onRetranslateResult)
 
@@ -630,6 +749,7 @@ onUnmounted(() => {
 })
 
 function onKeydown(e: KeyboardEvent) {
+  if (busy.value || retranslating.value) return
   if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveFile() }
 }
 </script>

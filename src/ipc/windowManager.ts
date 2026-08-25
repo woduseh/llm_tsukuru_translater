@@ -11,6 +11,7 @@ import { PROJECT_ROOT } from '../projectRoot';
 import { MutationApprovalRuntime } from '../agent/mutationApprovalRuntime';
 import { AgentBridgeServer } from '../agent/agentBridgeServer';
 import { rememberAllowedProjectRoot } from './llmProjectPathValidation';
+import { resolveWolfProjectPaths } from '../ts/wolf/paths';
 
 export function createWindow(ctx: AppContext) {
   loadSettings(ctx)
@@ -102,6 +103,17 @@ export function registerWindowHandlers(ctx: AppContext) {
     });
     if(!Path.canceled){
       const qs = Path.filePaths[0]
+      if(typeo === 'wolf_folder_input'){
+        try {
+          const wolfPaths = resolveWolfProjectPaths(qs, { allowEncryptedProject: true });
+          await rememberTrustedProjectPaths(ctx, wolfPaths.projectRoot, wolfPaths.projectRoot);
+          ctx.mainWindow!.webContents.send('set_path', {type:typeo, dir:wolfPaths.projectRoot});
+          ctx.mainWindow!.webContents.send('set-allowed-paths', [wolfPaths.projectRoot]);
+        } catch (error) {
+          ctx.mainWindow!.webContents.send('alert', {icon: 'error', message: (error as Error).message || String(error)});
+        }
+        return
+      }
       let qv
       if(qs.includes('\\')){
         qv = qs.split('\\')[qs.split('\\').length-1]

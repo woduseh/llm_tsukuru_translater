@@ -3,7 +3,7 @@
  * auto-fix, and untranslated detection. Extracted for unit-testing without DOM/Vue.
  */
 
-const SEP_RE = /^---\s*\d+\s*---$/
+import { haveSameTranslationLineStructure, isSeparatorLine } from '../ts/libs/translationSyntax'
 
 export interface Block { sep: string; lines: string[] }
 
@@ -12,7 +12,7 @@ export function splitBlocks(lines: string[]): Block[] {
   const blocks: Block[] = []
   let curSep = '', curLines: string[] = []
   for (const line of lines) {
-    if (SEP_RE.test(line.trim())) {
+    if (isSeparatorLine(line)) {
       if (curSep || curLines.length > 0) blocks.push({ sep: curSep, lines: [...curLines] })
       curSep = line; curLines = []
     } else { curLines.push(line) }
@@ -23,12 +23,7 @@ export function splitBlocks(lines: string[]): Block[] {
 
 /** Check whether orig and trans have a block-level mismatch (count or line-count). */
 export function checkMismatch(origLines: string[], transLines: string[]): boolean {
-  const ob = splitBlocks(origLines), tb = splitBlocks(transLines)
-  if (ob.length !== tb.length) return true
-  for (let i = 0; i < ob.length; i++) {
-    if (ob[i].sep !== tb[i].sep || ob[i].lines.length !== tb[i].lines.length) return true
-  }
-  return false
+  return checkMismatchBlocks(splitBlocks(origLines), splitBlocks(transLines))
 }
 
 /**
@@ -117,7 +112,8 @@ export function blocksToLines(blocks: Block[]): string[] {
 export function checkMismatchBlocks(origBlocks: Block[], transBlocks: Block[]): boolean {
   if (origBlocks.length !== transBlocks.length) return true
   for (let i = 0; i < origBlocks.length; i++) {
-    if (origBlocks[i].sep !== transBlocks[i].sep || origBlocks[i].lines.length !== transBlocks[i].lines.length) return true
+    if (origBlocks[i].sep !== transBlocks[i].sep
+      || !haveSameTranslationLineStructure(origBlocks[i].lines, transBlocks[i].lines)) return true
   }
   return false
 }

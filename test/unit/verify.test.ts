@@ -137,6 +137,24 @@ describe('verifyJsonIntegrity', () => {
     expect(issues.some(i => i.type === 'control_char_mismatch')).toBe(true);
   });
 
+  it('detects duplicated control characters in translated text', () => {
+    const issues = verifyJsonIntegrity(
+      'Test \\V[1] message',
+      'Test \\V[1] \\V[1] message',
+      '$', undefined, 'allow'
+    );
+    expect(issues.some(i => i.type === 'control_char_mismatch')).toBe(true);
+  });
+
+  it('detects reordered control characters in translated text', () => {
+    const issues = verifyJsonIntegrity(
+      '\\N[1] has \\I[2]',
+      '\\I[2]를 가진 \\N[1]',
+      '$', undefined, 'allow'
+    );
+    expect(issues.some(i => i.type === 'control_char_mismatch')).toBe(true);
+  });
+
   it('verifies event command indent mismatch', () => {
     const orig = { code: 401, indent: 0, parameters: ['Hello'] };
     const trans = { code: 401, indent: 2, parameters: ['Hello'] };

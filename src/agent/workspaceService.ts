@@ -3,6 +3,7 @@ import * as path from 'path';
 import type { AgentJobSummary, AgentProjectManifest, FailureArtifact, JsonObject, McpToolDefinition } from '../types/agentWorkspace';
 import { atomicWriteJsonFile } from '../ts/libs/atomicFile';
 import { redactSecretLikeValues } from './contractsValidation';
+import { detectAgentProjectEngine } from './projectEngine';
 
 export const AGENT_WORKSPACE_DIRECTORY = '.llm-tsukuru-agent';
 export const AGENT_WORKSPACE_SUBDIRECTORIES = [
@@ -96,7 +97,7 @@ export class WorkspaceService {
       schemaVersion: 1,
       generatedAt: new Date().toISOString(),
       engine: {
-        name: options.engine ?? 'unknown',
+        name: options.engine ?? detectAgentProjectEngine(this.projectRoot),
         projectPath: this.projectRoot,
       },
       projectPath: this.projectRoot,

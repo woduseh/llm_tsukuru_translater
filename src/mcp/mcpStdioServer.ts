@@ -143,6 +143,24 @@ export async function handleMcpRequestAsync(
   return ok(id, toToolCallResult(envelope));
 }
 
+export async function handleMcpLine(
+  registry: AsyncMcpToolRegistryLike,
+  line: string,
+  processSessionId: string,
+): Promise<JsonRpcResponse | null> {
+  let request: JsonRpcMessage;
+  try {
+    request = JSON.parse(line) as JsonRpcMessage;
+  } catch {
+    return err(null, -32700, 'Parse error.');
+  }
+  return handleMcpRequestAsync(
+    registry,
+    request,
+    createBridgeMcpRequestId(processSessionId, request.id),
+  );
+}
+
 export function runMcpStdioServer(
   projectRoot: string = process.cwd(),
   bridgeManifestPath?: string,
@@ -157,18 +175,12 @@ export function runMcpStdioServer(
     const trimmed = line.trim();
     if (!trimmed) return;
     void (async () => {
-      let response: JsonRpcResponse | null;
       try {
-        const request = JSON.parse(trimmed) as JsonRpcMessage;
-        response = await handleMcpRequestAsync(
-          registry,
-          request,
-          createBridgeMcpRequestId(processSessionId, request.id),
-        );
-      } catch (error) {
-        response = err(null, -32700, error instanceof Error ? error.message : String(error));
+        const response = await handleMcpLine(registry, trimmed, processSessionId);
+        if (response) process.stdout.write(`${JSON.stringify(response)}\n`);
+      } catch {
+        process.stdout.write(`${JSON.stringify(err(null, -32603, 'Internal error.'))}\n`);
       }
-      if (response) process.stdout.write(`${JSON.stringify(response)}\n`);
     })();
   });
 }

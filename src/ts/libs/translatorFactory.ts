@@ -1,6 +1,7 @@
 import type { AppSettings } from '../../types/settings';
 import {
   buildProviderCacheFingerprint,
+  buildProviderConfigFingerprint,
   ClaudeTranslator,
   createProviderTranslator,
   GeminiTranslator,
@@ -22,6 +23,7 @@ export interface Translator {
     validation: BlockValidation[];
     logEntry: Partial<TranslationLogEntry>;
     aborted?: boolean;
+    incomplete?: boolean;
   }>;
 }
 
@@ -29,8 +31,25 @@ type LlmSettingsLike = Partial<AppSettings> & Record<string, unknown>;
 
 export { getLlmProviderDisplayName, normalizeLlmProvider };
 
-export function buildTranslationCacheKey(provider: unknown, hash: string, model: string, targetLang: string, settings?: LlmSettingsLike): string {
-  return buildProviderCacheFingerprint(provider, { hash, model, targetLang, settings });
+export function buildTranslationCacheKey(
+  provider: unknown,
+  hash: string,
+  model: string,
+  sourceLang: string,
+  targetLang: string,
+  settings: LlmSettingsLike,
+): string {
+  return buildProviderCacheFingerprint(provider, { hash, model, sourceLang, targetLang, settings });
+}
+
+export function buildTranslationConfigFingerprint(
+  provider: unknown,
+  model: string,
+  sourceLang: string,
+  targetLang: string,
+  settings: LlmSettingsLike,
+): string {
+  return buildProviderConfigFingerprint(provider, { model, sourceLang, targetLang, settings });
 }
 
 export function getLlmReadinessError(settings: LlmSettingsLike): string | null {

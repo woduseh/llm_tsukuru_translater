@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
+import { isSeparatorLine } from './translationSyntax';
 
-const SEPARATOR_REGEX = /^---\s*\d+\s*---$/;
+export { isSeparatorLine, SEPARATOR_REGEX } from './translationSyntax';
 
 export interface TranslationBlock {
   separator: string;
@@ -48,7 +49,7 @@ export function splitIntoBlocks(content: string): TranslationBlock[] {
   let currentLines: string[] = [];
 
   for (const line of allLines) {
-    if (SEPARATOR_REGEX.test(line.trim())) {
+    if (isSeparatorLine(line)) {
       if (currentSep !== '' || currentLines.length > 0) {
         blocks.push({ separator: currentSep, lines: [...currentLines] });
       }

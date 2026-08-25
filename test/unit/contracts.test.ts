@@ -28,6 +28,7 @@ describe('IPC channel contract', () => {
     expect(SEND_CHANNELS).toContain('mutationApprovalDeny');
     expect(RECEIVE_CHANNELS).toContain('llmSettings');
     expect(RECEIVE_CHANNELS).toContain('verifyLlmRepairDone');
+    expect(RECEIVE_CHANNELS).toContain('replace-allowed-paths');
     expect(RECEIVE_CHANNELS).toContain('approvalQueueChanged');
 
     expect(isSendChannel('openLLMCompare')).toBe(true);
@@ -45,6 +46,9 @@ describe('LLM provider metadata contract', () => {
     expect(LLM_PROVIDER_METADATA.openai.displayName).toBe('OpenAI');
     expect(LLM_PROVIDER_METADATA['custom-openai'].displayName).toBe('OpenAI 호환 API');
     expect(LLM_PROVIDER_METADATA.claude.displayName).toBe('Claude');
+    expect(LLM_PROVIDER_METADATA.gemini.defaultModel).toBe('gemini-2.5-flash');
+    expect(LLM_PROVIDER_METADATA.claude.defaultModel).toBe('claude-haiku-4-5-20251001');
+    expect(LLM_PROVIDER_METADATA.claude.modelSuggestions).not.toContain('claude-3-5-haiku-latest');
     expect(LLM_PROVIDER_METADATA.gemini.settingFields.some((field) => field.key === 'llmApiKey' && field.secret)).toBe(true);
     expect(LLM_PROVIDER_METADATA.vertex.settingFields.some((field) => field.key === 'llmVertexServiceAccountJson' && field.secret)).toBe(true);
     expect(LLM_PROVIDER_METADATA.openai.settingFields.some((field) => field.key === 'llmOpenAiApiKey' && field.secret)).toBe(true);

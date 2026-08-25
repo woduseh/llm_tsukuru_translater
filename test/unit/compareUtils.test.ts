@@ -37,6 +37,14 @@ describe('splitBlocks', () => {
       { sep: '--- 2 ---', lines: ['text'] },
     ])
   })
+
+  it('splits Wolf command-index separators', () => {
+    const blocks = splitBlocks(['--- 101-0 ---', 'hello', '--- 102-3 ---', 'world'])
+    expect(blocks).toEqual([
+      { sep: '--- 101-0 ---', lines: ['hello'] },
+      { sep: '--- 102-3 ---', lines: ['world'] },
+    ])
+  })
 })
 
 describe('checkMismatch', () => {
@@ -62,6 +70,23 @@ describe('checkMismatch', () => {
     const orig = ['--- 1 ---', 'a']
     const trans = ['--- 2 ---', 'a']
     expect(checkMismatch(orig, trans)).toBe(true)
+  })
+
+  it('returns true when an empty-line position changes without changing line count', () => {
+    const orig = ['--- 1 ---', 'a', '', 'b']
+    const trans = ['--- 1 ---', 'x', 'filled', 'y']
+    expect(checkMismatch(orig, trans)).toBe(true)
+  })
+
+  it('returns true when control codes are removed or reordered', () => {
+    expect(checkMismatch(
+      ['--- 1 ---', '\\C[1]Hello \\V[2]'],
+      ['--- 1 ---', '안녕'],
+    )).toBe(true)
+    expect(checkMismatch(
+      ['--- 1 ---', '\\C[1]Hello \\V[2]'],
+      ['--- 1 ---', '\\V[2]안녕 \\C[1]'],
+    )).toBe(true)
   })
 
   it('returns false for identical empty inputs', () => {

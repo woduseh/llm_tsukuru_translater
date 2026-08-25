@@ -1,21 +1,7 @@
 import axios from 'axios';
-import { hanguls } from '../rpgmv/datas';
 import type { AppSettings } from '../../types/settings';
-import {
-    API_BACKOFF_BASE_MS, API_BACKOFF_MAX_MS,
-    VALIDATION_RETRY_BASE_MS, VALIDATION_RETRY_MAX_MS,
-    RATE_LIMIT_DELAY_MS, DEFAULT_API_TIMEOUT_SEC
-} from './constants';
-import {
-    splitIntoBlocks,
-    reassembleBlocks,
-    validateChunk,
-    isPermanentApiError,
-    isRetryableApiError,
-    type BlockValidation,
-    type TranslationLog,
-    type TranslationLogEntry,
-} from './translationCore';
+import { DEFAULT_API_TIMEOUT_SEC } from './constants';
+import { ProviderTranslationBase } from './providerTranslationBase';
 
 interface GeminiConfig {
     apiKey: string;
@@ -104,11 +90,37 @@ function buildUserMessage(text: string): string {
     return `<Source_Text>\n${text}\n</Source_Text>`;
 }
 
-export class GeminiTranslator {
+function normalizeGeminiError(error: unknown, apiKey: string): Error {
+    const responseMessage = (error as {
+        response?: { data?: { error?: { message?: unknown } } };
+    })?.response?.data?.error?.message;
+    const rawMessage = typeof responseMessage === 'string' && responseMessage.trim()
+        ? responseMessage.trim()
+        : error instanceof Error
+            ? error.message
+            : String(error);
+    const redactedMessage = apiKey.trim()
+        ? rawMessage.split(apiKey).join('[REDACTED]')
+        : rawMessage;
+    const normalized = new Error(`Gemini API error: ${redactedMessage}`) as Error & { code?: string };
+    const code = (error as { code?: unknown })?.code;
+    if (typeof code === 'string') normalized.code = code;
+    return normalized;
+}
+
+export class GeminiTranslator extends ProviderTranslationBase {
     private config: GeminiConfig;
     private apiUrl: string;
 
     constructor(config: GeminiConfig) {
+        super({
+            chunkSize: config.chunkSize,
+            translationUnit: config.translationUnit,
+            doNotTransHangul: config.doNotTransHangul,
+            maxRetries: config.maxRetries,
+            maxApiRetries: config.maxApiRetries,
+            isAborted: config.isAborted,
+        });
         this.config = config;
         const modelPath = config.model.includes('/') ? config.model : `models/${config.model}`;
         this.apiUrl = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent`;
@@ -119,22 +131,27 @@ export class GeminiTranslator {
         const userMessage = buildUserMessage(text);
         const targetLangName = LANG_NAMES[this.config.targetLang] || this.config.targetLang;
         const prefill = `(지침을 숙지했습니다. ${targetLangName} 리라이팅 결과를 출력합니다.)\n`;
-        const response = await axios.post(this.apiUrl, {
-            system_instruction: { parts: [{ text: systemInstruction }] },
-            contents: [
-                { role: 'user', parts: [{ text: userMessage }] },
-                { role: 'model', parts: [{ text: prefill }] }
-            ],
-            safetySettings: [
-                { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-                { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
-            ]
-        }, {
-            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.config.apiKey },
-            timeout: this.config.timeout
-        });
+        let response;
+        try {
+            response = await axios.post(this.apiUrl, {
+                system_instruction: { parts: [{ text: systemInstruction }] },
+                contents: [
+                    { role: 'user', parts: [{ text: userMessage }] },
+                    { role: 'model', parts: [{ text: prefill }] }
+                ],
+                safetySettings: [
+                    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+                    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+                    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+                    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+                ]
+            }, {
+                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.config.apiKey },
+                timeout: this.config.timeout
+            });
+        } catch (error) {
+            throw normalizeGeminiError(error, this.config.apiKey);
+        }
         const candidates = response.data?.candidates;
         if (!candidates || candidates.length === 0) {
             const blockReason = response.data?.promptFeedback?.blockReason;
@@ -148,173 +165,6 @@ export class GeminiTranslator {
         return translated.trim();
     }
 
-    async translateFileContent(
-        content: string,
-        onProgress?: (current: number, total: number, detail: string) => void
-    ): Promise<{ translatedContent: string; validation: BlockValidation[]; logEntry: Partial<TranslationLogEntry>; aborted?: boolean }> {
-        const startTime = Date.now();
-        const allBlocks = splitIntoBlocks(content);
-        const isFileMode = this.config.translationUnit === 'file';
-        const chunkSize = isFileMode ? allBlocks.length : this.config.chunkSize;
-        const allValidations: BlockValidation[] = [];
-        const allTranslatedBlocks: { separator: string; lines: string[] }[] = [];
-
-        const logData = {
-            totalBlocks: allBlocks.length,
-            translatedBlocks: 0,
-            skippedBlocks: 0,
-            errorBlocks: 0,
-            retries: 0,
-            errors: [] as string[],
-            durationMs: 0
-        };
-
-        const chunks: { separator: string; lines: string[] }[][] = [];
-        for (let i = 0; i < allBlocks.length; i += chunkSize) {
-            chunks.push(allBlocks.slice(i, i + chunkSize));
-        }
-
-        let processedBlocks = 0;
-        for (let ci = 0; ci < chunks.length; ci++) {
-            // Check abort flag between chunks
-            if (this.config.isAborted?.()) break;
-
-            const chunk = chunks[ci];
-            const chunkText = reassembleBlocks(chunk);
-
-            if (onProgress) {
-                onProgress(processedBlocks, allBlocks.length, `청크 ${ci + 1}/${chunks.length}`);
-            }
-
-            // Skip hangul-only chunks
-            if (this.config.doNotTransHangul && hanguls.test(chunkText)) {
-                for (const block of chunk) {
-                    allTranslatedBlocks.push({ ...block });
-                    allValidations.push({
-                        index: processedBlocks, separator: block.separator,
-                        originalLines: block.lines, translatedLines: block.lines,
-                        lineCountMatch: true, separatorMatch: true
-                    });
-                    processedBlocks++;
-                    logData.skippedBlocks++;
-                }
-                if (onProgress) onProgress(processedBlocks, allBlocks.length, `청크 ${ci + 1}/${chunks.length} (건너뜀)`);
-                continue;
-            }
-
-            let validation: { validatedBlocks: { separator: string; lines: string[] }[]; blockValidations: BlockValidation[] } = {
-                validatedBlocks: chunk.map(b => ({ ...b })),
-                blockValidations: chunk.map((b, idx) => ({
-                    index: processedBlocks + idx, separator: b.separator,
-                    originalLines: b.lines, translatedLines: b.lines,
-                    lineCountMatch: true, separatorMatch: true
-                }))
-            };
-
-            let retries = 0;
-            const maxRetries = this.config.maxRetries;
-            const maxApiRetries = this.config.maxApiRetries;
-            let apiRetries = 0;
-            let success = false;
-
-            while (!success && retries <= maxRetries) {
-                if (this.config.isAborted?.()) break;
-                try {
-                    let translated = await this.translateText(chunkText);
-                    // Normalize trailing newline to match original
-                    if (chunkText.endsWith('\n') && !translated.endsWith('\n')) {
-                        translated += '\n';
-                    }
-                    validation = validateChunk(chunk, translated);
-
-                    const hasError = validation.blockValidations.some(b => !b.lineCountMatch || !b.separatorMatch);
-
-                    if (!hasError) {
-                        success = true;
-                        logData.translatedBlocks += chunk.length;
-                    } else if (retries < maxRetries) {
-                        retries++;
-                        logData.retries++;
-                        console.log(`Chunk ${ci} validation failed, retrying (${retries}/${maxRetries})...`);
-                    } else {
-                        logData.errorBlocks += validation.blockValidations.filter(b => !b.lineCountMatch || !b.separatorMatch).length;
-                        logData.errors.push(`Chunk ${ci}: validation failed after ${maxRetries} retries`);
-                        success = true;
-                    }
-                } catch (error) {
-                    // Permanent errors (safety blocks): skip chunk immediately, retrying won't help
-                    if (isPermanentApiError(error)) {
-                        console.error(`Chunk ${ci} permanently blocked:`, error);
-                        logData.errors.push(`Chunk ${ci}: ${String(error).substring(0, 200)}`);
-                        validation = {
-                            validatedBlocks: chunk.map(b => ({ ...b })),
-                            blockValidations: chunk.map((b, idx) => ({
-                                index: processedBlocks + idx, separator: b.separator,
-                                originalLines: b.lines, translatedLines: b.lines,
-                                lineCountMatch: true, separatorMatch: true
-                            }))
-                        };
-                        logData.skippedBlocks += chunk.length;
-                        success = true;
-                    } else if (isRetryableApiError(error) && apiRetries < maxApiRetries) {
-                        apiRetries++;
-                        logData.retries++;
-                        const backoffMs = Math.min(API_BACKOFF_BASE_MS * Math.pow(2, apiRetries - 1), API_BACKOFF_MAX_MS);
-                        console.log(`API error on chunk ${ci}, backoff ${backoffMs}ms (${apiRetries}/${maxApiRetries})...`);
-                        logData.errors.push(`Chunk ${ci}: API retry ${apiRetries} (${String(error).substring(0, 100)})`);
-                        await new Promise(r => setTimeout(r, backoffMs));
-                        continue;
-                    } else {
-                        console.error(`Chunk ${ci} translation error:`, error);
-                        logData.errors.push(`Chunk ${ci}: ${String(error).substring(0, 200)}`);
-
-                        if (retries >= maxRetries) {
-                            validation = {
-                                validatedBlocks: chunk.map(b => ({ ...b })),
-                                blockValidations: chunk.map((b, idx) => ({
-                                    index: processedBlocks + idx, separator: b.separator,
-                                    originalLines: b.lines, translatedLines: b.lines,
-                                    lineCountMatch: true, separatorMatch: true
-                                }))
-                            };
-                            logData.skippedBlocks += chunk.length;
-                            success = true;
-                        } else {
-                            retries++;
-                            logData.retries++;
-                            const backoffMs = Math.min(VALIDATION_RETRY_BASE_MS * Math.pow(2, retries), VALIDATION_RETRY_MAX_MS);
-                            await new Promise(r => setTimeout(r, backoffMs));
-                        }
-                    }
-                }
-            }
-
-            for (const vb of validation.validatedBlocks) {
-                allTranslatedBlocks.push(vb);
-            }
-            for (const bv of validation.blockValidations) {
-                bv.index = processedBlocks;
-                allValidations.push(bv);
-                processedBlocks++;
-            }
-
-            if (onProgress) onProgress(processedBlocks, allBlocks.length, `청크 ${ci + 1}/${chunks.length} 완료`);
-
-            // Rate limit delay between chunks
-            if (ci < chunks.length - 1) {
-                await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
-            }
-        }
-
-        logData.durationMs = Date.now() - startTime;
-
-        return {
-            translatedContent: reassembleBlocks(allTranslatedBlocks),
-            validation: allValidations,
-            logEntry: logData,
-            aborted: !!this.config.isAborted?.()
-        };
-    }
 }
 
 export function createGeminiTranslator(settings: Partial<AppSettings>, sourceLang: string, targetLang = 'ko', isAborted?: () => boolean): GeminiTranslator {

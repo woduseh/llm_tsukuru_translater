@@ -4,7 +4,7 @@ export const SEND_CHANNELS = [
    'openLLMSettings', 'llmSettingsApply', 'llmSettingsClose', 'abortLLM',
    'scanGuidelineProfile', 'generateGuidelineDraft', 'applyGuidelineDraft', 'cancelGuidelineGeneration',
    'openLLMCompare', 'llmCompareClose', 'openJsonVerify',
-  'retranslateFile', 'retranslateBlocks', 'verifyLlmRepair',
+  'retranslateFile', 'retranslateBlocks', 'verifyLlmRepair', 'verifyApplyJson',
   'openFolder', 'projectConvert', 'license', 'app_version',
   'getextention', 'selFont', 'changeFontSize', 'updateVersion',
   'wolf_ext', 'wolf_apply', 'gamePatcher',
@@ -21,8 +21,8 @@ export const RECEIVE_CHANNELS = [
   'check_force', 'alert', 'alert_free', 'alert2',
   'llmTranslating', 'alertExten', 'settings', 'llmSettings',
   'initCompare', 'retranslateProgress', 'retranslateFileDone', 'retranslateBlocksDone',
-  'initVerify', 'verifySettings', 'verifyLlmRepairProgress', 'verifyLlmRepairDone',
-  'set-allowed-paths',
+  'initVerify', 'verifySettings', 'verifyLlmRepairProgress', 'verifyLlmRepairDone', 'verifyApplyJsonDone',
+  'set-allowed-paths', 'replace-allowed-paths',
   'terminalEvent', 'terminalSessions', 'approvalQueueChanged',
 ] as const;
 

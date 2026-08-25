@@ -71,7 +71,7 @@ function truncate(s: string, len: number = 40): string {
 
 function extractControlChars(str: string): string[] {
     const matches = str.match(CONTROL_RE);
-    return matches ? matches.slice().sort() : [];
+    return matches ? matches.slice() : [];
 }
 
 function checkControlChars(orig: string, trans: string, path: string, issues: VerifyIssue[]): void {
@@ -79,30 +79,35 @@ function checkControlChars(orig: string, trans: string, path: string, issues: Ve
     const transChars = extractControlChars(trans);
     if (origChars.length === 0 && transChars.length === 0) return;
 
+    if (origChars.length === transChars.length && origChars.every((char, index) => char === transChars[index])) {
+        return;
+    }
+
     const origCounts = new Map<string, number>();
     for (const c of origChars) origCounts.set(c, (origCounts.get(c) || 0) + 1);
     const transCounts = new Map<string, number>();
     for (const c of transChars) transCounts.set(c, (transCounts.get(c) || 0) + 1);
 
     const mismatches: string[] = [];
-    for (const [char, count] of origCounts) {
-        const tc = transCounts.get(char) || 0;
-        if (tc < count) mismatches.push(`${char} 누락(원본 ${count}→번역 ${tc})`);
+    for (const char of new Set([...origCounts.keys(), ...transCounts.keys()])) {
+        const origCount = origCounts.get(char) || 0;
+        const transCount = transCounts.get(char) || 0;
+        if (origCount !== transCount) {
+            mismatches.push(`${char} 개수 변경(원본 ${origCount}→번역 ${transCount})`);
+        }
     }
-    for (const [char, count] of transCounts) {
-        if (!origCounts.has(char)) mismatches.push(`${char} 추가(번역에만 ${count}개)`);
+    if (mismatches.length === 0) {
+        mismatches.push(`순서 변경(원본 ${origChars.join(' ')}→번역 ${transChars.join(' ')})`);
     }
 
-    if (mismatches.length > 0) {
-        issues.push({
-            path,
-            type: 'control_char_mismatch',
-            severity: 'warning',
-            message: `제어문자 불일치: ${mismatches.join('; ')}`,
-            origValue: orig,
-            transValue: trans
-        });
-    }
+    issues.push({
+        path,
+        type: 'control_char_mismatch',
+        severity: 'warning',
+        message: `제어문자 불일치: ${mismatches.join('; ')}`,
+        origValue: orig,
+        transValue: trans
+    });
 }
 
 function getParamPolicy(code: number, paramIndex: number): StringPolicy {

@@ -1,28 +1,16 @@
 import axios from 'axios';
 import { GoogleAuth } from 'google-auth-library';
-import { hanguls } from '../rpgmv/datas';
 import { type AppSettings, DEFAULT_LLM_VERTEX_LOCATION } from '../../types/settings';
-import {
-  API_BACKOFF_BASE_MS,
-  API_BACKOFF_MAX_MS,
-  DEFAULT_API_TIMEOUT_SEC,
-  RATE_LIMIT_DELAY_MS,
-  VALIDATION_RETRY_BASE_MS,
-  VALIDATION_RETRY_MAX_MS,
-} from './constants';
+import { DEFAULT_API_TIMEOUT_SEC } from './constants';
 import {
   parseVertexServiceAccountJson,
   type VertexServiceAccountJson,
 } from './vertexCredentials';
 import {
-  splitIntoBlocks,
-  reassembleBlocks,
-  validateChunk,
   isPermanentApiError,
   isRetryableApiError,
-  type BlockValidation,
-  type TranslationLogEntry,
 } from './translationCore';
+import { ProviderTranslationBase } from './providerTranslationBase';
 
 const CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 
@@ -65,8 +53,6 @@ interface VertexDependencies {
   accessTokenProvider?: () => Promise<string>;
   createGoogleAuth?: (options: { credentials: VertexServiceAccountJson; scopes: string[] }) => AccessTokenAuth;
 }
-
-type TranslationBlock = ReturnType<typeof splitIntoBlocks>[number];
 
 function buildSystemInstruction(config: VertexConfig): string {
   const sourceLangName = LANG_NAMES[config.sourceLang] || config.sourceLang;
@@ -221,20 +207,6 @@ function isRetryableVertexError(error: unknown): boolean {
   return !isVertexAuthError(error) && isRetryableApiError(error);
 }
 
-function createFallbackValidation(chunk: TranslationBlock[], startIndex: number) {
-  return {
-    validatedBlocks: chunk.map((block) => ({ ...block })),
-    blockValidations: chunk.map((block, idx) => ({
-      index: startIndex + idx,
-      separator: block.separator,
-      originalLines: block.lines,
-      translatedLines: block.lines,
-      lineCountMatch: true,
-      separatorMatch: true,
-    })),
-  };
-}
-
 export function buildVertexApiUrl(projectId: string, location: string, model: string): string {
   const normalizedLocation = normalizeVertexLocation(location);
   const normalizedModel = normalizeVertexModel(model);
@@ -262,13 +234,23 @@ export function createVertexAccessTokenProvider(
   };
 }
 
-export class VertexTranslator {
+export class VertexTranslator extends ProviderTranslationBase {
   private config: VertexConfig;
   private apiUrl: string;
   private httpClient: NonNullable<VertexDependencies['httpClient']>;
   private accessTokenProvider: () => Promise<string>;
 
   constructor(config: VertexConfig, deps: VertexDependencies = {}) {
+    super({
+      chunkSize: config.chunkSize,
+      translationUnit: config.translationUnit,
+      doNotTransHangul: config.doNotTransHangul,
+      maxRetries: config.maxRetries,
+      maxApiRetries: config.maxApiRetries,
+      isAborted: config.isAborted,
+      isPermanentError: isPermanentVertexError,
+      isRetryableError: isRetryableVertexError,
+    });
     this.config = config;
     this.apiUrl = buildVertexApiUrl(config.credentials.project_id, config.location, config.model);
     this.httpClient = deps.httpClient || axios;
@@ -320,143 +302,6 @@ export class VertexTranslator {
     }
   }
 
-  async translateFileContent(
-    content: string,
-    onProgress?: (current: number, total: number, detail: string) => void,
-  ): Promise<{ translatedContent: string; validation: BlockValidation[]; logEntry: Partial<TranslationLogEntry>; aborted?: boolean }> {
-    const startTime = Date.now();
-    const allBlocks = splitIntoBlocks(content);
-    const isFileMode = this.config.translationUnit === 'file';
-    const chunkSize = isFileMode ? allBlocks.length : this.config.chunkSize;
-    const allValidations: BlockValidation[] = [];
-    const allTranslatedBlocks = [];
-
-    const logData = {
-      totalBlocks: allBlocks.length,
-      translatedBlocks: 0,
-      skippedBlocks: 0,
-      errorBlocks: 0,
-      retries: 0,
-      errors: [] as string[],
-      durationMs: 0,
-    };
-
-    const chunks = [];
-    for (let i = 0; i < allBlocks.length; i += chunkSize) {
-      chunks.push(allBlocks.slice(i, i + chunkSize));
-    }
-
-    let processedBlocks = 0;
-    for (let ci = 0; ci < chunks.length; ci++) {
-      if (this.config.isAborted?.()) break;
-
-      const chunk = chunks[ci];
-      const chunkText = reassembleBlocks(chunk);
-
-      if (onProgress) {
-        onProgress(processedBlocks, allBlocks.length, `청크 ${ci + 1}/${chunks.length}`);
-      }
-
-      if (this.config.doNotTransHangul && hanguls.test(chunkText)) {
-        for (const block of chunk) {
-          allTranslatedBlocks.push({ ...block });
-          allValidations.push({
-            index: processedBlocks,
-            separator: block.separator,
-            originalLines: block.lines,
-            translatedLines: block.lines,
-            lineCountMatch: true,
-            separatorMatch: true,
-          });
-          processedBlocks++;
-          logData.skippedBlocks++;
-        }
-        if (onProgress) onProgress(processedBlocks, allBlocks.length, `청크 ${ci + 1}/${chunks.length} (건너뜀)`);
-        continue;
-      }
-
-      let validation = createFallbackValidation(chunk, processedBlocks);
-
-      let retries = 0;
-      let apiRetries = 0;
-      let success = false;
-
-      while (!success && retries <= this.config.maxRetries) {
-        if (this.config.isAborted?.()) break;
-
-        try {
-          let translated = await this.translateText(chunkText);
-          if (chunkText.endsWith('\n') && !translated.endsWith('\n')) {
-            translated += '\n';
-          }
-          validation = validateChunk(chunk, translated);
-
-          const hasError = validation.blockValidations.some((block) => !block.lineCountMatch || !block.separatorMatch);
-          if (!hasError) {
-            success = true;
-            logData.translatedBlocks += chunk.length;
-          } else if (retries < this.config.maxRetries) {
-            retries++;
-            logData.retries++;
-          } else {
-            logData.errorBlocks += validation.blockValidations.filter((block) => !block.lineCountMatch || !block.separatorMatch).length;
-            logData.errors.push(`Chunk ${ci}: validation failed after ${this.config.maxRetries} retries`);
-            success = true;
-          }
-        } catch (error) {
-          const normalizedError = normalizeVertexError(error);
-
-          if (isPermanentVertexError(normalizedError)) {
-            logData.errors.push(`Chunk ${ci}: ${normalizedError.message.substring(0, 200)}`);
-            validation = createFallbackValidation(chunk, processedBlocks);
-            logData.skippedBlocks += chunk.length;
-            success = true;
-          } else if (isRetryableVertexError(normalizedError) && apiRetries < this.config.maxApiRetries) {
-            apiRetries++;
-            logData.retries++;
-            const backoffMs = Math.min(API_BACKOFF_BASE_MS * Math.pow(2, apiRetries - 1), API_BACKOFF_MAX_MS);
-            logData.errors.push(`Chunk ${ci}: API retry ${apiRetries} (${normalizedError.message.substring(0, 100)})`);
-            await new Promise((resolve) => setTimeout(resolve, backoffMs));
-            continue;
-          } else if (retries >= this.config.maxRetries) {
-            logData.errors.push(`Chunk ${ci}: ${normalizedError.message.substring(0, 200)}`);
-            validation = createFallbackValidation(chunk, processedBlocks);
-            logData.skippedBlocks += chunk.length;
-            success = true;
-          } else {
-            retries++;
-            logData.retries++;
-            const backoffMs = Math.min(VALIDATION_RETRY_BASE_MS * Math.pow(2, retries), VALIDATION_RETRY_MAX_MS);
-            await new Promise((resolve) => setTimeout(resolve, backoffMs));
-          }
-        }
-      }
-
-      for (const block of validation.validatedBlocks) {
-        allTranslatedBlocks.push(block);
-      }
-      for (const blockValidation of validation.blockValidations) {
-        blockValidation.index = processedBlocks;
-        allValidations.push(blockValidation);
-        processedBlocks++;
-      }
-
-      if (onProgress) onProgress(processedBlocks, allBlocks.length, `청크 ${ci + 1}/${chunks.length} 완료`);
-
-      if (ci < chunks.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
-      }
-    }
-
-    logData.durationMs = Date.now() - startTime;
-
-    return {
-      translatedContent: reassembleBlocks(allTranslatedBlocks),
-      validation: allValidations,
-      logEntry: logData,
-      aborted: !!this.config.isAborted?.(),
-    };
-  }
 }
 
 export function createVertexTranslator(

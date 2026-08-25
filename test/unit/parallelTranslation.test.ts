@@ -3,11 +3,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { settings as defaultSettings } from '../../src/ts/rpgmv/datas';
 import {
+  isMatchingTranslationProgress,
   resolveLlmParallelWorkers,
   translateFilesWithCoordinator,
   validateTranslatedFileContent,
 } from '../../src/ts/rpgmv/translator';
 import { buildTranslationCacheKey, type Translator } from '../../src/ts/libs/translatorFactory';
+import { LLM_FINGERPRINT_SCHEMA_VERSION } from '../../src/ts/libs/providerRegistry';
 import { contentHash, type BlockValidation } from '../../src/ts/libs/translationCore';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'parallelTranslation');
@@ -49,14 +51,18 @@ describe('parallel translation coordinator', () => {
     const { edir, backupDir, files } = makeProject(['Cached.txt']);
     const original = fs.readFileSync(path.join(edir, files[0]), 'utf-8');
     const translated = translateContent(original);
-    const cacheKey = buildTranslationCacheKey('gemini', contentHash(original), 'mock-model', 'ko');
+    const options = baseOptions(edir, backupDir, files, 4);
+    const cacheKey = buildTranslationCacheKey(
+      'gemini', contentHash(original), 'mock-model', 'ja', 'ko', options.settings,
+    );
     const cache = {
       [cacheKey]: { translatedContent: translated, model: 'mock-model', targetLang: 'ko', provider: 'gemini' },
     };
     let workerCalls = 0;
 
     const result = await translateFilesWithCoordinator({
-      ...baseOptions(edir, backupDir, files, 4, cache),
+      ...options,
+      cache,
       createTranslatorForFile: () => {
         workerCalls++;
         return fakeTranslator(async (content) => translateContent(content));
@@ -68,6 +74,33 @@ describe('parallel translation coordinator', () => {
     expect(result.entries[0].cached).toBe(true);
     expect(fs.readFileSync(path.join(edir, files[0]), 'utf-8')).toBe(translated);
     expect(readProgress(edir).completedFiles).toEqual(['Cached.txt']);
+  });
+
+  it('falls through to a fresh translation after deleting an invalid cache hit', async () => {
+    const { edir, backupDir, files } = makeProject(['Stale.txt']);
+    const original = fs.readFileSync(path.join(edir, files[0]), 'utf-8');
+    const options = baseOptions(edir, backupDir, files, 1);
+    const cacheKey = buildTranslationCacheKey(
+      'gemini', contentHash(original), 'mock-model', 'ja', 'ko', options.settings,
+    );
+    const cache = {
+      [cacheKey]: { translatedContent: 'BROKEN', model: 'mock-model', targetLang: 'ko', provider: 'gemini' },
+    };
+    let workerCalls = 0;
+
+    const result = await translateFilesWithCoordinator({
+      ...options,
+      cache,
+      createTranslatorForFile: () => {
+        workerCalls++;
+        return fakeTranslator(async (content) => translateContent(content));
+      },
+    });
+
+    expect(workerCalls).toBe(1);
+    expect(result.failedFiles).toEqual([]);
+    expect(fs.readFileSync(path.join(edir, files[0]), 'utf-8')).toContain('번역');
+    expect(cache[cacheKey].translatedContent).toContain('번역');
   });
 
   it('reports stable file ordinals for concurrently started workers', async () => {
@@ -100,6 +133,31 @@ describe('parallel translation coordinator', () => {
     });
 
     expect(result.failedFiles).toEqual(['Bad.txt']);
+    expect(fs.readFileSync(path.join(edir, files[0]), 'utf-8')).toBe(original);
+    expect(fs.existsSync(path.join(edir, '.llm_progress.json'))).toBe(false);
+    expect(Object.keys(cache)).toHaveLength(0);
+  });
+
+  it('does not write, cache, or complete progress when any provider chunk failed terminally', async () => {
+    const { edir, backupDir, files } = makeProject(['Partial.txt']);
+    const original = fs.readFileSync(path.join(edir, files[0]), 'utf-8');
+    const translated = translateContent(original);
+    const cache: Record<string, { translatedContent: string; model: string; targetLang: string; provider?: string }> = {};
+
+    const result = await translateFilesWithCoordinator({
+      ...baseOptions(edir, backupDir, files, 1, cache),
+      createTranslatorForFile: () => ({
+        translateText: async (text) => text,
+        translateFileContent: async () => ({
+          translatedContent: translated,
+          validation: validBlockValidation(original, translated),
+          logEntry: { ...logEntry(), translatedBlocks: 0, errorBlocks: 1, errors: ['terminal failure'] },
+        }),
+      }),
+    });
+
+    expect(result.failedFiles).toEqual(['Partial.txt']);
+    expect(result.totalErrors).toBeGreaterThanOrEqual(1);
     expect(fs.readFileSync(path.join(edir, files[0]), 'utf-8')).toBe(original);
     expect(fs.existsSync(path.join(edir, '.llm_progress.json'))).toBe(false);
     expect(Object.keys(cache)).toHaveLength(0);
@@ -191,6 +249,27 @@ describe('parallel translation safeguards', () => {
     expect(validateTranslatedFileContent(original, '--- 1 ---\nHello\n\nWorld').ok).toBe(false);
     expect(validateTranslatedFileContent(original, '--- 1 ---\n\\C[1]Hello\nfilled\nWorld').ok).toBe(false);
     expect(validateTranslatedFileContent(original, '--- 1 ---\n\\C[1]Hello\n\nWorld\nextra').ok).toBe(false);
+  });
+
+  it('rejects legacy or mismatched progress fingerprints', () => {
+    expect(isMatchingTranslationProgress({
+      version: 0,
+      fingerprint: '',
+      completedFiles: ['Done.txt'],
+      timestamp: '',
+    }, 'llm-config-v2-gemini')).toBe(false);
+    expect(isMatchingTranslationProgress({
+      version: LLM_FINGERPRINT_SCHEMA_VERSION,
+      fingerprint: 'llm-config-v2-gemini-a',
+      completedFiles: ['Done.txt'],
+      timestamp: '',
+    }, 'llm-config-v2-gemini-b')).toBe(false);
+    expect(isMatchingTranslationProgress({
+      version: LLM_FINGERPRINT_SCHEMA_VERSION,
+      fingerprint: 'llm-config-v2-gemini-a',
+      completedFiles: ['Done.txt'],
+      timestamp: '',
+    }, 'llm-config-v2-gemini-a')).toBe(true);
   });
 });
 

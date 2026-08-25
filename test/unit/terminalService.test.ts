@@ -141,6 +141,31 @@ describe('TerminalService', () => {
     }
   });
 
+  it('evicts the oldest completed sessions from bounded terminal history', () => {
+    const projectRoot = makeProject('bounded-history');
+    const ctx = new AppContext();
+    ctx.terminalProjectRoots = [projectRoot];
+    const service = new TerminalService(ctx, { ptyAdapter: new FakePtyAdapter() });
+    const sessionIds: string[] = [];
+
+    for (let i = 0; i < 25; i += 1) {
+      const created = service.create({
+        schemaVersion: 1,
+        requestId: `req-history-${i}`,
+        kind: 'shell',
+        cwd: projectRoot,
+      });
+      sessionIds.push(created.session!.sessionId);
+      service.kill({ schemaVersion: 1, sessionId: created.session!.sessionId });
+    }
+
+    const listed = service.list();
+    const retainedIds = listed.sessions?.map((session) => session.sessionId) ?? [];
+    expect(retainedIds).toHaveLength(20);
+    expect(retainedIds).toEqual(sessionIds.slice(-20));
+    expect(service.snapshot({ schemaVersion: 1, sessionId: sessionIds[0] }).errorCode).toBe('session-not-found');
+  });
+
   it('defaults new sessions to the current selected terminal root', () => {
     const firstRoot = makeProject('first-default');
     const secondRoot = makeProject('second-default');
@@ -283,6 +308,43 @@ describe('TerminalService', () => {
     expect(transcript).not.toContain('persist-secret');
     expect(transcript).toContain('[REDACTED]');
     expect(transcript).not.toContain('\\u001b');
+  });
+
+  it('redacts exact secrets across every PTY chunk boundary and flushes safe trailing prefixes', async () => {
+    const projectRoot = makeProject('persisted-split-secret');
+    const secret = 'split-secret-value';
+    const script = [] as Array<{ kind: 'stdout' | 'exit'; data?: string; exitCode?: number }>;
+    for (let split = 1; split < secret.length; split += 1) {
+      script.push({ kind: 'stdout', data: secret.slice(0, split) });
+      script.push({ kind: 'stdout', data: `${secret.slice(split)}\n` });
+    }
+    script.push({ kind: 'stdout', data: 'safe trailing s' });
+    script.push({ kind: 'exit', exitCode: 0 });
+
+    const ctx = new AppContext();
+    ctx.terminalProjectRoots = [projectRoot];
+    ctx.settings.llmApiKey = secret;
+    const service = new TerminalService(ctx, { ptyAdapter: new FakePtyAdapter({ script }) });
+    const created = service.create({
+      schemaVersion: 1,
+      requestId: 'req-persist-split-secret',
+      kind: 'shell',
+      cwd: projectRoot,
+      persistOutput: true,
+    });
+    await delay(30);
+
+    const snapshot = service.snapshot({ schemaVersion: 1, sessionId: created.session!.sessionId });
+    const renderedOutput = snapshot.snapshot?.events.map((event) => event.data ?? '').join('') ?? '';
+    expect(renderedOutput).not.toContain(secret);
+    expect(renderedOutput.match(/\[REDACTED\]/g)).toHaveLength(secret.length - 1);
+    expect(renderedOutput).toContain('safe trailing s');
+
+    const transcriptPath = path.join(projectRoot, '.llm-tsukuru-agent', 'terminal-sessions', `${created.session!.sessionId}.json`);
+    const transcript = JSON.parse(fs.readFileSync(transcriptPath, 'utf8')) as { events: Array<{ data?: string }> };
+    const persistedOutput = transcript.events.map((event) => event.data ?? '').join('');
+    expect(persistedOutput).not.toContain(secret);
+    expect(persistedOutput).toContain('safe trailing s');
   });
 
   it('persists transcripts to the session owner root even if context roots change before kill', async () => {

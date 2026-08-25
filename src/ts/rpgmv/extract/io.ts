@@ -61,9 +61,18 @@ export const pack_externMsg = (dir:string, data: Record<string, string>) => {
         for(const i in data){
             rows.push([i, data[i]])
         }
+        let settled = false
         writeToPath(dir, rows)
-        .on('error', err => console.error(err))
-        .on('finish', () => resolve());
+        .on('error', err => {
+            if (settled) return
+            settled = true
+            reject(err)
+        })
+        .on('finish', () => {
+            if (settled) return
+            settled = true
+            resolve()
+        });
     })
 }
 

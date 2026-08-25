@@ -4,6 +4,7 @@ import {
   applyValidatedSettingsUpdate,
   sanitizeStoredSettings,
 } from '../../src/ts/libs/settingsRuntimeValidation';
+import { LLM_PROVIDER_METADATA } from '../../src/types/llmProviderContract';
 
 function createCurrentSettings() {
   return {
@@ -38,6 +39,28 @@ describe('sanitizeStoredSettings', () => {
     expect(sanitized.llmMaxApiRetries).toBe(5);
     expect(sanitized.llmTimeout).toBe(600);
     expect(sanitized.llmParallelWorkers).toBe(1);
+  });
+
+  it('migrates only retired project-default models for their matching provider', () => {
+    expect(sanitizeStoredSettings({
+      llmProvider: 'gemini',
+      llmModel: 'gemini-3.0-flash-preview',
+    }).llmModel).toBe(LLM_PROVIDER_METADATA.gemini.defaultModel);
+    expect(sanitizeStoredSettings({
+      llmProvider: 'claude',
+      llmModel: 'claude-3-5-haiku-latest',
+    }).llmModel).toBe(LLM_PROVIDER_METADATA.claude.defaultModel);
+    expect(sanitizeStoredSettings({
+      llmProvider: 'gemini',
+      llmModel: 'my-custom-gemini-model',
+    }).llmModel).toBe('my-custom-gemini-model');
+    expect(sanitizeStoredSettings({
+      llmProvider: 'openai',
+      llmModel: 'gemini-3.0-flash-preview',
+    }).llmModel).toBe('gemini-3.0-flash-preview');
+    expect(sanitizeStoredSettings({
+      llmProvider: 'claude',
+    }).llmModel).toBe(LLM_PROVIDER_METADATA.claude.defaultModel);
   });
 });
 

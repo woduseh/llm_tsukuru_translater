@@ -4,6 +4,7 @@ import {
 } from '../../types/settings';
 import { settings as defaultSettings } from '../rpgmv/datas';
 import { isBoolean, isNumber, isRecord, isString } from '../../types/guards';
+import { LLM_PROVIDER_METADATA } from '../../types/llmProviderContract';
 import { isKnownLlmProvider } from './providerRegistry';
 
 const BOOLEAN_KEYS = [
@@ -89,6 +90,14 @@ function createInvalidSettingError(key: string, reason: string): Error {
   return new Error(`설정 값이 올바르지 않습니다 (${key}): ${reason}`);
 }
 
+function migrateRetiredProjectDefaultModel(settings: AppSettings): void {
+  if (settings.llmProvider === 'gemini' && settings.llmModel === 'gemini-3.0-flash-preview') {
+    settings.llmModel = LLM_PROVIDER_METADATA.gemini.defaultModel;
+  } else if (settings.llmProvider === 'claude' && settings.llmModel === 'claude-3-5-haiku-latest') {
+    settings.llmModel = LLM_PROVIDER_METADATA.claude.defaultModel;
+  }
+}
+
 function validateSettingValue(
   current: AppSettings,
   key: string,
@@ -169,6 +178,7 @@ export function sanitizeStoredSettings(storedSettings: unknown): AppSettings {
   if (!isRecord(storedSettings)) {
     return sanitized;
   }
+  const hasValidStoredModel = isString(storedSettings.llmModel);
 
   for (const [key, value] of Object.entries(storedSettings)) {
     const nextValue = validateSettingValue(sanitized, key, value, false);
@@ -177,6 +187,11 @@ export function sanitizeStoredSettings(storedSettings: unknown): AppSettings {
     }
   }
 
+  if (!hasValidStoredModel) {
+    sanitized.llmModel = LLM_PROVIDER_METADATA[sanitized.llmProvider].defaultModel;
+  } else {
+    migrateRetiredProjectDefaultModel(sanitized);
+  }
   sanitized.themeList = [...defaultSettings.themeList];
   return sanitized;
 }

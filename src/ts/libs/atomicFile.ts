@@ -8,6 +8,7 @@ export type AtomicWritePhase = 'cleanup' | 'write' | 'replace';
 export interface AtomicWriteOptions {
   encoding?: BufferEncoding;
   mode?: number;
+  expectedContent?: string;
   cleanupStaleTempFiles?: boolean;
   staleTempMaxAgeMs?: number;
   nowMs?: number;
@@ -42,6 +43,16 @@ export class AtomicFileWriteError extends Error {
   }
 }
 
+export class AtomicFilePreimageMismatchError extends Error {
+  public readonly filePath: string;
+
+  constructor(filePath: string) {
+    super(`원자적 쓰기 직전 파일이 변경되었습니다: ${filePath}`);
+    this.name = 'AtomicFilePreimageMismatchError';
+    this.filePath = filePath;
+  }
+}
+
 export function atomicWriteTextFile(
   filePath: string,
   content: string,
@@ -67,6 +78,17 @@ export function atomicWriteTextFile(
     fs.fsyncSync(fd);
     fs.closeSync(fd);
     fd = undefined;
+    if (options.expectedContent !== undefined) {
+      let currentContent: string;
+      try {
+        currentContent = fs.readFileSync(finalPath, { encoding });
+      } catch {
+        throw new AtomicFilePreimageMismatchError(finalPath);
+      }
+      if (currentContent !== options.expectedContent) {
+        throw new AtomicFilePreimageMismatchError(finalPath);
+      }
+    }
     fs.renameSync(tempPath, finalPath);
   } catch (err) {
     const phase: AtomicWritePhase = fd === undefined && fs.existsSync(tempPath) ? 'replace' : 'write';

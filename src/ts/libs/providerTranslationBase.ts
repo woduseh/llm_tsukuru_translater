@@ -24,6 +24,8 @@ export interface ProviderTranslationConfig {
   maxRetries: number;
   maxApiRetries: number;
   isAborted?: () => boolean;
+  isPermanentError?: (error: unknown) => boolean;
+  isRetryableError?: (error: unknown) => boolean;
 }
 
 function createFallbackValidation(chunk: TranslationBlock[], startIndex: number) {
@@ -40,6 +42,35 @@ function createFallbackValidation(chunk: TranslationBlock[], startIndex: number)
   };
 }
 
+export function createTranslationChunks(
+  allBlocks: TranslationBlock[],
+  chunkSize: number,
+  doNotTransHangul: boolean,
+): TranslationBlock[][] {
+  const chunks: TranslationBlock[][] = [];
+  for (let i = 0; i < allBlocks.length; i += chunkSize) {
+    const baseChunk = allBlocks.slice(i, i + chunkSize);
+    if (!doNotTransHangul || baseChunk.length < 2) {
+      chunks.push(baseChunk);
+      continue;
+    }
+
+    let current: TranslationBlock[] = [];
+    let currentShouldSkip: boolean | undefined;
+    for (const block of baseChunk) {
+      const shouldSkip = hanguls.test(reassembleBlocks([block]));
+      if (current.length > 0 && shouldSkip !== currentShouldSkip) {
+        chunks.push(current);
+        current = [];
+      }
+      current.push(block);
+      currentShouldSkip = shouldSkip;
+    }
+    if (current.length > 0) chunks.push(current);
+  }
+  return chunks;
+}
+
 export abstract class ProviderTranslationBase {
   protected constructor(protected readonly baseConfig: ProviderTranslationConfig) {}
 
@@ -48,7 +79,13 @@ export abstract class ProviderTranslationBase {
   async translateFileContent(
     content: string,
     onProgress?: (current: number, total: number, detail: string) => void,
-  ): Promise<{ translatedContent: string; validation: BlockValidation[]; logEntry: Partial<TranslationLogEntry>; aborted?: boolean }> {
+  ): Promise<{
+    translatedContent: string;
+    validation: BlockValidation[];
+    logEntry: Partial<TranslationLogEntry>;
+    aborted?: boolean;
+    incomplete?: boolean;
+  }> {
     const startTime = Date.now();
     const allBlocks = splitIntoBlocks(content);
     const isFileMode = this.baseConfig.translationUnit === 'file';
@@ -65,12 +102,10 @@ export abstract class ProviderTranslationBase {
       durationMs: 0,
     };
 
-    const chunks: TranslationBlock[][] = [];
-    for (let i = 0; i < allBlocks.length; i += chunkSize) {
-      chunks.push(allBlocks.slice(i, i + chunkSize));
-    }
+    const chunks = createTranslationChunks(allBlocks, chunkSize, this.baseConfig.doNotTransHangul);
 
     let processedBlocks = 0;
+    let incomplete = false;
     for (let ci = 0; ci < chunks.length; ci++) {
       if (this.baseConfig.isAborted?.()) break;
 
@@ -117,16 +152,20 @@ export abstract class ProviderTranslationBase {
           } else {
             logData.errorBlocks += validation.blockValidations.filter((block) => !block.lineCountMatch || !block.separatorMatch).length;
             logData.errors.push(`Chunk ${ci}: validation failed after ${this.baseConfig.maxRetries} retries`);
+            incomplete = true;
             success = true;
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          if (isPermanentApiError(error)) {
+          const permanentError = this.baseConfig.isPermanentError?.(error) ?? isPermanentApiError(error);
+          const retryableError = this.baseConfig.isRetryableError?.(error) ?? isRetryableApiError(error);
+          if (permanentError) {
             logData.errors.push(`Chunk ${ci}: ${message.substring(0, 200)}`);
             validation = createFallbackValidation(chunk, processedBlocks);
-            logData.skippedBlocks += chunk.length;
+            logData.errorBlocks += chunk.length;
+            incomplete = true;
             success = true;
-          } else if (isRetryableApiError(error) && apiRetries < this.baseConfig.maxApiRetries) {
+          } else if (retryableError && apiRetries < this.baseConfig.maxApiRetries) {
             apiRetries++;
             logData.retries++;
             const backoffMs = Math.min(API_BACKOFF_BASE_MS * Math.pow(2, apiRetries - 1), API_BACKOFF_MAX_MS);
@@ -135,7 +174,8 @@ export abstract class ProviderTranslationBase {
           } else if (retries >= this.baseConfig.maxRetries) {
             logData.errors.push(`Chunk ${ci}: ${message.substring(0, 200)}`);
             validation = createFallbackValidation(chunk, processedBlocks);
-            logData.skippedBlocks += chunk.length;
+            logData.errorBlocks += chunk.length;
+            incomplete = true;
             success = true;
           } else {
             retries++;
@@ -162,6 +202,7 @@ export abstract class ProviderTranslationBase {
       validation: allValidations,
       logEntry: logData,
       aborted: !!this.baseConfig.isAborted?.(),
+      incomplete,
     };
   }
 }

@@ -12,7 +12,7 @@ function setProgressBar(now:number, max:number, multipl=50){
     Tools.send('loading', 50 + ((now/max) * multipl));
 }
 
-export default async function makeText(ctx: AppContext){
+export default async function makeText(ctx: AppContext, extractRoot: string){
     const ext = ctx.WolfExtData
     let texts:{[key:string]:string[]} = {}
     for(let i =0;i<ext.length;i++){
@@ -37,16 +37,61 @@ export default async function makeText(ctx: AppContext){
             ctx.WolfExtData[i].textLineNumber.push(texts[ext[i].extractFile].length-1)
         }
     }
-    const extTextDir = path.join(ctx.sourceDir, '_Extract')
-    if(fs.existsSync(extTextDir)){
-        fs.rmSync(extTextDir, { recursive: true, force: true });
-    }
-    fs.mkdirSync(extTextDir)
-    fs.mkdirSync(path.join(extTextDir, 'Texts'))
+    replaceDirectoryFromStaging(extractRoot, (stagingRoot) => {
+        const textsRoot = path.join(stagingRoot, 'Texts')
+        fs.mkdirSync(textsRoot)
 
-    for(const key in texts){
-        writeTextFile(path.join(extTextDir, 'Texts',`${key}.txt`), texts[key].join('\n'))
-    }
+        for(const key in texts){
+            writeTextFile(path.join(textsRoot,`${key}.txt`), texts[key].join('\n'))
+        }
+        WolfExtDataParser.create(path.join(stagingRoot, '.extracteddata'), ctx)
+    })
     Tools.send('loading', 0);
-    WolfExtDataParser.create(path.join(extTextDir, '.extracteddata'), ctx)
+}
+
+export function replaceDirectoryFromStaging(
+    targetDir: string,
+    populate: (stagingDir: string) => void,
+): void {
+    const resolvedTarget = path.resolve(targetDir)
+    const parent = path.dirname(resolvedTarget)
+    const baseName = path.basename(resolvedTarget)
+    fs.mkdirSync(parent, { recursive: true })
+    const stagingDir = fs.mkdtempSync(path.join(parent, `.${baseName}.staging-`))
+    const previousDir = path.join(parent, `.${baseName}.previous-${Date.now()}-${process.pid}-${Math.random().toString(16).slice(2)}`)
+    let previousMoved = false
+    let committed = false
+
+    try {
+        populate(stagingDir)
+        if(fs.existsSync(resolvedTarget)){
+            fs.renameSync(resolvedTarget, previousDir)
+            previousMoved = true
+        }
+        try {
+            fs.renameSync(stagingDir, resolvedTarget)
+            committed = true
+        } catch (error) {
+            if(previousMoved && !fs.existsSync(resolvedTarget)){
+                try {
+                    fs.renameSync(previousDir, resolvedTarget)
+                    previousMoved = false
+                } catch (restoreError) {
+                    throw new Error(`Wolf 추출 폴더 교체와 기존 폴더 복구에 실패했습니다: ${(error as Error).message}; restore: ${(restoreError as Error).message}`)
+                }
+            }
+            throw error
+        }
+    } finally {
+        if(!committed && fs.existsSync(stagingDir)){
+            fs.rmSync(stagingDir, { recursive: true, force: true })
+        }
+        if(committed && previousMoved && fs.existsSync(previousDir)){
+            try {
+                fs.rmSync(previousDir, { recursive: true, force: true })
+            } catch (error) {
+                console.warn('Wolf 이전 추출 폴더 정리에 실패했습니다:', previousDir, error)
+            }
+        }
+    }
 }

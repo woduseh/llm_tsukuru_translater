@@ -51,7 +51,8 @@
           </div>
           <div class="secondary-tools">
             <button type="button" @click="openVersionUp">버전 업</button>
-            <button type="button" @click="openFontConfig">폰트</button>
+            <button type="button" @click="selectFontFile">폰트 파일</button>
+            <button type="button" @click="openFontConfig">폰트 크기</button>
             <button type="button" @click="convertProject">프로젝트 변환</button>
           </div>
         </aside>
@@ -89,6 +90,7 @@ const config = reactive<Record<string, boolean>>({
 const extractOptions = [
   { key: 'ext_plugin', label: '플러그인' },
   { key: 'ext_src', label: '스크립트' },
+  { key: 'ext_javascript', label: 'JavaScript 문자열' },
   { key: 'ext_note', label: '노트 / 메모' },
   { key: 'exJson', label: '비표준 리소스' },
   { key: 'decryptImg', label: '이미지 복호화' },
@@ -280,6 +282,15 @@ async function openFontConfig() {
   if (fontSize) {
     api.send('changeFontSize', [folderPath.value, Number(fontSize)])
   }
+}
+
+function selectFontFile() {
+  if (guardRunning()) return
+  if (!folderPath.value) {
+    Swal.fire({ icon: 'warning', title: '프로젝트 폴더를 먼저 선택하세요', background: 'var(--Highlight1)', color: 'var(--mainColor)' })
+    return
+  }
+  api.send('selFont', folderPath.value)
 }
 
 function convertProject() {

@@ -14,7 +14,7 @@
       <div class="group-title">LLM 번역</div>
       <div class="setting-item">
         <label for="llmProvider">제공자</label>
-        <select id="llmProvider" class="text-input" v-model="settings.llmProvider">
+        <select id="llmProvider" class="text-input" v-model="settings.llmProvider" @change="onProviderChanged">
           <option value="gemini">Gemini API</option>
           <option value="vertex">Vertex AI</option>
           <option value="openai">OpenAI</option>
@@ -149,15 +149,15 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, toRaw } from 'vue'
 import { api } from '../composables/useIpc'
-import { DEFAULT_LLM_VERTEX_LOCATION } from '../../types/settings'
+import { DEFAULT_LLM_PROVIDER, DEFAULT_LLM_VERTEX_LOCATION } from '../../types/settings'
 import { getRendererLlmProviderMetadata, getRendererLlmProviderUiText } from '../../types/llmProviderContract'
 
 const settings = reactive<Record<string, any>>({
   loadingText: false, JsonChangeLine: false, DoNotTransHangul: false, ExtractAddLine: false,
   onefile_src: false, onefile_note: false, ExternMsgJson: false, oneMapFile: false,
   formatNice: false, HideExtractAll: false, extractSomeScript: false,
-  llmProvider: 'gemini',
-  llmApiKey: '', llmModel: 'gemini-3.0-flash-preview',
+  llmProvider: DEFAULT_LLM_PROVIDER,
+  llmApiKey: '', llmModel: getRendererLlmProviderMetadata(DEFAULT_LLM_PROVIDER).defaultModel,
   llmOpenAiApiKey: '', llmCustomApiKey: '', llmCustomBaseUrl: 'http://localhost:1234/v1',
   llmClaudeApiKey: '', llmMaxTokens: 4096,
   llmVertexServiceAccountJson: '', llmVertexLocation: DEFAULT_LLM_VERTEX_LOCATION,
@@ -219,6 +219,12 @@ function applySettings() {
   settings.llmVertexLocation = String(settings.llmVertexLocation || DEFAULT_LLM_VERTEX_LOCATION).trim() || DEFAULT_LLM_VERTEX_LOCATION
   settings.theme = 'Dracula'
   api.send('applysettings', { ...toRaw(settings) })
+}
+
+function onProviderChanged(event: Event) {
+  const provider = (event.target as HTMLSelectElement).value
+  settings.llmProvider = provider
+  settings.llmModel = getRendererLlmProviderMetadata(provider).defaultModel
 }
 
 function closeSettings() {

@@ -26,7 +26,28 @@ export function read(dir: string){
 
 export function write(dir: string, ext_data: Object){
     const d = iconv.encode(JSON.stringify({dat: ext_data}), 'utf8')
-    fs.writeFileSync(path.join(dir, '.extracteddata'), zlib.deflateSync(d))
+    const filePath = path.join(dir, '.extracteddata')
+    const tempPath = path.join(
+        dir,
+        `..extracteddata.${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.tmp`,
+    )
+    let descriptor: number | undefined
+    try {
+        descriptor = fs.openSync(tempPath, 'wx')
+        fs.writeFileSync(descriptor, zlib.deflateSync(d))
+        fs.fsyncSync(descriptor)
+        fs.closeSync(descriptor)
+        descriptor = undefined
+        fs.renameSync(tempPath, filePath)
+    } catch (error) {
+        if (descriptor !== undefined) {
+            try { fs.closeSync(descriptor) } catch { /* preserve the original error */ }
+        }
+        if (fs.existsSync(tempPath)) {
+            try { fs.rmSync(tempPath) } catch { /* preserve the original error */ }
+        }
+        throw error
+    }
 }
 
 export function exists (dir: string){

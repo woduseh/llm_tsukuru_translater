@@ -49,6 +49,7 @@ export async function DecryptDir (DataDir:string, type:string):Promise<void> {
 
     const imgDir = path.join(path.dirname(DataDir), type)
     const files:string[] = getFilesRecursively(imgDir)
+    const failures: string[] = []
     for(let i=0;i<files.length;i++){
         Tools.send('loadingTag', `${type} 복호화 중 : `);
         Tools.send('loading', ((i/files.length)*100))
@@ -60,12 +61,20 @@ export async function DecryptDir (DataDir:string, type:string):Promise<void> {
         try{
             const pat =path.join(ExtractImgDir , tlan)
             fsx.mkdirsSync(pat)
-            rpgencrypt.Decrypt(loc, pat, Key)
-        }catch(error){ console.warn('Decrypt failed:', files[i], error) }
+            await rpgencrypt.Decrypt(loc, pat, Key)
+        }catch(error){
+            console.warn('Decrypt failed:', files[i], error)
+            failures.push(files[i])
+        }
         await sleep(1)
     }
 
     Tools.send('loading', 0);
+    if (failures.length > 0) {
+        const preview = failures.slice(0, 5).join(', ')
+        const suffix = failures.length > 5 ? ` 외 ${failures.length - 5}개` : ''
+        throw new Error(`${type} 복호화에 실패한 파일이 있습니다: ${preview}${suffix}`)
+    }
 }
 
 
@@ -88,6 +97,7 @@ export async function EncryptDir(DataDir:string, type:string, instantapply:boole
     const files = getFilesRecursively(ExtractImgDir)
     const wwwDir = (dirname(dirname(dirname(CompleteDir))))
     let MVMode = (wwwDir.endsWith('www\\') || wwwDir.endsWith('www/') || wwwDir.endsWith('www'))
+    const failures: string[] = []
 
     for(let i=0;i<files.length;i++){
         Tools.send('loadingTag', `${type} 암호화 중 : `);
@@ -100,10 +110,18 @@ export async function EncryptDir(DataDir:string, type:string, instantapply:boole
         try{
             const pat =path.join(CompleteDir , tlan)
             fsx.mkdirsSync(pat)
-            rpgencrypt.Encrypt(loc, pat, Key, MVMode)
-        }catch(error){ console.warn('Encrypt failed:', files[i], error) }
+            await rpgencrypt.Encrypt(loc, pat, Key, MVMode)
+        }catch(error){
+            console.warn('Encrypt failed:', files[i], error)
+            failures.push(files[i])
+        }
         await sleep(1)
     }
 
     Tools.send('loading', 0);
+    if (failures.length > 0) {
+        const preview = failures.slice(0, 5).join(', ')
+        const suffix = failures.length > 5 ? ` 외 ${failures.length - 5}개` : ''
+        throw new Error(`${type} 암호화에 실패한 파일이 있습니다: ${preview}${suffix}`)
+    }
 }

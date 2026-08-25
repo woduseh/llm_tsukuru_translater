@@ -10,6 +10,10 @@ ipcRenderer.on('set-allowed-paths', (_event: unknown, paths: string[]) => {
   allowedBasePaths = [...new Set([...allowedBasePaths, ...resolved])];
 });
 
+ipcRenderer.on('replace-allowed-paths', (_event: unknown, paths: string[]) => {
+  allowedBasePaths = [...new Set(paths.map((p: string) => path.resolve(p)))];
+});
+
 function isPathAllowed(filePath: string): boolean {
   if (allowedBasePaths.length === 0) return false;
   const resolved = path.resolve(filePath);

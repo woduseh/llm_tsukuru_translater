@@ -90,11 +90,15 @@ describe('getLlmReadinessError', () => {
 
 describe('buildTranslationCacheKey', () => {
   it('includes provider identity to avoid cross-provider cache collisions', () => {
-    expect(buildTranslationCacheKey('vertex', 'abc123', 'gemini-2.5-pro', 'ko')).toBe(
-      'vertex_abc123_gemini-2.5-pro_ko',
+    const vertexKey = buildTranslationCacheKey(
+      'vertex', 'abc123', 'gemini-2.5-pro', 'ja', 'ko', baseVertexSettings,
     );
-    expect(buildTranslationCacheKey('gemini', 'abc123', 'gemini-2.0-flash', 'ko')).toBe(
-      'gemini_abc123_gemini-2.0-flash_ko',
+    const geminiKey = buildTranslationCacheKey(
+      'gemini', 'abc123', 'gemini-2.0-flash', 'ja', 'ko', baseGeminiSettings,
     );
+
+    expect(vertexKey).toContain('llm-cache-v2_vertex_abc123_');
+    expect(geminiKey).toContain('llm-cache-v2_gemini_abc123_');
+    expect(vertexKey).not.toBe(geminiKey);
   });
 });
