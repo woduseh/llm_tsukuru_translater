@@ -235,14 +235,13 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
     await waitForSelector(mainWindow, '[data-harness-view="wolf"]', stepTimeoutMs);
     const wolfEmpty = await snapshot(mainWindow, `(() => {
       const root = document.querySelector('[data-harness-view="wolf"]');
-      const option = root?.querySelector('.option-btn');
       const primary = root?.querySelector('[data-harness-primary-action]');
       return {
         projectState: root?.getAttribute('data-project-state'),
         currentTask: root?.querySelector('[data-harness-current-task]')?.textContent?.trim(),
         primaryAction: primary?.textContent?.trim(),
         primaryDisabled: primary instanceof HTMLButtonElement ? primary.disabled : null,
-        optionDisabled: option instanceof HTMLButtonElement ? option.disabled : null,
+        lockedPipelineActions: root?.querySelectorAll('.wolf-pipeline button:disabled').length ?? 0,
       };
     })()`);
     assertSnapshotValues('wolf-empty', wolfEmpty, {
@@ -250,7 +249,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       currentTask: '프로젝트 폴더 선택',
       primaryAction: '폴더 선택하기',
       primaryDisabled: false,
-      optionDisabled: true,
+      lockedPipelineActions: 3,
     });
 
     await mainWindow.webContents.executeJavaScript(`location.hash = '#/'`, true);
