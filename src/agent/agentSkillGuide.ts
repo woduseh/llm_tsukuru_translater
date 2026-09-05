@@ -29,20 +29,20 @@ export const AGENT_SKILL_RECIPES: AgentSkillRecipe[] = [
   {
     id: 'quality_review',
     title: 'Quality review',
-    summary: 'quality.review_file reports structural counts and read limits; qa.score_file saves a QA artifact. Use source and translation evidence to assess meaning and tone; compare and verification windows support visual review.',
-    tools: ['quality.review_file', 'qa.score_file', 'project.get_quality_rules'],
+    summary: 'Read paired numbered lines with translation.read_window, then qa.score_file for structural/heuristic checks. Scores do not measure meaning or tone. Partial or redacted input cannot pass the gate. Page existing findings with artifacts.read_ref.',
+    tools: ['translation.read_window', 'qa.score_file', 'artifacts.read_ref', 'project.get_quality_rules'],
   },
   {
     id: 'line_shift_repair',
     title: 'Line-shift diagnosis and proposal',
-    summary: 'Inspect alignment evidence before proposing replacements. If alignment remains ambiguous, identify the missing evidence instead of guessing line mappings.',
-    tools: ['alignment.inspect', 'alignment.explain', 'patch.propose', 'patch.validate'],
+    summary: 'Inspect alignment evidence and read affected lines before proposing replacements. True line-count drift requires app/manual recovery: same-line patches cannot insert/delete lines or change existing empty lines, separators or control codes. Never guess line mappings.',
+    tools: ['alignment.inspect', 'translation.read_window', 'patch.propose', 'patch.validate'],
   },
   {
     id: 'failed_translation_recovery',
     title: 'Failed translation recovery',
     summary: 'Use affected-file evidence to isolate the failure; retry the affected batch in the app. Offline MCP data cannot establish live provider readiness.',
-    tools: ['project.context_snapshot', 'project.translation_inventory', 'quality.review_file'],
+    tools: ['project.context_snapshot', 'project.translation_inventory', 'translation.read_window'],
   },
   {
     id: 'provider_setup',
@@ -88,6 +88,15 @@ export function createSafeRecipePayload(id: AgentSkillGuideTopic, definitions: M
 export function createTranslationWorkflowPayload(definitions: McpToolDefinition[]): JsonObject {
   return {
     capabilities: capabilities(definitions),
+    workflow: [
+      'Discover actual original/translation paths using project.translation_inventory; ask for pairing if ambiguous.',
+      'Read complete lines with translation.read_window. If textIsExact is false, do not use masked text as a patch precondition.',
+      'Inspect with alignment.inspect or qa.score_file; coverage/verified describe inspection coverage, not semantic correctness. Reuse returned refs for detail pages.',
+      'Propose operations with targetPath and [{lineNumber, originalText, replacementText}]. patch.propose returns validation, patch and preview together.',
+      'When app bridge tools exist, call bridge.status, then patch.apply with the returned patch and idempotencyKey=patch.patchId. Submission is not application.',
+      'For uncertain submissions reuse the same idempotencyKey. Poll approval.status with the returned approvalId; pending requires a user decision in the app. Never approve through MCP.',
+      'After applied, read the file and rerun QA. After stale, reread and prepare a new proposal. Denied is not authorization to resubmit.',
+    ],
     recipes: AGENT_SKILL_RECIPES.map((recipe) => recipePayload(recipe, definitions)),
     safetyInvariants: [...AGENT_GUIDE_SAFETY_INVARIANTS],
   };

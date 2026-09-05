@@ -100,6 +100,50 @@ describe('MutationApprovalRuntime', () => {
       .rejects.toMatchObject({ code: 'invalid-state' });
   });
 
+  it('replays an applied receipt after bytes change or the file disappears without applying twice', async () => {
+    const projectRoot = makeProject('applied-retry', ['Hello']);
+    const targetPath = path.join(projectRoot, 'Translated', 'Map001.txt');
+    const runtime = new MutationApprovalRuntime({ projectRoot });
+    const request = makeRequest('Translated\\Map001.txt', [
+      replaceLine('op-001', 'Translated\\Map001.txt', 1, 'Hello', '안녕'),
+    ]);
+    const submitted = runtime.submit(request, 'mcp');
+    await runtime.approve({ schemaVersion: 1, approvalId: submitted.approvalId });
+    const retry = { ...structuredClone(request), requestId: 'new-transport-request' };
+    expect(runtime.submit(retry, 'mcp')).toMatchObject({ approvalId: submitted.approvalId, status: 'applied' });
+    expect(fs.readFileSync(targetPath, 'utf-8')).toBe('안녕');
+    fs.unlinkSync(targetPath);
+    expect(runtime.submit(retry, 'mcp')).toMatchObject({ approvalId: submitted.approvalId, status: 'applied' });
+    expect(fs.existsSync(targetPath)).toBe(false);
+    expect(runtime.list({ schemaVersion: 1 })).toHaveLength(1);
+    const changed = structuredClone(retry);
+    changed.patch.operations[0].replacementText = 'different';
+    expect(() => runtime.submit(changed, 'mcp')).toThrowError(expect.objectContaining({ code: 'idempotency-conflict' }));
+    expect(() => runtime.submit({ ...retry, idempotencyKey: 'fresh-key' }, 'mcp'))
+      .toThrowError(expect.objectContaining({ code: 'invalid-request' }));
+  });
+
+  it('replays denied receipts but still rejects invalid wire shapes', () => {
+    const projectRoot = makeProject('denied-retry', ['Hello']);
+    const runtime = new MutationApprovalRuntime({ projectRoot });
+    const request = makeRequest('Translated\\Map001.txt', [
+      replaceLine('op-001', 'Translated\\Map001.txt', 1, 'Hello', '안녕'),
+    ]);
+    const submitted = runtime.submit(request, 'mcp');
+    runtime.deny({ schemaVersion: 1, approvalId: submitted.approvalId });
+    fs.unlinkSync(path.join(projectRoot, 'Translated', 'Map001.txt'));
+    expect(runtime.submit(structuredClone(request), 'mcp')).toMatchObject({ approvalId: submitted.approvalId, status: 'denied' });
+    for (const invalid of [
+      { ...request, schemaVersion: 2 },
+      { ...request, extra: true },
+      { ...request, requestId: '' },
+      { ...request, patch: { ...request.patch, extra: true } },
+      { ...request, patch: { ...request.patch, operations: Array.from({ length: 101 }, () => request.patch.operations[0]) } },
+    ]) {
+      expect(() => runtime.submit(invalid, 'mcp')).toThrowError(expect.objectContaining({ code: 'invalid-request' }));
+    }
+  });
+
   it('marks source drift stale before checking whether an executor is available', async () => {
     const projectRoot = makeProject('stale', ['Hello']);
     const targetPath = path.join(projectRoot, 'Translated', 'Map001.txt');

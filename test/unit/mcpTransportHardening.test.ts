@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AgentService } from '../../src/agent/agentService';
 import { handleMcpLine } from '../../src/mcp/mcpStdioServer';
-import { createMcpOfflineToolRegistry } from '../../src/mcp/readonlyTools';
+import { createMcpKernelToolRegistry, createMcpOfflineToolRegistry } from '../../src/mcp/readonlyTools';
 import type { JsonObject } from '../../src/types/agentWorkspace';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'mcpTransportHardening');
@@ -72,9 +72,11 @@ describe('MCP transport hardening', () => {
 
   it('publishes and enforces core patch and workflow argument contracts', () => {
     const projectRoot = makeDir('schema-contracts');
-    const registry = createMcpOfflineToolRegistry(new AgentService({ projectRoot }));
+    const service = new AgentService({ projectRoot });
+    const registry = createMcpOfflineToolRegistry(service);
+    const workflowRegistry = createMcpKernelToolRegistry(service);
     const patchDefinition = registry.listTools().find((tool) => tool.name === 'patch.validate');
-    const workflowDefinition = registry.listTools().find((tool) => tool.name === 'workflow.compose');
+    const workflowDefinition = workflowRegistry.listTools().find((tool) => tool.name === 'workflow.compose');
 
     expect(patchDefinition?.inputSchema.required).toEqual(['patch']);
     expect((workflowDefinition?.inputSchema.properties as JsonObject).preset).toMatchObject({
@@ -86,11 +88,11 @@ describe('MCP transport hardening', () => {
     expect(missingPatch.status).toBe('failed');
     expect(missingPatch.failure?.message).toContain('missing required property "patch"');
 
-    const invalidPreset = registry.callTool('workflow.compose', { preset: 'typo' });
+    const invalidPreset = workflowRegistry.callTool('workflow.compose', { preset: 'typo' });
     expect(invalidPreset.status).toBe('failed');
     expect(invalidPreset.failure?.message).toContain('translation-review');
 
-    const validPreset = registry.callTool('workflow.compose', { preset: 'repair-loop' });
+    const validPreset = workflowRegistry.callTool('workflow.compose', { preset: 'repair-loop' });
     expect(validPreset.status).toBe('ok');
     expect(validPreset.payload?.title).toBe('Repair loop workflow');
   });

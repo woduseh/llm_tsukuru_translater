@@ -55,12 +55,22 @@ Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-speci
 - When launched without an app bridge, the offline MCP surface does not expose a working source-project mutation path.
 - The Electron main process owns one `MutationApprovalRuntime` and one HTTP bridge bound to `127.0.0.1` for the selected project.
 - The per-process rendezvous manifest lives under Electron `userData/llm-tsukuru-agent-bridge/`, is blocked from renderer file APIs, and contains a rotating bearer plus app/project/bridge bindings.
-- MCP registration commands contain only `--bridge-manifest <path>`. The stdio adapter derives the project from its copied bundle, verifies the project hash, and exposes proxy `patch.apply` plus read-only `approval.status`.
+- MCP registration commands contain only `--bridge-manifest <path>`. The stdio adapter derives the project from its copied bundle, verifies the project hash, and exposes proxy `patch.apply` plus read-only `approval.status` and `bridge.status`. Registration does not establish live connectivity; the status tool checks the current bridge.
 - `patch.apply` only submits a bounded proposal. External agents cannot approve or deny it; an explicit app-UI approval lets the main-process runtime execute that one bound patch.
 - The mutation executor revalidates the canonical project, source bytes, argument/preview hashes, original lines, separators, empty lines, and RPG control codes before a same-directory atomic replacement. It preserves BOM, per-line CRLF/LF separators, final-newline state, and file mode, then re-reads the result and atomically restores the exact preimage if verification fails.
 - Renderer terminal sessions come from the main-process `TerminalService`; the renderer does not create placeholder sessions.
 
-`AgentService` assembles offline analysis services. `MutationApprovalRuntime` owns its `ApprovalService` directly and executes through `mutationPatchExecutor.ts`; starting approval handling does not construct the analysis kernel. `PatchService` provides proposal/validation/preview only. There is no second direct-write MCP mutation registry.
+`AgentService` assembles offline analysis services. `MutationApprovalRuntime` owns its `ApprovalService` directly and executes through `mutationPatchExecutor.ts`; starting approval handling does not construct the analysis kernel. `PatchService` provides proposal/validation/preview only, reusing `validatePatchApplyProposalRequest` for current-file and application-contract validation. `rpgTextInvariants.ts` holds shared separator/control-code helpers without a dependency on patch services. There is no second direct-write MCP mutation registry.
+
+### Public MCP Contracts
+
+`src/mcp/agentTools.ts` curates 16 offline tools with explicit input schemas; `bridgeTools.ts` adds three app-bridge tools. The public surface groups project discovery, exact text access, structural inspection, bounded patch preparation, artifact pagination, terminology lookup and help. See [AGENT_MCP_GUIDE.md](AGENT_MCP_GUIDE.md) for the tool list and migration from the former larger surface. Internal job graphs, workflow recipes and repair-loop simulations are not registered as externally executable work.
+
+`TranslationReadService` supplies `translation.read_window` and literal `translation.search`. It reads complete UTF-8 files up to 8 MiB, preserves physical empty lines and line endings, includes hashes of original bytes and bounds result sizes. Same-position source/target rows are context, not proof that dialogue is aligned. Response redaction must be checked before using text as a patch precondition.
+
+`alignment.inspect` and `qa.score_file` return compact summaries, coverage and artifact references. Partial reads cannot pass the structural gate, and semantic translation quality is explicitly not evaluated. `artifacts.read_ref` pages selected arrays with `collection`, `offset` and `limit`, preserving valid JSON and continuation offsets instead of clipping serialized content. Saved artifacts let agents inspect additional findings without rerunning the same analysis.
+
+`patch.propose` accepts exact original/replacement text for each line and includes its preview in the response. `patch.validate` checks an existing proposal against current bytes. Applicable patches retain the approval runtime's 256 KiB file, 100-operation and 8 KiB line bounds; oversized proposals/previews fail rather than inspecting only a file prefix. Virtual notes are analysis-only and inapplicable. A valid proposal does not imply approval or execution, and approval/execution revalidation still protects against later file changes.
 
 ## Shared Translation and View State
 

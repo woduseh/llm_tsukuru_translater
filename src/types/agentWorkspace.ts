@@ -385,6 +385,10 @@ export interface AlignmentMap {
   targetPath: string;
   score: number;
   confidence: 'high' | 'medium' | 'low';
+  coverage: 'full' | 'partial';
+  verified: boolean;
+  scoreKind: 'observed-structural';
+  limitations: string[];
   lineCount: {
     source: number;
     target: number;

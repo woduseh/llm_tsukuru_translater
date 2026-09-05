@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AgentService } from '../../src/agent/agentService';
 import type { AgentProvenance } from '../../src/agent/glossaryService';
-import { createMcpOfflineToolRegistry } from '../../src/mcp';
+import { createMcpLegacyOfflineToolRegistry as createMcpOfflineToolRegistry } from '../../src/mcp';
 import type { JsonObject } from '../../src/types/agentWorkspace';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'qaScoringGates');

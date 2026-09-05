@@ -5,7 +5,7 @@ import { TextDecoder } from 'util';
 import type { ValidationResult } from './contractsValidation';
 import { AgentSafeFileSystem } from './agentSafeFileSystem';
 import { hashArgs } from './approvalService';
-import { extractRpgControlCodes, isRpgSeparatorLine } from './patchService';
+import { extractRpgControlCodes, isRpgSeparatorLine } from './rpgTextInvariants';
 import type {
   JsonObject,
   MutationApprovalApproveRequest,
@@ -135,10 +135,8 @@ export class MutationApprovalStateError extends Error {
   }
 }
 
-export function validatePatchApplyProposalRequest(
-  value: unknown,
-  context: { projectRoot: string },
-): ValidationResult<ValidatedPatchApplyProposal> {
+/** Validate the full wire shape without requiring the target file to still exist. */
+export function validatePatchApplyProposalShape(value: unknown): ValidationResult<PatchApplyProposalRequest> {
   const errors: string[] = [];
   const requestBytes = jsonByteLength(value);
   if (requestBytes === undefined) {
@@ -160,8 +158,18 @@ export function validatePatchApplyProposalRequest(
   const patchObject = value.patch;
   validatePatchShape(patchObject, errors);
   if (errors.length > 0) return failure(errors);
+  return success(value as unknown as PatchApplyProposalRequest);
+}
 
-  const patch = patchObject as unknown as TranslationPatch;
+export function validatePatchApplyProposalRequest(
+  input: unknown,
+  context: { projectRoot: string },
+): ValidationResult<ValidatedPatchApplyProposal> {
+  const shape = validatePatchApplyProposalShape(input);
+  if (!shape.ok || !shape.value) return failure(shape.errors);
+  const value = shape.value;
+  const errors: string[] = [];
+  const patch = value.patch;
   let targetAbsolutePath: string;
   let targetRelativePath: string;
   let originalBytes: Buffer;

@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { AgentService } from '../../src/agent/agentService';
 import {
-  createMcpOfflineToolRegistry,
+  createMcpLegacyOfflineToolRegistry as createMcpOfflineToolRegistry,
   createMcpReadonlyToolRegistry,
 } from '../../src/mcp/readonlyTools';
 import { handleMcpRequest } from '../../src/mcp/mcpStdioServer';

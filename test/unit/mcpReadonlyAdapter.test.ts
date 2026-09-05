@@ -138,7 +138,7 @@ describe('MCP read-only adapter scaffold', () => {
     expect((repair.payload?.recipe as JsonObject).tools).not.toContain('patch.apply');
     expect(registry.callTool('help.explain_tool', { toolName: 'patch.apply' }).payload?.status).toBe('unknown');
 
-    const explained = registry.callTool('help.explain_tool', { toolName: 'quality.review_file' });
+    const explained = registry.callTool('help.explain_tool', { toolName: 'translation.read_window' });
     expect(explained.status).toBe('ok');
     expect((explained.payload as JsonObject).permissionTier).toBe('readonly');
 

@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ApprovalService } from './approvalService';
+import { ApprovalService, hashArgs } from './approvalService';
 import { AgentEventBus } from './eventBus';
 import { AGENT_WORKSPACE_DIRECTORY } from './workspaceService';
 import {
@@ -19,6 +19,7 @@ import {
   validateMutationApprovalGetRequest,
   validateMutationApprovalListRequest,
   validatePatchApplyProposalRequest,
+  validatePatchApplyProposalShape,
   type MutationApprovalRecord,
 } from './mutationApprovalContracts';
 import type {
@@ -67,7 +68,7 @@ export class MutationApprovalRuntime {
   private readonly executor: MutationApprovalExecutor;
   private readonly onChanged?: (snapshot: MutationApprovalQueueSnapshot) => void;
   private readonly records = new Map<string, MutationApprovalRecord>();
-  private readonly idempotencyIndex = new Map<string, string>();
+  private readonly idempotencyIndex = new Map<string, { approvalId: string; receiptHash: string }>();
   private disposed = false;
 
   constructor(options: MutationApprovalRuntimeOptions) {
@@ -91,28 +92,36 @@ export class MutationApprovalRuntime {
 
   submit(value: unknown, requestSource: 'mcp' | 'renderer'): MutationApprovalRendererView {
     this.assertActive();
-    const validated = validatePatchApplyProposalRequest(value, { projectRoot: this.projectRoot });
-    if (!validated.ok || !validated.value) {
+    const shape = validatePatchApplyProposalShape(value);
+    if (!shape.ok || !shape.value) {
       throw new MutationApprovalRuntimeError(
         'invalid-request',
-        safeValidationMessage(validated.errors, this.projectRoot),
+        safeValidationMessage(shape.errors, this.projectRoot),
       );
     }
-    const proposal = validated.value;
-    const existingId = this.idempotencyIndex.get(proposal.request.idempotencyKey);
-    if (existingId) {
-      const existing = this.records.get(existingId);
+    // Hash the received patch, before full validation canonicalizes paths. A
+    // retry is a receipt lookup and must work after application changes bytes.
+    const receiptHash = hashArgs(approvalArgs(shape.value));
+    const receipt = this.idempotencyIndex.get(shape.value.idempotencyKey);
+    if (receipt) {
+      const existing = this.records.get(receipt.approvalId);
       if (!existing) {
-        this.idempotencyIndex.delete(proposal.request.idempotencyKey);
-      } else if (!safeEqual(existing.argsHash, proposal.argsHash)) {
+        this.idempotencyIndex.delete(shape.value.idempotencyKey);
+      } else if (!safeEqual(receipt.receiptHash, receiptHash)) {
         throw new MutationApprovalRuntimeError(
           'idempotency-conflict',
           'The idempotency key was already used with different patch arguments.',
         );
       } else {
-        return toMutationApprovalRendererView(existing);
+        this.expirePending();
+        return toMutationApprovalRendererView(this.requireRecord(existing.approvalId));
       }
     }
+    const validated = validatePatchApplyProposalRequest(value, { projectRoot: this.projectRoot });
+    if (!validated.ok || !validated.value) {
+      throw new MutationApprovalRuntimeError('invalid-request', safeValidationMessage(validated.errors, this.projectRoot));
+    }
+    const proposal = validated.value;
     this.expirePending();
     if (this.pendingCount() >= MUTATION_APPROVAL_LIMITS.pendingRequests) {
       throw new MutationApprovalRuntimeError(
@@ -161,7 +170,7 @@ export class MutationApprovalRuntime {
       expiresAt: approval.expiresAt,
     };
     this.records.set(record.approvalId, record);
-    this.idempotencyIndex.set(record.idempotencyKey, record.approvalId);
+    this.idempotencyIndex.set(record.idempotencyKey, { approvalId: record.approvalId, receiptHash });
     this.emitChanged();
     return toMutationApprovalRendererView(record);
   }

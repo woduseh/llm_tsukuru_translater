@@ -1,8 +1,12 @@
 import type { JsonObject, TranslationPatch, TranslationPatchOperation } from '../types/agentWorkspace';
+import { randomUUID } from 'crypto';
 import { AgentSafeFileSystem } from './agentSafeFileSystem';
 import { ArtifactService } from './artifactService';
 import type { AgentDataRef } from './dataRefService';
 import { DataRefService } from './dataRefService';
+import { MUTATION_APPROVAL_LIMITS, validatePatchApplyProposalRequest } from './mutationApprovalContracts';
+import { extractRpgControlCodes, isRpgSeparatorLine } from './rpgTextInvariants';
+export { extractRpgControlCodes, isRpgSeparatorLine } from './rpgTextInvariants';
 
 export interface PatchProposeOptions {
   targetPath: string;
@@ -24,6 +28,9 @@ export interface PatchProposeResult {
 export interface PatchValidationResult {
   schemaVersion: 1;
   valid: boolean;
+  applicable: boolean;
+  purpose: 'apply-proposal' | 'analysis-only';
+  requiresUserApproval: true;
   lineCountPreserved: boolean;
   findings: JsonObject[];
 }
@@ -49,19 +56,20 @@ export class PatchService {
 
   propose(input: PatchProposeOptions): PatchProposeResult {
     assertPath(input.targetPath, 'patch.propose requires a non-empty targetPath.');
-    const read = this.options.files.readText(input.targetPath, { maxBytes: 256 * 1024 });
+    const read = this.options.files.readText(input.targetPath, { maxBytes: MUTATION_APPROVAL_LIMITS.targetFileBytes });
+    if (read.truncated) throw new Error(`Target file exceeds ${MUTATION_APPROVAL_LIMITS.targetFileBytes} bytes; bounded patch application cannot handle this file.`);
     const lines = read.text.split(/\r?\n/);
     const operations = input.operations?.length
       ? input.operations.map((operation, index) => normalizeOperation(operation, read.relativePath, lines, index))
       : [createSingleOperation(input, read.relativePath, lines)];
     const patch: TranslationPatch = {
       schemaVersion: 1,
-      patchId: `patch-${Date.now()}`,
+      patchId: `patch-${randomUUID()}`,
       createdAt: new Date().toISOString(),
       dryRunOnly: true,
       targetPath: read.relativePath,
       operations,
-      alignmentRef: input.alignmentRef,
+      ...(input.alignmentRef !== undefined ? { alignmentRef: input.alignmentRef } : {}),
       invariantPolicy: {
         preserveLineCount: true,
         requiresAlignmentProofForLineCountChange: true,
@@ -86,7 +94,8 @@ export class PatchService {
     if (!patch.invariantPolicy?.preserveLineCount) {
       findings.push({ severity: 'error', code: 'missing-line-count-policy', message: 'Patch must declare preserveLineCount=true.' });
     }
-    for (const operation of patch.operations) {
+    for (const operation of Array.isArray(patch.operations) ? patch.operations : []) {
+      if (!operation || typeof operation !== 'object') continue;
       if (operation.kind === 'replace-line') {
         if (typeof operation.replacementText !== 'string') {
           findings.push({ severity: 'error', code: 'missing-replacement', opId: operation.opId, message: 'replace-line requires replacementText.' });
@@ -101,7 +110,7 @@ export class PatchService {
         if (isRpgSeparatorLine(operation.originalText ?? '') && operation.originalText !== operation.replacementText) {
           findings.push({ severity: 'error', code: 'separator-replacement', opId: operation.opId, message: 'Separator lines must not be changed by same-line patches.' });
         }
-        if (extractRpgControlCodes(operation.originalText ?? '').join('\u0000') !== extractRpgControlCodes(operation.replacementText ?? '').join('\u0000')) {
+        if (extractRpgControlCodes(typeof operation.originalText === 'string' ? operation.originalText : '').join('\u0000') !== extractRpgControlCodes(typeof operation.replacementText === 'string' ? operation.replacementText : '').join('\u0000')) {
           findings.push({ severity: 'error', code: 'control-code-drift', opId: operation.opId, message: 'Replacement must preserve RPG control code sequence.' });
         }
       } else if (operation.kind === 'virtual-note') {
@@ -112,16 +121,33 @@ export class PatchService {
         findings.push({ severity: 'error', code: 'unknown-operation', opId: operation.opId, message: `Unknown patch operation kind: ${String(operation.kind)}.` });
       }
     }
+    // Use the exact same current-file, shape, size and invariant checks as the
+    // approval bridge. A successful dry run must be a submit-ready proposal.
+    const approvalValidation = validatePatchApplyProposalRequest({
+      schemaVersion: 1,
+      requestId: 'patch-validation',
+      idempotencyKey: 'patch-validation',
+      toolName: 'patch.apply',
+      patch,
+    }, { projectRoot: this.options.files.projectRoot });
+    for (const message of approvalValidation.errors) {
+      findings.push({ severity: 'error', code: 'apply-contract-violation', message });
+    }
+    const valid = !findings.some((finding) => finding.severity === 'error');
     return {
       schemaVersion: 1,
-      valid: !findings.some((finding) => finding.severity === 'error'),
+      valid,
+      applicable: valid,
+      purpose: Array.isArray(patch.operations) && patch.operations.some((operation) => operation?.kind === 'virtual-note') ? 'analysis-only' : 'apply-proposal',
+      requiresUserApproval: true,
       lineCountPreserved: !findings.some((finding) => finding.code === 'line-count-changing-replacement'),
       findings,
     };
   }
 
   preview(patch: TranslationPatch): PatchPreviewResult {
-    const read = this.options.files.readText(patch.targetPath, { maxBytes: 256 * 1024 });
+    const read = this.options.files.readText(patch.targetPath, { maxBytes: MUTATION_APPROVAL_LIMITS.targetFileBytes });
+    if (read.truncated) throw new Error(`Target file exceeds ${MUTATION_APPROVAL_LIMITS.targetFileBytes} bytes; preview would be incomplete.`);
     const lines = read.text.split(/\r?\n/);
     const validation = this.validate(patch);
     const previewLines = [...lines];
@@ -154,10 +180,10 @@ export class PatchService {
 }
 
 function createSingleOperation(input: PatchProposeOptions, targetPath: string, lines: string[]): TranslationPatchOperation {
-  if (typeof input.lineNumber !== 'number' || !Number.isFinite(input.lineNumber)) {
+  if (typeof input.lineNumber !== 'number' || !Number.isInteger(input.lineNumber)) {
     throw new Error('patch.propose requires lineNumber when operations are not provided.');
   }
-  const lineNumber = Math.floor(input.lineNumber);
+  const lineNumber = input.lineNumber;
   if (lineNumber < 1 || lineNumber > lines.length) throw new Error(`patch.propose lineNumber out of range: ${lineNumber}.`);
   if (typeof input.replacementText !== 'string' && typeof input.note !== 'string') {
     throw new Error('patch.propose requires replacementText or note.');
@@ -168,30 +194,22 @@ function createSingleOperation(input: PatchProposeOptions, targetPath: string, l
     targetPath,
     lineNumber,
     originalText: lines[lineNumber - 1],
-    replacementText: input.replacementText,
-    note: input.note,
-    alignmentProofRef: input.alignmentRef,
+    ...(input.replacementText !== undefined ? { replacementText: input.replacementText } : {}),
+    ...(input.note !== undefined ? { note: input.note } : {}),
+    ...(input.alignmentRef !== undefined ? { alignmentProofRef: input.alignmentRef } : {}),
   };
 }
 
 function normalizeOperation(operation: TranslationPatchOperation, targetPath: string, lines: string[], index: number): TranslationPatchOperation {
-  const lineNumber = Math.floor(operation.lineNumber);
-  if (!Number.isFinite(lineNumber) || lineNumber < 1 || lineNumber > lines.length) throw new Error(`patch operation lineNumber out of range: ${operation.lineNumber}.`);
+  const lineNumber = operation.lineNumber;
+  if (!Number.isInteger(lineNumber) || lineNumber < 1 || lineNumber > lines.length) throw new Error(`patch operation lineNumber out of range: ${operation.lineNumber}.`);
   return {
     ...operation,
     opId: operation.opId || `op-${String(index + 1).padStart(3, '0')}`,
-    targetPath,
+    targetPath: operation.targetPath || targetPath,
     lineNumber,
     originalText: operation.originalText ?? lines[lineNumber - 1],
   };
-}
-
-export function isRpgSeparatorLine(line: string): boolean {
-  return /^---\s*[^-]+?\s*---$/.test(line);
-}
-
-export function extractRpgControlCodes(line: string): string[] {
-  return line.match(/\\{1,2}[A-Za-z]+(?:\[[^\]\r\n]{0,24}\])?|\\[{}$|.!<>^]/g) ?? [];
 }
 
 function assertPath(value: unknown, message: string): asserts value is string {

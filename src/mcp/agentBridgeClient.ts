@@ -1,11 +1,13 @@
 import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
+import type { JsonObject } from '../types/agentWorkspace';
 import {
   AGENT_BRIDGE_BODY_LIMIT,
   hashAgentBridgeProjectBinding,
   isAgentBridgeManifest,
   type AgentBridgeApprovalStatusResponse,
+  type AgentBridgeStatusResponse,
   type AgentBridgeErrorResponse,
   type AgentBridgeManifest,
   type AgentBridgePatchApplyRequest,
@@ -66,11 +68,17 @@ export class AgentBridgeClient {
     return this.request('GET', `/v1/approvals/${approvalId}`) as Promise<AgentBridgeApprovalStatusResponse>;
   }
 
+  async getStatus(): Promise<JsonObject> {
+    const result = await this.request('GET', '/v1/status') as unknown as JsonObject;
+    if (result.available !== true || result.schemaVersion !== 1) throw new AgentBridgeClientError('invalid-response', 'Invalid bridge status response.');
+    return result;
+  }
+
   private request(
     method: 'GET' | 'POST',
     requestPath: string,
     body?: AgentBridgePatchApplyRequest,
-  ): Promise<AgentBridgePatchApplyResponse | AgentBridgeApprovalStatusResponse> {
+  ): Promise<AgentBridgePatchApplyResponse | AgentBridgeApprovalStatusResponse | AgentBridgeStatusResponse> {
     const serialized = body ? JSON.stringify(body) : undefined;
     if (serialized && Buffer.byteLength(serialized, 'utf-8') > AGENT_BRIDGE_BODY_LIMIT) {
       return Promise.reject(new AgentBridgeClientError(

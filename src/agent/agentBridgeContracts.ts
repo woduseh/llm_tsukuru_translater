@@ -47,6 +47,15 @@ export interface AgentBridgeApprovalStatusResponse {
   approval: MutationApprovalBridgeView;
 }
 
+export interface AgentBridgeStatusResponse {
+  schemaVersion: 1;
+  available: true;
+  approvalRequired: true;
+  operations: string[];
+  limits: { targetFileBytes: number; operations: number; lineBytes: number };
+  execution: string;
+}
+
 export interface AgentBridgeErrorResponse {
   schemaVersion: 1;
   error: {

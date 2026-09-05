@@ -101,25 +101,19 @@ describe('alignment and patch dry-run kernel', () => {
 
     expect(registry.listTools().map((tool) => tool.name)).toEqual(expect.arrayContaining([
       'alignment.inspect',
-      'alignment.find_breaks',
-      'alignment.score',
-      'alignment.explain',
       'patch.propose',
       'patch.validate',
-      'patch.preview',
+      'translation.read_window',
     ]));
 
     const proposed = registry.callTool('patch.propose', {
       targetPath: 'Translated\\Map001.txt',
-      lineNumber: 2,
-      replacementText: '안녕 \\V[1]',
+      operations: [{ lineNumber: 2, originalText: 'Hello \\V[1]', replacementText: '안녕 \\V[1]' }],
     });
-    const patch = ((proposed.payload as JsonObject).patch as unknown) as TranslationPatch;
-    const preview = registry.callTool('patch.preview', { patch });
+    const preview = (proposed.payload as JsonObject).preview as JsonObject;
 
     expect(proposed.status).toBe('ok');
-    expect(preview.status).toBe('ok');
-    expect(((preview.payload as JsonObject).validation as JsonObject).valid).toBe(true);
+    expect((preview.validation as JsonObject).valid).toBe(true);
   });
 });
 

@@ -6,6 +6,7 @@ import type { AgentArtifactRecord } from './artifactService';
 import { sanitizePathSegment } from './artifactService';
 import { redactSecretLikeValues } from './contractsValidation';
 import { SandboxPathError, SandboxReadLimitError } from './agentFileErrors';
+import { AgentSafeFileSystem } from './agentSafeFileSystem';
 
 export type AgentDataRefScope = 'session' | 'project';
 export type AgentDataRefKind =
@@ -151,6 +152,52 @@ export class DataRefService {
 
   listRefs(): AgentDataRef[] {
     return Object.values(this.readIndex()).sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  }
+
+  /** Whole JSON is bounded on disk; only a small valid JSON page crosses MCP. */
+  readPage(refId: string, options: { collection?: string; offset?: number; limit?: number } = {}): JsonObject {
+    const ref = this.readIndex()[sanitizePathSegment(refId)];
+    if (!ref || ref.refId !== refId || ref.projectRoot !== this.projectRoot) throw new AgentDataRefError(`Unknown data ref: ${refId}`);
+    if (ref.expiresAt && Date.parse(ref.expiresAt) <= Date.now()) throw new AgentDataRefError(`Data ref expired: ${refId}`);
+    const target = new AgentSafeFileSystem({ projectRoot: this.workspaceRoot }).resolveAllowed(ref.target.path);
+    const stat = fs.statSync(target);
+    if (!stat.isFile() || stat.size > 16 * 1024 * 1024) throw new SandboxReadLimitError('Artifact exceeds the 16 MiB JSON read limit. Inspect a smaller file or lower maxBytes.');
+    const record = JSON.parse(fs.readFileSync(target, 'utf8')) as AgentArtifactRecord;
+    if (record.schemaVersion !== 1 || record.kind !== ref.kind || !record.payload || typeof record.payload !== 'object' || Array.isArray(record.payload)) {
+      throw new AgentDataRefError('Artifact is not a supported JSON analysis record.');
+    }
+    const content = record.payload as JsonObject;
+    const collection = options.collection ?? 'summary';
+    const offset = options.offset ?? 0;
+    const limit = options.limit ?? 20;
+    if (!['summary', 'refs', 'breaks', 'findings', 'operations'].includes(collection)
+      || !Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      throw new AgentDataRefError('Invalid artifact page arguments.');
+    }
+    let page: JsonObject;
+    if (collection === 'summary') {
+      const summarize = (value: JsonValue): JsonValue => {
+        if (Array.isArray(value)) return { itemCount: value.length };
+        if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, summarize(item)]));
+        return value;
+      };
+      page = { refId, kind: ref.kind, summary: summarize(content) };
+    } else {
+      const parent = collection === 'operations' && content.patch && typeof content.patch === 'object' ? content.patch as JsonObject : content;
+      const rows = parent[collection];
+      if (!Array.isArray(rows)) throw new AgentDataRefError(`Artifact has no ${collection} collection.`);
+      const items: JsonValue[] = [];
+      for (const item of rows.slice(offset, offset + limit)) {
+        if (Buffer.byteLength(JSON.stringify([...items, item]), 'utf8') > 48 * 1024) break;
+        items.push(item);
+      }
+      if (!items.length && offset < rows.length) throw new SandboxReadLimitError('One artifact item exceeds the page byte budget. Use translation.read_window for line context.');
+      page = { refId, kind: ref.kind, collection, offset, total: rows.length, items,
+        nextOffset: offset + items.length < rows.length ? offset + items.length : null };
+    }
+    const redacted = redactSecretLikeValues(page);
+    if (Buffer.byteLength(JSON.stringify(redacted.value), 'utf8') > 64 * 1024) throw new SandboxReadLimitError('Artifact summary exceeds the response limit; request a collection page.');
+    return { ...redacted.value, redactions: [...ref.redaction.redactions, ...redacted.redactions] };
   }
 
   private readIndex(): Record<string, AgentDataRef> {

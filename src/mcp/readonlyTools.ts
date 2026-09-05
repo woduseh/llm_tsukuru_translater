@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { curateAgentTools } from './agentTools';
 import type { AgentService } from '../agent/agentService';
 import type { AlignmentInspectOptions } from '../agent/alignmentService';
 import type { BatchPlanOptions } from '../agent/batchPlanningService';
@@ -35,12 +36,12 @@ export interface McpToolContext {
   toolDefinitions: McpToolDefinition[];
 }
 
-interface RegisteredMcpTool {
+export interface RegisteredMcpTool {
   definition: McpToolDefinition;
   handler: McpToolHandler;
 }
 
-const PATCH_VALIDATE_INPUT_SCHEMA: JsonObject = {
+export const PATCH_VALIDATE_INPUT_SCHEMA: JsonObject = {
   type: 'object',
   properties: {
     patch: {
@@ -182,6 +183,13 @@ export function createMcpReadonlyToolRegistry(
 }
 
 export function createMcpOfflineToolRegistry(service: AgentService): McpOfflineToolRegistry {
+  const registry = new McpOfflineToolRegistry(service, { allowedTiers: ['readonly', 'workspace-write'] });
+  for (const tool of curateAgentTools(createAgentToolDefinitions())) registry.register(tool.definition, tool.handler);
+  return registry;
+}
+
+/** Internal compatibility surface for service tests; never registered by the stdio server. */
+export function createMcpLegacyOfflineToolRegistry(service: AgentService): McpOfflineToolRegistry {
   const registry = new McpOfflineToolRegistry(service, {
     allowedTiers: ['readonly', 'workspace-write'],
     excludedTools: ['settings.get_sanitized', 'provider.readiness', 'harness.latest'],
@@ -1052,7 +1060,7 @@ function countLinesBounded(filePath: string, maxBytes: number): number {
   }
 }
 
-function validateToolArguments(args: JsonObject, schema: JsonObject): string[] {
+export function validateToolArguments(args: JsonObject, schema: JsonObject): string[] {
   return validateSchemaValue(args, schema, 'arguments');
 }
 
@@ -1064,6 +1072,19 @@ function validateSchemaValue(value: unknown, schema: JsonObject, label: string):
   }
 
   const enumValues = Array.isArray(schema.enum) ? schema.enum : undefined;
+  if (typeof value === 'number') {
+    if (typeof schema.minimum === 'number' && value < schema.minimum) errors.push(`${label} must be >= ${schema.minimum}`);
+    if (typeof schema.maximum === 'number' && value > schema.maximum) errors.push(`${label} must be <= ${schema.maximum}`);
+  }
+  if (typeof value === 'string') {
+    if (typeof schema.minLength === 'number' && value.length < schema.minLength) errors.push(`${label} is too short`);
+    if (typeof schema.maxLength === 'number' && value.length > schema.maxLength) errors.push(`${label} is too long`);
+    if (typeof schema.pattern === 'string' && !new RegExp(schema.pattern).test(value)) errors.push(`${label} has an invalid format`);
+  }
+  if (Array.isArray(value)) {
+    if (typeof schema.minItems === 'number' && value.length < schema.minItems) errors.push(`${label} has too few items`);
+    if (typeof schema.maxItems === 'number' && value.length > schema.maxItems) errors.push(`${label} has too many items`);
+  }
   if (enumValues && !enumValues.some((candidate) => Object.is(candidate, value))) {
     errors.push(`${label} must be one of ${enumValues.map((candidate) => JSON.stringify(candidate)).join(', ')}`);
     return errors;
@@ -1106,6 +1127,7 @@ function matchesSchemaType(value: unknown, expectedType: string): boolean {
   if (expectedType === 'object') return isPlainObject(value);
   if (expectedType === 'array') return Array.isArray(value);
   if (expectedType === 'number') return typeof value === 'number' && Number.isFinite(value);
+  if (expectedType === 'integer') return typeof value === 'number' && Number.isSafeInteger(value);
   if (expectedType === 'string') return typeof value === 'string';
   if (expectedType === 'boolean') return typeof value === 'boolean';
   if (expectedType === 'null') return value === null;

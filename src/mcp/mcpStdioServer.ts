@@ -25,7 +25,7 @@ export interface McpToolRegistryLike {
 /** Protocol versions we understand, newest first. */
 const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const DEFAULT_PROTOCOL_VERSION = '2024-11-05';
-const SERVER_INFO = { name: 'llm-tsukuru-translater', version: '1.0.0' };
+const SERVER_INFO = { name: 'llm-tsukuru-translater', version: '2.0.0' };
 
 export interface JsonRpcMessage {
   jsonrpc: '2.0';
@@ -78,8 +78,12 @@ export function toToolCallResult(envelope: AgentResultEnvelope): JsonObject {
           approvalRequest: envelope.approvalRequest ?? {},
         }
       : (envelope.payload ?? {});
+  const serialized = JSON.stringify(body);
+  if (Buffer.byteLength(serialized, 'utf8') > 256 * 1024) {
+    return { content: [{ type: 'text', text: JSON.stringify({ code: 'response-too-large', message: 'Result exceeds 256 KiB. Reduce count, limit, maxFiles or patch operations; page analysis artifacts with artifacts.read_ref.' }) }], isError: true };
+  }
   return {
-    content: [{ type: 'text', text: JSON.stringify(body, null, 2) }],
+    content: [{ type: 'text', text: serialized }],
     isError,
   };
 }

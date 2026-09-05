@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { randomUUID } from 'crypto';
 import * as path from 'path';
 import * as zlib from 'zlib';
 import type { AlignmentBreak, AlignmentMap, JsonObject } from '../types/agentWorkspace';
@@ -39,14 +40,25 @@ export class AlignmentService {
     const metadata = input.metadataPath ? readMetadataSummary(this.options.files, this.options.projectRoot, input.metadataPath) : { status: 'not-provided' };
     const breaks = findBreaks(sourceLines, targetLines);
     const score = scoreBreaks(sourceLines.length, targetLines.length, breaks);
+    const partial = source.truncated || target.truncated;
+    const redacted = source.redactions.length > 0 || target.redactions.length > 0;
     const result: AlignmentInspectResult = {
       schemaVersion: 1,
-      alignmentId: `alignment-${Date.now()}`,
+      alignmentId: `alignment-${randomUUID()}`,
       createdAt: new Date().toISOString(),
       sourcePath: source.relativePath,
       targetPath: target.relativePath,
       score,
-      confidence: score >= 0.92 ? 'high' : score >= 0.75 ? 'medium' : 'low',
+      confidence: partial || redacted ? 'low' : score >= 0.92 ? 'high' : score >= 0.75 ? 'medium' : 'low',
+      coverage: partial ? 'partial' : 'full',
+      verified: !partial && !redacted,
+      scoreKind: 'observed-structural',
+      limitations: [
+        ...(partial ? ['Only file prefixes were inspected. Score and line counts describe the observed prefixes; the remaining content is unverified. Increase maxBytes and rerun.'] : []),
+        ...(redacted ? ['Text was redacted during reading; exact structural preservation is unverified.'] : []),
+        'Structural checks do not assess translation meaning or guarantee game-data apply safety.',
+        'Metadata is summarized only; extraction-to-game mappings are not validated.',
+      ],
       lineCount: {
         source: sourceLines.length,
         target: targetLines.length,
@@ -84,6 +96,10 @@ export class AlignmentService {
       targetPath: inspected.targetPath,
       score: inspected.score,
       confidence: inspected.confidence,
+      coverage: inspected.coverage,
+      verified: inspected.verified,
+      scoreKind: inspected.scoreKind,
+      limitations: inspected.limitations,
       lineCount: inspected.lineCount,
       breaks: inspected.breaks,
       alignmentRef: inspected.alignmentRef,
@@ -96,6 +112,10 @@ export class AlignmentService {
       schemaVersion: 1,
       score: inspected.score,
       confidence: inspected.confidence,
+      coverage: inspected.coverage,
+      verified: inspected.verified,
+      scoreKind: inspected.scoreKind,
+      limitations: inspected.limitations,
       breakCount: inspected.breaks.length,
       lineCount: inspected.lineCount,
       alignmentRef: inspected.alignmentRef,
@@ -107,11 +127,15 @@ export class AlignmentService {
     const topBreaks = inspected.breaks.slice(0, 8);
     return {
       schemaVersion: 1,
-      summary: topBreaks.length === 0
+      summary: !inspected.verified ? 'Inspection is incomplete. Observed findings cannot establish whole-file alignment.' : topBreaks.length === 0
         ? 'Source and target keep the first-model alignment invariants.'
         : `${topBreaks.length} representative alignment break(s) found. Preserve line count, separator order, empty-line positions, and RPG control codes before apply.`,
       score: inspected.score,
       confidence: inspected.confidence,
+      coverage: inspected.coverage,
+      verified: inspected.verified,
+      scoreKind: inspected.scoreKind,
+      limitations: inspected.limitations,
       lineCount: inspected.lineCount,
       topBreaks,
       alignmentRef: inspected.alignmentRef,
@@ -229,7 +253,12 @@ function readMetadataSummary(files: AgentSafeFileSystem, projectRoot: string, me
   const absolutePath = files.resolveAllowed(metadataPath);
   const relativePath = path.relative(projectRoot, absolutePath);
   const buffer = fs.readFileSync(absolutePath);
-  const parsed = parseMetadataBuffer(buffer);
+  let parsed: unknown;
+  try {
+    parsed = parseMetadataBuffer(buffer);
+  } catch {
+    return { status: 'unrecognized', path: relativePath, mappingValidated: false };
+  }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return { status: 'unrecognized', path: relativePath };
   }
@@ -240,6 +269,8 @@ function readMetadataSummary(files: AgentSafeFileSystem, projectRoot: string, me
     status: 'loaded',
     path: relativePath,
     spanCount: spans.length,
+    mappingValidated: false,
+    maxEndLine: spans.reduce((max, span) => Math.max(max, Number(span.endLine)), 0),
     multilineSpanCount: spans.filter((span) => Number(span.endLine) > Number(span.startLine) + 1).length,
     sampleSpans: spans.slice(0, 12),
   };

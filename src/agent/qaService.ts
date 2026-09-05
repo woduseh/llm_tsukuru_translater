@@ -1,4 +1,5 @@
 import type { JsonObject } from '../types/agentWorkspace';
+import { randomUUID } from 'crypto';
 import type { AgentSafeFileSystem } from './agentSafeFileSystem';
 import type { AlignmentInspectOptions, AlignmentInspectResult, AlignmentService } from './alignmentService';
 import type { ArtifactService } from './artifactService';
@@ -79,6 +80,10 @@ export interface QaScoreResult {
   metadataPath?: string;
   qualityScore: number;
   confidence: 'high' | 'medium' | 'low';
+  coverage: 'full' | 'partial';
+  verified: boolean;
+  scoreKind: 'structural-and-heuristic';
+  limitations: string[];
   dimensions: QaDimensionScore[];
   findings: QaFinding[];
   alignment?: JsonObject;
@@ -132,6 +137,8 @@ export class QaService {
       })
       : undefined;
     const findings: QaFinding[] = [];
+    const partial = target.truncated || Boolean(source?.truncated);
+    const verified = Boolean(source && alignment?.verified) && !partial;
 
     if (!target.relativePath.toLowerCase().endsWith('.txt')) {
       findings.push(finding('warning', 'non-text-extension', 'jsonApplyRisk', 'QA scoring is optimized for extracted .txt files.'));
@@ -153,13 +160,22 @@ export class QaService {
     const qualityScore = round3(dimensions.reduce((sum, item) => sum + item.score * item.weight, 0) / DIMENSIONS.reduce((sum, item) => sum + item.weight, 0));
     const result: QaScoreResult = {
       schemaVersion: 1,
-      qaScoreId: `qa-${Date.now()}`,
+      qaScoreId: `qa-${randomUUID()}`,
       createdAt: new Date().toISOString(),
       sourcePath: source?.relativePath,
       targetPath: target.relativePath,
       metadataPath: input.metadataPath,
       qualityScore,
-      confidence: source ? qualityConfidence(qualityScore) : 'medium',
+      confidence: verified ? qualityConfidence(qualityScore) : 'low',
+      coverage: partial ? 'partial' : 'full',
+      verified,
+      scoreKind: 'structural-and-heuristic',
+      limitations: [
+        ...(!source ? ['Source was not provided; preservation checks are unverified.'] : []),
+        ...(partial ? ['Only file prefixes were inspected. Score describes observed content; whole-file QA is unverified. Increase maxBytes and rerun.'] : []),
+        ...(alignment?.limitations ?? []),
+        'This score combines deterministic structure checks and text heuristics. Translation meaning, fluency, and game-data apply safety are not certified.',
+      ],
       dimensions,
       findings,
       alignment: alignmentSummary(alignment),
@@ -189,7 +205,7 @@ export class QaService {
       schemaVersion: 1,
       qualityScore: averageScore,
       threshold,
-      passed: scores.every((score) => score.qualityScore >= threshold && !score.findings.some((finding) => finding.severity === 'error')),
+      passed: scores.length > 0 && scores.every((score) => score.verified && score.qualityScore >= threshold && !score.findings.some((finding) => finding.severity === 'error')),
       fileCount: scores.length,
       scores: scores.map((score) => scoreSummary(score)) as unknown as JsonObject[],
       nextSuggestedCalls: averageScore >= threshold ? ['qa.threshold_gate'] : ['qa.explain_score', 'patch.propose', 'qa.score_file'],
@@ -203,7 +219,11 @@ export class QaService {
       schemaVersion: 1,
       qualityScore: score.qualityScore,
       confidence: score.confidence,
-      summary: topFindings.length === 0
+      verified: score.verified,
+      coverage: score.coverage,
+      scoreKind: score.scoreKind,
+      limitations: score.limitations,
+      summary: !score.verified ? 'QA is incomplete; no whole-file preservation gate can pass.' : topFindings.length === 0
         ? 'QA score is high and no deterministic gate findings were detected.'
         : `${topFindings.length} representative QA finding(s) need review in the app.`,
       dimensions: score.dimensions as unknown as JsonObject[],
@@ -232,11 +252,15 @@ export class QaService {
     const score = input.score ?? this.scoreFile(input);
     const threshold = normalizeThreshold(input.threshold);
     const blockingFindings = score.findings.filter((item) => item.severity === 'error');
-    const blocked = score.qualityScore < threshold || Boolean(input.blockOnErrors ?? true) && blockingFindings.length > 0;
+    const blocked = score.verified !== true || score.qualityScore < threshold || Boolean(input.blockOnErrors ?? true) && blockingFindings.length > 0;
     const result: JsonObject = {
       schemaVersion: 1,
       gate: blocked ? 'blocked' : 'passed',
       blocked,
+      verified: score.verified === true,
+      coverage: score.coverage ?? 'partial',
+      scoreKind: 'structural-and-heuristic',
+      limitations: score.limitations ?? ['Legacy score has no verification evidence; rerun QA.'],
       qualityScore: score.qualityScore,
       threshold,
       blockingFindings: blockingFindings.slice(0, 20) as unknown as JsonObject[],
@@ -396,10 +420,10 @@ function metadataRiskFindings(alignment: AlignmentInspectResult | undefined, tar
   if (metadata.status === 'unrecognized') {
     return [finding('warning', 'metadata-unrecognized', 'jsonApplyRisk', 'Extracted metadata could not be parsed; apply risk is elevated.')];
   }
-  const spans = Array.isArray(metadata.sampleSpans) ? metadata.sampleSpans as JsonObject[] : [];
-  return spans
-    .filter((span) => typeof span.endLine === 'number' && span.endLine > targetLineCount + 1)
-    .map((span) => finding('error', 'metadata-span-out-of-range', 'jsonApplyRisk', 'Metadata span points past the target file line count.', Number(span.startLine)));
+  if (alignment.coverage !== 'full') return [];
+  return typeof metadata.maxEndLine === 'number' && metadata.maxEndLine > targetLineCount + 1
+    ? [finding('error', 'metadata-span-out-of-range', 'jsonApplyRisk', 'Metadata span points past the target file line count.')]
+    : [];
 }
 
 function scoreDimensions(findings: QaFinding[], alignment?: AlignmentInspectResult): QaDimensionScore[] {
@@ -432,6 +456,10 @@ function alignmentSummary(alignment?: AlignmentInspectResult): JsonObject | unde
   return {
     score: alignment.score,
     confidence: alignment.confidence,
+    verified: alignment.verified,
+    coverage: alignment.coverage,
+    scoreKind: alignment.scoreKind,
+    limitations: alignment.limitations,
     lineCount: alignment.lineCount as unknown as JsonObject,
     breakCount: alignment.breaks.length,
     metadata: alignment.metadata,
@@ -444,6 +472,10 @@ function scoreSummary(score: QaScoreResult): JsonObject {
     targetPath: score.targetPath,
     qualityScore: score.qualityScore,
     confidence: score.confidence,
+    verified: score.verified,
+    coverage: score.coverage,
+    scoreKind: score.scoreKind,
+    limitations: score.limitations,
     findingCount: score.findings.length,
     qaRef: score.qaRef as unknown as JsonObject,
     nextSuggestedCalls: score.nextSuggestedCalls,

@@ -12,7 +12,7 @@ import {
   validateTerminalEvent,
 } from '../../src/agent/contractsValidation';
 import {
-  createMcpOfflineToolRegistry,
+  createMcpLegacyOfflineToolRegistry as createMcpOfflineToolRegistry,
   createMcpReadonlyToolRegistry,
 } from '../../src/mcp';
 import { applyTerminalEvent } from '../../src/renderer/agentWorkspaceModel';

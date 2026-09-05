@@ -12,6 +12,7 @@ import {
   AGENT_BRIDGE_SUBMISSION_RATE,
   hashAgentBridgeProjectBinding,
   type AgentBridgeApprovalStatusResponse,
+  type AgentBridgeStatusResponse,
   type AgentBridgeErrorResponse,
   type AgentBridgeManifest,
   type AgentBridgePatchApplyResponse,
@@ -21,6 +22,7 @@ import {
   type MutationApprovalRuntime,
 } from './mutationApprovalRuntime';
 import { issueAppBridgeToken, validateAppBridgeToken } from './agentBridgeToken';
+import { MUTATION_APPROVAL_LIMITS } from './mutationApprovalContracts';
 
 export interface AgentBridgeServerOptions {
   runtime: MutationApprovalRuntime;
@@ -121,6 +123,12 @@ export class AgentBridgeServer {
     }
     if (request.method === 'POST' && request.url === '/v1/patch-apply') {
       return this.handlePatchApply(request, response);
+    }
+    if (request.method === 'GET' && request.url === '/v1/status') {
+      drainRequest(request);
+      return writeJson(response, 200, { schemaVersion: 1, available: true, approvalRequired: true,
+        operations: ['patch.apply', 'approval.status'], limits: { targetFileBytes: MUTATION_APPROVAL_LIMITS.targetFileBytes, operations: MUTATION_APPROVAL_LIMITS.operations, lineBytes: MUTATION_APPROVAL_LIMITS.lineBytes },
+        execution: 'Extraction, provider translation and game-data apply run in the app UI.' });
     }
     if (request.method === 'GET' && request.url?.startsWith('/v1/approvals/')) {
       drainRequest(request);
@@ -314,7 +322,7 @@ function applyResponseHeaders(response: http.ServerResponse): void {
 function writeJson(
   response: http.ServerResponse,
   statusCode: number,
-  value: AgentBridgePatchApplyResponse | AgentBridgeApprovalStatusResponse | AgentBridgeErrorResponse,
+  value: AgentBridgePatchApplyResponse | AgentBridgeApprovalStatusResponse | AgentBridgeErrorResponse | AgentBridgeStatusResponse,
 ): void {
   if (response.destroyed || response.writableEnded) return;
   response.statusCode = statusCode;
