@@ -83,6 +83,7 @@ Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-speci
 ## Build and IPC Details
 
 - `tsconfig.main.json` extends `tsconfig.json` and compiles main-process code into `dist-main/`; Vite builds Vue into `dist-renderer/`. Generated output is not source.
+- Windows packaging runs `@electron/rebuild` for the native `node-pty` terminal dependency. The scoped `overrides` entry in `package.json` selects `node-gyp ^12.1.0` for Visual Studio 2026 (18.x) discovery; the lockfile pins the resolved version. Keep native rebuilding enabled and `node_modules/node-pty/**` in `asarUnpack`. Reassess the override when upgrading `@electron/rebuild` to a release that directly supports the required toolchain. See [Windows packaging checks](HARNESS.md#packaged-windows-checks).
 - Vue uses hash routing for packaged `file://` URLs. `App.vue` receives global theme updates across routes. `useIpcOn` disposes only its own subscription on component unmount, using the unsubscribe callback returned by preload `api.on`. Add IPC channels to the whitelist for their actual direction in `src/preload.ts`.
 - Sub-window route components mount after `did-finish-load`. Main retains pending data until the component sends its ready signal from `onMounted`; see `toolsHandler.ts` for compare/verify examples.
 - Existing windows use `sandbox: false` for the current Node-dependent preload. This is an implementation dependency to reassess when changing preload, not a requirement for every future window.

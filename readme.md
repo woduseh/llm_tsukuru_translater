@@ -65,6 +65,10 @@ npm run lint
 
 ### 프로덕션 빌드
 
+Windows 패키징은 `node-pty`를 Electron용으로 다시 빌드하므로 Python과 Visual Studio Build Tools의 **C++를 사용한 데스크톱 개발**, x64/x86 MSVC 빌드 도구, Windows SDK, 해당 MSVC 버전의 x64/x86 Spectre 완화 라이브러리가 필요해요. 완성된 앱을 실행하는 사용자에게는 이 빌드 도구가 필요하지 않아요.
+
+VS 2026(18.x)을 인식하도록 `package.json`의 `overrides`에서 `@electron/rebuild`가 사용하는 `node-gyp`를 `^12.1.0`으로 지정해요. 정확한 설치 버전은 `package-lock.json`으로 고정하며, 새 체크아웃에서는 `npm ci`로 설치하세요. 빌드 도구가 설치되어 있는데도 `Could not find any Visual Studio installation to use`가 나오면 `npm ls node-gyp @electron/rebuild`로 프로젝트가 실제 사용하는 버전을 확인하세요. `node-gyp` 11.x는 VS 2026을 인식하지 못해요. 전역 `node-gyp` 설치는 이 프로젝트 의존성을 바꾸지 않아요. 자세한 진단과 검증 범위는 [Windows 패키징 검증](docs/HARNESS.md#packaged-windows-checks)을 참조하세요.
+
 ```bash
 # Windows 포터블 실행 파일
 npm run dist:portable
