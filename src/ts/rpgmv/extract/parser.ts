@@ -8,13 +8,20 @@ let hadComment = false
 
 interface DatObj {
     main: Record<string, ExtractDictEntry>;
+    entryCount: number;
     edited: Record<string, any>;  // JSON data with deeply nested access
+}
+
+function setEntry(obj: DatObj, id: string, entry: ExtractDictEntry) {
+    if (!Object.prototype.hasOwnProperty.call(obj.main, id)) obj.entryCount++
+    obj.main[id] = entry
 }
 
 function addtodic(pa: string, obj: DatObj, usePath='', conf: ExtractEntryConf | undefined = undefined, spliter=false){
     if(pa === '%comment%'){
-        const id = `comment_${(Object.keys(obj.main)).length}`
-        obj.main[id] = {var: conf!.comment!, conf: {isComment:true}, qpath:usePath}
+        // Preserve the historical ID without enumerating every previous entry.
+        const id = `comment_${obj.entryCount}`
+        setEntry(obj, id, {var: conf!.comment!, conf: {isComment:true}, qpath:usePath})
         return obj
     }
     let val = returnVal(pa, obj.edited)
@@ -39,7 +46,7 @@ function addtodic(pa: string, obj: DatObj, usePath='', conf: ExtractEntryConf | 
         if(usePath === 'note' || spliter){
             obj = addtodic('%comment%', obj, usePath, {comment:'-----'}) 
         }
-        obj.main[id] = {var: val, conf: conf, qpath:usePath}
+        setEntry(obj, id, {var: val, conf: conf, qpath:usePath})
         hadComment = false
     }
     return obj
@@ -226,6 +233,7 @@ export const extract = async (filedata: string, conf: ExtractConf, ftype: Extrac
     }
     let dat_obj: DatObj = {
         main: {},
+        entryCount: 0,
         edited: data
     }
     if(ftype == 'map'){

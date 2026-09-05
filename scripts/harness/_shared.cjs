@@ -22,17 +22,39 @@ function runCommand(command, args, options = {}) {
     stdio: 'inherit',
     ...options,
   };
-  const result = process.platform === 'win32'
-    ? spawnSync([command, ...args].join(' '), { ...spawnOptions, shell: true })
-    : spawnSync(command, args, spawnOptions);
-
-  if (result.error) {
-    throw result.error;
+  let executable = command;
+  let commandArgs = args;
+  // npm.cmd requires cmd.exe, which reparses and corrupts quoted arguments.
+  // Invoke its JavaScript entry point with Node instead, including standalone harness runs.
+  if (process.platform === 'win32' && /^(npm|npm\.cmd)$/i.test(command)) {
+    const npmPaths = [
+      process.env.npm_execpath,
+      ...[path.dirname(process.execPath), ...(process.env.PATH || '').split(path.delimiter)]
+        .filter(Boolean)
+        .map((directory) => path.join(directory, 'node_modules', 'npm', 'bin', 'npm-cli.js')),
+    ];
+    const npmPath = npmPaths.find((candidate) => candidate && fs.existsSync(candidate));
+    if (npmPath) {
+      executable = process.execPath;
+      commandArgs = [npmPath, ...args];
+    }
   }
+  const result = spawnSync(executable, commandArgs, spawnOptions);
 
-  if (result.status !== 0) {
-    const signalText = result.signal ? ` (signal: ${result.signal})` : '';
-    throw new Error(`${command} ${args.join(' ')} failed with exit code ${result.status}${signalText}`);
+  if (result.error || result.status !== 0) {
+    const reason = result.error?.message || (result.signal
+      ? `terminated by signal ${result.signal}`
+      : `failed with exit code ${result.status}`);
+    const error = new Error(`${command} ${args.join(' ')}: ${reason}`);
+    Object.assign(error, {
+      command,
+      args: [...args],
+      cwd: spawnOptions.cwd,
+      exitCode: result.status,
+      signal: result.signal,
+      ...(result.error?.code ? { code: result.error.code } : {}),
+    });
+    throw error;
   }
 }
 
@@ -105,6 +127,9 @@ function serializeError(error) {
     return {
       message: error.message,
       stack: error.stack,
+      ...Object.fromEntries(['command', 'args', 'cwd', 'exitCode', 'signal', 'code']
+        .filter((key) => error[key] !== undefined)
+        .map((key) => [key, error[key]])),
     };
   }
   return { message: String(error) };
@@ -148,11 +173,12 @@ function buildFailureHints(result) {
 
 function normalizeHarnessResult(suiteName, result, outputPath) {
   const cases = result.cases || result.results || [];
+  const hasCases = Array.isArray(result.cases) || Array.isArray(result.results);
   const completedAt = result.completedAt || new Date().toISOString();
-  const total = result.total ?? cases.length;
-  const passed = result.passed ?? cases.filter((testCase) => testCase.status === 'passed').length;
-  const failed = result.failed ?? cases.filter((testCase) => testCase.status === 'failed').length;
-  const status = result.status || (failed === 0 ? 'passed' : 'failed');
+  const total = hasCases ? cases.length : (result.total ?? 0);
+  const passed = hasCases ? cases.filter((testCase) => testCase.status === 'passed').length : (result.passed ?? 0);
+  const failed = hasCases ? cases.filter((testCase) => testCase.status === 'failed').length : (result.failed ?? 0);
+  const status = result.fatal || failed > 0 ? 'failed' : (result.status || 'passed');
   const artifacts = {
     ...(result.artifacts || {}),
     result: relativeArtifactPath(outputPath),
@@ -167,12 +193,12 @@ function normalizeHarnessResult(suiteName, result, outputPath) {
     passed,
     failed,
     cases,
-    results: result.results || cases,
+    results: cases,
     metrics: result.metrics || {},
     artifacts,
     reproCommand: result.reproCommand || reproCommandForSuite(suiteName),
   };
-  normalized.failureHints = result.failureHints || buildFailureHints(normalized);
+  normalized.failureHints = [...new Set([...(result.failureHints || []), ...buildFailureHints(normalized)])];
   return normalized;
 }
 
@@ -186,11 +212,11 @@ function writeHarnessResult(defaultName, result) {
 
 function writeFatalHarnessResult(defaultName, error, extra = {}) {
   return writeHarnessResult(defaultName, {
+    ...extra,
     suite: defaultName,
     status: 'failed',
     fatal: true,
     error: serializeError(error),
-    ...extra,
   });
 }
 

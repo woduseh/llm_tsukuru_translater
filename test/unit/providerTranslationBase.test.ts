@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createGeminiTranslator } from '../../src/ts/libs/geminiTranslator';
-import { ProviderTranslationBase } from '../../src/ts/libs/providerTranslationBase';
+import { createTranslationChunks, ProviderTranslationBase } from '../../src/ts/libs/providerTranslationBase';
 
 class StubTranslator extends ProviderTranslationBase {
   constructor(
@@ -27,6 +27,31 @@ afterEach(() => {
 });
 
 describe('ProviderTranslationBase terminal failures', () => {
+  it('preserves a large skipped block without submitting it to the provider', async () => {
+    const translate = vi.fn(async (text: string) => text);
+    const translator = new StubTranslator(translate, true);
+    const content = `--- 1-0 ---\n이미 번역됨\n${'\n'.repeat(200_000)}`;
+
+    const result = await translator.translateFileContent(content);
+
+    expect(result.translatedContent).toBe(content);
+    expect(result.logEntry.skippedBlocks).toBe(1);
+    expect(translate).not.toHaveBeenCalled();
+  });
+
+  it('groups Hangul found on later lines while retaining block order and chunk boundaries', () => {
+    const blocks = [
+      { separator: '--- 1 ---', lines: ['Hello', '', '한글'] },
+      { separator: '--- 2 ---', lines: ['안녕'] },
+      { separator: '--- 3 ---', lines: ['Hello'] },
+      { separator: '--- 4 ---', lines: ['World'] },
+      { separator: '--- 5 ---', lines: ['끝'] },
+    ];
+    expect(createTranslationChunks(blocks, 3, true)).toEqual([
+      blocks.slice(0, 2), blocks.slice(2, 3), blocks.slice(3, 4), blocks.slice(4),
+    ]);
+  });
+
   it('marks provider fallback as incomplete instead of an intentional skip', async () => {
     const translator = new StubTranslator(async () => {
       throw new Error('blocked by provider');

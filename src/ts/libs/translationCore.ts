@@ -51,7 +51,7 @@ export function splitIntoBlocks(content: string): TranslationBlock[] {
   for (const line of allLines) {
     if (isSeparatorLine(line)) {
       if (currentSep !== '' || currentLines.length > 0) {
-        blocks.push({ separator: currentSep, lines: [...currentLines] });
+        blocks.push({ separator: currentSep, lines: currentLines });
       }
       currentSep = line;
       currentLines = [];
@@ -68,12 +68,20 @@ export function splitIntoBlocks(content: string): TranslationBlock[] {
 }
 
 export function reassembleBlocks(blocks: TranslationBlock[]): string {
-  const parts: string[] = [];
+  let lineCount = 0;
+  for (const block of blocks) {
+    lineCount += block.lines.length + (block.separator ? 1 : 0);
+  }
+  // Allocate once and avoid spreading large blocks as function arguments.
+  const parts = new Array<string>(lineCount);
+  let index = 0;
   for (const block of blocks) {
     if (block.separator) {
-      parts.push(block.separator);
+      parts[index++] = block.separator;
     }
-    parts.push(...block.lines);
+    for (const line of block.lines) {
+      parts[index++] = line;
+    }
   }
   return parts.join('\n');
 }

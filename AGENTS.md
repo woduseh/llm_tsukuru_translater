@@ -6,6 +6,10 @@ Electron + Vue desktop translator for RPG Maker MV/MZ and Wolf RPG Editor. This 
 - Choose implementation and verification to match the change. Add regression coverage for changed behavior; stop once relevant checks pass unless new evidence warrants more work. Default tests/CI use fixtures and mocks; live providers are opt-in.
 - The app's game-project MCP approval rules describe product behavior, not permission requirements for editing this repository.
 
+For a verification loop, use `npm run verify:plan` to see checks and selection reasons, then `npm run verify` to execute them. It includes staged, unstaged, deleted and untracked files. For committed branch work use `npm run verify -- --base <ref>`; `npm run verify:full` runs all deterministic CI gates. Focused tests remain useful during implementation.
+
+Read `artifacts/verify/latest.json` for the aggregate status and per-check log/command paths. `skipped` means no checks ran; `stale` means source changed during the run. Neither establishes a verified final checkout. A failed build blocks only dependent harnesses; other checks still run. Do not launch concurrent verification/build commands in the same checkout.
+
 Read references as needed for the affected area; no full-document reading sequence is required:
 
 - [README](readme.md): setup, commands, product overview.

@@ -112,6 +112,37 @@ describe('extract-apply round-trip', () => {
   });
 
   describe('format_extracted output', () => {
+    it('preserves separator IDs and exact line mappings for a large database across extractions', async () => {
+      appCtx.settings.ExtractAddLine = false;
+      const actors = [null, ...Array.from({ length: 2000 }, (_, i) => ({
+        name: `Actor ${i}`,
+        nickname: '',
+        profile: `First \\V[1]\n\nLast ${i}`,
+      }))];
+      const source = JSON.stringify(actors);
+      for (const fileName of ['Actors.json', 'ActorsAgain.json']) {
+        const result = await extract(source, makeConf(fileName), 'actor', appCtx);
+        const expectedKeys: string[] = [];
+        const expectedText: string[] = [];
+        for (let i = 1; i < actors.length; i++) {
+          expectedKeys.push(`comment_${(i - 1) * 4}`, `${i}.name`, `comment_${(i - 1) * 4 + 2}`, `${i}.profile`);
+          expectedText.push('-----', actors[i]!.name, '-----', actors[i]!.profile);
+        }
+        expect(Object.keys(result.datobj)).toEqual(expectedKeys);
+        await format_extracted(result, 0, appCtx);
+        const output = appCtx.gb[fileName];
+        expect(output.outputText).toBe(expectedText.join('\n') + '\n');
+        const lines = output.outputText!.split('\n');
+        const restored = JSON.parse(source);
+        for (const [line, entry] of Object.entries(output.data)) {
+          const text = lines.slice(Number(line), entry.m).join('\n');
+          expect(text).toBe(entry.originText);
+          if (!entry.conf?.isComment) setObj(entry.val, text, restored);
+        }
+        expect(restored).toEqual(actors);
+      }
+    });
+
     it('produces correct text output with line numbering metadata', async () => {
       const filedata = fs.readFileSync(path.join(fixturesDir, 'Actors.json'), 'utf8');
       const conf = makeConf('Actors.json');

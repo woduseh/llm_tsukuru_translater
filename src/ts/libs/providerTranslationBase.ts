@@ -89,7 +89,7 @@ export function createTranslationChunks(
     let current: TranslationBlock[] = [];
     let currentShouldSkip: boolean | undefined;
     for (const block of baseChunk) {
-      const shouldSkip = hanguls.test(reassembleBlocks([block]));
+      const shouldSkip = blockContainsHangul(block);
       if (current.length > 0 && shouldSkip !== currentShouldSkip) {
         chunks.push(current);
         current = [];
@@ -100,6 +100,10 @@ export function createTranslationChunks(
     if (current.length > 0) chunks.push(current);
   }
   return chunks;
+}
+
+function blockContainsHangul(block: TranslationBlock): boolean {
+  return hanguls.test(block.separator) || block.lines.some((line) => hanguls.test(line));
 }
 
 export abstract class ProviderTranslationBase {
@@ -141,10 +145,9 @@ export abstract class ProviderTranslationBase {
       if (this.baseConfig.isAborted?.()) break;
 
       const chunk = chunks[ci];
-      const chunkText = reassembleBlocks(chunk);
       onProgress?.(processedBlocks, allBlocks.length, `청크 ${ci + 1}/${chunks.length}`);
 
-      if (this.baseConfig.doNotTransHangul && hanguls.test(chunkText)) {
+      if (this.baseConfig.doNotTransHangul && chunk.some(blockContainsHangul)) {
         for (const block of chunk) {
           allTranslatedBlocks.push({ ...block });
           allValidations.push({
@@ -162,6 +165,7 @@ export abstract class ProviderTranslationBase {
         continue;
       }
 
+      const chunkText = reassembleBlocks(chunk);
       let validation = createFallbackValidation(chunk, processedBlocks);
       let retries = 0;
       let apiRetries = 0;
@@ -217,7 +221,7 @@ export abstract class ProviderTranslationBase {
         }
       }
 
-      allTranslatedBlocks.push(...validation.validatedBlocks);
+      for (const block of validation.validatedBlocks) allTranslatedBlocks.push(block);
       for (const blockValidation of validation.blockValidations) {
         blockValidation.index = processedBlocks;
         allValidations.push(blockValidation);

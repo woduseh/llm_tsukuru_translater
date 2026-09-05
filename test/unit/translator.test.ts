@@ -110,6 +110,21 @@ describe('splitIntoBlocks', () => {
 // ─── reassembleBlocks ───────────────────────────────────────────────
 
 describe('reassembleBlocks', () => {
+  it('preserves large blocks beyond the JavaScript argument limit', () => {
+    const lines = Array.from({ length: 200_000 }, (_, index) => index % 3 === 0 ? '' : `line ${index} \\V[1]`);
+    const content = `--- 101-0 ---\n${lines.join('\n')}\n`;
+    expect(reassembleBlocks(splitIntoBlocks(content))).toBe(content);
+  });
+
+  it('does not insert extra lines for empty blocks without separators', () => {
+    expect(reassembleBlocks([
+      { separator: '', lines: [] },
+      { separator: '--- 1 ---', lines: [] },
+      { separator: '', lines: [] },
+      { separator: '--- 2 ---', lines: ['', 'text', ''] },
+    ])).toBe('--- 1 ---\n--- 2 ---\n\ntext\n');
+  });
+
   it('reassembles blocks into original text', () => {
     const content = 'line1\n--- 101 ---\nline2\nline3\n--- 101 ---\nline4';
     const blocks = splitIntoBlocks(content);

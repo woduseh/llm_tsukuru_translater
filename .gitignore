@@ -27,3 +27,4 @@ audit_report.html
 # generated MCP server bundle and harness output
 res/mcp-agent-server.cjs
 /artifacts/harness/
+/artifacts/verify/

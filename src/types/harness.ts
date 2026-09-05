@@ -1,9 +1,15 @@
 export type HarnessStatus = 'passed' | 'failed' | 'skipped';
-export type HarnessCaseStatus = Exclude<HarnessStatus, 'skipped'>;
+export type HarnessCaseStatus = HarnessStatus;
 
 export interface HarnessError {
   message: string;
   stack?: string;
+  command?: string;
+  args?: string[];
+  cwd?: string;
+  exitCode?: number | null;
+  signal?: string | null;
+  code?: string;
 }
 
 export interface HarnessCaseResult {
