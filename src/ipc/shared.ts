@@ -35,10 +35,6 @@ function getEncryptionKey(): string {
 export const storage = new Store({ encryptionKey: getEncryptionKey(), cwd: getStorageDir() });
 export const defaultHeight = 550;
 
-export function sendAlert(ctx: AppContext, txt: string){
-  ctx.mainWindow!.webContents.send('alert', txt);
-}
-
 export function sendError(ctx: AppContext, txt: string){
   ctx.mainWindow!.webContents.send('alert', {icon: 'error',  message: txt});
 }
@@ -46,10 +42,6 @@ export function sendError(ctx: AppContext, txt: string){
 export function worked(ctx: AppContext){
   ctx.mainWindow!.webContents.send('worked', 0);
   ctx.mainWindow!.webContents.send('loading', 0);
-}
-
-export function getSettings(ctx: AppContext){
-  return ctx.settings
 }
 
 export async function loadSettings(ctx: AppContext){

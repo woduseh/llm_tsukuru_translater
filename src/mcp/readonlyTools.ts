@@ -806,7 +806,7 @@ export function createAgentToolDefinitions(): RegisteredMcpTool[] {
         permissionTier: 'readonly',
         inputSchema: { type: 'object', additionalProperties: false },
       },
-      handler: () => createTranslationWorkflowPayload(),
+      handler: (_args, { toolDefinitions }) => createTranslationWorkflowPayload(toolDefinitions),
     },
     {
       definition: {
@@ -834,7 +834,7 @@ export function createAgentToolDefinitions(): RegisteredMcpTool[] {
       definition: {
         name: 'help.safe_recipe',
         title: 'Safe agent recipe',
-        description: 'Returns one safety-focused recipe by id for translation workflow guidance.',
+        description: 'Returns task-specific capabilities and constraints by recipe id.',
         permissionTier: 'readonly',
         inputSchema: {
           type: 'object',
@@ -845,11 +845,11 @@ export function createAgentToolDefinitions(): RegisteredMcpTool[] {
           additionalProperties: false,
         },
       },
-      handler: (args) => {
+      handler: (args, { toolDefinitions }) => {
         if (!isAgentSkillGuideTopic(args.recipeId)) {
           throw new Error(`help.safe_recipe requires recipeId to be one of: ${AGENT_SKILL_RECIPES.map((recipe) => recipe.id).join(', ')}.`);
         }
-        return createSafeRecipePayload(args.recipeId);
+        return createSafeRecipePayload(args.recipeId, toolDefinitions);
       },
     },
   ];

@@ -7,6 +7,6 @@ export * from './mutationApprovalContracts';
 export * from './mutationApprovalRuntime';
 export * from './mutationPatchExecutor';
 export * from './ptyAdapter';
-export * from './sandboxManager';
+export * from './agentFileErrors';
 export * from './terminalService';
 export * from './workspaceService';

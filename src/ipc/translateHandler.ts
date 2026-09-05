@@ -157,105 +157,59 @@ export function registerTranslateHandlers(ctx: AppContext) {
     }
   })
 
-  ipcMain.on('retranslateFile', async (_ev, data: {
+  interface RetranslateRequest {
     dir: string;
     fileName: string;
     requestId?: string;
     expectedContent?: string;
-  }) => {
-    const wolfEdir = path.join(data.dir, '_Extract', 'Texts');
-    const mvEdir = path.join(data.dir, 'Extract');
-    const edir = (fs.existsSync(wolfEdir) && fs.existsSync(wolfEdir + '_backup')) ? wolfEdir : mvEdir;
-    try {
-      const result = await eztrans.retranslateFile(
-        edir,
-        data.fileName,
-        ctx.settings.llmSourceLang || 'ja',
-        ctx.settings.llmTargetLang || 'ko',
-        ctx,
-        (msg: string) => {
-          const lcw = getLLMCompareWindow();
-          if (lcw && !lcw.isDestroyed()) {
-            lcw.webContents.send('retranslateProgress', {
-              requestId: data.requestId,
-              fileName: data.fileName,
-              message: msg,
-            });
-          }
-        },
-        data.expectedContent,
-      );
-      const lcw = getLLMCompareWindow();
-      if (lcw && !lcw.isDestroyed()) {
-        lcw.webContents.send('retranslateFileDone', {
-          ...result,
-          requestId: data.requestId,
-          fileName: data.fileName,
-        });
-      }
-    } catch (err: unknown) {
-      log.error('Retranslate file failed:', err);
-      const lcw = getLLMCompareWindow();
-      if (lcw && !lcw.isDestroyed()) {
-        lcw.webContents.send('retranslateFileDone', {
-          success: false,
-          error: (err as Error).message || String(err),
-          requestId: data.requestId,
-          fileName: data.fileName,
-        });
-      }
-    }
-  })
+  }
 
-  ipcMain.on('retranslateBlocks', async (_ev, data: {
-    dir: string;
-    fileName: string;
-    blockIndices: number[];
-    requestId?: string;
-    expectedContent?: string;
-  }) => {
-    const wolfEdir = path.join(data.dir, '_Extract', 'Texts');
-    const mvEdir = path.join(data.dir, 'Extract');
-    const edir = (fs.existsSync(wolfEdir) && fs.existsSync(wolfEdir + '_backup')) ? wolfEdir : mvEdir;
+  async function retranslate(
+    data: RetranslateRequest,
+    doneChannel: 'retranslateFileDone' | 'retranslateBlocksDone',
+    translate: (extractDir: string, onProgress: (message: string) => void) => Promise<{ success: boolean; error?: string }>,
+  ): Promise<void> {
+    const send = (channel: 'retranslateProgress' | typeof doneChannel, payload: object) => {
+      const win = getLLMCompareWindow();
+      if (win && !win.isDestroyed()) {
+        win.webContents.send(channel, { ...payload, requestId: data.requestId, fileName: data.fileName });
+      }
+    };
     try {
-      const result = await eztrans.retranslateBlocks(
-        edir,
-        data.fileName,
-        data.blockIndices,
-        ctx.settings.llmSourceLang || 'ja',
-        ctx.settings.llmTargetLang || 'ko',
-        ctx,
-        (msg: string) => {
-          const lcw = getLLMCompareWindow();
-          if (lcw && !lcw.isDestroyed()) {
-            lcw.webContents.send('retranslateProgress', {
-              requestId: data.requestId,
-              fileName: data.fileName,
-              message: msg,
-            });
-          }
-        },
-        data.expectedContent,
-      );
-      const lcw = getLLMCompareWindow();
-      if (lcw && !lcw.isDestroyed()) {
-        lcw.webContents.send('retranslateBlocksDone', {
-          ...result,
-          requestId: data.requestId,
-          fileName: data.fileName,
-        });
-      }
+      const wolfDir = path.join(data.dir, '_Extract', 'Texts');
+      const extractDir = fs.existsSync(wolfDir) && fs.existsSync(wolfDir + '_backup')
+        ? wolfDir
+        : path.join(data.dir, 'Extract');
+      const result = await translate(extractDir, (message) => send('retranslateProgress', { message }));
+      send(doneChannel, result);
     } catch (err: unknown) {
-      log.error('Retranslate blocks failed:', err);
-      const lcw = getLLMCompareWindow();
-      if (lcw && !lcw.isDestroyed()) {
-        lcw.webContents.send('retranslateBlocksDone', {
-          success: false,
-          error: (err as Error).message || String(err),
-          requestId: data.requestId,
-          fileName: data.fileName,
-        });
-      }
+      log.error('Retranslation failed:', err);
+      send(doneChannel, { success: false, error: (err as Error).message || String(err) });
     }
-  })
+  }
+
+  ipcMain.on('retranslateFile', (_ev, data: RetranslateRequest) => {
+    return retranslate(data, 'retranslateFileDone', (extractDir, onProgress) => eztrans.retranslateFile(
+      extractDir,
+      data.fileName,
+      ctx.settings.llmSourceLang || 'ja',
+      ctx.settings.llmTargetLang || 'ko',
+      ctx,
+      onProgress,
+      data.expectedContent,
+    ));
+  });
+
+  ipcMain.on('retranslateBlocks', (_ev, data: RetranslateRequest & { blockIndices: number[] }) => {
+    return retranslate(data, 'retranslateBlocksDone', (extractDir, onProgress) => eztrans.retranslateBlocks(
+      extractDir,
+      data.fileName,
+      data.blockIndices,
+      ctx.settings.llmSourceLang || 'ja',
+      ctx.settings.llmTargetLang || 'ko',
+      ctx,
+      onProgress,
+      data.expectedContent,
+    ));
+  });
 }

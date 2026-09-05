@@ -12,6 +12,7 @@ async function main() {
 
   const translatorFactory = loadCompiledModule('src/ts/libs/translatorFactory.js');
   const translationCore = loadCompiledModule('src/ts/libs/translationCore.js');
+  const translationSyntax = loadCompiledModule('src/ts/libs/translationSyntax.js');
   const llmProviderConfig = loadCompiledModule('src/ts/libs/llmProviderConfig.js');
 
   const provider = process.env.LLM_HARNESS_PROVIDER || (process.env.VERTEX_SERVICE_ACCOUNT_JSON ? 'vertex' : 'gemini');
@@ -70,13 +71,17 @@ async function main() {
   }
 
   const translator = translatorFactory.createTranslator(settings, 'ja', 'ko');
-  const original = '--- 101 ---\nこんにちは\n\\V[1]';
+  const original = '--- 101 ---\nこんにちは\\V[1]\\N[2]\n\nさようなら';
   const translated = await translator.translateText(original);
   const validation = translationCore.validateChunk(translationCore.splitIntoBlocks(original), translated);
 
   assert(translated.trim().length > 0, 'live translation returned empty text');
 
-  const passed = validation.blockValidations.every((item) => item.lineCountMatch && item.separatorMatch);
+  const lineStructureMatch = translationSyntax.haveSameTranslationLineStructure(
+    original.split(/\r?\n/), translated.split(/\r?\n/),
+  );
+  const passed = lineStructureMatch
+    && validation.blockValidations.every((item) => item.lineCountMatch && item.separatorMatch);
   const result = {
     suite: 'harness-live',
     status: passed ? 'passed' : 'failed',
@@ -85,7 +90,7 @@ async function main() {
     completedAt: new Date().toISOString(),
     cases: [{
       id: 'live-translation-smoke',
-      title: 'live provider preserves separator and line-count invariants',
+      title: 'live provider preserves separators, lines, ordered control codes, and empty lines',
       status: passed ? 'passed' : 'failed',
       durationMs: 0,
       details: {
@@ -94,13 +99,14 @@ async function main() {
       },
       ...(passed ? {} : {
         error: {
-          message: 'Live provider output failed separator or line-count validation.',
+          message: 'Live provider output failed separator, line-count, ordered control-code, or empty-line validation.',
         },
       }),
     }],
     metrics: {
       separatorMatch: validation.blockValidations.every((item) => item.separatorMatch),
       lineCountMatch: validation.blockValidations.every((item) => item.lineCountMatch),
+      lineStructureMatch,
       outputPreview: translated.slice(0, 200),
     },
   };

@@ -10,6 +10,7 @@ import {
   createProviderTranslator,
   getAllProviderSecretSettingKeys,
   getProviderRegistryEntry,
+  isKnownLlmProvider,
   LLM_CACHE_KEY_PREFIX,
   listProviderRegistryEntries,
   validateProviderReadiness,
@@ -40,6 +41,13 @@ function createSettings(overrides: Record<string, unknown> = {}) {
 }
 
 describe('provider registry', () => {
+  it('does not treat object prototype names as registered providers', () => {
+    for (const value of ['constructor', 'toString', '__proto__', null, 1]) {
+      expect(isKnownLlmProvider(value)).toBe(false);
+      expect(getProviderRegistryEntry(value).id).toBe('gemini');
+    }
+  });
+
   it('registers provider metadata without placeholder providers', () => {
     const entries = listProviderRegistryEntries();
 

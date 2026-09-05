@@ -137,6 +137,30 @@ export function validateChunk(
   return { validatedBlocks, blockValidations };
 }
 
+export function getApiErrorMessage(error: unknown): string {
+  const apiMessage = (error as { response?: { data?: { error?: { message?: unknown } } } })?.response?.data?.error?.message;
+  if (typeof apiMessage === 'string' && apiMessage.trim()) return apiMessage.trim();
+  if (error instanceof Error && error.message.trim()) return error.message.trim();
+  return String(error);
+}
+
+export function getApiErrorStatus(error: unknown): number | undefined {
+  const status = (error as { response?: { status?: unknown } })?.response?.status;
+  return typeof status === 'number' ? status : undefined;
+}
+
+export function normalizeProviderApiError(error: unknown, provider: string, secret?: string): Error {
+  if (error instanceof Error && error.message.startsWith(`${provider} API `)) return error;
+  const status = getApiErrorStatus(error);
+  const rawMessage = getApiErrorMessage(error);
+  const message = secret?.trim() ? rawMessage.split(secret).join('[REDACTED]') : rawMessage;
+  const reason = status === 401 || status === 403 ? 'authentication failed'
+    : status === 429 ? 'rate limit (429)'
+      : (error as { code?: unknown })?.code === 'ECONNABORTED' ? 'timeout'
+        : 'error';
+  return new Error(`${provider} API ${reason}: ${message}`);
+}
+
 export function isPermanentApiError(error: unknown): boolean {
   if (!error) return false;
   const msg = String((error as Record<string, unknown>).message || error).toLowerCase();

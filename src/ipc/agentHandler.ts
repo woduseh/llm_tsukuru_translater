@@ -93,7 +93,7 @@ export function registerAgentHandlers(ctx: AppContext): void {
   });
 
   ipcMain.handle('mutationApprovalApprove', async (_event, request: unknown) => {
-    return handleMutationApprovalAsync(ctx.mutationApprovalRuntime, async (runtime) => ({
+    return handleMutationApproval(ctx.mutationApprovalRuntime, async (runtime) => ({
       approval: await runtime.approve(request),
     }));
   });
@@ -105,21 +105,10 @@ export function registerAgentHandlers(ctx: AppContext): void {
   });
 }
 
-function handleMutationApproval(
+async function handleMutationApproval(
   runtime: MutationApprovalRuntime | null,
-  action: (runtime: MutationApprovalRuntime) => Omit<MutationApprovalOperationResult, 'schemaVersion' | 'ok'>,
-): MutationApprovalOperationResult {
-  if (!runtime) return mutationApprovalFailure('runtime-unavailable', '먼저 프로젝트 폴더를 선택하세요.');
-  try {
-    return { schemaVersion: 1, ok: true, ...action(runtime) };
-  } catch (error) {
-    return mutationApprovalErrorResult(error);
-  }
-}
-
-async function handleMutationApprovalAsync(
-  runtime: MutationApprovalRuntime | null,
-  action: (runtime: MutationApprovalRuntime) => Promise<Omit<MutationApprovalOperationResult, 'schemaVersion' | 'ok'>>,
+  action: (runtime: MutationApprovalRuntime) => Omit<MutationApprovalOperationResult, 'schemaVersion' | 'ok'>
+    | Promise<Omit<MutationApprovalOperationResult, 'schemaVersion' | 'ok'>>,
 ): Promise<MutationApprovalOperationResult> {
   if (!runtime) return mutationApprovalFailure('runtime-unavailable', '먼저 프로젝트 폴더를 선택하세요.');
   try {

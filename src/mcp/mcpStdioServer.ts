@@ -1,8 +1,5 @@
 /**
- * Spec-compliant Model Context Protocol (MCP) stdio server exposing the
- * project-protecting translation tools. Unlike protocolLight.ts (kept for the in-process
- * mock/tests), this speaks the real MCP handshake so external CLIs such as
- * Codex and Claude can connect to it.
+ * MCP stdio server for external CLI clients.
  *
  * Transport: newline-delimited JSON-RPC 2.0 over stdin/stdout.
  * Scope: project reads plus analysis writes under .llm-tsukuru-agent/ (offline;

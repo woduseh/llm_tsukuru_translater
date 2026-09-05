@@ -1,6 +1,5 @@
 import { AgentSafeFileSystem } from './agentSafeFileSystem';
 import { AlignmentService } from './alignmentService';
-import { ApprovalService } from './approvalService';
 import { ArtifactService } from './artifactService';
 import { BatchPlanningService } from './batchPlanningService';
 import { CorpusSamplingService } from './corpusSamplingService';
@@ -18,8 +17,6 @@ import { AgentWorkspaceDescriptor, WorkspaceService, type WorkspaceServiceOption
 
 export interface AgentServiceOptions extends WorkspaceServiceOptions {
   eventHistoryLimit?: number;
-  sessionId?: string;
-  approvalAuditMode?: 'full-redacted' | 'metadata-only';
 }
 
 export class AgentService {
@@ -30,7 +27,6 @@ export class AgentService {
   readonly jobs: JobService;
   readonly jobGraphs: JobGraphService;
   readonly workflows: WorkflowService;
-  readonly approvals: ApprovalService;
   readonly files: AgentSafeFileSystem;
   readonly dataRefs: DataRefService;
   readonly batch: BatchPlanningService;
@@ -41,7 +37,7 @@ export class AgentService {
   readonly memory: MemoryService;
   readonly qa: QaService;
   readonly repair: RepairLoopService;
-  private readonly manifestOptions: Omit<AgentServiceOptions, 'projectRoot' | 'eventHistoryLimit' | 'sessionId' | 'approvalAuditMode'>;
+  private readonly manifestOptions: Omit<AgentServiceOptions, 'projectRoot' | 'eventHistoryLimit'>;
 
   constructor(options: AgentServiceOptions) {
     this.workspace = new WorkspaceService(options.projectRoot);
@@ -68,12 +64,6 @@ export class AgentService {
       graphs: this.jobGraphs,
       artifacts: this.artifacts,
       dataRefs: this.dataRefs,
-    });
-    this.approvals = new ApprovalService({
-      eventBus: this.eventBus,
-      sessionId: options.sessionId,
-      auditRoot: this.descriptor.workspaceRoot,
-      auditMode: options.approvalAuditMode,
     });
     this.files = new AgentSafeFileSystem({
       projectRoot: this.descriptor.projectRoot,
@@ -137,8 +127,4 @@ export class AgentService {
       currentJobs: this.jobs.listCurrentJobSummaries(),
     });
   }
-}
-
-export function createAgentService(options: AgentServiceOptions): AgentService {
-  return new AgentService(options);
 }

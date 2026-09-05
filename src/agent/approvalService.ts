@@ -5,18 +5,6 @@ import type { ApprovalRequest, JsonObject, PermissionTier } from '../types/agent
 import { redactSecretLikeValues } from './contractsValidation';
 import { AgentEventBus } from './eventBus';
 
-export interface AgentTransactionPlan {
-  schemaVersion: 1;
-  transactionId: string;
-  createdAt: string;
-  title: string;
-  summary: string;
-  affectedPaths: string[];
-  previewArtifactPath?: string;
-  permissionTier: Exclude<PermissionTier, 'readonly'>;
-  approvalId?: string;
-}
-
 export interface ApprovalServiceOptions {
   eventBus: AgentEventBus;
   idFactory?: () => string;
@@ -63,20 +51,6 @@ export class ApprovalService {
     this.now = options.now ?? (() => new Date());
     this.sessionId = options.sessionId ?? 'local-session';
     this.auditPath = path.join(options.auditRoot ?? options.eventBus.workspaceRoot, 'audit', 'approvals.jsonl');
-  }
-
-  createTransactionPlan(input: Omit<AgentTransactionPlan, 'schemaVersion' | 'transactionId' | 'createdAt'> & { transactionId?: string }): AgentTransactionPlan {
-    return {
-      schemaVersion: 1,
-      transactionId: input.transactionId ?? `txn-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      createdAt: this.now().toISOString(),
-      title: input.title,
-      summary: input.summary,
-      affectedPaths: input.affectedPaths,
-      previewArtifactPath: input.previewArtifactPath,
-      permissionTier: input.permissionTier,
-      approvalId: input.approvalId,
-    };
   }
 
   planApproval(input: ApprovalPlanInput): ApprovalRequest {

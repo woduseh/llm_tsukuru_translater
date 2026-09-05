@@ -1,49 +1,27 @@
-# Agent MCP Guide
+# MCP Guide
 
-The offline MCP server protects game and translation source files. It may write bounded analysis artifacts under `.llm-tsukuru-agent/`, but it does not expose translation or apply execution. Run those actions through the app UI.
+This describes the app's game-project tools. Repository development instructions live in [AGENTS.md](../AGENTS.md).
 
-## Safety invariants
+## Capabilities
 
-- Keep MCP writes under `.llm-tsukuru-agent/`.
-- Never dump full source files, translated scripts, credentials, or provider secrets into prompts, logs, MCP responses, or terminal output.
-- Preserve `.txt` line-number alignment with `.extracteddata` metadata.
-- Preserve RPG Maker separators such as `--- 101 ---`, control codes, escape sequences, and intentional empty lines.
-- Use the app UI for extraction, translation, comparison, verification, and apply actions.
+| Mode | Available work | Write behavior |
+| --- | --- | --- |
+| Offline stdio | Project inventory, structural review, alignment analysis, QA and analysis artifacts | Analysis state under `.llm-tsukuru-agent/`; no source-file mutation |
+| App bridge (`--bridge-manifest`) | Offline tools plus `patch.apply` and `approval.status` | A proposal enters the app queue; the main process applies it only after the user approves that request in the app |
 
-## Recipes
+Tool registration does not prove the app bridge is still reachable. A missing or stale bridge returns a failure; it does not grant a fallback write path. Extraction, provider translation and full game-data apply run through the app UI.
 
-### Translation preflight
+`patch.apply` accepts bounded same-line replacements in one translated UTF-8 `.txt` file. It preserves line count, separators, empty lines and control codes; it cannot repair drift by inserting or deleting lines. `approval.status` reports a decision/result and cannot approve it. Contract limits and validation are implemented in `src/agent/mutationApprovalContracts.ts`.
 
-1. Use `project.context_snapshot` and `project.translation_inventory` to inspect project state without returning file contents.
-2. Use `provider.list` to review supported providers.
-3. Configure credentials and confirm readiness in the app settings UI.
-4. Run extraction and a small translation batch in the app.
-5. Review representative results with `quality.review_file` or `qa.score_file`.
+## Choosing Tools
 
-### Quality review
+- `project.context_snapshot` and `project.translation_inventory`: locate inputs and backups.
+- `quality.review_file`: structural findings without a persistent QA report; `qa.score_file`: durable QA output.
+- `alignment.inspect` and `alignment.explain`: evidence for suspected alignment errors.
+- `provider.list`: supported providers; actual credentials and readiness belong in app settings.
 
-1. Locate candidate translated `.txt` files with `project.translation_inventory`.
-2. Use `quality.review_file` for a non-persistent structural review.
-3. Use `qa.score_file` when a durable QA artifact in `.llm-tsukuru-agent/` is useful.
-4. Use the compare window for human review of meaning, tone, placeholders, and omissions.
+Use the evidence needed for the request; these are choices, not a mandatory sequence. Structural scores do not establish semantic translation quality. Relevant text excerpts can support meaning/tone review; credentials and bridge tokens must stay out of prompts, logs and results.
 
-### Line-shift diagnosis
+## Runtime Help
 
-1. Use `quality.review_file` to find separator, empty-line, and control-code anomalies.
-2. Use `alignment.inspect` or `alignment.explain` for bounded alignment artifacts.
-3. Summarize affected lines without modifying source or translated files.
-4. Continue review in the app compare and verification surfaces.
-
-### Failed translation recovery
-
-1. Inspect `project.context_snapshot` and `project.translation_inventory`.
-2. Review only representative failed files with `quality.review_file`.
-3. Check provider configuration in the app settings UI.
-4. Retry only the failed batch from the app when possible.
-
-### Provider setup
-
-1. Use `provider.list` to choose a supported provider and model.
-2. Enter credentials only in the app settings UI.
-3. Confirm readiness in the app UI.
-4. Run a small app translation sample before starting a large batch.
+`help.translation_workflow`, `help.safe_recipe` and `help.explain_tool` expose concise guidance on demand. Their shared content is maintained in [agentSkillGuide.ts](../src/agent/agentSkillGuide.ts); bridge-specific dispatch is in [bridgeTools.ts](../src/mcp/bridgeTools.ts). Keep recipe details there rather than duplicating them in this document.

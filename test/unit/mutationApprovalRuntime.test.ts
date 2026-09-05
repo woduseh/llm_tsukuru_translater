@@ -163,7 +163,7 @@ describe('MutationApprovalRuntime', () => {
     const submitted = runtime.submit(makeRequest('Translated\\Map001.txt', [
       replaceLine('op-001', 'Translated\\Map001.txt', 1, 'Hello', '안녕'),
     ]), 'renderer');
-    const internalApproval = runtime.agentService.approvals.getApproval(submitted.approvalId);
+    const internalApproval = runtime.approvals.getApproval(submitted.approvalId);
 
     runtime.dispose('project-change');
 
@@ -171,7 +171,7 @@ describe('MutationApprovalRuntime', () => {
       status: 'cancelled',
       failure: { code: 'cancelled' },
     });
-    expect(() => runtime.agentService.approvals.consumeConfirmation({
+    expect(() => runtime.approvals.consumeConfirmation({
       toolName: 'patch.apply',
       args: { patch: makeRequest('Translated\\Map001.txt', []).patch },
       confirmToken: internalApproval?.confirmToken,

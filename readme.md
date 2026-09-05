@@ -20,7 +20,7 @@ RPG Maker MV/MZ 및 Wolf RPG Editor 게임의 텍스트를 추출·번역·적�
 
 ### 요구 사항
 
-- Node.js 20 이상
+- Node.js 22.13 이상인 22.x (CI는 Node 22 사용)
 - Windows OS (Electron 빌드 대상)
 
 ### 개발 환경 설정
@@ -79,11 +79,6 @@ npm run dist:all
 - **CI**: `main` branch push/PR 시 메인·Vue 타입 검사, 린트, 테스트와 deterministic harness 실행
 - **Release**: `v*` 태그 push 시 CI 검증 후 Windows 빌드 → GitHub Release 자동 공개
 
-```bash
-git tag v3.2.0
-git push origin v3.2.0
-```
-
 ## 프로젝트 구조
 
 ```
@@ -119,6 +114,10 @@ scripts/harness/     # core, eval, UI, live, package smoke 실행기
 3. **적용 (Apply)**: 번역된 `.txt` + 메타데이터를 원본 JSON에 재적용
 
 Agent Workspace와 외부 MCP 서버는 프로젝트 상태와 번역 품질 분석을 지원합니다. 오프라인 MCP 도구는 원본 게임·번역 파일을 직접 수정하지 않으며, 필요한 분석 산출물만 `.llm-tsukuru-agent/` 아래에 기록합니다. 실행 중인 앱에 연결된 MCP는 제한된 `patch.apply` 변경안을 승인 큐에 제출할 수 있지만 직접 승인하거나 쓰기 권한을 얻을 수는 없습니다. 사용자가 앱 UI에서 명시적으로 승인하면 메인 프로세스가 그 요청에 결박된 파일 하나만 원자적으로 적용하고 결과를 검증합니다. 실제 추출·번역·적용과 변경 승인은 앱 UI가 소유합니다.
+
+## 개발 문서
+
+저장소의 에이전트 개발 지침은 [Codex용 AGENTS.md](AGENTS.md)로 통합합니다. 구조·품질 계약·검증 명령은 해당 파일의 주제별 링크에서 확인할 수 있습니다.
 
 ## 라이선스
 

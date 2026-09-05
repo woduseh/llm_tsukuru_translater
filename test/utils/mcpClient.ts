@@ -1,10 +1,10 @@
-import type { JsonObject } from '../types/agentWorkspace';
+import type { JsonObject } from '../../src/types/agentWorkspace';
 import {
   handleMcpRequest,
   type JsonRpcMessage as JsonRpcRequest,
   type JsonRpcResponse,
   type McpToolRegistryLike,
-} from './mcpStdioServer';
+} from '../../src/mcp/mcpStdioServer';
 
 export type { JsonRpcRequest, JsonRpcResponse, McpToolRegistryLike };
 

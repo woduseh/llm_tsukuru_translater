@@ -204,25 +204,25 @@ const DEFAULT_STARTER_PROMPTS: AgentStarterPrompt[] = [
     id: 'project-overview',
     title: '프로젝트 개요',
     action: 'send',
-    prompt: 'project.context_snapshot과 project.translation_inventory로 현재 프로젝트 구조와 번역 입력을 간결하게 요약해줘. 게임 파일을 수정하지 말고 전체 원문 덤프는 피해야 해.',
+    prompt: '현재 프로젝트 구조와 번역 입력을 간결하게 요약해줘.',
   },
   {
     id: 'quality-review',
     title: '품질 점검',
     action: 'send',
-    prompt: '현재 번역을 점검해. 필요하면 QA 산출물을 프로젝트 전용 작업공간에 기록해도 되지만 게임과 번역 원본은 수정하지 마. 줄 번호, 구분선, 제어 코드, 빈 줄을 확인하고 전체 원문 덤프는 피해야 해.',
+    prompt: '현재 번역의 줄 정렬, 구분선, 제어 코드, 빈 줄을 점검하고 문제를 보고해줘. 필요하면 QA 산출물을 기록해도 돼.',
   },
   {
     id: 'line-shift',
     title: '줄 정렬 진단',
     action: 'send',
-    prompt: 'alignment 도구로 원문과 번역문의 줄 수, 구분선, 빈 줄, 제어 코드 차이를 진단해줘. 분석 산출물은 .llm-tsukuru-agent에만 기록하고 원본 파일은 수정하지 마.',
+    prompt: '원문과 번역문의 줄 정렬 차이를 진단하고, 영향받는 줄과 복구 가능한 범위를 알려줘.',
   },
   {
     id: 'provider-setup',
     title: '제공자 설정 안내',
     action: 'copy',
-    prompt: 'provider.list로 지원 제공자를 설명하고, 실제 자격 증명과 준비 상태는 앱 설정 화면에서 확인하도록 안내해줘. 인증 정보는 채팅이나 터미널에 요청하지 마.',
+    prompt: '지원 번역 제공자와 앱 설정 방법을 설명해줘. 실제 인증 정보는 앱 설정에서 입력할게.',
   },
 ]
 
@@ -261,8 +261,8 @@ export const AGENT_CLI_PRESETS: AgentCliPreset[] = [
 
 export const AGENT_SAFETY_GUIDANCE = [
   'MCP 분석 산출물은 .llm-tsukuru-agent 작업공간에만 기록합니다.',
-  '실제 번역과 적용은 앱 화면에서 사용자가 직접 실행합니다.',
-  '전체 원문 덤프나 비밀값을 에이전트, 로그, 프롬프트, 터미널 출력에 붙여넣지 않습니다.',
+  '번역과 게임 데이터 적용은 앱에서 실행합니다. MCP 패치는 앱 승인 큐에 제출되며 요청별 승인 후 적용됩니다.',
+  '검토에 필요한 텍스트만 공유하고 인증 정보와 브리지 토큰은 출력하지 않습니다.',
   '줄 번호 정렬, 구분선, 제어 코드, 이스케이프 시퀀스, 빈 줄을 보존합니다.',
 ]
 

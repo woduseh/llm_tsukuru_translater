@@ -40,7 +40,7 @@ const DEFAULT_QUALITY_RULES = [
   'Preserve extracted .txt line-number alignment with .extracteddata metadata.',
   'Preserve RPG Maker separators, control codes, and empty lines.',
   'Keep provider secrets out of artifacts, audit logs, MCP responses, and terminal output.',
-  'Use preview artifacts and approval before destructive or project-writing actions.',
+  'Analysis artifacts may be written under .llm-tsukuru-agent. Game-file patch proposals require a per-request decision in the app approval queue.',
 ];
 
 export class WorkspaceService {

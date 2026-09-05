@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { ProtocolLightMcpClient, ProtocolLightMcpServer } from '../utils/mcpClient';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -8,15 +9,10 @@ import {
 } from '../../src/agent';
 import {
   redactSecretLikeValues,
-  validateAgentResultEnvelope,
-  validateGoldenWorkflowTranscript,
   validateTerminalEvent,
 } from '../../src/agent/contractsValidation';
-import { runGoldenWorkflow } from '../utils/mockAgents';
 import {
-  ProtocolLightMcpClient,
-  ProtocolLightMcpServer,
-  createMcpMutationToolRegistry,
+  createMcpOfflineToolRegistry,
   createMcpReadonlyToolRegistry,
 } from '../../src/mcp';
 import { applyTerminalEvent } from '../../src/renderer/agentWorkspaceModel';
@@ -34,28 +30,6 @@ afterEach(() => {
 });
 
 describe('security harness gates', () => {
-  it('records a deterministic mock-agent golden transcript with valid result envelopes', () => {
-    const { transcript, results } = runGoldenWorkflow();
-
-    expect(transcript).toMatchObject({
-      schemaVersion: 1,
-      workflowId: 'golden-project-context-inventory-review',
-      finalStatus: 'ok',
-      artifacts: [
-        'mock://project.context_snapshot',
-        'mock://project.translation_inventory',
-        'mock://quality.review_batch',
-      ],
-    });
-    expect(transcript.steps).toEqual([
-      expect.objectContaining({ toolName: 'project.context_snapshot', status: 'ok', permissionTier: 'readonly' }),
-      expect.objectContaining({ toolName: 'project.translation_inventory', status: 'ok', permissionTier: 'readonly' }),
-      expect.objectContaining({ toolName: 'quality.review_batch', status: 'ok', permissionTier: 'readonly' }),
-    ]);
-    expect(validateGoldenWorkflowTranscript(transcript).ok).toBe(true);
-    expect(results.every((result) => validateAgentResultEnvelope(result).ok)).toBe(true);
-  });
-
   it('rejects traversal, ADS, UNC/absolute escapes, and symlink escapes without leaking contents', () => {
     const projectRoot = makeProject('safe-paths');
     const outside = makeDir('outside');
@@ -192,10 +166,10 @@ describe('security harness gates', () => {
     `);
   });
 
-  it('keeps repair simulation and unapproved mutation calls from writing project files', () => {
+  it('keeps repair simulation read-only and rejects offline patch application', () => {
     const projectRoot = makeRepairProject('no-unapproved-writes', ['--- 101 ---', 'Hello \\V[1]'], ['--- 101 ---', 'Hello \\V[1]']);
-    const service = new AgentService({ projectRoot, sessionId: 'session-a' });
-    const registry = createMcpMutationToolRegistry(service, { sessionId: 'session-a' });
+    const service = new AgentService({ projectRoot });
+    const registry = createMcpOfflineToolRegistry(service);
     const targetPath = path.join(projectRoot, 'Translated', 'Map001.txt');
     const before = fs.readFileSync(targetPath, 'utf-8');
 
@@ -214,7 +188,7 @@ describe('security harness gates', () => {
       replacementText: '안녕 \\V[1]',
     }).patch;
     const unapproved = registry.callTool('patch.apply', { patch });
-    expect(unapproved.status).toBe('needs-approval');
+    expect(unapproved.status).toBe('failed');
     expect(fs.readFileSync(targetPath, 'utf-8')).toBe(before);
   });
 

@@ -7,6 +7,13 @@ import type {
   McpToolDefinition,
 } from '../types/agentWorkspace';
 import type { AgentBridgePatchApplyRequest } from '../agent/agentBridgeContracts';
+import { redactSecretLikeValues } from '../agent/contractsValidation';
+import {
+  createSafeRecipePayload,
+  createTranslationWorkflowPayload,
+  explainTool,
+  type AgentSkillGuideTopic,
+} from '../agent/agentSkillGuide';
 import {
   AgentBridgeClient,
   AgentBridgeClientError,
@@ -81,7 +88,24 @@ export class BridgeAwareMcpToolRegistry implements AsyncMcpToolRegistryLike {
   ): Promise<AgentResultEnvelope> {
     if (name === 'patch.apply') return this.submitPatch(args, requestId);
     if (name === 'approval.status') return this.readApproval(args, requestId);
-    return this.offlineRegistry.callTool(name, args, requestId);
+    const result = await this.offlineRegistry.callTool(name, args, requestId);
+    // Retain argument validation and audit metadata while describing the full
+    // registered surface, without probing or submitting to the app bridge.
+    if (result.status === 'ok') {
+      if (name === 'help.explain_tool') {
+        result.payload = explainTool(args.toolName as string, this.listTools());
+      } else if (name === 'help.translation_workflow') {
+        result.payload = createTranslationWorkflowPayload(this.listTools());
+      } else if (name === 'help.safe_recipe') {
+        result.payload = createSafeRecipePayload(args.recipeId as AgentSkillGuideTopic, this.listTools());
+      }
+      if (name.startsWith('help.') && result.payload) {
+        const redacted = redactSecretLikeValues(result.payload);
+        result.payload = redacted.value;
+        result.redactions = [...result.redactions, ...redacted.redactions];
+      }
+    }
+    return result;
   }
 
   private async submitPatch(args: JsonObject, requestId: string): Promise<AgentResultEnvelope> {

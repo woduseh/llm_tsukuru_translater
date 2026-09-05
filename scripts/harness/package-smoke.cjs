@@ -91,13 +91,15 @@ function main() {
     nativePtyLoad = { attempted: true, ok: false, error: error.message || String(error) };
   }
   cases.push({
-    id: 'native-pty-load-or-fallback',
-    title: 'native PTY module loads or app can use degraded fallback',
-    status: 'passed',
+    id: 'native-pty-load',
+    title: 'native PTY module loads in the current Node runtime',
+    status: nativePtyLoad.ok ? 'passed' : 'skipped',
     durationMs: 0,
     details: {
       nativePtyLoad,
-      fallbackExpectedWhenUnavailable: !nativePtyLoad.ok,
+      ...(nativePtyLoad.ok ? {} : {
+        reason: 'Native module unavailable in this runtime; packaged Electron loading is not verified.',
+      }),
     },
   });
 

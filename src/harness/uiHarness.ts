@@ -1,9 +1,7 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { AppContext } from '../appContext';
-import { AgentBridgeServer } from '../agent/agentBridgeServer';
-import { MutationApprovalRuntime } from '../agent/mutationApprovalRuntime';
 import log from '../logger';
 
 interface UiHarnessScenario {
@@ -140,8 +138,41 @@ function assertSnapshotValues(
   }
 }
 
-function emit(channel: string, ...args: unknown[]): void {
-  ipcMain.emit(channel, {} as Electron.IpcMainEvent, ...args);
+async function click(win: BrowserWindow, selector: string): Promise<void> {
+  await win.webContents.executeJavaScript(`(() => {
+    const button = document.querySelector(${JSON.stringify(selector)});
+    if (!(button instanceof HTMLButtonElement) || button.disabled) {
+      throw new Error('UI action is missing or disabled: ' + ${JSON.stringify(selector)});
+    }
+    button.click();
+  })()`, true);
+}
+
+async function selectProject(ctx: AppContext, dataDir: string, timeoutMs: number): Promise<void> {
+  const win = ctx.mainWindow!;
+  await win.webContents.executeJavaScript(`location.hash = '#/mvmz'`, true);
+  await waitForSelector(win, '[data-harness-view="mvmz"] .project-header .btn-secondary', timeoutMs);
+  // Stub only the native picker. The real button, preload, and selection handler
+  // establish the trusted roots, runtime, and bridge.
+  const showOpenDialog = dialog.showOpenDialog;
+  dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [dataDir] })) as typeof dialog.showOpenDialog;
+  try {
+    await click(win, '[data-harness-view="mvmz"] .project-header .btn-secondary');
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      const selectedPath = await snapshot(win, `document.querySelector('.project-path span')?.textContent`);
+      if (selectedPath === dataDir) break;
+      await delay(100);
+    }
+    const selectedPath = await snapshot(win, `document.querySelector('.project-path span')?.textContent`);
+    if (selectedPath !== dataDir) throw new Error('Project selection did not reach the renderer.');
+    await waitForAttributeValue(win, '[data-harness-view="mvmz"]', 'data-project-state', 'ready', timeoutMs);
+  } finally {
+    dialog.showOpenDialog = showOpenDialog;
+  }
+  if (ctx.currentTerminalProjectRoot !== path.dirname(dataDir) || !ctx.agentBridgeServer?.isReady()) {
+    throw new Error('Project selection did not initialize the production approval bridge.');
+  }
 }
 
 async function openLlmSettingsSnapshot(ctx: AppContext, llmReady: boolean, targetDir: string, timeoutMs: number): Promise<unknown> {
@@ -151,7 +182,8 @@ async function openLlmSettingsSnapshot(ctx: AppContext, llmReady: boolean, targe
   ctx.settings.llmParallelWorkers = 4;
   ctx.settings.llmCustomPrompt = 'Harness custom prompt';
 
-  emit('openLLMSettings', { dir: targetDir.replaceAll('\\', '/'), game: 'mvmz' });
+  await selectProject(ctx, targetDir, timeoutMs);
+  await click(ctx.mainWindow!, '.pipeline > button:nth-child(2)');
   const win = await waitForWindow('/llm-settings', timeoutMs);
   await waitForSelector(win, '[data-harness-view="llm-settings"]', timeoutMs);
   await waitForAttributeValue(win, '[data-harness-view="llm-settings"]', 'data-llm-ready', llmReady ? 'true' : 'false', timeoutMs);
@@ -194,6 +226,12 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
   try {
     const scenario = JSON.parse(fs.readFileSync(scenarioPath, 'utf8')) as UiHarnessScenario;
     const stepTimeoutMs = scenario.timeoutMs || timeoutMs;
+    const profile = path.resolve(process.env.LLM_TSUKURU_UI_HARNESS_USER_DATA!);
+    if (app.getPath('userData') !== profile
+      || app.getPath('sessionData') !== path.join(profile, 'session')
+      || app.getPath('logs') !== path.join(profile, 'logs')) {
+      throw new Error('UI harness is not using its isolated Electron profile.');
+    }
 
     const mainWindow = await waitForWindow('/', stepTimeoutMs);
     await waitForSelector(mainWindow, '[data-harness-view="home"]', stepTimeoutMs);
@@ -255,28 +293,16 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
     await mainWindow.webContents.executeJavaScript(`location.hash = '#/'`, true);
     await waitForSelector(mainWindow, '[data-harness-view="home"]', stepTimeoutMs);
 
-    ctx.terminalProjectRoots = [scenario.compareDir];
-    ctx.currentTerminalProjectRoot = scenario.compareDir;
-    const approvalTargetPath = path.join(scenario.compareDir, 'Harness', 'Approval.txt');
+    await selectProject(ctx, scenario.compareDir, stepTimeoutMs);
+    const bridgeManifest = JSON.parse(fs.readFileSync(ctx.agentBridgeServer!.manifestPath, 'utf8')) as { token: string };
+    await mainWindow.webContents.executeJavaScript(`location.hash = '#/'`, true);
+    await waitForSelector(mainWindow, '[data-harness-view="home"]', stepTimeoutMs);
+    const approvalTargetPath = path.join(path.dirname(scenario.compareDir), 'Harness', 'Approval.txt');
     const approvalOriginalBytes = Buffer.from('--- 101 ---\r\nHello \\V[1]\r\n', 'utf-8');
     const approvalExpectedBytes = Buffer.from('--- 101 ---\r\n안녕하세요 \\V[1]\r\n', 'utf-8');
     fs.mkdirSync(path.dirname(approvalTargetPath), { recursive: true });
     fs.writeFileSync(approvalTargetPath, approvalOriginalBytes);
-    ctx.mutationApprovalRuntime = new MutationApprovalRuntime({
-      projectRoot: scenario.compareDir,
-      appSessionId: ctx.agentAppSessionId,
-      onChanged: (queueSnapshot) => {
-        if (ctx.mainWindow && !ctx.mainWindow.isDestroyed()) {
-          ctx.mainWindow.webContents.send('approvalQueueChanged', queueSnapshot);
-        }
-      },
-    });
-    ctx.agentBridgeServer = new AgentBridgeServer({
-      runtime: ctx.mutationApprovalRuntime,
-      userDataPath: app.getPath('userData'),
-    });
-    const bridgeManifest = await ctx.agentBridgeServer.start();
-    const approval = ctx.mutationApprovalRuntime.submit({
+    const approvalRequest = {
       schemaVersion: 1,
       requestId: 'ui-harness-approval',
       idempotencyKey: 'ui-harness-approval-v1',
@@ -300,7 +326,14 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
           requiresAlignmentProofForLineCountChange: true,
         },
       },
-    }, 'renderer');
+    };
+    const submitted = await mainWindow.webContents.executeJavaScript(
+      `window.api.approvals.submit(${JSON.stringify(approvalRequest)})`, true,
+    );
+    if (!submitted?.ok || !submitted.approval?.approvalId) {
+      throw new Error(`Renderer approval submission failed: ${JSON.stringify(submitted)}`);
+    }
+    const approval = submitted.approval as { approvalId: string };
 
     await waitForSelector(mainWindow, '[data-harness-approval-banner]', stepTimeoutMs);
     await waitForAttributeValue(
@@ -427,7 +460,8 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       applyGuidelineDisabled: true,
     });
 
-    emit('openLLMCompare', scenario.compareDir);
+    await selectProject(ctx, scenario.compareDir, stepTimeoutMs);
+    await click(mainWindow, '.pipeline > button:nth-child(3)');
     const compareWindow = await waitForWindow('/llm-compare', stepTimeoutMs);
     await waitForSelector(compareWindow, '[data-harness-view="llm-compare"]', stepTimeoutMs);
     await waitForAttributeValue(compareWindow, '[data-harness-view="llm-compare"]', 'data-file-count', '2', stepTimeoutMs);
@@ -448,7 +482,8 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       loading: 'false',
     });
 
-    emit('openJsonVerify', scenario.verifyDir);
+    await selectProject(ctx, scenario.verifyDir, stepTimeoutMs);
+    await click(mainWindow, '.review-link');
     const verifyWindow = await waitForWindow('/json-verify', stepTimeoutMs);
     await waitForSelector(verifyWindow, '[data-harness-view="json-verify"]', stepTimeoutMs);
     await waitForAttributeValue(verifyWindow, '[data-harness-view="json-verify"]', 'data-file-count', '2', stepTimeoutMs);
@@ -508,8 +543,9 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       },
     };
 
+    await cleanupHarness(ctx);
     writeResult(resultPath, result);
-    setTimeout(() => app.exit(0), 100);
+    app.exit(0);
   } catch (error) {
     const result: UiHarnessResult = {
       schemaVersion: 1,
@@ -534,7 +570,33 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       },
     };
     log.error('UI harness failed:', error);
-    writeResult(resultPath, result);
-    setTimeout(() => app.exit(1), 100);
+    try {
+      await cleanupHarness(ctx);
+    } catch (cleanupError) {
+      result.failureHints?.push(`Cleanup failed: ${(cleanupError as Error).message}`);
+    }
+    try {
+      writeResult(resultPath, result);
+    } finally {
+      app.exit(1);
+    }
+  }
+}
+
+async function cleanupHarness(ctx: AppContext): Promise<void> {
+  const bridge = ctx.agentBridgeServer;
+  try {
+    await bridge?.stop();
+  } finally {
+    ctx.agentBridgeServer = null;
+    try {
+      ctx.mutationApprovalRuntime?.dispose('ui-harness-finished');
+    } finally {
+      ctx.mutationApprovalRuntime = null;
+      ctx.terminalService?.disposeAll('ui-harness-finished');
+    }
+  }
+  if (bridge && fs.existsSync(bridge.manifestPath)) {
+    throw new Error('UI harness bridge manifest remained after shutdown.');
   }
 }

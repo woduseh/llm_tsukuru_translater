@@ -1,12 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { ProtocolLightMcpClient, ProtocolLightMcpServer } from '../utils/mcpClient';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AgentService } from '../../src/agent/agentService';
 import { AGENT_SKILL_RECIPES } from '../../src/agent/agentSkillGuide';
 import {
   issueAppBridgeToken,
-  ProtocolLightMcpClient,
-  ProtocolLightMcpServer,
   createMcpOfflineToolRegistry,
   createMcpReadonlyToolRegistry,
   validateAppBridgeToken,
@@ -127,10 +126,17 @@ describe('MCP read-only adapter scaffold', () => {
     expect(workflow.status).toBe('ok');
     expect(JSON.stringify(workflow.payload)).toContain('Run translation and apply through the app UI');
     expect(JSON.stringify(workflow.payload)).not.toContain('api_key=');
+    expect(workflow.payload?.capabilities).toMatchObject({ mode: 'offline' });
+    expect(workflow.payload).not.toHaveProperty('guideText');
 
     const recipe = registry.callTool('help.safe_recipe', { recipeId: 'quality_review' });
     expect(recipe.status).toBe('ok');
     expect(JSON.stringify(recipe.payload)).toContain('.extracteddata');
+    expect(recipe.payload?.recipe).not.toHaveProperty('safety');
+    const repair = registry.callTool('help.safe_recipe', { recipeId: 'line_shift_repair' });
+    expect((repair.payload?.recipe as JsonObject).tools).toContain('patch.propose');
+    expect((repair.payload?.recipe as JsonObject).tools).not.toContain('patch.apply');
+    expect(registry.callTool('help.explain_tool', { toolName: 'patch.apply' }).payload?.status).toBe('unknown');
 
     const explained = registry.callTool('help.explain_tool', { toolName: 'quality.review_file' });
     expect(explained.status).toBe('ok');

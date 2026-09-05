@@ -68,17 +68,13 @@ export function getLlmReadinessError(settings: LlmSettingsLike): string | null {
       : 'Vertex AI 서비스 계정 JSON이 설정되지 않았습니다.';
   }
   if (validation.llmProvider === 'openai') {
-    return validation.llmValidationErrors.includes('LLM model is required.')
-      ? 'LLM 모델이 설정되지 않았습니다.'
-      : 'OpenAI API 키가 설정되지 않았습니다.';
+    return 'OpenAI API 키가 설정되지 않았습니다.';
   }
   if (validation.llmProvider === 'custom-openai') {
     return validation.llmValidationErrors[0] || 'OpenAI 호환 API 설정을 확인해주세요.';
   }
   if (validation.llmProvider === 'claude') {
-    return validation.llmValidationErrors.includes('LLM model is required.')
-      ? 'LLM 모델이 설정되지 않았습니다.'
-      : 'Claude API 키 또는 최대 토큰 설정을 확인해주세요.';
+    return 'Claude API 키 또는 최대 토큰 설정을 확인해주세요.';
   }
 
   return 'Gemini API 키가 설정되지 않았습니다.';

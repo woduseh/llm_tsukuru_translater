@@ -5,7 +5,7 @@ import type { JsonObject, JsonValue } from '../types/agentWorkspace';
 import type { AgentArtifactRecord } from './artifactService';
 import { sanitizePathSegment } from './artifactService';
 import { redactSecretLikeValues } from './contractsValidation';
-import { SandboxPathError, SandboxReadLimitError } from './sandboxManager';
+import { SandboxPathError, SandboxReadLimitError } from './agentFileErrors';
 
 export type AgentDataRefScope = 'session' | 'project';
 export type AgentDataRefKind =

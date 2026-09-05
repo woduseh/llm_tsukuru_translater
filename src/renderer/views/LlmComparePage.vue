@@ -16,10 +16,10 @@
     <!-- Left: File list -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <input type="text" v-model="searchQuery" class="search-input" placeholder="파일 검색..." @input="updateFilteredFiles">
+        <input type="text" v-model="searchQuery" class="search-input" placeholder="파일 검색...">
         <div class="filter-row">
-          <label><input type="checkbox" v-model="filterMismatch" @change="updateFilteredFiles"> 불일치</label>
-          <label><input type="checkbox" v-model="filterUntranslated" @change="updateFilteredFiles"> 미번역</label>
+          <label><input type="checkbox" v-model="filterMismatch"> 불일치</label>
+          <label><input type="checkbox" v-model="filterUntranslated"> 미번역</label>
           <span class="file-count">{{ filteredFiles.length }}/{{ files.length }}</span>
         </div>
       </div>
@@ -109,7 +109,7 @@
                     @input="onBlockEdit(i, $event)"></textarea>
                   <div class="block-badges">
                     <span v-if="untranslatedBlocks.has(i)" class="badge badge-untranslated-block">미번역</span>
-                    <span class="line-count">{{ editedTransLines[i] || transBlocks[i]?.lines.length }}줄</span>
+                    <span class="line-count">{{ transBlocks[i]?.lines.length }}줄</span>
                   </div>
                 </div>
               </div>
@@ -140,14 +140,11 @@ const selectedBlocks = ref<Set<number>>(new Set())
 const searchQuery = ref('')
 const filterMismatch = ref(false)
 const filterUntranslated = ref(false)
-const filteredFiles = ref<{ file: FileEntry; realIdx: number }[]>([])
 const origBlocks = ref<Block[]>([])
 const transBlocks = ref<Block[]>([])
-const editedTransLines = reactive<Record<number, number>>({})
-const untranslatedBlocks = ref<Set<number>>(new Set())
 const saveStatus = ref('')
 const retranslating = ref(false)
-const isDirty = ref(false)
+const isDirty = computed(() => !!dirty[files.value[currentIdx.value]?.name])
 const loading = ref(true)
 const busy = ref(false)
 const busyMessage = ref('')
@@ -251,13 +248,14 @@ const hasUntranslatedBlocks = computed(() => untranslatedBlocks.value.size > 0)
 const mismatchFileCount = computed(() => files.value.filter(f => f.mismatch).length)
 const untranslatedFileCount = computed(() => files.value.filter(f => f.untranslated).length)
 
-/** Whether the current file has any problem blocks (mismatch or untranslated). */
-const hasProblems = computed(() => {
-  for (let i = 0; i < origBlocks.value.length; i++) {
-    if (blockClass(i) !== 'ok') return true
+const problemIndices = computed(() => {
+  const indices: number[] = []
+  for (let i = 0; i < Math.max(origBlocks.value.length, transBlocks.value.length); i++) {
+    if (blockClass(i) !== 'ok') indices.push(i)
   }
-  return false
+  return indices
 })
+const hasProblems = computed(() => problemIndices.value.length > 0)
 
 interface SummaryItem {
   class: string
@@ -267,8 +265,8 @@ interface SummaryItem {
 const summaryItems = computed<SummaryItem[]>(() => {
   if (loading.value) return [{ class: 'summary-loading', text: '⏳ 파일 비교 중...' }]
   if (files.value.length === 0) return [{ class: 'summary-error', text: '비교할 파일이 없습니다.' }]
-  const mc = files.value.filter(f => f.mismatch).length
-  const uc = files.value.filter(f => f.untranslated).length
+  const mc = mismatchFileCount.value
+  const uc = untranslatedFileCount.value
   const parts: SummaryItem[] = []
   if (mc > 0) parts.push({ class: 'summary-error', text: `⚠ ${mc}개 줄 수 불일치` })
   if (uc > 0) parts.push({ class: 'summary-warn', text: `● ${uc}개 미번역` })
@@ -319,7 +317,6 @@ async function loadFiles(dir: string) {
     }
     currentIdx.value = 0
     selectedBlocks.value = new Set()
-    updateFilteredFiles()
     renderBlocks()
   } catch (error) {
     files.value = []
@@ -330,9 +327,9 @@ async function loadFiles(dir: string) {
   }
 }
 
-function updateFilteredFiles() {
+const filteredFiles = computed(() => {
   const q = searchQuery.value.toLowerCase()
-  filteredFiles.value = files.value
+  return files.value
     .map((file, i) => ({ file, realIdx: i }))
     .filter(({ file }) => {
       if (q && !file.name.toLowerCase().includes(q)) return false
@@ -340,7 +337,7 @@ function updateFilteredFiles() {
       if (filterUntranslated.value && !file.untranslated) return false
       return true
     })
-}
+})
 
 async function selectFile(idx: number) {
   if (retranslating.value) return
@@ -365,30 +362,26 @@ function renderBlocks() {
   origBlocks.value = splitBlocks(window.nodeFs.readFileSync(f.origPath, 'utf-8').split('\n'))
   transBlocks.value = splitBlocks(window.nodeFs.readFileSync(f.transPath, 'utf-8').split('\n'))
   selectedBlocks.value = new Set()
-  isDirty.value = false
+  dirty[f.name] = false
   saveStatus.value = ''
-  for (const k in editedTransLines) delete editedTransLines[k]
-  updateUntranslatedBlocks()
   computeBlockHeights()
   scrollTop.value = 0
   if (viewportEl.value) viewportEl.value.scrollTop = 0
 }
 
-function updateUntranslatedBlocks() {
+const untranslatedBlocks = computed(() => {
   const set = new Set<number>()
   const len = Math.min(origBlocks.value.length, transBlocks.value.length)
   for (let i = 0; i < len; i++) {
     if (isBlockUntranslated(origBlocks.value[i], transBlocks.value[i])) set.add(i)
   }
-  untranslatedBlocks.value = set
-}
+  return set
+})
 
 function blockClass(i: number): string {
   const ob = origBlocks.value[i], tb = transBlocks.value[i]
   if (!ob || !tb) return 'missing'
   if (ob.sep !== tb.sep) return 'error-sep'
-  const tLines = editedTransLines[i] ?? tb.lines.length
-  if (ob.lines.length !== tLines) return 'error-lines'
   if (!haveSameTranslationLineStructure(ob.lines, tb.lines)) return 'error-lines'
   if (untranslatedBlocks.value.has(i)) return 'untranslated'
   return 'ok'
@@ -398,11 +391,8 @@ function onBlockEdit(i: number, event: Event) {
   const ta = event.target as HTMLTextAreaElement
   const newLines = ta.value.split('\n')
   transBlocks.value[i].lines = newLines
-  editedTransLines[i] = newLines.length
-  isDirty.value = true
   dirty[files.value[currentIdx.value].name] = true
   saveStatus.value = ''
-  updateUntranslatedBlocks()
 }
 
 function toggleSelection(i: number) {
@@ -414,20 +404,9 @@ function toggleSelection(i: number) {
 function deleteBlock(i: number) {
   if (i < 0 || i >= transBlocks.value.length) return
   transBlocks.value.splice(i, 1)
-  // Rebuild editedTransLines with shifted indices
-  const newEdited: Record<number, number> = {}
-  for (const k in editedTransLines) {
-    const idx = Number(k)
-    if (idx < i) newEdited[idx] = editedTransLines[idx]
-    else if (idx > i) newEdited[idx - 1] = editedTransLines[idx]
-  }
-  for (const k in editedTransLines) delete editedTransLines[k]
-  Object.assign(editedTransLines, newEdited)
   selectedBlocks.value = new Set()
-  isDirty.value = true
   dirty[files.value[currentIdx.value].name] = true
   saveStatus.value = '블록 삭제됨'
-  updateUntranslatedBlocks()
   computeBlockHeights()
 }
 
@@ -437,13 +416,9 @@ function deleteSelectedBlocks() {
   for (const i of indices) {
     if (i >= 0 && i < transBlocks.value.length) transBlocks.value.splice(i, 1)
   }
-  // Rebuild editedTransLines
-  for (const k in editedTransLines) delete editedTransLines[k]
   selectedBlocks.value = new Set()
-  isDirty.value = true
   dirty[files.value[currentIdx.value].name] = true
   saveStatus.value = `${indices.length}개 블록 삭제됨`
-  updateUntranslatedBlocks()
   computeBlockHeights()
 }
 
@@ -452,12 +427,10 @@ function autoFixSelected() {
   for (const i of selectedBlocks.value) {
     const result = autoFixBlock(origBlocks.value[i], transBlocks.value[i])
     if (result) {
-      editedTransLines[i] = transBlocks.value[i].lines.length
       fixes.push(result)
     }
   }
   if (fixes.length > 0) {
-    isDirty.value = true
     dirty[files.value[currentIdx.value].name] = true
     saveStatus.value = `${fixes.length}개 블록 수정됨`
     computeBlockHeights()
@@ -475,18 +448,14 @@ async function autoFixCurrentFile() {
     count += dupRemoved
     for (let i = 0; i < origBlocks.value.length; i++) {
       if (autoFixBlock(origBlocks.value[i], transBlocks.value[i])) {
-        editedTransLines[i] = transBlocks.value[i].lines.length
         count++
       }
     }
     if (count > 0) {
-      if (dupRemoved > 0) for (const k in editedTransLines) delete editedTransLines[k]
-      isDirty.value = true
       dirty[files.value[currentIdx.value].name] = true
       saveStatus.value = dupRemoved > 0
         ? `${count}개 블록 수정됨 (중복 헤더 ${dupRemoved}개 제거 포함)`
         : `${count}개 블록 자동 수정됨`
-      updateUntranslatedBlocks()
       computeBlockHeights()
     }
   } finally {
@@ -527,7 +496,6 @@ async function autoFixAllMapFiles() {
     saveStatus.value = filesFixed > 0
       ? `${filesFixed}개 Map 파일, ${totalFixed}개 블록 자동 수정 완료`
       : '수정할 Map 파일이 없습니다'
-    updateFilteredFiles()
     renderBlocks()
   } finally {
     busy.value = false
@@ -546,12 +514,8 @@ async function saveFile() {
     f.mismatch = checkMismatchBlocks(origBlocks.value, transBlocks.value)
     f.untranslated = hasAnyUntranslatedBlock(origBlocks.value, transBlocks.value)
     dirty[f.name] = false
-    isDirty.value = false
     saveStatus.value = '저장됨 ✓'
     selectedBlocks.value = new Set()
-    for (const k in editedTransLines) delete editedTransLines[k]
-    updateUntranslatedBlocks()
-    updateFilteredFiles()
     computeBlockHeights()
     // Auto-navigate to next problem file if current has no issues
     if (!f.mismatch && !f.untranslated) {
@@ -646,16 +610,13 @@ function navigateFile(dir: 1 | -1) {
   for (let i = 0; i < files.value.length; i++) {
     const idx = ((start + dir * i) % files.value.length + files.value.length) % files.value.length
     if (files.value[idx].mismatch || files.value[idx].untranslated) {
-      currentIdx.value = idx; updateFilteredFiles(); renderBlocks(); return
+      currentIdx.value = idx; renderBlocks(); return
     }
   }
 }
 
 function navigateBlock(dir: 1 | -1) {
-  const problemIdx: number[] = []
-  for (let i = 0; i < origBlocks.value.length; i++) {
-    if (blockClass(i) !== 'ok') problemIdx.push(i)
-  }
+  const problemIdx = problemIndices.value
   if (problemIdx.length === 0) return
 
   const currentSelected = selectedBlocks.value.size > 0 ? Math.min(...selectedBlocks.value) : -1
@@ -711,7 +672,6 @@ function onRetranslateResult(result: RetranslateResult) {
     f.mismatch = checkMismatch(origContent.split('\n'), transContent.split('\n'))
     f.untranslated = checkFileUntranslated(origContent, transContent)
     dirty[f.name] = false
-    updateFilteredFiles()
     if (currentIdx.value === fileIdx) renderBlocks()
     saveStatus.value = '재번역 완료 ✓'
   } else { saveStatus.value = `❌ ${result.error || '번역 실패'}` }

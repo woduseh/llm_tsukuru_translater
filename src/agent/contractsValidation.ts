@@ -3,11 +3,9 @@ import type {
   ApprovalRequest,
   AuditEntry,
   FailureArtifact,
-  GoldenWorkflowTranscript,
   JsonObject,
   JsonValue,
   PermissionTier,
-  SandboxManifest,
   TerminalEvent,
 } from '../types/agentWorkspace';
 
@@ -80,41 +78,6 @@ export function validateAuditEntry(value: unknown): ValidationResult<AuditEntry>
 export function validateFailureArtifact(value: unknown): ValidationResult<FailureArtifact> {
   const errors: ValidationIssue[] = [];
   validateFailureArtifactShape(value, 'failure', errors);
-  return toResult(value, errors);
-}
-
-export function validateSandboxManifest(value: unknown): ValidationResult<SandboxManifest> {
-  const errors: ValidationIssue[] = [];
-  requireObject(value, 'sandboxManifest', errors, (obj) => {
-    requireSchemaVersion(obj, 'sandboxManifest', errors);
-    requireString(obj, 'sandboxId', errors);
-    requireIsoDate(obj, 'createdAt', errors);
-    requireString(obj, 'sourceRoot', errors);
-    requireString(obj, 'sandboxRoot', errors);
-    requireStringArray(obj, 'allowedRoots', errors);
-    requireManifestEntries(obj, 'preManifest', errors);
-    if ('postManifest' in obj) requireManifestEntries(obj, 'postManifest', errors);
-  });
-  return toResult(value, errors);
-}
-
-export function validateGoldenWorkflowTranscript(value: unknown): ValidationResult<GoldenWorkflowTranscript> {
-  const errors: ValidationIssue[] = [];
-  requireObject(value, 'goldenWorkflowTranscript', errors, (obj) => {
-    requireSchemaVersion(obj, 'goldenWorkflowTranscript', errors);
-    requireString(obj, 'workflowId', errors);
-    requireIsoDate(obj, 'createdAt', errors);
-    requireArray(obj, 'steps', errors, (item, index) => {
-      requireObject(item, `steps[${index}]`, errors, (step) => {
-        requireString(step, 'toolName', errors);
-        requireString(step, 'requestId', errors);
-        requireEnum(step, 'status', ['ok', 'needs-approval', 'failed'], errors);
-        requirePermissionTier(step, 'permissionTier', errors);
-      });
-    });
-    requireEnum(obj, 'finalStatus', ['ok', 'needs-approval', 'failed'], errors);
-    requireStringArray(obj, 'artifacts', errors);
-  });
   return toResult(value, errors);
 }
 
@@ -278,15 +241,4 @@ function requireArray(obj: Record<string, unknown>, key: string, errors: Validat
     return;
   }
   value.forEach(validateItem);
-}
-
-function requireManifestEntries(obj: Record<string, unknown>, key: string, errors: ValidationIssue[]): void {
-  requireArray(obj, key, errors, (item, index) => {
-    requireObject(item, `${key}[${index}]`, errors, (entry) => {
-      requireString(entry, 'relativePath', errors);
-      requireNumber(entry, 'sizeBytes', errors);
-      requireNumber(entry, 'modifiedTimeMs', errors);
-      requireString(entry, 'sha256', errors);
-    });
-  });
 }

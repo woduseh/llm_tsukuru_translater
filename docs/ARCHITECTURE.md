@@ -2,7 +2,7 @@
 
 ## Runtime Shape
 
-The app is an Electron 40 desktop tool for translating RPG Maker MV/MZ and Wolf RPG Editor projects.
+The app is an Electron desktop tool for translating RPG Maker MV/MZ and Wolf RPG Editor projects. Dependency versions and build commands are defined in `package.json`.
 
 - `main.ts` boots the Electron main process and registers IPC handlers.
 - `src/ipc/` owns window lifecycle and renderer-to-main actions.
@@ -51,7 +51,7 @@ Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-speci
 
 - Translation and apply execution remain app UI responsibilities.
 - The bundled offline MCP server may read project structure and translation quality state.
-- MCP writes are restricted to bounded analysis artifacts under `.llm-tsukuru-agent/`.
+- Offline MCP writes are restricted to bounded analysis artifacts under `.llm-tsukuru-agent/`.
 - When launched without an app bridge, the offline MCP surface does not expose a working source-project mutation path.
 - The Electron main process owns one `MutationApprovalRuntime` and one HTTP bridge bound to `127.0.0.1` for the selected project.
 - The per-process rendezvous manifest lives under Electron `userData/llm-tsukuru-agent-bridge/`, is blocked from renderer file APIs, and contains a rotating bearer plus app/project/bridge bindings.
@@ -60,13 +60,23 @@ Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-speci
 - The mutation executor revalidates the canonical project, source bytes, argument/preview hashes, original lines, separators, empty lines, and RPG control codes before a same-directory atomic replacement. It preserves BOM, per-line CRLF/LF separators, final-newline state, and file mode, then re-reads the result and atomically restores the exact preimage if verification fails.
 - Renderer terminal sessions come from the main-process `TerminalService`; the renderer does not create placeholder sessions.
 
-## Harness Boundaries
+`AgentService` assembles offline analysis services. `MutationApprovalRuntime` owns its `ApprovalService` directly and executes through `mutationPatchExecutor.ts`; starting approval handling does not construct the analysis kernel. `PatchService` provides proposal/validation/preview only. There is no second direct-write MCP mutation registry.
 
-Harnesses should validate production code through these layers:
+## Shared Translation and View State
 
-- deterministic library and workflow checks against compiled main-process modules
-- fixture-driven evals that score structure and repair behavior
-- Electron UI smoke harnesses that inspect real windows and filesystem outputs
-- a packaging smoke that validates packaging configuration and renderer-local asset references
+- `providerTranslationBase.ts` owns common provider configuration and translation retry/chunk handling. `translationPrompt.ts` builds prompts, preserving the existing Google/standard wording variants. `translationCore.ts` shares API error parsing; `providerRegistry.ts` owns provider selection and cache/config fingerprints.
+- Compare and verify views derive filters and editing indicators from their source state with Vue computed values. Compare problem navigation includes unmatched blocks on either side.
+- JSON Verify uses the pure `setAtPath` from `src/ts/rpgmv/verify.ts` locally; the actual file write still goes through validated main-process IPC.
 
-The harness should not replace the production code path with a parallel implementation.
+## Build and IPC Details
+
+- `tsconfig.main.json` extends `tsconfig.json` and compiles main-process code into `dist-main/`; Vite builds Vue into `dist-renderer/`. Generated output is not source.
+- Vue uses hash routing for packaged `file://` URLs. `useIpcOn` removes listeners on component unmount. Add IPC channels to the whitelist for their actual direction in `src/preload.ts`.
+- Sub-window route components mount after `did-finish-load`. Main retains pending data until the component sends its ready signal from `onMounted`; see `toolsHandler.ts` for compare/verify examples.
+- Existing windows use `sandbox: false` for the current Node-dependent preload. This is an implementation dependency to reassess when changing preload, not a requirement for every future window.
+
+## Extracted Metadata
+
+MV/MZ `.extracteddata` is compressed JSON handled by `src/ts/rpgmv/edtool.ts`. A record keyed by text line number contains `val` (dotted JSON path), `m` (exclusive end line), `origin` (source JSON filename), and extraction configuration in `conf`. Changing text line positions without updating this mapping can apply dialogue to the wrong entry.
+
+Harness entrypoints and coverage are in [HARNESS.md](HARNESS.md).

@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import type { JsonObject, TranslationPatch, TranslationPatchOperation } from '../types/agentWorkspace';
 import { AgentSafeFileSystem } from './agentSafeFileSystem';
 import { ArtifactService } from './artifactService';
@@ -36,16 +35,6 @@ export interface PatchPreviewResult {
   lineCountBefore: number;
   lineCountAfter: number;
   hunks: JsonObject[];
-  validation: PatchValidationResult;
-}
-
-export interface PatchApplyResult {
-  schemaVersion: 1;
-  applied: true;
-  targetPath: string;
-  lineCountBefore: number;
-  lineCountAfter: number;
-  operationsApplied: number;
   validation: PatchValidationResult;
 }
 
@@ -162,35 +151,6 @@ export class PatchService {
     };
   }
 
-  apply(patch: TranslationPatch): PatchApplyResult {
-    const target = this.options.files.resolveAllowed(patch.targetPath);
-    const original = stripBom(fs.readFileSync(target, 'utf-8'));
-    const newline = original.includes('\r\n') ? '\r\n' : '\n';
-    const lines = original.split(/\r?\n/);
-    const validation = this.validate(patch);
-    if (!validation.valid || !validation.lineCountPreserved) {
-      throw new Error('patch.apply requires a valid same-line-count patch.');
-    }
-    const nextLines = [...lines];
-    for (const operation of patch.operations) {
-      if (operation.kind !== 'replace-line') continue;
-      if (operation.originalText !== undefined && lines[operation.lineNumber - 1] !== operation.originalText) {
-        throw new Error(`patch.apply original text mismatch at line ${operation.lineNumber}.`);
-      }
-      nextLines[operation.lineNumber - 1] = operation.replacementText ?? '';
-    }
-    if (nextLines.length !== lines.length) throw new Error('patch.apply refused line-count-changing write.');
-    fs.writeFileSync(target, nextLines.join(newline), 'utf-8');
-    return {
-      schemaVersion: 1,
-      applied: true,
-      targetPath: patch.targetPath,
-      lineCountBefore: lines.length,
-      lineCountAfter: nextLines.length,
-      operationsApplied: patch.operations.filter((operation) => operation.kind === 'replace-line').length,
-      validation,
-    };
-  }
 }
 
 function createSingleOperation(input: PatchProposeOptions, targetPath: string, lines: string[]): TranslationPatchOperation {
@@ -236,8 +196,4 @@ export function extractRpgControlCodes(line: string): string[] {
 
 function assertPath(value: unknown, message: string): asserts value is string {
   if (typeof value !== 'string' || value.trim() === '') throw new Error(message);
-}
-
-function stripBom(value: string): string {
-  return value.charCodeAt(0) === 0xFEFF ? value.slice(1) : value;
 }

@@ -63,7 +63,6 @@ export interface LlmProviderRegistryEntry extends LlmProviderMetadataContract {
   configHint: string;
   missingConfigMessage: string;
   readinessValidator(settings: Partial<AppSettings> & Record<string, unknown>): ProviderReadinessValidation;
-  cacheFingerprint(args: ProviderCacheFingerprintArgs): string;
   translatorFactory(args: ProviderTranslatorFactoryArgs): Translator;
   concurrencyCap: number;
 }
@@ -158,9 +157,6 @@ const providerRegistry = {
       }
       return completeReadiness(validation);
     },
-    cacheFingerprint(args: ProviderCacheFingerprintArgs): string {
-      return versionedCacheFingerprint('gemini', args);
-    },
     translatorFactory(args: ProviderTranslatorFactoryArgs): Translator {
       return createGeminiTranslator(args.settings, args.sourceLang, args.targetLang, args.isAborted);
     },
@@ -180,9 +176,6 @@ const providerRegistry = {
       }
       return completeReadiness(validation);
     },
-    cacheFingerprint(args: ProviderCacheFingerprintArgs): string {
-      return versionedCacheFingerprint('vertex', args);
-    },
     translatorFactory(args: ProviderTranslatorFactoryArgs): Translator {
       return createVertexTranslator(args.settings, args.sourceLang, args.targetLang, args.isAborted);
     },
@@ -199,9 +192,6 @@ const providerRegistry = {
         validation.llmValidationErrors.push('OpenAI API key is required.');
       }
       return completeReadiness(validation);
-    },
-    cacheFingerprint(args: ProviderCacheFingerprintArgs): string {
-      return versionedCacheFingerprint('openai', args);
     },
     translatorFactory(args: ProviderTranslatorFactoryArgs): Translator {
       return createOpenAiTranslator(args.settings, args.sourceLang, args.targetLang, args.isAborted);
@@ -229,9 +219,6 @@ const providerRegistry = {
       }
       return completeReadiness(validation);
     },
-    cacheFingerprint(args: ProviderCacheFingerprintArgs): string {
-      return versionedCacheFingerprint('custom-openai', args);
-    },
     translatorFactory(args: ProviderTranslatorFactoryArgs): Translator {
       return createCustomOpenAiTranslator(args.settings, args.sourceLang, args.targetLang, args.isAborted);
     },
@@ -252,9 +239,6 @@ const providerRegistry = {
       }
       return completeReadiness(validation);
     },
-    cacheFingerprint(args: ProviderCacheFingerprintArgs): string {
-      return versionedCacheFingerprint('claude', args);
-    },
     translatorFactory(args: ProviderTranslatorFactoryArgs): Translator {
       return createClaudeTranslator(args.settings, args.sourceLang, args.targetLang, args.isAborted);
     },
@@ -266,11 +250,7 @@ export function normalizeLlmProvider(value: unknown): LlmProvider {
 }
 
 export function isKnownLlmProvider(value: unknown): value is LlmProvider {
-  return value === 'gemini'
-    || value === 'vertex'
-    || value === 'openai'
-    || value === 'custom-openai'
-    || value === 'claude';
+  return typeof value === 'string' && Object.hasOwn(providerRegistry, value);
 }
 
 export function getProviderRegistryEntry(provider: unknown): LlmProviderRegistryEntry {
@@ -278,13 +258,7 @@ export function getProviderRegistryEntry(provider: unknown): LlmProviderRegistry
 }
 
 export function listProviderRegistryEntries(): readonly LlmProviderRegistryEntry[] {
-  return [
-    providerRegistry.gemini,
-    providerRegistry.vertex,
-    providerRegistry.openai,
-    providerRegistry['custom-openai'],
-    providerRegistry.claude,
-  ];
+  return Object.values(providerRegistry);
 }
 
 export function getLlmProviderDisplayName(provider: unknown): string {
@@ -300,7 +274,7 @@ export function validateProviderReadiness(settings: SettingsLike): ProviderReadi
 }
 
 export function buildProviderCacheFingerprint(provider: unknown, args: ProviderCacheFingerprintArgs): string {
-  return getProviderRegistryEntry(provider).cacheFingerprint(args);
+  return versionedCacheFingerprint(normalizeLlmProvider(provider), args);
 }
 
 export function buildProviderConfigFingerprint(provider: unknown, args: ProviderConfigFingerprintArgs): string {

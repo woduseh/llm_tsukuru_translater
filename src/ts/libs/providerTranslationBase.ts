@@ -1,7 +1,9 @@
 import { hanguls } from '../rpgmv/datas';
+import type { AppSettings } from '../../types/settings';
 import {
   API_BACKOFF_BASE_MS,
   API_BACKOFF_MAX_MS,
+  DEFAULT_API_TIMEOUT_SEC,
   RATE_LIMIT_DELAY_MS,
   VALIDATION_RETRY_BASE_MS,
   VALIDATION_RETRY_MAX_MS,
@@ -26,6 +28,35 @@ export interface ProviderTranslationConfig {
   isAborted?: () => boolean;
   isPermanentError?: (error: unknown) => boolean;
   isRetryableError?: (error: unknown) => boolean;
+}
+
+export interface ProviderTranslatorConfig extends ProviderTranslationConfig {
+  model: string;
+  customPrompt: string;
+  sourceLang: string;
+  targetLang: string;
+  timeout: number;
+}
+
+export function createProviderTranslatorConfig(
+  settings: Partial<AppSettings>,
+  sourceLang: string,
+  targetLang: string,
+  isAborted?: () => boolean,
+): ProviderTranslatorConfig {
+  return {
+    model: settings.llmModel || '',
+    customPrompt: settings.llmCustomPrompt || '',
+    chunkSize: settings.llmChunkSize || 30,
+    translationUnit: settings.llmTranslationUnit || 'file',
+    sourceLang,
+    targetLang,
+    doNotTransHangul: !!settings.DoNotTransHangul,
+    maxRetries: settings.llmMaxRetries ?? 2,
+    maxApiRetries: settings.llmMaxApiRetries ?? 5,
+    timeout: (settings.llmTimeout || DEFAULT_API_TIMEOUT_SEC) * 1000,
+    isAborted,
+  };
 }
 
 function createFallbackValidation(chunk: TranslationBlock[], startIndex: number) {

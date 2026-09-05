@@ -13,7 +13,7 @@
     "typecheck:main": "tsc -p tsconfig.main.json --noEmit",
     "typecheck:renderer": "vue-tsc -p tsconfig.renderer.json --noEmit",
     "typecheck": "npm-run-all typecheck:main typecheck:renderer",
-    "build:ts": "tsc -p tsconfig.main.json",
+    "build:ts": "node scripts/clean-main.cjs && tsc -p tsconfig.main.json",
     "build:renderer": "vite build --config vite.renderer.config.ts",
     "build:app": "npm run build:renderer && npm run build:ts && npm run build:mcp",
     "prestart": "npm run build:app",

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { redactSecretLikeValues } from './contractsValidation';
-import { SandboxPathError, SandboxReadLimitError } from './sandboxManager';
+import { SandboxPathError, SandboxReadLimitError } from './agentFileErrors';
 
 export interface SafeReadOptions {
   startLine?: number;

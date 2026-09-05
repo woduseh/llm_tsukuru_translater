@@ -206,7 +206,7 @@ async function main() {
           'docs/ARCHITECTURE.md',
           'docs/QUALITY_RULES.md',
           'docs/HARNESS.md',
-          'docs/exec-plans/active/harness-engineering.md',
+          'docs/AGENT_MCP_GUIDE.md',
         ];
         for (const docPath of requiredDocs) {
           assert(fs.existsSync(path.join(projectRoot, docPath)), `missing ${docPath}`);

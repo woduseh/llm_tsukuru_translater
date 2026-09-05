@@ -30,7 +30,7 @@ export function getLanguageName(lang: string): string {
   return LANG_NAMES[lang] || lang;
 }
 
-export function buildTranslationSystemPrompt(config: TranslationPromptConfig): string {
+export function buildTranslationSystemPrompt(config: TranslationPromptConfig, style: 'standard' | 'google' = 'standard'): string {
   const sourceLangName = getLanguageName(config.sourceLang);
   const targetLangName = getLanguageName(config.targetLang);
 
@@ -52,16 +52,46 @@ export function buildTranslationSystemPrompt(config: TranslationPromptConfig): s
   sys += `## Voice & Style\n\n`;
   sys += `| Rule | Directive |\n|------|----------|\n`;
   sys += `| Sentence rhythm | If the source accumulates meaning in long periods, do the same. If it cuts short, cut short. |\n`;
+  if (style === 'google') {
+    sys += `| Pro-drop | Omit subjects when context is sufficient. Never open every sentence with he/she equivalents. |\n`;
+  }
   sys += `| Dialogue | 100% colloquial. Match character voice: formal/informal register by context. Natural contractions, fillers, idioms. |\n`;
   sys += `| Profanity | Natural ${targetLangName} equivalents preserving register and force of original. |\n`;
-  sys += `| Tone matching | Read the source's emotional register and match it. |\n\n`;
+  if (style === 'google') {
+    sys += `| Tone matching | Read the source's emotional register and match it. Tense → fragmented, rapid. Romantic → lyrical, sensory. Comedy → snappy, fast. Peaceful → unhurried, spacious. |\n`;
+    sys += `| Sensory detail | Use onomatopoeia and mimetic words actively when appropriate. |\n`;
+    sys += `| Character voice | Reproduce speech patterns — archaic, rough, refined, childish — using equivalent ${targetLangName} registers. |\n\n`;
+    sys += `## Anti-Translationese\n\n`;
+    sys += `| Instead of (stiff literal) | Use (natural ${targetLangName}) |\n|---------------------------|-------------------------------|\n`;
+    sys += `| Verbose cognitive constructions | Direct perception statements |\n`;
+    sys += `| Formal connectives in dialogue | Colloquial conjunctions or omission |\n`;
+    sys += `| Overused temporal markers | Concrete sensory descriptions |\n`;
+    sys += `| Verbose sentence endings | Concise endings |\n\n`;
+  } else {
+    sys += `| Tone matching | Read the source's emotional register and match it. |\n\n`;
+  }
   sys += `## Authorial Intent Preservation\n\n`;
-  sys += `The source text may contain deliberate inconsistencies, omissions, contradictions, or distortions as narrative devices. Do not correct, clarify, or normalize them.\n\n`;
+  if (style === 'google') {
+    sys += `The source text may contain deliberate inconsistencies, omissions, contradictions, or distortions as narrative devices. These are not errors. Do not correct, clarify, or normalize them. Rewrite them as they are — the reader is meant to encounter them intact.\n\n`;
+  } else {
+    sys += `The source text may contain deliberate inconsistencies, omissions, contradictions, or distortions as narrative devices. Do not correct, clarify, or normalize them.\n\n`;
+  }
   if (config.customPrompt?.trim()) {
     sys += `## Additional Instructions\n\n${config.customPrompt.trim()}\n\n`;
   }
   sys += `## Output\n\n`;
-  sys += `Output the rewritten ${targetLangName} text ONLY. No commentary, no explanations, no markdown code blocks, no meta-text.`;
+  if (style === 'google') {
+    sys += `Output the rewritten ${targetLangName} text ONLY. No commentary, no explanations, no markdown code blocks, no meta-text.\n\n`;
+    sys += `## Validation (Apply silently)\n\n`;
+    sys += `Before output, verify:\n`;
+    sys += `- Is every sentence of source accounted for?\n`;
+    sys += `- Does the prose architecture match the source?\n`;
+    sys += `- Is explicit/profane/sensitive content at original intensity?\n`;
+    sys += `- Does the text read as native ${targetLangName} with zero translation artifacts?\n`;
+    sys += `- Are all format elements (separators, RPG codes, tags) intact?`;
+  } else {
+    sys += `Output the rewritten ${targetLangName} text ONLY. No commentary, no explanations, no markdown code blocks, no meta-text.`;
+  }
   return sys;
 }
 

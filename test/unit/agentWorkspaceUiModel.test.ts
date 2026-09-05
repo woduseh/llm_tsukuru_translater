@@ -43,15 +43,8 @@ describe('agent workspace UI model', () => {
     expect(workspace.agentPresets[0].executable.detectionStatus).toBe('unknown')
   })
 
-  it('keeps command previews and starter prompts project-protecting', () => {
-    const workspace = createAgentWorkspaceViewModel()
-    const allPrompts = workspace.agentPresets.flatMap((preset) => preset.starterPrompts.map((prompt) => prompt.prompt))
-
+  it('quotes command paths containing spaces', () => {
     expect(createCommandPreview('codex', ['--cwd', 'C:\\Game Project'])).toBe('codex --cwd "C:\\Game Project"')
-    expect(allPrompts.join('\n')).toContain('게임 파일을 수정하지')
-    expect(allPrompts.join('\n')).toContain('.llm-tsukuru-agent')
-    expect(allPrompts.join('\n')).toContain('줄 번호')
-    expect(workspace.safetyGuidance.join('\n')).toContain('비밀값')
   })
 
   it('exposes MCP enabled/degraded/disconnected UX states and setup guidance', () => {

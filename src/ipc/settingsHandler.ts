@@ -4,7 +4,7 @@ import * as edTool from '../ts/rpgmv/edtool.js';
 import Themes from '../ts/rpgmv/styles'
 import { sanitizeSettingsForRenderer } from '../ts/libs/llmProviderConfig';
 import { applyValidatedSettingsUpdate } from '../ts/libs/settingsRuntimeValidation';
-import { sendError, worked, getSettings, storage } from './shared';
+import { sendError, worked, storage } from './shared';
 import { loadRoute } from './viteHelper';
 import { AppContext } from '../appContext';
 import { PROJECT_ROOT } from '../projectRoot';
@@ -37,7 +37,7 @@ export function registerSettingsHandlers(ctx: AppContext) {
 
   ipcMain.on('settingsReady', () => {
     if (ctx.settingsWindow && !ctx.settingsWindow.isDestroyed()) {
-      ctx.settingsWindow.webContents.send('settings', getSettings(ctx));
+      ctx.settingsWindow.webContents.send('settings', ctx.settings);
     }
   })
 
@@ -89,7 +89,7 @@ export function registerSettingsHandlers(ctx: AppContext) {
     loadRoute(ctx.settingsWindow, '/game-patcher')
     ctx.settingsWindow.webContents.on('did-finish-load', function () {
       ctx.settingsWindow!.show();
-      ctx.settingsWindow!.webContents.send('settings', getSettings(ctx));
+      ctx.settingsWindow!.webContents.send('settings', ctx.settings);
     });
     ctx.settingsWindow.on('close', function() {
       worked(ctx)

@@ -1,100 +1,71 @@
-# Harness
+# Verification
 
-## Goals
+Choose checks for the changed behavior; this is a command reference, not a checklist for every task. Harnesses exercise production modules or real Electron windows using deterministic fixtures. Live providers are opt-in.
 
-The harness stack exists to make the repository self-checking for both humans and coding agents.
+| Command | What it checks |
+| --- | --- |
+| `npm run typecheck` | Main TypeScript and renderer Vue types |
+| `npm run lint` | Main/renderer TypeScript and Vue lint |
+| `npx vitest run test/unit/<file>.test.ts` | Focused regression suite |
+| `npm test` | All unit tests |
+| `npm run harness:core` | Compiled translation workflows, provider/cache behavior, bundled MCP handshake and submit → app approve/apply → status |
+| `npm run harness:eval` | Fixture corpus with exact issue type/path/severity expectations, valid-input controls, structural preservation and repair |
+| `npm run harness:ui` | Real Electron project selection, preload IPC, compare/verify state, approval UI and exact applied bytes, MCP commands and terminal surface |
+| `npm run harness:package-smoke` | Packaging configuration, native PTY loading in the current Node runtime and local CSS assets; packaged artifact checks are opt-in |
+| `npm run harness:live` | Opt-in provider smoke for separators, line counts, ordered control codes and empty lines; skips when credentials are absent |
 
-- `harness:core`: deterministic checks against compiled main-process modules and translation workflow semantics
-- `harness:eval`: curated fixture corpus scored by structural and repair metrics
-- `harness:ui`: Electron smoke harness that opens real windows and inspects stable UI state
-- `harness:live`: optional real-provider smoke run for Gemini, Vertex, OpenAI, OpenAI-compatible APIs, or Claude
-- `harness:package-smoke`: Windows packaging smoke scaffold; validates packaging config by default and only inspects built artifacts when explicitly opted in
+Core/eval build main modules as needed; UI builds the app. `build:ts` clears `dist-main` before compiling so deleted source files cannot leave stale packaged modules. `LLM_TSUKURU_SKIP_BUILD=1` reuses existing outputs only when the caller has already built the current source.
 
-All harnesses write versioned JSON summaries under `artifacts/harness/` by default.
+UI runs with temporary settings, user-data, session and log directories. It replaces the native folder picker with a fixture selection and uses the production project initialization and preload IPC. It shuts down the bridge and removes its manifest before exiting. UI assertions use DOM state and `data-*` attributes, so they do not establish visual fidelity or full real-game compatibility.
 
-## Commands
+Vitest also mounts the real compare Vue component in jsdom (`test/unit/comparePage.test.ts`) to exercise editing, badges, navigation and saving. The in-process MCP client helper is under `test/utils/`; production protocol behavior is exercised through the actual stdio handler and bundled-server harness.
 
-```bash
-npm run harness:core
-npm run harness:eval
-npm run harness:ui
-npm run harness:live
-npm run harness:package-smoke
-```
+Harness regression tests inject incorrect verifier results, corrupt translations and native module load failures. Native PTY fallback is checked against the real adapter and terminal service in `test/unit/packageHarness.test.ts`; package smoke alone does not establish fallback behavior. The eval score is the pass percentage of its fixture corpus, not a general translation-quality score.
 
-Optional output override:
+## Results
 
-```bash
+Versioned JSON is written under `artifacts/harness/`. Example output override:
+
+```powershell
 node scripts/harness/core.cjs --output artifacts/harness/custom-core.json
 ```
 
-## JSON Result Contract
+The `schemaVersion: 1` contract includes `suite`, `status` (`passed`, `failed`, `skipped`), `cases`, `metrics`, `artifacts`, `reproCommand` and `failureHints`. Cases include id, title, status, duration and optional details/error. `results` is a legacy alias; consumers use `cases`. Core/eval also emit task manifests with case IDs and fixture references.
 
-Harness artifacts use `schemaVersion: 1` and keep the same agent-facing top-level fields across deterministic, UI, and live runs:
+## Packaged Windows Checks
 
-- `suite`: stable suite id such as `harness-core`
-- `status`: `passed`, `failed`, or `skipped`
-- `cases`: per-case results with `id`, `title`, `status`, `durationMs`, and optional `details` or `error`
-- `metrics`: suite-level counters or scores for quick triage
-- `artifacts`: related files such as task manifests, fixture corpus paths, raw UI results, or workspace paths
-- `reproCommand`: command an agent can rerun to reproduce the result
-- `failureHints`: concise next steps when a suite fails or is skipped
+After `npm run dist:all`, check that both current-version portable and Setup executables exist:
 
-`results` is still emitted as a compatibility alias for older consumers; new tools should read `cases`.
+```powershell
+$env:LLM_TSUKURU_PACKAGE_SMOKE = '1'
+npm run harness:package-smoke
+Remove-Item Env:LLM_TSUKURU_PACKAGE_SMOKE
+```
 
-## Deterministic Harnesses
+That command checks artifact presence, not app launch. To run the UI flow against an unpacked or installed executable with a private harness workspace:
 
-`harness:core` and `harness:eval` build `dist-main/` as needed, import compiled modules, and run without live provider access.
+```powershell
+$env:LLM_TSUKURU_UI_HARNESS_EXECUTABLE = 'C:\path\to\app.exe'
+npm run harness:ui
+Remove-Item Env:LLM_TSUKURU_UI_HARNESS_EXECUTABLE
+```
 
-They validate:
+A healthy default package smoke reports `skipped` for the opt-in portion; inspect its individual base checks. Its native-load case is also `skipped` when the current Node runtime cannot load the module. Neither result is evidence that a packaged Electron app or its terminal launched successfully.
 
-- block splitting and chunk validation invariants
-- provider readiness and cache-key semantics
-- JSON verification and repair behavior
-- bulk translation workflow behavior with a mocked translator
-- fixture corpus scoring for structure and repair cases
-- the packaged MCP agent server initialization, tool list, and project context response
-- the bundled stdio MCP submit → app-owned approve/apply → applied-status round trip with exact target-byte verification
+## Live Providers
 
-`harness:core` and `harness:eval` also write `*-task-manifest.json` files, which list deterministic case ids and fixture inputs. The core manifest records the mock-provider scaffold used by the bulk translation workflow.
+Set `LLM_HARNESS_PROVIDER` to `gemini`, `vertex`, `openai`, `custom-openai` or `claude`, with `LLM_HARNESS_MODEL` and the corresponding environment variables:
 
-## UI Harness
+| Provider | Configuration |
+| --- | --- |
+| Gemini | `GEMINI_API_KEY` |
+| Vertex | `VERTEX_SERVICE_ACCOUNT_JSON`, `VERTEX_LOCATION` |
+| OpenAI | `OPENAI_API_KEY` |
+| OpenAI-compatible | `CUSTOM_OPENAI_BASE_URL`, optional `CUSTOM_OPENAI_API_KEY` |
+| Claude | `CLAUDE_API_KEY`, optional `CLAUDE_MAX_TOKENS` |
 
-`harness:ui` builds the renderer and main process, launches Electron with a private harness workspace, and records snapshots from:
-
-- home/main window
-- LLM settings window
-- compare window
-- JSON verify window
-- agent workspace approval queue, environment, manifest-based MCP connection, CLI presets, and terminal surface
-
-The UI harness uses stable `data-*` attributes and DOM text instead of pixel-based visual tests. It asserts the fixture contract for route and heading state, approval reachability and keyboard focus, explicit approval to applied-state transition with exact CRLF/control-code-preserving file bytes, manifest-based MCP commands without bearer exposure, agent environment and preset counts, provider readiness, compare mismatch/untranslated counts, and JSON verification issue counts.
-
-After building a Windows unpacked or installed app, set `LLM_TSUKURU_UI_HARNESS_EXECUTABLE` to its `.exe` path and run `npm run harness:ui` to execute the same deterministic flow against the packaged runtime instead of the development Electron binary.
-
-## Live Harness
-
-`harness:live` is optional and exits cleanly with a skipped result when credentials are not present.
-
-Environment variables:
-
-- Gemini: `GEMINI_API_KEY`, `LLM_HARNESS_MODEL`
-- Vertex: `VERTEX_SERVICE_ACCOUNT_JSON`, `VERTEX_LOCATION`, `LLM_HARNESS_MODEL`
-- OpenAI: `OPENAI_API_KEY`, `LLM_HARNESS_MODEL`
-- OpenAI-compatible: `CUSTOM_OPENAI_BASE_URL`, optional `CUSTOM_OPENAI_API_KEY`, `LLM_HARNESS_MODEL`
-- Claude: `CLAUDE_API_KEY`, optional `CLAUDE_MAX_TOKENS`, `LLM_HARNESS_MODEL`
-- Selector: `LLM_HARNESS_PROVIDER=gemini|vertex|openai|custom-openai|claude`
-
-## Packaged Windows Smoke Scaffold
-
-`harness:package-smoke` is intentionally lightweight because producing the portable executable and NSIS installer is expensive for routine agent validation.
-
-- Default mode: validates `package.json` packaging invariants (`asar`, Windows `portable`/`nsis` targets, compiled-only file globs, and resolvable renderer CSS assets), writes `artifacts/harness/harness-package-smoke.json`, and exits cleanly as `skipped` when the scaffold is healthy.
-- Opt-in mode: after `npm run dist:all`, run `LLM_TSUKURU_PACKAGE_SMOKE=1 npm run harness:package-smoke` to verify that both the portable and Setup `.exe` artifacts exist for the current version.
-- TODO before release: extend the opt-in mode to launch the portable artifact in a disposable profile and assert the same stable UI markers used by `harness:ui`.
+Use live results with their provider, model and run date. Credential values do not belong in reports.
 
 ## CI
 
-- `.github/workflows/ci.yml` runs core, eval, UI, and default package-smoke harnesses on PRs and pushes.
-- `.github/workflows/harness-live.yml` provides a manual live-provider workflow.
-- CI uploads `artifacts/harness/` so failures remain inspectable after the job ends.
+[ci.yml](../.github/workflows/ci.yml) runs typecheck, lint, unit coverage, core/eval/UI and default package smoke on main pushes/PRs and uploads harness artifacts. [harness-live.yml](../.github/workflows/harness-live.yml) is manually triggered. CI gates do not require every local edit to rerun all suites.

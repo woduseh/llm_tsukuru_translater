@@ -49,8 +49,8 @@
           "밀려온 대사"
         ]
       },
-      "expectedTypes": [
-        "text_shift"
+      "expectedIssues": [
+        { "type": "text_shift", "path": "$.parameters[0]", "severity": "error" }
       ]
     },
     {
@@ -58,8 +58,31 @@
       "title": "verify detects dropped control characters",
       "orig": "Test \\V[1] message",
       "trans": "Test message",
-      "expectedTypes": [
-        "control_char_mismatch"
+      "expectedIssues": [
+        { "type": "control_char_mismatch", "path": "$", "severity": "warning" }
+      ]
+    },
+    {
+      "id": "verify-accepts-valid-event-translation",
+      "title": "verify accepts translated dialogue with intact event structure and control codes",
+      "orig": { "code": 401, "indent": 0, "parameters": ["こんにちは\\V[1]\\N[2]"] },
+      "trans": { "code": 401, "indent": 0, "parameters": ["안녕하세요\\V[1]\\N[2]"] },
+      "expectedIssues": []
+    },
+    {
+      "id": "verify-accepts-unchanged-marker",
+      "title": "verify accepts an unchanged structural marker",
+      "orig": { "code": 401, "indent": 0, "parameters": ["--- 101 ---"] },
+      "trans": { "code": 401, "indent": 0, "parameters": ["--- 101 ---"] },
+      "expectedIssues": []
+    },
+    {
+      "id": "verify-detects-control-code-order",
+      "title": "verify detects reordered control codes in translated dialogue",
+      "orig": { "code": 401, "indent": 0, "parameters": ["こんにちは\\V[1]\\N[2]"] },
+      "trans": { "code": 401, "indent": 0, "parameters": ["안녕하세요\\N[2]\\V[1]"] },
+      "expectedIssues": [
+        { "type": "control_char_mismatch", "path": "$.parameters[0]", "severity": "warning" }
       ]
     }
   ],

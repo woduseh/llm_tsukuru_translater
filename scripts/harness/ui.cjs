@@ -51,11 +51,12 @@ async function main() {
 
   const workspace = makeTempDir('llm-tsukuru-ui-');
   const fixturesRoot = path.join(projectRoot, 'test', 'fixtures', 'harness', 'ui');
-  const compareDir = path.join(workspace, 'compare-project');
-  const verifyDir = path.join(workspace, 'verify-project');
+  const compareDir = path.join(workspace, 'compare-project', 'data');
+  const verifyDir = path.join(workspace, 'verify-project', 'data');
   const resultPath = path.join(workspace, 'harness-ui-result.json');
   const scenarioPath = path.join(workspace, 'harness-ui-scenario.json');
   const storeDir = path.join(workspace, 'store');
+  const userDataDir = path.join(workspace, 'user-data');
   const timeoutMs = 45000;
 
   copyDir(path.join(fixturesRoot, 'compare-project'), compareDir);
@@ -70,6 +71,7 @@ async function main() {
   const exitCode = await runElectronHarness({
     ...process.env,
     LLM_TSUKURU_STORE_DIR: storeDir,
+    LLM_TSUKURU_UI_HARNESS_USER_DATA: userDataDir,
     LLM_TSUKURU_UI_HARNESS_SCENARIO: scenarioPath,
     LLM_TSUKURU_UI_HARNESS_RESULT: resultPath,
     LLM_TSUKURU_UI_HARNESS_TIMEOUT_MS: '45000',
@@ -81,6 +83,13 @@ async function main() {
 
   const result = readJson(resultPath);
   result.processExitCode = exitCode;
+  if (exitCode !== 0) {
+    result.status = 'failed';
+    result.cases = [...(result.cases || []), {
+      id: 'electron-exit', title: 'Electron exits cleanly after cleanup',
+      status: 'failed', durationMs: 0, error: { message: `Electron exited with code ${exitCode}` },
+    }];
+  }
   result.artifacts = {
     ...(result.artifacts || {}),
     workspace: relativeArtifactPath(workspace),

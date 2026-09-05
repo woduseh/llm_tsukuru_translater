@@ -1,3 +1,4 @@
+import './src/harness/uiHarnessEnvironment';
 import log from './src/logger';
 
 import { app, BrowserWindow, ipcMain } from 'electron';

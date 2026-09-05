@@ -10,10 +10,10 @@
     <!-- Left: File list -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <input type="text" v-model="searchQuery" class="search-input" placeholder="파일 검색..." @input="updateFilteredFiles">
+        <input type="text" v-model="searchQuery" class="search-input" placeholder="파일 검색...">
         <div class="filter-row">
-          <label><input type="checkbox" v-model="filterErrors" @change="updateFilteredFiles"> 오류</label>
-          <label><input type="checkbox" v-model="filterWarnings" @change="updateFilteredFiles"> 경고</label>
+          <label><input type="checkbox" v-model="filterErrors"> 오류</label>
+          <label><input type="checkbox" v-model="filterWarnings"> 경고</label>
           <span class="file-count">{{ filteredFiles.length }}/{{ files.length }}</span>
         </div>
       </div>
@@ -144,6 +144,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { api } from '../composables/useIpc'
 import { getRendererLlmProviderUiText } from '../../types/llmProviderContract'
+import { setAtPath } from '../../ts/rpgmv/verify'
 
 interface VerifyIssue {
   path: string; type: string; severity: 'error' | 'warning'; message: string;
@@ -159,7 +160,6 @@ const currentIdx = ref(0)
 const searchQuery = ref('')
 const filterErrors = ref(false)
 const filterWarnings = ref(false)
-const filteredFiles = ref<{ file: FileEntry; realIdx: number }[]>([])
 const statusText = ref('')
 const statusClass = ref('')
 const selectedIssues = ref<Set<number>>(new Set())
@@ -240,26 +240,6 @@ function onVerifyApplyJsonDone(result: VerifyApplyJsonResult) {
   pending.resolve(result)
 }
 
-/**
- * Local setAtPath — avoids contextBridge structured-clone which discards mutations.
- * Navigates a JSON path (e.g. "$.events[0].pages[1].list[5].parameters[0]") and sets value.
- */
-function localSetAtPath(obj: unknown, jsonPath: string, value: unknown): boolean {
-  const cleaned = jsonPath.replace(/^\$\.?/, '')
-  if (!cleaned) return false
-  const parts = cleaned.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean)
-    .map(p => /^\d+$/.test(p) ? Number(p) : p)
-  if (parts.length === 0) return false
-  let current: unknown = obj
-  for (let i = 0; i < parts.length - 1; i++) {
-    if (current == null || typeof current !== 'object') return false
-    current = (current as Record<string, unknown>)[parts[i] as string]
-  }
-  if (current == null || typeof current !== 'object') return false
-  ;(current as Record<string, unknown>)[parts[parts.length - 1] as string] = value
-  return true
-}
-
 const currentFileName = computed(() => files.value.length > 0 ? files.value[currentIdx.value].name : '')
 const currentIssues = computed(() => files.value.length > 0 ? files.value[currentIdx.value].issues : [])
 const currentHasIssues = computed(() => files.value.length > 0 && files.value[currentIdx.value].issues.length > 0)
@@ -329,9 +309,9 @@ interface SummaryItem {
 const summaryItems = computed<SummaryItem[]>(() => {
   if (loading.value) return [{ class: 'summary-loading', text: '⏳ 파일 비교 중...' }]
   if (files.value.length === 0) return [{ class: 'summary-error', text: '비교할 파일이 없습니다.' }]
-  const ef = files.value.filter(f => f.errorCount > 0).length
-  const wf = files.value.filter(f => f.warningCount > 0 && f.errorCount === 0).length
-  const total = files.value.reduce((s, f) => s + f.issues.length, 0)
+  const ef = errorFileCount.value
+  const wf = warningFileCount.value
+  const total = totalIssueCount.value
   if (total === 0) return [{ class: 'summary-ok', text: `✓ 모든 파일의 JSON 구조가 일치합니다 (${files.value.length}개)` }]
   const parts: SummaryItem[] = []
   if (ef > 0) parts.push({ class: 'summary-error', text: `❌ ${ef}개 파일에서 구조 오류` })
@@ -386,7 +366,6 @@ function loadFiles(dir: string) {
         })
       }
     }
-    updateFilteredFiles()
     if (files.value.length > 0 && files.value[0].issues.length === 0) {
       loadPreview(files.value[0])
     } else {
@@ -400,9 +379,9 @@ function loadFiles(dir: string) {
   }
 }
 
-function updateFilteredFiles() {
+const filteredFiles = computed(() => {
   const q = searchQuery.value.toLowerCase()
-  filteredFiles.value = files.value
+  return files.value
     .map((file, i) => ({ file, realIdx: i }))
     .filter(({ file }) => {
       if (q && !file.name.toLowerCase().includes(q)) return false
@@ -413,7 +392,7 @@ function updateFilteredFiles() {
       }
       return true
     })
-}
+})
 
 function selectFile(idx: number) {
   if (llmRepairing.value || verifyWriting.value) return
@@ -512,7 +491,7 @@ async function revertSelected() {
       if (!issue || issue.path === '$') continue
       const origVal = window.verify.getAtPath(orig, issue.path)
       if (origVal !== undefined) {
-        localSetAtPath(trans, issue.path, JSON.parse(JSON.stringify(origVal)))
+        setAtPath(trans, issue.path, JSON.parse(JSON.stringify(origVal)))
         reverted++
       }
     }
@@ -533,7 +512,6 @@ async function revertSelected() {
       statusClass.value = 'status-error'
     }
     selectedIssues.value = new Set()
-    updateFilteredFiles()
   } catch (e) {
     statusText.value = `❌ 되돌리기 실패: ${(e as Error).message}`
     statusClass.value = 'status-error'
@@ -581,7 +559,6 @@ async function repairCurrentFile() {
       statusClass.value = 'status-error'
     }
     selectedIssues.value = new Set()
-    updateFilteredFiles()
   } finally {
     verifyWriting.value = false
   }
@@ -610,7 +587,6 @@ async function repairAll() {
       statusClass.value = 'status-error'
     }
     selectedIssues.value = new Set()
-    updateFilteredFiles()
   } finally {
     verifyWriting.value = false
   }
@@ -688,7 +664,7 @@ async function applyLlmRepair() {
     let applied = 0
     for (const item of llmRepairResults.value) {
       if (item.newText.startsWith('[번역 실패:')) continue
-      if (localSetAtPath(trans, item.path, item.newText)) applied++
+      if (setAtPath(trans, item.path, item.newText)) applied++
     }
     if (applied > 0) {
       const indent = getIndent()
@@ -705,7 +681,6 @@ async function applyLlmRepair() {
     }
     llmRepairResults.value = []
     llmRepairContext.value = null
-    updateFilteredFiles()
   } catch (e) {
     statusText.value = `❌ LLM 적용 실패: ${(e as Error).message}`
     statusClass.value = 'status-error'

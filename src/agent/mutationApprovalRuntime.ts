@@ -1,7 +1,9 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AgentService } from './agentService';
+import { ApprovalService } from './approvalService';
+import { AgentEventBus } from './eventBus';
+import { AGENT_WORKSPACE_DIRECTORY } from './workspaceService';
 import {
   createMutationPatchExecutor,
   MutationPatchExecutionError,
@@ -39,7 +41,6 @@ export interface MutationApprovalRuntimeOptions {
   projectBindingId?: string;
   bridgeSessionId?: string;
   now?: () => Date;
-  agentService?: AgentService;
   executor?: MutationApprovalExecutor;
   onChanged?: (snapshot: MutationApprovalQueueSnapshot) => void;
 }
@@ -60,7 +61,7 @@ export class MutationApprovalRuntime {
   readonly appSessionId: string;
   readonly projectBindingId: string;
   readonly bridgeSessionId: string;
-  readonly agentService: AgentService;
+  readonly approvals: ApprovalService;
 
   private readonly now: () => Date;
   private readonly executor: MutationApprovalExecutor;
@@ -76,10 +77,13 @@ export class MutationApprovalRuntime {
     this.projectBindingId = options.projectBindingId ?? `project-${crypto.randomUUID()}`;
     this.bridgeSessionId = options.bridgeSessionId ?? `bridge-${crypto.randomUUID()}`;
     this.now = options.now ?? (() => new Date());
-    this.agentService = options.agentService ?? new AgentService({
-      projectRoot: this.projectRoot,
+    const workspaceRoot = path.join(this.projectRoot, AGENT_WORKSPACE_DIRECTORY);
+    this.approvals = new ApprovalService({
+      eventBus: new AgentEventBus({ workspaceRoot }),
+      auditRoot: workspaceRoot,
       sessionId: this.appSessionId,
-      approvalAuditMode: 'metadata-only',
+      auditMode: 'metadata-only',
+      now: this.now,
     });
     this.executor = options.executor ?? createMutationPatchExecutor({ projectRoot: this.projectRoot });
     this.onChanged = options.onChanged;
@@ -117,7 +121,7 @@ export class MutationApprovalRuntime {
       );
     }
     this.trimHistory();
-    const approval = this.agentService.approvals.planApproval({
+    const approval = this.approvals.planApproval({
       requestId: proposal.request.requestId,
       toolName: 'patch.apply',
       permissionTier: 'approval-required',
@@ -208,7 +212,7 @@ export class MutationApprovalRuntime {
     }
     const denied = transitionMutationApproval(record, { type: 'deny', note: request.value.note });
     this.records.set(denied.approvalId, denied);
-    this.agentService.approvals.updateApprovalStatus(denied.approvalId, 'denied');
+    this.approvals.updateApprovalStatus(denied.approvalId, 'denied');
     this.emitChanged();
     return toMutationApprovalRendererView(denied);
   }
@@ -245,7 +249,7 @@ export class MutationApprovalRuntime {
     this.records.set(applying.approvalId, applying);
     this.emitChanged();
     try {
-      this.agentService.approvals.consumeConfirmation({
+      this.approvals.consumeConfirmation({
         toolName: 'patch.apply',
         args: approvalArgs(current.value.request),
         confirmToken: applying.confirmToken,
@@ -261,7 +265,7 @@ export class MutationApprovalRuntime {
       }
       const applied = transitionMutationApproval(latest, { type: 'applied', result });
       this.records.set(applied.approvalId, applied);
-      this.agentService.approvals.writeToolAudit({
+      this.approvals.writeToolAudit({
         requestId: applied.requestId,
         toolName: 'patch.apply',
         action: 'applied approved patch',
@@ -286,7 +290,7 @@ export class MutationApprovalRuntime {
         },
       });
       this.records.set(failed.approvalId, failed);
-      this.agentService.approvals.writeToolAudit({
+      this.approvals.writeToolAudit({
         requestId: failed.requestId,
         toolName: 'patch.apply',
         action: 'approved patch execution failed',
@@ -323,7 +327,7 @@ export class MutationApprovalRuntime {
         },
       });
       this.records.set(cancelled.approvalId, cancelled);
-      this.agentService.approvals.updateApprovalStatus(cancelled.approvalId, 'cancelled');
+      this.approvals.updateApprovalStatus(cancelled.approvalId, 'cancelled');
     }
     this.disposed = true;
     this.emitChanged();
@@ -343,7 +347,7 @@ export class MutationApprovalRuntime {
       },
     });
     this.records.set(stale.approvalId, stale);
-    this.agentService.approvals.updateApprovalStatus(stale.approvalId, 'stale');
+    this.approvals.updateApprovalStatus(stale.approvalId, 'stale');
     this.emitChanged();
     return toMutationApprovalRendererView(stale);
   }
@@ -355,7 +359,7 @@ export class MutationApprovalRuntime {
       if (record.status !== 'pending' || Date.parse(record.expiresAt) > nowMs) continue;
       const expired = transitionMutationApproval(record, { type: 'expire' });
       this.records.set(expired.approvalId, expired);
-      this.agentService.approvals.updateApprovalStatus(expired.approvalId, 'expired');
+      this.approvals.updateApprovalStatus(expired.approvalId, 'expired');
       changed = true;
     }
     if (changed) this.emitChanged();

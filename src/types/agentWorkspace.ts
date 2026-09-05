@@ -306,40 +306,6 @@ export interface HandoffArtifact {
   failureId?: string;
 }
 
-export interface FileManifestEntry {
-  relativePath: string;
-  sizeBytes: number;
-  modifiedTimeMs: number;
-  sha256: string;
-}
-
-export interface SandboxManifest {
-  schemaVersion: 1;
-  sandboxId: string;
-  createdAt: string;
-  sourceRoot: string;
-  sandboxRoot: string;
-  allowedRoots: string[];
-  preManifest: FileManifestEntry[];
-  postManifest?: FileManifestEntry[];
-}
-
-export interface GoldenWorkflowStep {
-  toolName: string;
-  requestId: string;
-  status: AgentResultStatus;
-  permissionTier: PermissionTier;
-}
-
-export interface GoldenWorkflowTranscript {
-  schemaVersion: 1;
-  workflowId: string;
-  createdAt: string;
-  steps: GoldenWorkflowStep[];
-  finalStatus: AgentResultStatus;
-  artifacts: string[];
-}
-
 export interface McpToolDefinition {
   name: string;
   title: string;

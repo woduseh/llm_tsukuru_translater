@@ -1,21 +1,16 @@
 import axios from 'axios';
+import { normalizeProviderApiError } from './translationCore';
 import type { AppSettings } from '../../types/settings';
-import { DEFAULT_API_TIMEOUT_SEC } from './constants';
-import { ProviderTranslationBase, type ProviderTranslationConfig } from './providerTranslationBase';
+import { ProviderTranslationBase, createProviderTranslatorConfig, type ProviderTranslatorConfig } from './providerTranslationBase';
 import {
   buildTranslationSystemPrompt,
   buildTranslationUserMessage,
   stripMarkdownFences,
 } from './translationPrompt';
 
-interface OpenAiCompatibleConfig extends ProviderTranslationConfig {
+interface OpenAiCompatibleConfig extends ProviderTranslatorConfig {
   apiKey?: string;
   baseUrl: string;
-  model: string;
-  customPrompt: string;
-  sourceLang: string;
-  targetLang: string;
-  timeout: number;
 }
 
 interface OpenAiCompatibleDependencies {
@@ -36,33 +31,6 @@ function normalizeBaseUrl(baseUrl: string): string {
 
 export function buildChatCompletionsUrl(baseUrl: string): string {
   return `${normalizeBaseUrl(baseUrl)}/chat/completions`;
-}
-
-function getProviderErrorMessage(error: unknown): string {
-  const data = (error as { response?: { data?: unknown } })?.response?.data;
-  const apiMessage = (data as { error?: { message?: unknown } })?.error?.message;
-  if (typeof apiMessage === 'string' && apiMessage.trim()) return apiMessage.trim();
-  if (error instanceof Error && error.message.trim()) return error.message.trim();
-  return String(error);
-}
-
-function getProviderErrorStatus(error: unknown): number | undefined {
-  const status = (error as { response?: { status?: unknown } })?.response?.status;
-  return typeof status === 'number' ? status : undefined;
-}
-
-function redactSecret(message: string, secret?: string): string {
-  return secret && secret.trim() ? message.split(secret).join('[REDACTED]') : message;
-}
-
-function normalizeOpenAiError(error: unknown, apiKey?: string): Error {
-  if (error instanceof Error && error.message.startsWith('OpenAI-compatible API ')) return error;
-  const status = getProviderErrorStatus(error);
-  const message = redactSecret(getProviderErrorMessage(error), apiKey);
-  if (status === 401 || status === 403) return new Error(`OpenAI-compatible API authentication failed: ${message}`);
-  if (status === 429) return new Error(`OpenAI-compatible API rate limit (429): ${message}`);
-  if ((error as { code?: unknown })?.code === 'ECONNABORTED') return new Error(`OpenAI-compatible API timeout: ${message}`);
-  return new Error(`OpenAI-compatible API error: ${message}`);
 }
 
 export class OpenAiCompatibleTranslator extends ProviderTranslationBase {
@@ -103,7 +71,7 @@ export class OpenAiCompatibleTranslator extends ProviderTranslationBase {
       }
       return stripMarkdownFences(translated);
     } catch (error) {
-      throw normalizeOpenAiError(error, this.config.apiKey);
+      throw normalizeProviderApiError(error, 'OpenAI-compatible', this.config.apiKey);
     }
   }
 }
@@ -116,19 +84,9 @@ export function createOpenAiTranslator(
   deps: OpenAiCompatibleDependencies = {},
 ): OpenAiCompatibleTranslator {
   return new OpenAiCompatibleTranslator({
+    ...createProviderTranslatorConfig(settings, sourceLang, targetLang, isAborted),
     apiKey: settings.llmOpenAiApiKey || '',
     baseUrl: OPENAI_BASE_URL,
-    model: settings.llmModel || '',
-    customPrompt: settings.llmCustomPrompt || '',
-    chunkSize: settings.llmChunkSize || 30,
-    translationUnit: settings.llmTranslationUnit || 'file',
-    sourceLang,
-    targetLang,
-    doNotTransHangul: !!settings.DoNotTransHangul,
-    maxRetries: settings.llmMaxRetries ?? 2,
-    maxApiRetries: settings.llmMaxApiRetries ?? 5,
-    timeout: (settings.llmTimeout || DEFAULT_API_TIMEOUT_SEC) * 1000,
-    isAborted,
   }, deps);
 }
 
@@ -140,18 +98,8 @@ export function createCustomOpenAiTranslator(
   deps: OpenAiCompatibleDependencies = {},
 ): OpenAiCompatibleTranslator {
   return new OpenAiCompatibleTranslator({
+    ...createProviderTranslatorConfig(settings, sourceLang, targetLang, isAborted),
     apiKey: settings.llmCustomApiKey || '',
     baseUrl: settings.llmCustomBaseUrl || '',
-    model: settings.llmModel || '',
-    customPrompt: settings.llmCustomPrompt || '',
-    chunkSize: settings.llmChunkSize || 30,
-    translationUnit: settings.llmTranslationUnit || 'file',
-    sourceLang,
-    targetLang,
-    doNotTransHangul: !!settings.DoNotTransHangul,
-    maxRetries: settings.llmMaxRetries ?? 2,
-    maxApiRetries: settings.llmMaxApiRetries ?? 5,
-    timeout: (settings.llmTimeout || DEFAULT_API_TIMEOUT_SEC) * 1000,
-    isAborted,
   }, deps);
 }

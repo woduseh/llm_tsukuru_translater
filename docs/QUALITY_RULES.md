@@ -1,5 +1,7 @@
 # Quality Rules
 
+Behavioral contracts for the affected code, not a mandatory verification sequence. See [HARNESS.md](HARNESS.md) for checks and [Architecture](ARCHITECTURE.md) for implementation locations.
+
 ## Structural Invariants
 
 - Dialogue separators such as `--- 101 ---` must survive translation unchanged.
@@ -13,8 +15,16 @@
 - `Extract_backup` or `_backup` is the source of truth for untranslated content.
 - `.llm_progress.json` and `.llm_cache.json` must remain resumable and safe to clear.
 - `untranslated` mode must skip already translated files and re-run only files that still match backup.
-- Cache keys must include provider, content hash, model, and target language.
+- Cache/progress identity must include the effective provider configuration; cache keys also include content hash, model, source and target language. `translatorFactory.ts` and `providerRegistry.ts` define the fingerprints.
 - Provider readiness errors must be deterministic and renderer-safe.
+- Failed or incomplete provider output must not be saved, cached, or marked complete as a successful translation.
+
+## File Mutation Rules
+
+- Extraction/apply validates input structure and stages outputs before committing; failed multi-file commits roll back instead of reporting partial success.
+- Existing translation backups are reusable only when their complete file set matches the extraction surface. `ext_javascript.js` belongs to the line-aligned translation surface too.
+- Successfully decrypted Wolf archives remain recoverable as `.wolf.tsukuru-backup` files; leaving active `.wolf` archives can hide translated loose `Data/**` at runtime.
+- JSON Verify writes are authorized by main-process validation of the active root, exact target/preimage and valid JSON immediately before atomic replacement. Renderer previews alone do not authorize a write.
 
 ## Verification Rules
 

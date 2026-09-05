@@ -60,13 +60,16 @@ async function main() {
         const issues = stringPolicy
           ? verify.verifyJsonIntegrity(verifyCase.orig, verifyCase.trans, '$', undefined, stringPolicy)
           : verify.verifyJsonIntegrity(verifyCase.orig, verifyCase.trans);
-        const types = issues.map((issue) => issue.type);
-        for (const expectedType of verifyCase.expectedTypes) {
-          assert(types.includes(expectedType), `${verifyCase.id}: missing expected issue type ${expectedType}`);
-        }
+        const summarize = (entries) => entries
+          .map(({ type, path, severity }) => ({ type, path, severity }))
+          .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+        const actualIssues = summarize(issues);
+        const expectedIssues = summarize(verifyCase.expectedIssues);
+        assert(deepEqual(actualIssues, expectedIssues),
+          `${verifyCase.id}: expected ${JSON.stringify(expectedIssues)}, received ${JSON.stringify(actualIssues)}`);
         return {
           category: 'verify',
-          issueTypes: types,
+          issues: actualIssues,
           issueCount: issues.length,
         };
       },

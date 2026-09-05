@@ -122,6 +122,29 @@ describe('AgentBridgeServer', () => {
 });
 
 describe('MCP app bridge proxy', () => {
+  it('describes bridge tools without claiming a live connection or bypassing help validation', async () => {
+    const { projectRoot, userDataPath, targetPath } = makeProject('bridge-help');
+    const before = fs.readFileSync(targetPath);
+    const registry = new BridgeAwareMcpToolRegistry(
+      createMcpOfflineToolRegistry(new AgentService({ projectRoot })),
+      { manifestPath: path.join(userDataPath, 'missing.json'), projectRoot },
+    );
+    const explanation = await registry.callTool('help.explain_tool', { toolName: 'patch.apply' });
+    expect(explanation.payload).toMatchObject({ status: 'ok', permissionTier: 'approval-required' });
+    expect(explanation.payload?.safety).toContain('submission does not apply');
+    const statusHelp = await registry.callTool('help.explain_tool', { toolName: 'approval.status' });
+    expect(statusHelp.payload).toMatchObject({ status: 'ok', permissionTier: 'readonly' });
+    const workflow = await registry.callTool('help.translation_workflow');
+    expect(workflow.payload?.capabilities).toMatchObject({ mode: 'app-bridge' });
+    expect(JSON.stringify(workflow.payload)).toContain('Registration does not establish a live connection');
+    const repair = await registry.callTool('help.safe_recipe', { recipeId: 'line_shift_repair' });
+    expect((repair.payload?.recipe as JsonObject).tools).toEqual(expect.arrayContaining(['patch.apply', 'approval.status']));
+    expect((await registry.callTool('help.explain_tool', {})).status).toBe('failed');
+    expect((await registry.callTool('help.safe_recipe', { recipeId: 'unknown' })).status).toBe('failed');
+    expect((await registry.callTool('help.translation_workflow', { unexpected: true })).status).toBe('failed');
+    expect(fs.readFileSync(targetPath)).toEqual(before);
+  });
+
   it('exposes proposal and status tools and preserves JSON-RPC idempotency', async () => {
     const { projectRoot, userDataPath, targetPath } = makeProject('mcp-proxy');
     const before = fs.readFileSync(targetPath);
