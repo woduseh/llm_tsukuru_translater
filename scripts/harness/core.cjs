@@ -497,19 +497,28 @@ async function main() {
             translationMode: 'untranslated',
           };
 
-          await translatorModule.trans(null, arg, ctx);
-          const firstRunCalls = translateCalls;
+          const runTranslation = async (label, options, expectedCalls) => {
+            const firstEvent = emitted.length;
+            translateCalls = 0;
+            await translatorModule.trans(null, options, ctx);
+            // trans reports caught failures through the production alert channel.
+            // Stop before a later run can recover and overwrite the failed log.
+            const alerts = emitted.slice(firstEvent)
+              .filter((event) => event.channel === 'alert').map((event) => event.args[0]);
+            const errors = alerts.filter((alert) => alert?.icon === 'error');
+            assert(errors.length === 0, `${label} emitted an application error: ${JSON.stringify(errors)}`);
+            assert(translateCalls === expectedCalls,
+              `expected ${expectedCalls} translations on ${label}, got ${translateCalls}; application alerts: ${JSON.stringify(alerts)}`);
+            return translateCalls;
+          };
 
-          translateCalls = 0;
-          await translatorModule.trans(null, arg, ctx);
-          const secondRunCalls = translateCalls;
+          const firstRunCalls = await runTranslation('first run', arg, 2);
+          const secondRunCalls = await runTranslation('second run', arg, 0);
 
           const backupFileOne = path.join(workspace, 'Extract_backup', 'Map001.txt');
           fs.copyFileSync(backupFileOne, fileOne);
 
-          translateCalls = 0;
-          await translatorModule.trans(null, { ...arg, resetProgress: true }, ctx);
-          const resetRunCalls = translateCalls;
+          const resetRunCalls = await runTranslation('reset run', { ...arg, resetProgress: true }, 1);
 
           const cachePath = path.join(extractDir, '.llm_cache.json');
           const progressPath = path.join(extractDir, '.llm_progress.json');
@@ -521,9 +530,6 @@ async function main() {
           assert(logFiles.length >= 1, 'translation log not written');
           assert(fs.readFileSync(fileOne, 'utf8').includes('안녕하세요'), 'first file was not translated');
           assert(fs.readFileSync(fileTwo, 'utf8').includes('안녕히 가세요'), 'second file was not translated');
-          assert(firstRunCalls === 2, `expected 2 translations on first run, got ${firstRunCalls}`);
-          assert(secondRunCalls === 0, `expected untranslated-only second run to skip all files, got ${secondRunCalls}`);
-          assert(resetRunCalls === 1, `expected reset untranslated-only run to retranslate one file, got ${resetRunCalls}`);
           assert(emitted.some((event) => event.channel === 'loadingTag'), 'loading progress events disappeared');
 
           return {

@@ -93,6 +93,54 @@ describe('harness command execution', () => {
     expect(buildMainIfNeeded).toHaveBeenCalledOnce();
     expect(runCommand.mock.calls).toEqual(reuseBuild ? [] : [['npm', ['run', 'build:mcp']]]);
   });
+
+  it.each([true, false])('stops a failed first bulk run before retrying and losing its diagnostics (alert=%s)', async (emitError) => {
+    const corePath = path.join(process.cwd(), 'scripts/harness/core.cjs');
+    const originalCreateTranslator = () => ({});
+    const originalReadiness = () => null;
+    const factory = { createTranslator: originalCreateTranslator, getLlmReadinessError: originalReadiness };
+    const trans = vi.fn(async (_event: unknown, _args: unknown, ctx: {
+      mainWindow: { webContents: { send: (channel: string, ...args: unknown[]) => void } };
+    }) => {
+      if (emitError) ctx.mainWindow.webContents.send('alert', { icon: 'error', message: 'injected backup rename failure' });
+    });
+    await new Promise<void>((resolve, reject) => {
+      const harnessShared = {
+        ...shared,
+        buildMainIfNeeded: () => {},
+        makeTempDir: () => path.join(process.cwd(), 'in-memory-core-workspace'),
+        writeTaskManifest: () => 'in-memory',
+        loadCompiledModule: (name: string) => {
+          if (name === 'src/ts/libs/translatorFactory.js') return factory;
+          if (name === 'src/ts/rpgmv/translator.js') return { trans };
+          if (name === 'src/ts/libs/projectTools.js') return { init: () => {} };
+          return {};
+        },
+        runCases: async (_suite: string, cases: Array<{ id: string; run: () => Promise<unknown> }>) => {
+          const bulk = cases.find(testCase => testCase.id === 'bulk-translation-workflow');
+          if (!bulk) throw new Error('Missing real bulk translation case');
+          await expect(bulk.run()).rejects.toThrow(emitError
+            ? 'first run emitted an application error: [{"icon":"error","message":"injected backup rename failure"}]'
+            : 'expected 2 translations on first run, got 0');
+          return { total: 1, failed: 0 };
+        },
+        writeHarnessResult: () => resolve(),
+        writeFatalHarnessResult: (_suite: string, error: unknown) => reject(error),
+      };
+      vm.runInNewContext(fs.readFileSync(corePath, 'utf8'), {
+        Buffer,
+        process: { env: { LLM_TSUKURU_SKIP_BUILD: '1' }, exitCode: 0 },
+        require: (id: string) => {
+          if (id === './_shared.cjs') return harnessShared;
+          if (id === 'fs') return { ...fs, mkdirSync: vi.fn(), writeFileSync: vi.fn() };
+          return require(id);
+        },
+      }, { filename: corePath });
+    });
+    expect(trans).toHaveBeenCalledOnce();
+    expect(factory.createTranslator).toBe(originalCreateTranslator);
+    expect(factory.getLlmReadinessError).toBe(originalReadiness);
+  });
 });
 
 describe('harness result reliability', () => {

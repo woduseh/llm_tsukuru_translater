@@ -122,19 +122,36 @@ async function snapshot(win: BrowserWindow, source: string): Promise<unknown> {
   return win.webContents.executeJavaScript(source, true);
 }
 
-async function captureScreen(win: BrowserWindow, directory: string, name: string): Promise<string> {
+export async function captureScreen(win: BrowserWindow, directory: string, name: string, timeoutMs = 3000): Promise<string> {
   const output = path.join(directory, `${name}.png`);
-  const image = await win.webContents.capturePage();
-  if (image.isEmpty()) throw new Error(`UI capture is empty: ${name}`);
-  fs.writeFileSync(output, image.toPNG());
-  return output;
+  // DOM assertions may finish before their changes reach the captured frame.
+  await win.webContents.executeJavaScript(`new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('UI did not paint before capture')), ${timeoutMs});
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      clearTimeout(timer);
+      resolve(null);
+    }));
+  })`, true);
+  const startedAt = Date.now();
+  // DOM readiness can precede the first compositor frame on a fresh window.
+  do {
+    const image = await win.webContents.capturePage();
+    if (!image.isEmpty()) {
+      fs.writeFileSync(output, image.toPNG());
+      return output;
+    }
+    await delay(100);
+  } while (Date.now() - startedAt < timeoutMs);
+  throw new Error(`UI capture is empty after ${timeoutMs}ms: ${name}`);
 }
 
 async function captureFailure(directory: string, stage: string): Promise<void> {
   const windows = [];
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue;
-    const info: Record<string, unknown> = { id: win.id };
+    const info: Record<string, unknown> = {
+      id: win.id, visible: win.isVisible(), minimized: win.isMinimized(), bounds: win.getBounds(),
+    };
     try {
       // Only structural state. Never dump form values, HTML, or bridge tokens.
       info.state = await snapshot(win, `({ route: location.hash, readyState: document.readyState,

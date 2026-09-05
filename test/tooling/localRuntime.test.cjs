@@ -6,7 +6,7 @@ const net = require('node:net');
 const { spawn } = require('node:child_process');
 const { runDev } = require('../../scripts/dev.cjs');
 const { isolatedEnvironment, electronExecutable, childCompletion, stopChild, shutdownChild, removePrivateState, withTimeout } = require('../../scripts/local-runtime.cjs');
-const { assertUiEvidence } = require('../../scripts/harness/ui.cjs');
+const { assertUiEvidence, validateUiArgs } = require('../../scripts/harness/ui.cjs');
 
 const scratch = path.resolve(__dirname, '../../artifacts/unit/local-runtime');
 const roots = [];
@@ -52,6 +52,13 @@ test('standalone UI rejects empty/skipped evidence and cannot pass an ignored fa
   assert.throws(() => assertUiEvidence({ ...passed, cases: [{ status: 'skipped' }] }), /nonempty/);
   assert.throws(() => assertUiEvidence(passed, true), /fault was not exercised/);
   assert.doesNotThrow(() => assertUiEvidence({ ...passed, status: 'failed', cases: [] }, true));
+});
+
+test('UI arguments reject a fault command whose option names were lost by the shell', () => {
+  assert.doesNotThrow(() => validateUiArgs(['--fail-at', 'home', '--output', 'result with spaces.json']));
+  assert.throws(() => validateUiArgs(['home', 'result.json']), /Unexpected or incomplete argument/);
+  assert.throws(() => validateUiArgs(['--fail-at']), /Unexpected or incomplete argument/);
+  assert.throws(() => validateUiArgs(['--output']), /Unexpected or incomplete argument/);
 });
 
 test('private cleanup removes settings and credentials but preserves diagnostic evidence', () => {
@@ -147,7 +154,9 @@ function serverFactory(record) {
       httpServer: server,
       listen: () => new Promise((resolve, reject) => {
         server.once('error', reject);
-        server.listen(options.server.port, options.server.host, resolve);
+        // This stand-in only checks consumption of the assigned address.
+        // Real Vite port fallback is covered in unit/devServer.test.ts.
+        server.listen(0, options.server.host, resolve);
       }),
       close: () => new Promise(resolve => { server.close(resolve); record.closed = true; }),
     };
@@ -164,7 +173,7 @@ test('fresh dev startup builds before launch, verifies renderer origin and clean
   });
   assert.equal(result.status, 'passed');
   assert.ok(result.readyAt);
-  assert.deepEqual(server.options.server, { host: '127.0.0.1', port: 0, strictPort: true });
+  assert.deepEqual(server.options.server, { host: '127.0.0.1', port: 5173, strictPort: false });
   assert.equal(server.closed, true);
   assert.equal(result.privateStateRemoved, true);
   assert.equal(fs.existsSync(path.join(result.workspace, 'user-data')), false);

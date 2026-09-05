@@ -18,6 +18,14 @@ function waitForReady(file, completion, timeoutMs) {
   ]), timeoutMs, `Renderer did not send mainReady within ${timeoutMs}ms.`).finally(() => clearInterval(interval));
 }
 
+function createRendererServer(root, createServer) {
+  return createServer({
+    configFile: path.join(root, 'vite.renderer.config.ts'),
+    // Vite treats port 0 as its default. Let it bind the next available port.
+    server: { host: '127.0.0.1', port: 5173, strictPort: false },
+  });
+}
+
 async function runDev(options = {}) {
   const root = options.root || path.resolve(__dirname, '..');
   const runs = path.join(root, 'artifacts', 'dev');
@@ -61,11 +69,7 @@ async function runDev(options = {}) {
     if (interrupted) throw new Error('Development startup interrupted.');
     report.phase = 'renderer-server'; save();
     const createServer = options.createServer || (await import('vite')).createServer;
-    server = await createServer({
-      configFile: path.join(root, 'vite.renderer.config.ts'),
-      // The listening server owns the allocated port; no reserve/release race.
-      server: { host: '127.0.0.1', port: 0, strictPort: true },
-    });
+    server = await createRendererServer(root, createServer);
     await server.listen();
     const address = server.httpServer?.address();
     if (!address || typeof address === 'string') throw new Error('Vite did not expose its listening port.');
@@ -128,5 +132,5 @@ async function main(args = process.argv.slice(2)) {
   process.exitCode = ['passed', 'stopped'].includes(result.status) ? 0 : 1;
 }
 
-module.exports = { runDev, waitForReady, main };
+module.exports = { runDev, waitForReady, createRendererServer, main };
 if (require.main === module) main().catch(error => { console.error(`[dev] ${error.message}`); process.exitCode = 1; });

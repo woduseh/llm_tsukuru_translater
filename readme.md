@@ -25,6 +25,17 @@ RPG Maker MV/MZ 및 Wolf RPG Editor 게임의 텍스트를 추출·번역·적�
 
 ### 개발 환경 설정
 
+Windows x64에서 프로젝트 전용 Node 22.23.2 / npm을 쓰려면 다음 PowerShell 명령을 사용하세요. 첫 실행은 공식 Node ZIP을 내려받아 SHA256을 확인하고 `.tools/`에 설치해요. 이 명령 안에서만 런타임을 선택하며, 관리자 권한이나 전역 Node 변경은 필요하지 않아요.
+
+```powershell
+.\scripts\dev-env.ps1 ci --prefer-offline --no-audit --fund=false
+.\scripts\dev-env.ps1 run doctor
+.\scripts\dev-env.ps1 run dev '--' --smoke
+.\scripts\dev-env.ps1 run verify:full
+```
+
+인수 없이 실행하면 `doctor`, `run dev`는 대화식 개발 실행이에요. PowerShell에서 npm 스크립트에 옵션을 넘길 때는 예제처럼 `'--'`를 따옴표로 감싸야 해요. 다운로드와 프로세스 실행은 현재 실행 환경에서 허용돼야 하며, 이 스크립트는 권한 정책을 변경하지 않아요. Node 22 환경이 이미 준비돼 있다면 아래 기본 명령을 바로 사용할 수 있어요.
+
 ```bash
 # 체크아웃마다 lockfile 기준 설치 (Electron 다운로드와 설치 스크립트 필요)
 npm ci
@@ -48,7 +59,7 @@ npm test
 npm run lint
 ```
 
-`dev`는 실행별 임시 포트와 설정·로그·세션 프로필을 사용해요. 앱을 닫거나 Ctrl+C로 종료하면 서버와 개인 상태를 정리하고 `artifacts/dev/latest.json` 및 실행별 로그를 남겨요. 개발 프로필의 설정은 유지되지 않으며 메인/preload 변경은 `dev`를 다시 실행해야 반영돼요. 평소 사용자 설정으로 빌드된 앱을 실행하려면 `npm start`를 사용하세요.
+`dev`는 실행별 빈 포트와 설정·로그·세션 프로필을 사용해요. 5173부터 사용 가능한 포트를 선택하고 실제 주소를 Electron에 전달해요. 앱을 닫거나 Ctrl+C로 종료하면 서버와 개인 상태를 정리하고 `artifacts/dev/latest.json` 및 실행별 로그를 남겨요. 개발 프로필의 설정은 유지되지 않으며 메인/preload 변경은 `dev`를 다시 실행해야 반영돼요. 평소 사용자 설정으로 빌드된 앱을 실행하려면 `npm start`를 사용하세요.
 
 변경 후에는 `npm run verify:plan` → `npm run verify`를 사용하세요. 실제 Electron 동작 검사는 `npm run harness:ui`, 전체 결정적 검사는 `npm run verify:full`이에요. 환경 진단 통과나 홈 화면 smoke만으로 번역·적용 동작이 검증되지는 않아요. 실패 진단과 검증 범위는 [HARNESS.md](docs/HARNESS.md)를 참조하세요.
 

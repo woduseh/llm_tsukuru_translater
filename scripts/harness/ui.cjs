@@ -51,6 +51,14 @@ function assertUiEvidence(result, failureInjected = false) {
   }
 }
 
+function validateUiArgs(args) {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--fail-at' && args[i + 1] === 'home') { i++; continue; }
+    if (args[i] === '--output' && args[i + 1] && !args[i + 1].startsWith('--')) { i++; continue; }
+    throw new Error('Use harness:ui with optional --fail-at home and --output <path>. Unexpected or incomplete argument.');
+  }
+}
+
 async function main() {
   const workspace = makeTempDir('llm-tsukuru-ui-');
   const fixturesRoot = path.join(projectRoot, 'test', 'fixtures', 'harness', 'ui');
@@ -67,9 +75,7 @@ async function main() {
   let result;
   let phase = 'arguments';
   try {
-    if (failureIndex !== -1 && process.argv[failureIndex + 1] !== 'home') {
-      throw new Error('The supported fault probe is --fail-at home. It must exit nonzero.');
-    }
+    validateUiArgs(process.argv.slice(2));
     phase = 'build';
     const buildOutput = fs.openSync(buildLog, 'w');
     try { buildAppIfNeeded({ stdio: ['ignore', buildOutput, buildOutput], env: isolatedEnvironment() }); }
@@ -176,4 +182,4 @@ if (require.main === module) main().catch((error) => {
   });
   process.exitCode = 1;
 });
-module.exports = { main, runElectronHarness, assertUiEvidence };
+module.exports = { main, runElectronHarness, assertUiEvidence, validateUiArgs };

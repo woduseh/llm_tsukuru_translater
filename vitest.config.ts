@@ -8,6 +8,7 @@ export default defineConfig({
     globals: true,
     coverage: {
       provider: 'v8',
+      reportsDirectory: 'artifacts/unit/coverage',
       reporter: ['text', 'text-summary'],
       include: ['src/**/*.ts'],
       exclude: ['src/types/**'],
