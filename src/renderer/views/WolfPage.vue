@@ -44,8 +44,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { api } from '../composables/useIpc'
+import { computed, ref, onMounted } from 'vue'
+import { api, useIpcOn } from '../composables/useIpc'
 import TitleBar from '../components/TitleBar.vue'
 import Swal from 'sweetalert2'
 
@@ -120,25 +120,16 @@ function openLLMCompare() {
 onMounted(() => {
   api.send('setheight', 550)
 
-  api.on('set_path', (tt: Record<string, string>) => {
+  useIpcOn('set_path', (tt: Record<string, string>) => {
     if (tt && tt.type === 'wolf_folder_input') {
       folderPath.value = tt.dir
       if (mode.value === -1) mode.value = 0
     }
   })
 
-  api.on('getGlobalSettings', (tt: Record<string, unknown>) => {
-    if (tt && tt.themeData) {
-      const root = document.documentElement
-      for (const [key, val] of Object.entries(tt.themeData as Record<string, string>)) {
-        root.style.setProperty(key, val)
-      }
-    }
-  })
+  useIpcOn('worked', () => { running.value = false })
 
-  api.on('worked', () => { running.value = false })
-
-  api.on('alert2', async () => {
+  useIpcOn('alert2', async () => {
     const { isDenied } = await Swal.fire({
       icon: 'success',
       showDenyButton: true,
@@ -150,7 +141,7 @@ onMounted(() => {
     }
   })
 
-  api.on('alertExten', async (arg: unknown) => {
+  useIpcOn('alertExten', async (arg: unknown) => {
     if (!Array.isArray(arg)) return
     const { isDenied } = await Swal.fire({
       icon: 'success',
@@ -166,11 +157,6 @@ onMounted(() => {
   })
 })
 
-onUnmounted(() => {
-  for (const ch of ['set_path', 'getGlobalSettings', 'worked', 'alert2', 'alertExten']) {
-    api.removeAllListeners(ch)
-  }
-})
 </script>
 
 <style scoped>

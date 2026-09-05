@@ -142,7 +142,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { api } from '../composables/useIpc'
+import { api, useIpcOn } from '../composables/useIpc'
 import { getRendererLlmProviderUiText } from '../../types/llmProviderContract'
 import { setAtPath } from '../../ts/rpgmv/verify'
 
@@ -695,25 +695,19 @@ function cancelLlmRepair() {
 }
 
 onMounted(() => {
-  api.on('initVerify', (dir: string) => loadFiles(dir))
-  api.on('verifyApplyJsonDone', onVerifyApplyJsonDone)
-  api.on('verifySettings', (s: unknown) => {
+  useIpcOn('initVerify', (dir: string) => loadFiles(dir))
+  useIpcOn('verifyApplyJsonDone', onVerifyApplyJsonDone)
+  useIpcOn('verifySettings', (s: unknown) => {
     const settings = s as Record<string, any>
     jsonChangeLine.value = !!settings.JsonChangeLine
     llmReady.value = !!settings.llmReady
     currentProvider.value = typeof settings.llmProvider === 'string' ? settings.llmProvider : 'gemini'
-    if (settings.themeData) {
-      const root = document.documentElement
-      for (const [key, val] of Object.entries(settings.themeData as Record<string, string>)) {
-        root.style.setProperty(key, val)
-      }
-    }
   })
-  api.on('verifyLlmRepairProgress', (data: { requestId: string; current: number; total: number; path: string }) => {
+  useIpcOn('verifyLlmRepairProgress', (data: { requestId: string; current: number; total: number; path: string }) => {
     if (data.requestId !== llmRepairContext.value?.requestId) return
     llmProgress.value = `${data.current}/${data.total}`
   })
-  api.on('verifyLlmRepairDone', (data: { requestId: string; success: boolean; results?: { path: string; origText: string; newText: string }[]; error?: string }) => {
+  useIpcOn('verifyLlmRepairDone', (data: { requestId: string; success: boolean; results?: { path: string; origText: string; newText: string }[]; error?: string }) => {
     const repairContext = llmRepairContext.value
     if (!repairContext || data.requestId !== repairContext.requestId) return
     llmRepairing.value = false
@@ -747,11 +741,6 @@ onMounted(() => {
   api.send('verifyReady')
 })
 onUnmounted(() => {
-  api.removeAllListeners('initVerify')
-  api.removeAllListeners('verifySettings')
-  api.removeAllListeners('verifyLlmRepairProgress')
-  api.removeAllListeners('verifyLlmRepairDone')
-  api.removeAllListeners('verifyApplyJsonDone')
   for (const pending of pendingVerifyWrites.values()) clearTimeout(pending.timeoutId)
   pendingVerifyWrites.clear()
 })

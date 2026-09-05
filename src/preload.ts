@@ -32,7 +32,7 @@ contextBridge.exposeInMainWorld('api', {
     if (isReceiveChannel(channel)) {
       const subscription = (_event: unknown, ...args: unknown[]) => callback(...args);
       ipcRenderer.on(channel, subscription as (...args: unknown[]) => void);
-      return subscription;
+      return () => ipcRenderer.removeListener(channel, subscription);
     }
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

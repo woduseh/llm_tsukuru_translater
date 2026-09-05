@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   on: vi.fn(),
   handle: vi.fn(),
   send: vi.fn(),
+  storageSet: vi.fn(),
   isDestroyed: vi.fn(() => false),
   existsSync: vi.fn(() => false),
   retranslateFile: vi.fn(),
@@ -16,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() }, ipcMain: { on: mocks.on, handle: mocks.handle } }));
 vi.mock('fs', () => ({ default: { existsSync: mocks.existsSync } }));
-vi.mock('../../src/ipc/shared', () => ({ storage: { set: vi.fn() } }));
+vi.mock('../../src/ipc/shared', () => ({ storage: { set: mocks.storageSet } }));
 vi.mock('../../src/ipc/toolsHandler', () => ({
   getLLMCompareWindow: () => ({ isDestroyed: mocks.isDestroyed, webContents: { send: mocks.send } }),
 }));
@@ -35,6 +36,36 @@ function handler(registrations: typeof mocks.on, channel: string) {
 }
 
 beforeEach(() => vi.clearAllMocks());
+
+describe('translation request settings IPC', () => {
+  it.each([
+    { workers: 8, rpm: 120, expectedWorkers: 8, expectedRpm: 120 },
+    { workers: 16, rpm: 60_001, expectedWorkers: 8, expectedRpm: 60_000 },
+    { workers: 1.5, rpm: -1, expectedWorkers: 1, expectedRpm: 0 },
+    { workers: undefined, rpm: undefined, expectedWorkers: 1, expectedRpm: 0 },
+  ])('normalizes and saves API request settings ($workers / $rpm)', ({ workers, rpm, expectedWorkers, expectedRpm }) => {
+    const ctx = new AppContext();
+    ctx.settings.llmModel = 'user-selected-model';
+    registerTranslateHandlers(ctx);
+
+    handler(mocks.on, 'llmSettingsApply')({}, {
+      llmSortOrder: 'size-desc',
+      llmParallelWorkers: workers,
+      llmRequestsPerMinute: rpm,
+    });
+
+    const expected = {
+      llmSortOrder: 'size-desc',
+      llmParallelWorkers: expectedWorkers,
+      llmRequestsPerMinute: expectedRpm,
+      llmModel: 'user-selected-model',
+    };
+    expect(ctx.settings).toMatchObject(expected);
+    expect(mocks.storageSet).toHaveBeenCalledOnce();
+    expect(mocks.storageSet.mock.calls[0][0]).toBe('settings');
+    expect(JSON.parse(mocks.storageSet.mock.calls[0][1])).toMatchObject(expected);
+  });
+});
 
 describe('retranslation IPC', () => {
   const request = { dir: path.resolve('game'), fileName: 'Map001.txt', requestId: 'request-1', expectedContent: 'original', blockIndices: [2, 4] };

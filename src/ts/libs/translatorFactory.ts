@@ -12,12 +12,14 @@ import {
   VertexTranslator,
 } from './providerRegistry';
 import type { BlockValidation, TranslationLogEntry } from './translationCore';
+import type { TranslationExecution } from './providerTranslationBase';
 
 export interface Translator {
   translateText(text: string): Promise<string>;
   translateFileContent(
     content: string,
-    onProgress?: (current: number, total: number, detail: string) => void
+    onProgress?: (current: number, total: number, detail: string) => void,
+    execution?: TranslationExecution,
   ): Promise<{
     translatedContent: string;
     validation: BlockValidation[];

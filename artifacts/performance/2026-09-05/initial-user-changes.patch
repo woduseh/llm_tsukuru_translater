@@ -1,0 +1,1160 @@
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index da478a8..75f56e9 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -76,12 +76,14 @@ Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-speci
+ 
+ - `providerTranslationBase.ts` owns common provider configuration and translation retry/chunk handling. `translationPrompt.ts` builds prompts, preserving the existing Google/standard wording variants. `translationCore.ts` shares API error parsing; `providerRegistry.ts` owns provider selection and cache/config fingerprints.
+ - Compare and verify views derive filters and editing indicators from their source state with Vue computed values. Compare problem navigation includes unmatched blocks on either side.
++- Agent Workspace keeps environment and executable-detection responses per page instance, deriving preset readiness and the timeline from those signals without modifying shared preset definitions.
++- The file translation coordinator uses bounded async workers. Provider failures remain per-file results; completion-handler failures stop new work and propagate after in-flight workers settle, before the directory lock is released. Bulk translation and retranslation share the same line-array block parser.
+ - JSON Verify uses the pure `setAtPath` from `src/ts/rpgmv/verify.ts` locally; the actual file write still goes through validated main-process IPC.
+ 
+ ## Build and IPC Details
+ 
+ - `tsconfig.main.json` extends `tsconfig.json` and compiles main-process code into `dist-main/`; Vite builds Vue into `dist-renderer/`. Generated output is not source.
+-- Vue uses hash routing for packaged `file://` URLs. `useIpcOn` removes listeners on component unmount. Add IPC channels to the whitelist for their actual direction in `src/preload.ts`.
++- Vue uses hash routing for packaged `file://` URLs. `App.vue` receives global theme updates across routes. `useIpcOn` disposes only its own subscription on component unmount, using the unsubscribe callback returned by preload `api.on`. Add IPC channels to the whitelist for their actual direction in `src/preload.ts`.
+ - Sub-window route components mount after `did-finish-load`. Main retains pending data until the component sends its ready signal from `onMounted`; see `toolsHandler.ts` for compare/verify examples.
+ - Existing windows use `sandbox: false` for the current Node-dependent preload. This is an implementation dependency to reassess when changing preload, not a requirement for every future window.
+ 
+diff --git a/docs/HARNESS.md b/docs/HARNESS.md
+index 92f7a06..88619c0 100644
+--- a/docs/HARNESS.md
++++ b/docs/HARNESS.md
+@@ -10,7 +10,7 @@ Choose checks for the changed behavior; this is a command reference, not a check
+ | --- | --- |
+ | Markdown only or no changes | Explicit `skipped`; no verification claim |
+ | Unit tests/test utilities | Both typechecks, lint, all unit tests |
+-| Translation, extraction, Wolf, agent kernel, MCP | Above plus clean main build, core and eval |
++| Translation, extraction, Wolf, agent kernel, MCP | Above plus clean main/MCP builds, core and eval |
+ | Renderer, IPC, preload, app bootstrap, UI harness, terminal/bridge runtime | Above plus renderer/MCP builds and real Electron UI harness |
+ | Config, scripts, fixtures, shared types, unknown paths, or `--full` | All checks, unit coverage, UI and package smoke |
+ 
+@@ -18,7 +18,7 @@ The complete unit suite is intentionally retained: it is short and includes cros
+ 
+ Each run writes `artifacts/verify/<run-id>/result.json`, individual check logs, and harness JSON files. `artifacts/verify/latest.json` points to the same run via its `reportPath` field and contains the full summary. Reports are updated before and after checks; an interrupted process leaves `running`, not an old success. Commands are stored as executable plus an argument array so spaces/quotes do not require guessing shell escapes.
+ 
+-Checks execute serially. A failed check does not prevent independent checks from running, but failed build dependencies mark their harnesses `blocked`. Main TypeScript output is cleaned and compiled once for core/eval/UI. Builds in the current run must pass before those harnesses receive `LLM_TSUKURU_SKIP_BUILD=1`; inherited skip-build, packaged-UI executable, and package-smoke opt-ins are removed. Live provider checks are never selected. Avoid concurrent builds or verify runners in one checkout because build outputs are shared.
++Checks execute serially. A failed check does not prevent independent checks from running, but failed build dependencies mark their harnesses `blocked`. Main TypeScript output is cleaned and compiled once for core/eval/UI. The MCP bundle is built once as an explicit dependency of core/UI. Builds in the current run must pass before those harnesses receive `LLM_TSUKURU_SKIP_BUILD=1`; inherited skip-build, packaged-UI executable, and package-smoke opt-ins are removed. Live provider checks are never selected. Avoid concurrent builds or verify runners in one checkout because build outputs are shared.
+ 
+ The runner requires both successful process exit and valid nonempty harness evidence. It records skipped package cases separately; those are not passed checks. It hashes Git-listed file contents (including untracked non-ignored files) before and after execution. A changed fingerprint yields `stale` and a nonzero exit even if the checks passed. This catches edits during verification, not transient edits reverted before completion or changes under ignored paths such as `node_modules`. After changing dependencies, install from the lockfile before verification.
+ 
+@@ -36,7 +36,7 @@ For failures, read the failed check's `logPath` and `error`/`failureHint`; fix t
+ | `npm run harness:package-smoke` | Packaging configuration, native PTY loading in the current Node runtime and local CSS assets; packaged artifact checks are opt-in |
+ | `npm run harness:live` | Opt-in provider smoke for separators, line counts, ordered control codes and empty lines; skips when credentials are absent |
+ 
+-Core/eval build main modules as needed; UI builds the app. `build:ts` clears `dist-main` before compiling so deleted source files cannot leave stale packaged modules. `LLM_TSUKURU_SKIP_BUILD=1` reuses existing outputs only when the caller has already built the current source.
++Standalone core builds main modules and the MCP bundle; eval builds main modules; UI builds the app. `build:ts` clears `dist-main` before compiling so deleted source files cannot leave stale packaged modules. `LLM_TSUKURU_SKIP_BUILD=1` reuses existing outputs only when the caller has already built all outputs needed by that harness from the current source.
+ 
+ UI runs with temporary settings, user-data, session and log directories. It replaces the native folder picker with a fixture selection and uses the production project initialization and preload IPC. It shuts down the bridge and removes its manifest before exiting. UI assertions use DOM state and `data-*` attributes, so they do not establish visual fidelity or full real-game compatibility.
+ 
+diff --git a/scripts/harness/_shared.cjs b/scripts/harness/_shared.cjs
+index 5f58f5f..1875d22 100644
+--- a/scripts/harness/_shared.cjs
++++ b/scripts/harness/_shared.cjs
+@@ -12,10 +12,6 @@ const DEFAULT_REPRO_COMMANDS = {
+   'harness-live': 'npm run harness:live',
+ };
+ 
+-function npmCommand() {
+-  return 'npm';
+-}
+-
+ function runCommand(command, args, options = {}) {
+   const spawnOptions = {
+     cwd: projectRoot,
+@@ -60,12 +56,12 @@ function runCommand(command, args, options = {}) {
+ 
+ function buildMainIfNeeded() {
+   if (process.env.LLM_TSUKURU_SKIP_BUILD === '1') return;
+-  runCommand(npmCommand(), ['run', 'build:ts']);
++  runCommand('npm', ['run', 'build:ts']);
+ }
+ 
+ function buildAppIfNeeded() {
+   if (process.env.LLM_TSUKURU_SKIP_BUILD === '1') return;
+-  runCommand(npmCommand(), ['run', 'build:app']);
++  runCommand('npm', ['run', 'build:app']);
+ }
+ 
+ function readJson(filePath) {
+@@ -296,7 +292,6 @@ module.exports = {
+   loadCompiledModule,
+   makeTempDir,
+   normalizeHarnessResult,
+-  npmCommand,
+   projectRoot,
+   readJson,
+   relativeArtifactPath,
+diff --git a/scripts/harness/core.cjs b/scripts/harness/core.cjs
+index b6a14b9..9cdb4bb 100644
+--- a/scripts/harness/core.cjs
++++ b/scripts/harness/core.cjs
+@@ -9,7 +9,6 @@ const {
+   defaultExport,
+   loadCompiledModule,
+   makeTempDir,
+-  npmCommand,
+   projectRoot,
+   runCases,
+   runCommand,
+@@ -186,6 +185,7 @@ async function runBundledMcpStartupFailure(projectPath, timeoutMs = 5000) {
+ 
+ async function main() {
+   buildMainIfNeeded();
++  if (process.env.LLM_TSUKURU_SKIP_BUILD !== '1') runCommand('npm', ['run', 'build:mcp']);
+ 
+   const translationCore = loadCompiledModule('src/ts/libs/translationCore.js');
+   const llmProviderConfig = loadCompiledModule('src/ts/libs/llmProviderConfig.js');
+@@ -218,7 +218,6 @@ async function main() {
+       id: 'bundled-mcp-stdio',
+       title: 'bundled MCP server completes a real stdio handshake and tool call',
+       run: async () => {
+-        runCommand(npmCommand(), ['run', 'build:mcp']);
+         const workspace = makeTempDir('llm-tsukuru-mcp-bundle-');
+         try {
+           const response = await runBundledMcpConversation(workspace);
+diff --git a/scripts/verify.cjs b/scripts/verify.cjs
+index 7a61442..56f3c2c 100644
+--- a/scripts/verify.cjs
++++ b/scripts/verify.cjs
+@@ -60,7 +60,8 @@ function createPlan(files, options = {}) {
+   }
+   const checks = [...FAST];
+   if (full || integration || ui) checks.push('clean-main', 'build-main');
+-  if (full || ui) checks.push('build-renderer', 'build-mcp');
++  if (full || ui) checks.push('build-renderer');
++  if (full || integration || ui) checks.push('build-mcp');
+   if (full || integration) checks.push('core', 'eval');
+   if (full || ui) checks.push('ui');
+   if (full) checks.push('package-smoke');
+@@ -103,7 +104,7 @@ function definitions(plan, root) {
+     'build-main': node([cli('typescript/bin/tsc'), '-p', 'tsconfig.main.json'], ['clean-main']),
+     'build-renderer': node([cli('vite/bin/vite.js'), 'build', '--config', 'vite.renderer.config.ts']),
+     'build-mcp': node(['scripts/build-mcp-server.mjs']),
+-    core: harness('core', ['build-main']),
++    core: harness('core', ['build-main', 'build-mcp']),
+     eval: harness('eval', ['build-main']),
+     ui: harness('ui', ['build-main', 'build-renderer', 'build-mcp']),
+     'package-smoke': harness('package-smoke', []),
+diff --git a/src/preload.ts b/src/preload.ts
+index a0e5d40..8bdfb71 100644
+--- a/src/preload.ts
++++ b/src/preload.ts
+@@ -32,7 +32,7 @@ contextBridge.exposeInMainWorld('api', {
+     if (isReceiveChannel(channel)) {
+       const subscription = (_event: unknown, ...args: unknown[]) => callback(...args);
+       ipcRenderer.on(channel, subscription as (...args: unknown[]) => void);
+-      return subscription;
++      return () => ipcRenderer.removeListener(channel, subscription);
+     }
+   },
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+diff --git a/src/renderer/App.vue b/src/renderer/App.vue
+index ea41b72..18f807d 100644
+--- a/src/renderer/App.vue
++++ b/src/renderer/App.vue
+@@ -22,10 +22,10 @@
+ </template>
+ 
+ <script setup lang="ts">
+-import { computed, onMounted } from 'vue'
++import { computed } from 'vue'
+ import { useRoute, useRouter } from 'vue-router'
+ import AgentTerminalDrawer from './components/AgentTerminalDrawer.vue'
+-import { api } from './composables/useIpc'
++import { useIpcOn } from './composables/useIpc'
+ import { useMutationApprovals } from './composables/useMutationApprovals'
+ import Swal from 'sweetalert2'
+ import { AGENT_WORKSPACE_ROUTE } from './agentWorkspaceModel'
+@@ -37,6 +37,16 @@ const terminalDrawerRoutes = new Set(['/', '/mvmz', '/wolf'])
+ const showGlobalTerminalDrawer = computed(() => terminalDrawerRoutes.has(route.path))
+ const showApprovalBanner = computed(() => route.path !== AGENT_WORKSPACE_ROUTE && pendingCount.value > 0)
+ 
++for (const channel of ['getGlobalSettings', 'settings', 'llmSettings', 'verifySettings']) {
++  useIpcOn(channel, (settings: Record<string, unknown>) => {
++    if (settings && settings.themeData) {
++      for (const [key, value] of Object.entries(settings.themeData as Record<string, string>)) {
++        document.documentElement.style.setProperty(key, value)
++      }
++    }
++  })
++}
++
+ function openApprovalQueue() {
+   const first = pendingApprovals.value[0]
+   if (!first) return
+@@ -46,25 +56,22 @@ function openApprovalQueue() {
+   })
+ }
+ 
+-// Global alert handler shared across all pages
+-onMounted(() => {
+-  api.on('alert', (tt: unknown) => {
+-    if (typeof tt === 'string') {
+-      Swal.fire({ icon: 'success', title: tt })
+-    } else if (tt && typeof tt === 'object') {
+-      const obj = tt as Record<string, unknown>
+-      Swal.fire({
+-        icon: (obj.icon as any) || 'info',
+-        title: (obj.message as string) || '',
+-      })
+-    }
+-  })
++useIpcOn('alert', (tt: unknown) => {
++  if (typeof tt === 'string') {
++    Swal.fire({ icon: 'success', title: tt })
++  } else if (tt && typeof tt === 'object') {
++    const obj = tt as Record<string, unknown>
++    Swal.fire({
++      icon: (obj.icon as any) || 'info',
++      title: (obj.message as string) || '',
++    })
++  }
++})
+ 
+-  api.on('alert_free', (tt: unknown) => {
+-    if (typeof tt === 'string') {
+-      Swal.fire({ icon: 'info', title: tt })
+-    }
+-  })
++useIpcOn('alert_free', (tt: unknown) => {
++  if (typeof tt === 'string') {
++    Swal.fire({ icon: 'info', title: tt })
++  }
+ })
+ </script>
+ 
+diff --git a/src/renderer/components/TitleBar.vue b/src/renderer/components/TitleBar.vue
+index e90a6f1..6bc50d0 100644
+--- a/src/renderer/components/TitleBar.vue
++++ b/src/renderer/components/TitleBar.vue
+@@ -22,8 +22,8 @@
+ </template>
+ 
+ <script setup lang="ts">
+-import { ref, computed, onMounted, onUnmounted } from 'vue'
+-import { api } from '../composables/useIpc'
++import { ref, computed, onMounted } from 'vue'
++import { api, useIpcOn } from '../composables/useIpc'
+ import Swal from 'sweetalert2'
+ 
+ defineProps<{
+@@ -100,15 +100,9 @@ async function onAbort() {
+ }
+ 
+ onMounted(() => {
+-  api.on('loading', onLoading)
+-  api.on('loadingTag', (tt: string) => { loadingTag.value = tt })
+-  api.on('llmTranslating', (val: boolean) => { llmTranslating.value = val })
+-})
+-
+-onUnmounted(() => {
+-  api.removeAllListeners('loading')
+-  api.removeAllListeners('loadingTag')
+-  api.removeAllListeners('llmTranslating')
++  useIpcOn('loading', onLoading)
++  useIpcOn('loadingTag', (tt: string) => { loadingTag.value = tt })
++  useIpcOn('llmTranslating', (val: boolean) => { llmTranslating.value = val })
+ })
+ </script>
+ 
+diff --git a/src/renderer/composables/useIpc.ts b/src/renderer/composables/useIpc.ts
+index 73e2031..41b7fa5 100644
+--- a/src/renderer/composables/useIpc.ts
++++ b/src/renderer/composables/useIpc.ts
+@@ -21,7 +21,7 @@ type IpcCallback = (...args: any[]) => void
+ 
+ interface ElectronApi {
+   send: (channel: string, ...args: unknown[]) => void
+-  on: (channel: string, callback: IpcCallback) => void
++  on: (channel: string, callback: IpcCallback) => (() => void) | undefined
+   once: (channel: string, callback: IpcCallback) => void
+   removeAllListeners: (channel: string) => void
+   invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
+@@ -93,8 +93,8 @@ export const api = {
+ 
+ /** Register an IPC listener that auto-cleans on component unmount */
+ export function useIpcOn(channel: string, callback: IpcCallback) {
+-  api.on(channel, callback)
++  const unsubscribe = api.on(channel, callback)
+   onUnmounted(() => {
+-    api.removeAllListeners(channel)
++    unsubscribe?.()
+   })
+ }
+diff --git a/src/renderer/views/AgentWorkspacePage.vue b/src/renderer/views/AgentWorkspacePage.vue
+index f289215..5f80cb1 100644
+--- a/src/renderer/views/AgentWorkspacePage.vue
++++ b/src/renderer/views/AgentWorkspacePage.vue
+@@ -192,7 +192,7 @@
+ </template>
+ 
+ <script setup lang="ts">
+-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
++import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+ import { useRoute } from 'vue-router'
+ import TitleBar from '../components/TitleBar.vue'
+ import AgentTerminalPane from '../components/AgentTerminalPane.vue'
+@@ -217,14 +217,35 @@ import type { AgentExecutableDetectionResult } from '../../agent/agentExecutable
+ import type { AgentWorkspaceStatus } from '../../agent/agentWorkspaceStatus'
+ import type { TerminalSessionKind } from '../../types/agentWorkspace'
+ 
+-const workspace = reactive(createAgentWorkspaceViewModel())
++const workspaceTemplate = createAgentWorkspaceViewModel()
+ const route = useRoute()
+ const { sessions: terminalSessions, launch } = useTerminalSessions()
+ const { refresh: refreshApprovals } = useMutationApprovals()
+-const activeAgentPresetId = ref<AgentCliPreset['id']>(workspace.agentPresets[0].id)
++const activeAgentPresetId = ref<AgentCliPreset['id']>(workspaceTemplate.agentPresets[0].id)
+ const activeCommandPresetId = ref('')
+ const selectedPrompt = ref('')
+ const liveStatus = ref<AgentWorkspaceStatus | null>(null)
++const executableDetections = ref<AgentExecutableDetectionResult | null>(null)
++const workspace = computed(() => ({
++  ...workspaceTemplate,
++  agentPresets: workspaceTemplate.agentPresets.map((preset) => {
++    const detected = executableDetections.value?.results.find((entry) => entry.id === preset.id)
++    const executable = createExecutableDetectionHint(preset.executable.executableNames, detected?.status)
++    return {
++      ...preset,
++      executable,
++      mcpStatus: liveStatus.value ? derivePresetMcpStatus(preset.id, {
++        serverAvailable: liveStatus.value.mcp.serverAvailable,
++        executableAvailable: executable.detectionStatus === 'available',
++        projectSelected: liveStatus.value.project.selected,
++      }) : preset.mcpStatus,
++    }
++  }),
++  timeline: deriveAgentTimeline({
++    projectSelected: liveStatus.value?.project.selected ?? false,
++    mcpServerAvailable: liveStatus.value?.mcp.serverAvailable ?? false,
++  }),
++}))
+ const activeSessionId = ref('')
+ const launchBusy = ref(false)
+ const launchMessage = ref('')
+@@ -254,10 +275,10 @@ const activeSession = computed(() => {
+   return terminalSessions.value.find((session) => session.sessionId === activeSessionId.value) ?? null
+ })
+ const activeAgentPreset = computed(() => {
+-  return workspace.agentPresets.find((preset) => preset.id === activeAgentPresetId.value) ?? workspace.agentPresets[0]
++  return workspace.value.agentPresets.find((preset) => preset.id === activeAgentPresetId.value) ?? workspace.value.agentPresets[0]
+ })
+ const activeCommandPreset = computed(() => {
+-  return workspace.presets.find((preset) => preset.id === activeCommandPresetId.value) ?? null
++  return workspace.value.presets.find((preset) => preset.id === activeCommandPresetId.value) ?? null
+ })
+ const recommendedPrompt = computed(() => {
+   const preset = activeCommandPreset.value
+@@ -283,9 +304,9 @@ async function focusShellTerminal() {
+ let refreshing = false
+ 
+ onMounted(async () => {
++  window.addEventListener('focus', handleWindowFocus)
+   await Promise.all([refreshAll(), refreshApprovals()])
+   await focusRequestedApproval()
+-  window.addEventListener('focus', handleWindowFocus)
+ })
+ 
+ onUnmounted(() => {
+@@ -333,53 +354,32 @@ async function refreshAll() {
+   refreshing = true
+   try {
+     await Promise.all([detectExecutables(), refreshStatus()])
+-    applyLiveMcpStatus()
+   } finally {
+     refreshing = false
+   }
+ }
+ 
+-function applyLiveMcpStatus() {
+-  const serverAvailable = liveStatus.value?.mcp.serverAvailable ?? false
+-  const projectSelected = liveStatus.value?.project.selected ?? false
+-  for (const preset of workspace.agentPresets) {
+-    preset.mcpStatus = derivePresetMcpStatus(preset.id, {
+-      serverAvailable,
+-      executableAvailable: preset.executable.detectionStatus === 'available',
+-      projectSelected,
+-    })
+-  }
+-}
+-
+ async function refreshStatus() {
+   try {
+     const status = (await api.invoke('getAgentWorkspaceStatus')) as AgentWorkspaceStatus | undefined
+     if (!status) return
+     liveStatus.value = status
+-    workspace.timeline = deriveAgentTimeline({
+-      projectSelected: status.project.selected,
+-      mcpServerAvailable: status.mcp.serverAvailable,
+-    })
+   } catch {
+-    // Best-effort; the default (waiting) timeline stays in place on failure.
++    // Keep the last successful environment snapshot on transient IPC failures.
+   }
+ }
+ 
+ async function detectExecutables() {
+   try {
+-    const payload = workspace.agentPresets.map((preset) => ({
++    const payload = workspaceTemplate.agentPresets.map((preset) => ({
+       id: preset.id,
+       executableNames: preset.executable.executableNames,
+     }))
+     const result = (await api.invoke('detectAgentExecutables', payload)) as AgentExecutableDetectionResult | undefined
+     if (!result || !Array.isArray(result.results)) return
+-    for (const entry of result.results) {
+-      const preset = workspace.agentPresets.find((candidate) => candidate.id === entry.id)
+-      if (!preset) continue
+-      preset.executable = createExecutableDetectionHint(preset.executable.executableNames, entry.status)
+-    }
++    executableDetections.value = result
+   } catch {
+-    // Detection is best-effort; leave the default "not yet probed" hint on failure.
++    // Keep this page's last successful executable probe on transient IPC failures.
+   }
+ }
+ 
+diff --git a/src/renderer/views/HomePage.vue b/src/renderer/views/HomePage.vue
+index 471ae48..7530470 100644
+--- a/src/renderer/views/HomePage.vue
++++ b/src/renderer/views/HomePage.vue
+@@ -42,16 +42,7 @@
+ <script setup lang="ts">
+ import { onMounted } from 'vue'
+ import TitleBar from '../components/TitleBar.vue'
+-import { api, useIpcOn } from '../composables/useIpc'
+-
+-useIpcOn('getGlobalSettings', (tt: Record<string, unknown>) => {
+-  if (tt && tt.themeData) {
+-    const root = document.documentElement
+-    for (const [key, val] of Object.entries(tt.themeData as Record<string, string>)) {
+-      root.style.setProperty(key, val)
+-    }
+-  }
+-})
++import { api } from '../composables/useIpc'
+ 
+ onMounted(() => {
+   api.send('mainReady')
+diff --git a/src/renderer/views/JsonVerifyPage.vue b/src/renderer/views/JsonVerifyPage.vue
+index 5dba5b2..bf2ca03 100644
+--- a/src/renderer/views/JsonVerifyPage.vue
++++ b/src/renderer/views/JsonVerifyPage.vue
+@@ -142,7 +142,7 @@
+ 
+ <script setup lang="ts">
+ import { ref, computed, onMounted, onUnmounted } from 'vue'
+-import { api } from '../composables/useIpc'
++import { api, useIpcOn } from '../composables/useIpc'
+ import { getRendererLlmProviderUiText } from '../../types/llmProviderContract'
+ import { setAtPath } from '../../ts/rpgmv/verify'
+ 
+@@ -695,25 +695,19 @@ function cancelLlmRepair() {
+ }
+ 
+ onMounted(() => {
+-  api.on('initVerify', (dir: string) => loadFiles(dir))
+-  api.on('verifyApplyJsonDone', onVerifyApplyJsonDone)
+-  api.on('verifySettings', (s: unknown) => {
++  useIpcOn('initVerify', (dir: string) => loadFiles(dir))
++  useIpcOn('verifyApplyJsonDone', onVerifyApplyJsonDone)
++  useIpcOn('verifySettings', (s: unknown) => {
+     const settings = s as Record<string, any>
+     jsonChangeLine.value = !!settings.JsonChangeLine
+     llmReady.value = !!settings.llmReady
+     currentProvider.value = typeof settings.llmProvider === 'string' ? settings.llmProvider : 'gemini'
+-    if (settings.themeData) {
+-      const root = document.documentElement
+-      for (const [key, val] of Object.entries(settings.themeData as Record<string, string>)) {
+-        root.style.setProperty(key, val)
+-      }
+-    }
+   })
+-  api.on('verifyLlmRepairProgress', (data: { requestId: string; current: number; total: number; path: string }) => {
++  useIpcOn('verifyLlmRepairProgress', (data: { requestId: string; current: number; total: number; path: string }) => {
+     if (data.requestId !== llmRepairContext.value?.requestId) return
+     llmProgress.value = `${data.current}/${data.total}`
+   })
+-  api.on('verifyLlmRepairDone', (data: { requestId: string; success: boolean; results?: { path: string; origText: string; newText: string }[]; error?: string }) => {
++  useIpcOn('verifyLlmRepairDone', (data: { requestId: string; success: boolean; results?: { path: string; origText: string; newText: string }[]; error?: string }) => {
+     const repairContext = llmRepairContext.value
+     if (!repairContext || data.requestId !== repairContext.requestId) return
+     llmRepairing.value = false
+@@ -747,11 +741,6 @@ onMounted(() => {
+   api.send('verifyReady')
+ })
+ onUnmounted(() => {
+-  api.removeAllListeners('initVerify')
+-  api.removeAllListeners('verifySettings')
+-  api.removeAllListeners('verifyLlmRepairProgress')
+-  api.removeAllListeners('verifyLlmRepairDone')
+-  api.removeAllListeners('verifyApplyJsonDone')
+   for (const pending of pendingVerifyWrites.values()) clearTimeout(pending.timeoutId)
+   pendingVerifyWrites.clear()
+ })
+diff --git a/src/renderer/views/LlmComparePage.vue b/src/renderer/views/LlmComparePage.vue
+index c4d7d95..47bc85e 100644
+--- a/src/renderer/views/LlmComparePage.vue
++++ b/src/renderer/views/LlmComparePage.vue
+@@ -123,7 +123,7 @@
+ 
+ <script setup lang="ts">
+ import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+-import { api } from '../composables/useIpc'
++import { api, useIpcOn } from '../composables/useIpc'
+ import { splitBlocks, checkMismatch, autoFixBlock, isBlockUntranslated, removeDuplicateHeaders, blocksToLines, checkMismatchBlocks, hasAnyUntranslatedBlock } from '../compareUtils'
+ import type { Block } from '../compareUtils'
+ import { haveSameTranslationLineStructure, isTranslationTextFileName } from '../../ts/libs/translationSyntax'
+@@ -680,10 +680,10 @@ function onRetranslateResult(result: RetranslateResult) {
+ let resizeObs: ResizeObserver | null = null
+ 
+ onMounted(() => {
+-  api.on('initCompare', (dir: string) => loadFiles(dir))
+-  api.on('retranslateProgress', onRetranslateProgress)
+-  api.on('retranslateFileDone', onRetranslateResult)
+-  api.on('retranslateBlocksDone', onRetranslateResult)
++  useIpcOn('initCompare', (dir: string) => loadFiles(dir))
++  useIpcOn('retranslateProgress', onRetranslateProgress)
++  useIpcOn('retranslateFileDone', onRetranslateResult)
++  useIpcOn('retranslateBlocksDone', onRetranslateResult)
+ 
+   document.addEventListener('keydown', onKeydown)
+ 
+@@ -703,9 +703,6 @@ onUnmounted(() => {
+   document.removeEventListener('keydown', onKeydown)
+   if (scrollRafId) cancelAnimationFrame(scrollRafId)
+   resizeObs?.disconnect()
+-  for (const ch of ['initCompare', 'retranslateProgress', 'retranslateFileDone', 'retranslateBlocksDone']) {
+-    api.removeAllListeners(ch)
+-  }
+ })
+ 
+ function onKeydown(e: KeyboardEvent) {
+diff --git a/src/renderer/views/LlmSettingsPage.vue b/src/renderer/views/LlmSettingsPage.vue
+index 36e9052..a80a68d 100644
+--- a/src/renderer/views/LlmSettingsPage.vue
++++ b/src/renderer/views/LlmSettingsPage.vue
+@@ -106,7 +106,7 @@
+ <script setup lang="ts">
+ import { computed, onMounted, ref } from 'vue'
+ import Swal from 'sweetalert2'
+-import { api } from '../composables/useIpc'
++import { api, useIpcOn } from '../composables/useIpc'
+ import { getRendererLlmProviderUiText } from '../../types/llmProviderContract'
+ import type { ProjectTranslationProfile } from '../../ts/libs/projectProfile'
+ 
+@@ -149,7 +149,7 @@ const profileSummary = computed(() => {
+ const currentPromptCharCount = computed(() => currentCustomPrompt.value.length)
+ 
+ onMounted(() => {
+-  api.on('llmSettings', (arg: unknown) => {
++  useIpcOn('llmSettings', (arg: unknown) => {
+     const s = arg as Record<string, any>
+     sortOrder.value = s.llmSortOrder || 'name-asc'
+     parallelWorkers.value = Number.isInteger(s.llmParallelWorkers) ? s.llmParallelWorkers : 1
+@@ -158,12 +158,6 @@ onMounted(() => {
+     sourceLang.value = typeof s.llmSourceLang === 'string' ? s.llmSourceLang : 'ja'
+     targetLang.value = typeof s.llmTargetLang === 'string' ? s.llmTargetLang : 'ko'
+     currentCustomPrompt.value = typeof s.llmCustomPrompt === 'string' ? s.llmCustomPrompt : ''
+-    if (s.themeData) {
+-      const root = document.documentElement
+-      for (const [key, val] of Object.entries(s.themeData as Record<string, string>)) {
+-        root.style.setProperty(key, val)
+-      }
+-    }
+   })
+   api.send('llmSettingsReady')
+ })
+diff --git a/src/renderer/views/MvMzPage.vue b/src/renderer/views/MvMzPage.vue
+index f93c740..c93a96e 100644
+--- a/src/renderer/views/MvMzPage.vue
++++ b/src/renderer/views/MvMzPage.vue
+@@ -62,8 +62,8 @@
+ </template>
+ 
+ <script setup lang="ts">
+-import { computed, ref, reactive, onMounted, onUnmounted } from 'vue'
+-import { api } from '../composables/useIpc'
++import { computed, ref, reactive, onMounted } from 'vue'
++import { api, useIpcOn } from '../composables/useIpc'
+ import TitleBar from '../components/TitleBar.vue'
+ import Swal from 'sweetalert2'
+ import type { VersionUpRequest } from '../../ts/rpgmv/types'
+@@ -305,7 +305,7 @@ function convertProject() {
+ onMounted(() => {
+   api.send('setheight', 550)
+ 
+-  api.on('set_path', (tt: Record<string, string>) => {
++  useIpcOn('set_path', (tt: Record<string, string>) => {
+     if (tt && tt.type) {
+       if (tt.type === 'folder_input') {
+         folderPath.value = tt.dir
+@@ -317,18 +317,9 @@ onMounted(() => {
+     }
+   })
+ 
+-  api.on('getGlobalSettings', (tt: Record<string, unknown>) => {
+-    if (tt && tt.themeData) {
+-      const root = document.documentElement
+-      for (const [key, val] of Object.entries(tt.themeData as Record<string, string>)) {
+-        root.style.setProperty(key, val)
+-      }
+-    }
+-  })
++  useIpcOn('worked', () => { running.value = false })
+ 
+-  api.on('worked', () => { running.value = false })
+-
+-  api.on('alert2', async () => {
++  useIpcOn('alert2', async () => {
+     const { isDenied } = await Swal.fire({
+       icon: 'success',
+       showDenyButton: true,
+@@ -340,7 +331,7 @@ onMounted(() => {
+     }
+   })
+ 
+-  api.on('alertExten', async (arg: unknown) => {
++  useIpcOn('alertExten', async (arg: unknown) => {
+     if (!Array.isArray(arg)) return
+     const { isDenied } = await Swal.fire({
+       icon: 'success',
+@@ -355,7 +346,7 @@ onMounted(() => {
+     }
+   })
+ 
+-  api.on('check_force', async () => {
++  useIpcOn('check_force', async () => {
+     const { isConfirmed } = await Swal.fire({
+       icon: 'question',
+       title: '이미 추출된 파일이 있습니다.\n덮어쓰시겠습니까?',
+@@ -372,11 +363,6 @@ onMounted(() => {
+   })
+ })
+ 
+-onUnmounted(() => {
+-  for (const ch of ['set_path', 'getGlobalSettings', 'worked', 'alert2', 'alertExten', 'check_force']) {
+-    api.removeAllListeners(ch)
+-  }
+-})
+ </script>
+ 
+ <style scoped>
+diff --git a/src/renderer/views/SettingsPage.vue b/src/renderer/views/SettingsPage.vue
+index 458b914..e8ac31f 100644
+--- a/src/renderer/views/SettingsPage.vue
++++ b/src/renderer/views/SettingsPage.vue
+@@ -148,7 +148,7 @@
+ 
+ <script setup lang="ts">
+ import { computed, onMounted, reactive, ref, toRaw } from 'vue'
+-import { api } from '../composables/useIpc'
++import { api, useIpcOn } from '../composables/useIpc'
+ import { DEFAULT_LLM_PROVIDER, DEFAULT_LLM_VERTEX_LOCATION } from '../../types/settings'
+ import { getRendererLlmProviderMetadata, getRendererLlmProviderUiText } from '../../types/llmProviderContract'
+ 
+@@ -232,7 +232,7 @@ function closeSettings() {
+ }
+ 
+ onMounted(() => {
+-  api.on('settings', (arg: unknown) => {
++  useIpcOn('settings', (arg: unknown) => {
+     const s = arg as Record<string, any>
+     for (const key of Object.keys(settings)) {
+       if (s[key] !== undefined) (settings as any)[key] = s[key]
+@@ -244,12 +244,6 @@ onMounted(() => {
+       extractPlusText.value = (s.extractPlus as number[]).map(String).join('\n')
+     }
+     settings.llmVertexLocation = String(settings.llmVertexLocation || DEFAULT_LLM_VERTEX_LOCATION).trim() || DEFAULT_LLM_VERTEX_LOCATION
+-    if (s.themeData) {
+-      const root = document.documentElement
+-      for (const [key, val] of Object.entries(s.themeData as Record<string, string>)) {
+-        root.style.setProperty(key, val)
+-      }
+-    }
+   })
+   api.send('settingsReady')
+ })
+diff --git a/src/renderer/views/WolfPage.vue b/src/renderer/views/WolfPage.vue
+index c4c31d3..a9a10fb 100644
+--- a/src/renderer/views/WolfPage.vue
++++ b/src/renderer/views/WolfPage.vue
+@@ -44,8 +44,8 @@
+ </template>
+ 
+ <script setup lang="ts">
+-import { computed, ref, onMounted, onUnmounted } from 'vue'
+-import { api } from '../composables/useIpc'
++import { computed, ref, onMounted } from 'vue'
++import { api, useIpcOn } from '../composables/useIpc'
+ import TitleBar from '../components/TitleBar.vue'
+ import Swal from 'sweetalert2'
+ 
+@@ -120,25 +120,16 @@ function openLLMCompare() {
+ onMounted(() => {
+   api.send('setheight', 550)
+ 
+-  api.on('set_path', (tt: Record<string, string>) => {
++  useIpcOn('set_path', (tt: Record<string, string>) => {
+     if (tt && tt.type === 'wolf_folder_input') {
+       folderPath.value = tt.dir
+       if (mode.value === -1) mode.value = 0
+     }
+   })
+ 
+-  api.on('getGlobalSettings', (tt: Record<string, unknown>) => {
+-    if (tt && tt.themeData) {
+-      const root = document.documentElement
+-      for (const [key, val] of Object.entries(tt.themeData as Record<string, string>)) {
+-        root.style.setProperty(key, val)
+-      }
+-    }
+-  })
+-
+-  api.on('worked', () => { running.value = false })
++  useIpcOn('worked', () => { running.value = false })
+ 
+-  api.on('alert2', async () => {
++  useIpcOn('alert2', async () => {
+     const { isDenied } = await Swal.fire({
+       icon: 'success',
+       showDenyButton: true,
+@@ -150,7 +141,7 @@ onMounted(() => {
+     }
+   })
+ 
+-  api.on('alertExten', async (arg: unknown) => {
++  useIpcOn('alertExten', async (arg: unknown) => {
+     if (!Array.isArray(arg)) return
+     const { isDenied } = await Swal.fire({
+       icon: 'success',
+@@ -166,11 +157,6 @@ onMounted(() => {
+   })
+ })
+ 
+-onUnmounted(() => {
+-  for (const ch of ['set_path', 'getGlobalSettings', 'worked', 'alert2', 'alertExten']) {
+-    api.removeAllListeners(ch)
+-  }
+-})
+ </script>
+ 
+ <style scoped>
+diff --git a/src/ts/libs/translationCore.ts b/src/ts/libs/translationCore.ts
+index 171a47e..0a74b87 100644
+--- a/src/ts/libs/translationCore.ts
++++ b/src/ts/libs/translationCore.ts
+@@ -43,7 +43,10 @@ export interface TranslationLog {
+ }
+ 
+ export function splitIntoBlocks(content: string): TranslationBlock[] {
+-  const allLines = content.split('\n');
++  return splitFileBlocks(content.split('\n'));
++}
++
++export function splitFileBlocks(allLines: readonly string[]): TranslationBlock[] {
+   const blocks: TranslationBlock[] = [];
+   let currentSep = '';
+   let currentLines: string[] = [];
+diff --git a/src/ts/rpgmv/translator.ts b/src/ts/rpgmv/translator.ts
+index 49fc795..e17d23c 100644
+--- a/src/ts/rpgmv/translator.ts
++++ b/src/ts/rpgmv/translator.ts
+@@ -8,8 +8,10 @@ import {
+     contentHash,
+     isSeparatorLine,
+     reassembleBlocks,
++    splitFileBlocks,
+     validateChunk,
+ } from '../libs/translationCore';
++export { splitFileBlocks } from '../libs/translationCore';
+ import type { BlockValidation } from '../libs/translationCore';
+ import { extractTranslationControlCodes, isTranslationTextFileName } from '../libs/translationSyntax';
+ import { atomicWriteJsonFile, atomicWriteTextFile } from '../libs/atomicFile';
+@@ -164,7 +166,6 @@ interface TranslationFileResult extends PendingTranslationFile {
+     logEntry: Partial<TranslationLogEntry>;
+     aborted: boolean;
+     incomplete: boolean;
+-    durationMs: number;
+ }
+ 
+ export interface TranslationCoordinatorOptions {
+@@ -460,7 +461,6 @@ async function translateOneFile(
+     options: TranslationCoordinatorOptions,
+     getWorkedFiles: () => number,
+ ): Promise<TranslationFileResult> {
+-    const started = Date.now();
+     const translator = options.createTranslatorForFile
+         ? options.createTranslatorForFile(task.fileName)
+         : createTranslator(options.settings, options.sourceLang, options.targetLang, options.isAborted);
+@@ -481,7 +481,6 @@ async function translateOneFile(
+         logEntry: result.logEntry,
+         aborted: !!result.aborted,
+         incomplete: !!result.incomplete || Number(result.logEntry.errorBlocks || 0) > 0,
+-        durationMs: Date.now() - started,
+     };
+ }
+ 
+@@ -493,30 +492,30 @@ async function runTranslationQueue<T, R>(
+     onSuccess: (result: R) => void,
+     onFailure: (task: T, err: unknown) => void,
+ ): Promise<void> {
+-    return new Promise((resolve) => {
+-        let nextIndex = 0;
+-        let active = 0;
+-
+-        const launch = () => {
+-            while (active < workerCount && nextIndex < tasks.length && !isAborted()) {
++    let nextIndex = 0;
++    let failure: { error: unknown } | undefined;
++    const runWorker = async () => {
++        try {
++            while (nextIndex < tasks.length && !isAborted() && !failure) {
+                 const task = tasks[nextIndex++];
+-                active++;
+-                worker(task).then(onSuccess, (err) => onFailure(task, err)).finally(() => {
+-                    active--;
+-                    if ((nextIndex >= tasks.length || isAborted()) && active === 0) {
+-                        resolve();
+-                    } else {
+-                        launch();
+-                    }
+-                });
+-            }
+-            if ((nextIndex >= tasks.length || isAborted()) && active === 0) {
+-                resolve();
++                let result: R;
++                try {
++                    result = await worker(task);
++                } catch (error) {
++                    onFailure(task, error);
++                    continue;
++                }
++                onSuccess(result);
+             }
+-        };
++        } catch (error) {
++            failure ??= { error };
++        }
++    };
+ 
+-        launch();
+-    });
++    // Completion callback failures stop the queue, but in-flight work must settle
++    // before the caller can release its directory lock or start another run.
++    await Promise.all(Array.from({ length: Math.min(workerCount, tasks.length) }, runWorker));
++    if (failure) throw failure.error;
+ }
+ 
+ function createFailureLogEntry(fileName: string, errors: string[], cached: boolean): TranslationLogEntry {
+@@ -1019,25 +1018,3 @@ async function retranslateBlocksUnlocked(
+         return { success: false, error: (err as Error).message || String(err) };
+     }
+ }
+-
+-// Local block splitter (same logic as geminiTranslator's splitIntoBlocks)
+-export function splitFileBlocks(lines: string[]): { separator: string; lines: string[] }[] {
+-    const blocks: { separator: string; lines: string[] }[] = [];
+-    let curSep = '';
+-    let curLines: string[] = [];
+-    for (const line of lines) {
+-        if (isSeparatorLine(line)) {
+-            if (curSep || curLines.length > 0) {
+-                blocks.push({ separator: curSep, lines: [...curLines] });
+-            }
+-            curSep = line;
+-            curLines = [];
+-        } else {
+-            curLines.push(line);
+-        }
+-    }
+-    if (curSep || curLines.length > 0) {
+-        blocks.push({ separator: curSep, lines: curLines });
+-    }
+-    return blocks;
+-}
+diff --git a/test/unit/comparePage.test.ts b/test/unit/comparePage.test.ts
+index 4f8f586..a2c7a95 100644
+--- a/test/unit/comparePage.test.ts
++++ b/test/unit/comparePage.test.ts
+@@ -4,17 +4,19 @@ import { createApp, nextTick, type App } from 'vue'
+ import path from 'node:path'
+ import LlmComparePage from '../../src/renderer/views/LlmComparePage.vue'
+ 
+-const { listeners, send } = vi.hoisted(() => ({
+-  listeners: new Map<string, (...args: string[]) => unknown>(),
+-  send: vi.fn(),
+-}))
+-vi.mock('../../src/renderer/composables/useIpc', () => ({
+-  api: {
+-    on: (channel: string, callback: (...args: string[]) => unknown) => listeners.set(channel, callback),
++const { listeners, send } = vi.hoisted(() => {
++  const listeners = new Map<string, (...args: string[]) => unknown>()
++  const send = vi.fn()
++  window.api = {
++    on: (channel: string, callback: (...args: string[]) => unknown) => {
++      listeners.set(channel, callback)
++      return () => listeners.delete(channel)
++    },
+     removeAllListeners: (channel: string) => listeners.delete(channel),
+     send,
+-  },
+-}))
++  } as unknown as Window['api']
++  return { listeners, send }
++})
+ 
+ describe('compare page editing', () => {
+   let app: App
+diff --git a/test/unit/harnessShared.test.ts b/test/unit/harnessShared.test.ts
+index 28f29cd..fff10f1 100644
+--- a/test/unit/harnessShared.test.ts
++++ b/test/unit/harnessShared.test.ts
+@@ -62,6 +62,37 @@ describe('harness command execution', () => {
+       cwd: process.cwd(), stdio: 'inherit',
+     });
+   });
++
++  it.each([false, true])('builds the MCP bundle only when core must supply its own build (reuse=%s)', async (reuseBuild) => {
++    const runCommand = vi.fn();
++    const buildMainIfNeeded = vi.fn();
++    const workspaceBoundary = new Error('stop before the real MCP workspace and subprocess');
++    const corePath = path.join(process.cwd(), 'scripts/harness/core.cjs');
++    await new Promise<void>((resolve, reject) => {
++      const harnessShared = {
++        ...shared,
++        runCommand,
++        buildMainIfNeeded,
++        loadCompiledModule: () => ({}),
++        makeTempDir: () => { throw workspaceBoundary; },
++        writeTaskManifest: () => 'in-memory',
++        runCases: async (_suite: string, cases: Array<{ id: string; run: () => Promise<unknown> }>) => {
++          const bundled = cases.find(testCase => testCase.id === 'bundled-mcp-stdio');
++          if (!bundled) throw new Error('Missing real bundled MCP case');
++          await expect(bundled.run()).rejects.toBe(workspaceBoundary);
++          return { total: 0, failed: 0 };
++        },
++        writeHarnessResult: () => resolve(),
++        writeFatalHarnessResult: (_suite: string, error: unknown) => reject(error),
++      };
++      vm.runInNewContext(fs.readFileSync(corePath, 'utf8'), {
++        process: { env: reuseBuild ? { LLM_TSUKURU_SKIP_BUILD: '1' } : {}, exitCode: 0 },
++        require: (id: string) => id === './_shared.cjs' ? harnessShared : require(id),
++      }, { filename: corePath });
++    });
++    expect(buildMainIfNeeded).toHaveBeenCalledOnce();
++    expect(runCommand.mock.calls).toEqual(reuseBuild ? [] : [['npm', ['run', 'build:mcp']]]);
++  });
+ });
+ 
+ describe('harness result reliability', () => {
+diff --git a/test/unit/parallelTranslation.test.ts b/test/unit/parallelTranslation.test.ts
+index a882678..ca1ad95 100644
+--- a/test/unit/parallelTranslation.test.ts
++++ b/test/unit/parallelTranslation.test.ts
+@@ -1,4 +1,4 @@
+-import { afterEach, describe, expect, it } from 'vitest';
++import { afterEach, describe, expect, it, vi } from 'vitest';
+ import * as fs from 'fs';
+ import * as path from 'path';
+ import { settings as defaultSettings } from '../../src/ts/rpgmv/datas';
+@@ -11,12 +11,14 @@ import {
+ import { buildTranslationCacheKey, type Translator } from '../../src/ts/libs/translatorFactory';
+ import { LLM_FINGERPRINT_SCHEMA_VERSION } from '../../src/ts/libs/providerRegistry';
+ import { contentHash, type BlockValidation } from '../../src/ts/libs/translationCore';
++import * as atomicFile from '../../src/ts/libs/atomicFile';
+ 
+ const sandboxRoot = path.resolve('artifacts', 'unit', 'parallelTranslation');
+ const createdDirs: string[] = [];
+ let sequence = 0;
+ 
+ afterEach(() => {
++  vi.restoreAllMocks();
+   for (const dir of createdDirs.splice(0)) {
+     fs.rmSync(dir, { recursive: true, force: true });
+   }
+@@ -41,7 +43,7 @@ describe('parallel translation coordinator', () => {
+ 
+     expect(result.failedFiles).toEqual([]);
+     expect(result.workedFiles).toBe(files.length);
+-    expect(maxActive).toBeLessThanOrEqual(workers);
++    expect(maxActive).toBe(workers);
+     for (const file of files) {
+       expect(fs.readFileSync(path.join(edir, file), 'utf-8')).toContain('번역');
+     }
+@@ -163,6 +165,85 @@ describe('parallel translation coordinator', () => {
+     expect(Object.keys(cache)).toHaveLength(0);
+   });
+ 
++  it.each(['creation', 'request'])('records provider %s failures and continues with queued files', async (failurePhase) => {
++    const { edir, backupDir, files } = makeProject(['Failed.txt', 'Next.txt']);
++    const options = baseOptions(edir, backupDir, files, 1);
++    const failedPath = path.join(edir, files[0]);
++    const original = fs.readFileSync(failedPath, 'utf-8');
++    const providerError = new Error('provider unavailable');
++
++    const result = await translateFilesWithCoordinator({
++      ...options,
++      createTranslatorForFile: (fileName) => {
++        if (fileName === 'Failed.txt' && failurePhase === 'creation') throw providerError;
++        return fakeTranslator(async (content) => {
++          if (fileName === 'Failed.txt') throw providerError;
++          return translateContent(content);
++        });
++      },
++    });
++
++    expect(result.failedFiles).toEqual(['Failed.txt']);
++    expect(result.workedFiles).toBe(2);
++    expect(result.entries[0]).toMatchObject({ fileName: 'Failed.txt', errorBlocks: 1, errors: ['provider unavailable'] });
++    expect(fs.readFileSync(failedPath, 'utf-8')).toBe(original);
++    expect(readProgress(edir).completedFiles).toEqual(['Next.txt']);
++    expect(Object.keys(options.cache)).toHaveLength(1);
++  });
++
++  it('propagates commit failures after in-flight workers settle and stops dequeuing new files', async () => {
++    const { edir, backupDir, files } = makeProject(['Failed.txt', 'InFlight.txt', 'Queued.txt']);
++    const options = baseOptions(edir, backupDir, files, 2);
++    const failedPath = path.join(edir, files[0]);
++    const original = fs.readFileSync(failedPath, 'utf-8');
++    const commitError = new Error('translation file commit failed');
++    let signalCommitFailure!: () => void;
++    const commitFailed = new Promise<void>((resolve) => { signalCommitFailure = resolve; });
++    let releaseInFlight!: () => void;
++    const inFlight = new Promise<void>((resolve) => { releaseInFlight = resolve; });
++    const started: string[] = [];
++    const writeTextFile = atomicFile.atomicWriteTextFile;
++    vi.spyOn(atomicFile, 'atomicWriteTextFile').mockImplementation((filePath, content, writeOptions) => {
++      if (filePath === failedPath) {
++        signalCommitFailure();
++        throw commitError;
++      }
++      writeTextFile(filePath, content, writeOptions);
++    });
++
++    let settled = false;
++    const outcome = translateFilesWithCoordinator({
++      ...options,
++      createTranslatorForFile: (fileName) => fakeTranslator(async (content) => {
++        started.push(fileName);
++        if (fileName === 'InFlight.txt') await inFlight;
++        return translateContent(content);
++      }),
++    }).then(
++      (result) => ({ result, error: undefined }),
++      (error: unknown) => ({ result: undefined, error }),
++    ).finally(() => { settled = true; });
++
++    await commitFailed;
++    try {
++      await Promise.resolve();
++      expect(settled).toBe(false);
++    } finally {
++      releaseInFlight();
++    }
++
++    expect((await outcome).error).toBe(commitError);
++    expect(started).toEqual(['Failed.txt', 'InFlight.txt']);
++    expect(fs.readFileSync(failedPath, 'utf-8')).toBe(original);
++    expect(fs.readFileSync(path.join(edir, 'Queued.txt'), 'utf-8')).not.toContain('번역');
++    expect(fs.readFileSync(path.join(edir, 'InFlight.txt'), 'utf-8')).toContain('번역');
++    expect(readProgress(edir).completedFiles).toEqual(['InFlight.txt']);
++    expect([...options.completedFiles]).toEqual(['InFlight.txt']);
++    expect(Object.keys(options.cache)).toHaveLength(1);
++    const persistedCache = JSON.parse(fs.readFileSync(path.join(edir, '.llm_cache.json'), 'utf-8'));
++    expect(Object.keys(persistedCache.entries)).toEqual(Object.keys(options.cache));
++  });
++
+   it('stops dequeuing queued files after abort while saving completed successes', async () => {
+     const { edir, backupDir, files } = makeProject(['One.txt', 'Two.txt', 'Three.txt']);
+     let aborted = false;
+diff --git a/test/unit/translator.test.ts b/test/unit/translator.test.ts
+index 1fa67f0..eb47ba1 100644
+--- a/test/unit/translator.test.ts
++++ b/test/unit/translator.test.ts
+@@ -336,7 +336,7 @@ describe('isRetryableApiError', () => {
+   });
+ });
+ 
+-// ─── splitFileBlocks (translator.ts local splitter) ─────────────────
++// ─── splitFileBlocks (line-array entry point) ───────────────────────
+ 
+ describe('splitFileBlocks', () => {
+   it('splits lines by numbered separator pattern', () => {
+@@ -353,6 +353,18 @@ describe('splitFileBlocks', () => {
+     expect(blocks).toHaveLength(0);
+   });
+ 
++  it('distinguishes no lines from one empty line and preserves array elements', () => {
++    expect(splitFileBlocks([''])).toEqual([{ separator: '', lines: [''] }]);
++    expect(splitFileBlocks(['first\n--- 101 ---\nsecond', ''])).toEqual([
++      { separator: '', lines: ['first\n--- 101 ---\nsecond', ''] },
++    ]);
++  });
++
++  it('preserves Wolf separators, empty lines, and final newline through the legacy export', () => {
++    const content = 'preamble\n--- 101-0 ---\n\\C[1]hello\n\n--- 102-1 ---\nworld\n';
++    expect(reassembleBlocks(splitFileBlocks(content.split('\n')))).toBe(content);
++  });
++
+   it('handles single line with no separator', () => {
+     const blocks = splitFileBlocks(['hello']);
+     expect(blocks).toHaveLength(1);
+@@ -366,8 +378,7 @@ describe('splitFileBlocks', () => {
+     expect(blocks[1]).toEqual({ separator: '--- 2 ---', lines: [] });
+   });
+ 
+-  it('uses broader separator pattern than geminiTranslator', () => {
+-    // After fixing SEPARATOR_REGEX, both now accept any number
++  it('accepts any numbered separator', () => {
+     const lines = ['a', '--- 999 ---', 'b'];
+     const blocks = splitFileBlocks(lines);
+     expect(blocks).toHaveLength(2);
+diff --git a/test/unit/verifyRunner.test.ts b/test/unit/verifyRunner.test.ts
+index 2a5dd92..103ccde 100644
+--- a/test/unit/verifyRunner.test.ts
++++ b/test/unit/verifyRunner.test.ts
+@@ -25,7 +25,7 @@ describe('verification selection and arguments', () => {
+   });
+   it('selects deterministic workflow checks for translation code', () => {
+     expect(runner.createPlan(['src/ts/libs/translationCore.ts']).checks).toEqual([
+-      'typecheck-main', 'typecheck-renderer', 'lint', 'unit', 'clean-main', 'build-main', 'core', 'eval',
++      'typecheck-main', 'typecheck-renderer', 'lint', 'unit', 'clean-main', 'build-main', 'build-mcp', 'core', 'eval',
+     ]);
+   });
+   it.each(['src/renderer/App.vue', 'src/ipc/register.ts', 'src/preload.ts', 'main.ts', 'src/agent/terminalService.ts'])
+@@ -83,15 +83,23 @@ describe('verification execution evidence', () => {
+     expect(report.checks.map((check: { status: string }) => check.status)).toEqual(['failed', 'passed']);
+     expect(report.checks[0].error.message).toContain('cannot open log');
+   });
+-  it('blocks build dependents while running unrelated checks', async () => {
+-    const { plan, options } = setup(['build', 'core', 'unit'], {
+-      build: { command: 'node', args: [] }, core: { command: 'node', args: [], depends: ['build'] }, unit: { command: 'node', args: [] },
++  it.each(['build-main', 'build-mcp'])('blocks core after %s fails while running independent checks', async (failedBuild) => {
++    const { plan, options } = setup(['clean-main', 'build-main', 'build-mcp', 'core', 'eval', 'unit']);
++    const definitions = runner.definitions(plan, process.cwd());
++    const execute = vi.fn(async (check: { args: string[] }) => {
++      if (check.args[0] === definitions[failedBuild].args[0]) return { status: 'failed', exitCode: 1 };
++      if (check.args.includes('--output')) fs.writeFileSync(check.args.at(-1)!, JSON.stringify({
++        schemaVersion: 1, suite: 'harness-eval', status: 'passed', cases: [{ id: 'fixture', status: 'passed' }],
++      }));
++      return { status: 'passed', exitCode: 0 };
+     });
+-    const execute = vi.fn().mockResolvedValueOnce({ status: 'failed', exitCode: 1 }).mockResolvedValueOnce({ status: 'passed', exitCode: 0 });
+-    const report = await runner.runPlan(plan, { ...options, execute });
+-    expect(execute).toHaveBeenCalledTimes(2);
+-    expect(report.checks[1]).toMatchObject({ status: 'blocked', blockedBy: ['build'] });
+-    expect(report.checks[2].status).toBe('passed');
++    const report = await runner.runPlan(plan, { ...options, definitions, execute });
++    expect(report.checks.find((check: { id: string }) => check.id === 'core'))
++      .toMatchObject({ status: 'blocked', blockedBy: [failedBuild] });
++    expect(report.checks.find((check: { id: string }) => check.id === 'eval').status)
++      .toBe(failedBuild === 'build-main' ? 'blocked' : 'passed');
++    expect(report.checks.find((check: { id: string }) => check.id === 'unit').status).toBe('passed');
++    expect(execute).toHaveBeenCalledTimes(failedBuild === 'build-main' ? 4 : 5);
+   });
+   it('marks successful checks stale when source changes during verification', async () => {
+     const { plan, options } = setup(['unit']);

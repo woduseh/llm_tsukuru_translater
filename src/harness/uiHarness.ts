@@ -8,6 +8,7 @@ interface UiHarnessScenario {
   compareDir: string;
   verifyDir: string;
   timeoutMs?: number;
+  expectedHomeHeading?: string;
 }
 
 interface UiHarnessResult {
@@ -121,6 +122,30 @@ async function snapshot(win: BrowserWindow, source: string): Promise<unknown> {
   return win.webContents.executeJavaScript(source, true);
 }
 
+async function captureScreen(win: BrowserWindow, directory: string, name: string): Promise<string> {
+  const output = path.join(directory, `${name}.png`);
+  const image = await win.webContents.capturePage();
+  if (image.isEmpty()) throw new Error(`UI capture is empty: ${name}`);
+  fs.writeFileSync(output, image.toPNG());
+  return output;
+}
+
+async function captureFailure(directory: string, stage: string): Promise<void> {
+  const windows = [];
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed()) continue;
+    const info: Record<string, unknown> = { id: win.id };
+    try {
+      // Only structural state. Never dump form values, HTML, or bridge tokens.
+      info.state = await snapshot(win, `({ route: location.hash, readyState: document.readyState,
+        view: document.querySelector('[data-harness-view]')?.getAttribute('data-harness-view') ?? null })`);
+      info.screenshot = await captureScreen(win, directory, `failure-window-${win.id}`);
+    } catch { info.captureFailed = true; }
+    windows.push(info);
+  }
+  fs.writeFileSync(path.join(directory, 'diagnostics.json'), JSON.stringify({ stage, windows }, null, 2));
+}
+
 function assertSnapshotValues(
   label: string,
   value: unknown,
@@ -222,8 +247,17 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
   const resultPath = process.env.LLM_TSUKURU_UI_HARNESS_RESULT
     || path.join(process.cwd(), 'artifacts', 'harness', 'harness-ui.json');
   const timeoutMs = Number(process.env.LLM_TSUKURU_UI_HARNESS_TIMEOUT_MS || 30000);
+  const diagnosticDir = path.dirname(resultPath);
+  let stage = 'scenario';
+  const screenshots: Record<string, string> = {};
+  const checkpoint = (name: string): void => {
+    stage = name;
+    fs.mkdirSync(diagnosticDir, { recursive: true });
+    fs.writeFileSync(path.join(diagnosticDir, 'progress.json'), JSON.stringify({ stage, updatedAt: new Date().toISOString() }));
+  };
 
   try {
+    checkpoint('scenario');
     const scenario = JSON.parse(fs.readFileSync(scenarioPath, 'utf8')) as UiHarnessScenario;
     const stepTimeoutMs = scenario.timeoutMs || timeoutMs;
     const profile = path.resolve(process.env.LLM_TSUKURU_UI_HARNESS_USER_DATA!);
@@ -233,6 +267,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       throw new Error('UI harness is not using its isolated Electron profile.');
     }
 
+    checkpoint('home-window');
     const mainWindow = await waitForWindow('/', stepTimeoutMs);
     await waitForSelector(mainWindow, '[data-harness-view="home"]', stepTimeoutMs);
 
@@ -242,11 +277,13 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       route: location.hash,
     }))()`);
     assertSnapshotValues('home', home, {
-      heading: '번역 프로젝트를 시작하세요',
+      heading: scenario.expectedHomeHeading ?? '번역 프로젝트를 시작하세요',
       subtitle: '게임 엔진을 선택하면 추출부터 검수와 적용까지 한 흐름으로 이어집니다.',
       route: '#/',
     });
+    screenshots.home = await captureScreen(mainWindow, diagnosticDir, 'home');
 
+    checkpoint('mvmz-empty-state');
     await mainWindow.webContents.executeJavaScript(`location.hash = '#/mvmz'`, true);
     await waitForSelector(mainWindow, '[data-harness-view="mvmz"]', stepTimeoutMs);
     const mvmzEmpty = await snapshot(mainWindow, `(() => {
@@ -269,6 +306,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       optionDisabled: true,
     });
 
+    checkpoint('wolf-empty-state');
     await mainWindow.webContents.executeJavaScript(`location.hash = '#/wolf'`, true);
     await waitForSelector(mainWindow, '[data-harness-view="wolf"]', stepTimeoutMs);
     const wolfEmpty = await snapshot(mainWindow, `(() => {
@@ -293,6 +331,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
     await mainWindow.webContents.executeJavaScript(`location.hash = '#/'`, true);
     await waitForSelector(mainWindow, '[data-harness-view="home"]', stepTimeoutMs);
 
+    checkpoint('project-selection-and-approval');
     await selectProject(ctx, scenario.compareDir, stepTimeoutMs);
     const bridgeManifest = JSON.parse(fs.readFileSync(ctx.agentBridgeServer!.manifestPath, 'utf8')) as { token: string };
     await mainWindow.webContents.executeJavaScript(`location.hash = '#/'`, true);
@@ -356,6 +395,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       `document.querySelector('[data-harness-approval-banner]')?.click()`,
       true,
     );
+    checkpoint('agent-workspace');
     const agentWorkspaceWindow = await waitForWindow('/agent-workspace', stepTimeoutMs);
     await waitForSelector(agentWorkspaceWindow, '[data-harness-view="agent-workspace"]', stepTimeoutMs);
     await waitForSelector(agentWorkspaceWindow, '[data-harness-agent-env-status]', stepTimeoutMs);
@@ -441,8 +481,8 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       throw new Error('UI approval did not apply the exact expected bytes');
     }
 
+    checkpoint('llm-settings-missing');
     const llmSettingsMissing = await openLlmSettingsSnapshot(ctx, false, scenario.compareDir, stepTimeoutMs);
-    const llmSettingsReady = await openLlmSettingsSnapshot(ctx, true, scenario.compareDir, stepTimeoutMs);
     assertSnapshotValues('llmSettingsMissing', llmSettingsMissing, {
       llmReady: 'false',
       provider: 'gemini',
@@ -451,6 +491,8 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       generateGuidelineDisabled: true,
       applyGuidelineDisabled: true,
     });
+    checkpoint('llm-settings-ready');
+    const llmSettingsReady = await openLlmSettingsSnapshot(ctx, true, scenario.compareDir, stepTimeoutMs);
     assertSnapshotValues('llmSettingsReady', llmSettingsReady, {
       llmReady: 'true',
       provider: 'gemini',
@@ -460,6 +502,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       applyGuidelineDisabled: true,
     });
 
+    checkpoint('compare-window');
     await selectProject(ctx, scenario.compareDir, stepTimeoutMs);
     await click(mainWindow, '.pipeline > button:nth-child(3)');
     const compareWindow = await waitForWindow('/llm-compare', stepTimeoutMs);
@@ -481,7 +524,9 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       untranslatedCount: '1',
       loading: 'false',
     });
+    screenshots.compare = await captureScreen(compareWindow, diagnosticDir, 'compare');
 
+    checkpoint('json-verify-window');
     await selectProject(ctx, scenario.verifyDir, stepTimeoutMs);
     await click(mainWindow, '.review-link');
     const verifyWindow = await waitForWindow('/json-verify', stepTimeoutMs);
@@ -503,6 +548,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       errorFiles: '1',
       warningFiles: '0',
     });
+    screenshots.verify = await captureScreen(verifyWindow, diagnosticDir, 'verify');
 
     const result: UiHarnessResult = {
       schemaVersion: 1,
@@ -527,6 +573,8 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       },
       artifacts: {
         scenario: scenarioPath,
+        screenshots,
+        progress: path.join(diagnosticDir, 'progress.json'),
       },
       reproCommand: 'npm run harness:ui',
       snapshots: {
@@ -543,7 +591,9 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       },
     };
 
+    checkpoint('cleanup');
     await cleanupHarness(ctx);
+    checkpoint('completed');
     writeResult(resultPath, result);
     app.exit(0);
   } catch (error) {
@@ -558,6 +608,9 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       },
       artifacts: {
         scenario: scenarioPath,
+        screenshots,
+        progress: path.join(diagnosticDir, 'progress.json'),
+        diagnostics: path.join(diagnosticDir, 'diagnostics.json'),
       },
       reproCommand: 'npm run harness:ui',
       failureHints: [
@@ -565,11 +618,14 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
         'Rerun npm run harness:ui after fixing the failing window or selector.',
       ],
       error: {
-        message: (error as Error).message,
+        message: `[${stage}] ${(error as Error).message}`,
         stack: (error as Error).stack,
       },
     };
     log.error('UI harness failed:', error);
+    try {
+      await captureFailure(diagnosticDir, stage);
+    } catch { result.failureHints?.push('Failure diagnostics could not be captured; inspect the Electron log.'); }
     try {
       await cleanupHarness(ctx);
     } catch (cleanupError) {

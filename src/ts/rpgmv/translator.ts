@@ -8,13 +8,16 @@ import {
     contentHash,
     isSeparatorLine,
     reassembleBlocks,
+    splitFileBlocks,
     validateChunk,
 } from '../libs/translationCore';
+export { splitFileBlocks } from '../libs/translationCore';
 import type { BlockValidation } from '../libs/translationCore';
 import { extractTranslationControlCodes, isTranslationTextFileName } from '../libs/translationSyntax';
 import { atomicWriteJsonFile, atomicWriteTextFile } from '../libs/atomicFile';
 import { runWithDirectoryLock } from '../libs/concurrency';
-import { getProviderRegistryEntry, LLM_FINGERPRINT_SCHEMA_VERSION } from '../libs/providerRegistry';
+import { LLM_FINGERPRINT_SCHEMA_VERSION } from '../libs/providerRegistry';
+import { normalizeTranslationConcurrency, TranslationRequestScheduler } from '../libs/translationRequestScheduler';
 import {
     buildTranslationCacheKey,
     buildTranslationConfigFingerprint,
@@ -164,7 +167,6 @@ interface TranslationFileResult extends PendingTranslationFile {
     logEntry: Partial<TranslationLogEntry>;
     aborted: boolean;
     incomplete: boolean;
-    durationMs: number;
 }
 
 export interface TranslationCoordinatorOptions {
@@ -264,11 +266,8 @@ export function validateTranslatedFileContent(
     return { ok: errors.length === 0, errors };
 }
 
-export function resolveLlmParallelWorkers(provider: string, requested: unknown): number {
-    const requestedWorkers = Number.isInteger(requested) ? requested as number : 1;
-    const safeRequested = Math.max(1, Math.min(16, requestedWorkers));
-    const providerCap = Math.max(1, getProviderRegistryEntry(provider).concurrencyCap || 1);
-    return Math.min(safeRequested, providerCap);
+export function resolveLlmParallelWorkers(_provider: string, requested: unknown): number {
+    return normalizeTranslationConcurrency(requested);
 }
 
 export async function translateFilesWithCoordinator(options: TranslationCoordinatorOptions): Promise<TranslationCoordinatorResult> {
@@ -278,6 +277,17 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
     let workedFiles = 0;
     let totalErrors = 0;
     let totalBlocks = 0;
+    let executionFailure: { error: unknown } | undefined;
+    const scheduler = new TranslationRequestScheduler({
+        concurrency: options.workerCount,
+        requestsPerMinute: options.settings.llmRequestsPerMinute,
+        isAborted: options.isAborted,
+    });
+    const fileProgress = new Map<string, number>();
+    const reportProgress = () => {
+        const partial = [...fileProgress.values()].reduce((sum, value) => sum + value, 0);
+        options.onProgress?.(((workedFiles + partial) / Math.max(1, options.fileList.length)) * 100);
+    };
     const configFingerprint = buildTranslationConfigFingerprint(
         options.provider,
         options.model,
@@ -294,8 +304,9 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
     });
 
     const markWorked = (fileName: string, detail: string) => {
+        fileProgress.delete(fileName);
         workedFiles++;
-        options.onProgress?.((workedFiles / options.fileList.length) * 100);
+        reportProgress();
         options.onStatus?.(`${fileName} ${detail}`);
     };
 
@@ -373,9 +384,13 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
         pending.push({ fileName, fileOrdinal, originalContent, cacheKey });
     }
 
-    await runTranslationQueue(pending, options.workerCount, options.isAborted, async (task) => {
+    await runTranslationQueue(pending, scheduler.concurrency, () => scheduler.isAborted(), async (task) => {
         options.onStatus?.(`[${task.fileOrdinal}/${options.fileList.length}] ${task.fileName}`);
-        return translateOneFile(task, options, () => workedFiles);
+        return translateOneFile(task, options, scheduler, (current, total) => {
+            const fraction = total > 0 ? Math.min(1, Math.max(0, current / total)) : 0;
+            fileProgress.set(task.fileName, Math.max(fileProgress.get(task.fileName) ?? 0, fraction));
+            reportProgress();
+        });
     }, (result) => {
         const filePath = path.join(options.edir, result.fileName);
         if (result.aborted) {
@@ -436,13 +451,16 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
         } as TranslationLogEntry);
         markWorked(result.fileName, translationSucceeded ? '' : stalePreimage ? '(파일 변경, 건너뜀)' : '(검증 실패)');
     }, (task, err) => {
-        if (options.isAborted()) {
+        if (scheduler.isAborted()) {
+            if (!options.isAborted()) executionFailure ??= { error: err };
             return;
         }
         failedFiles.push(task.fileName);
         entries.push(createFailureLogEntry(task.fileName, [String((err as Error).message || err)], false));
         markWorked(task.fileName, '(번역 실패)');
-    });
+    }, () => scheduler.cancel());
+
+    if (executionFailure) throw executionFailure.error;
 
     return { workedFiles, failedFiles, totalErrors, totalBlocks, entries };
 }
@@ -458,20 +476,19 @@ function fileStillMatches(filePath: string, expectedContent: string): boolean {
 async function translateOneFile(
     task: PendingTranslationFile,
     options: TranslationCoordinatorOptions,
-    getWorkedFiles: () => number,
+    scheduler: TranslationRequestScheduler,
+    onProgress: (current: number, total: number) => void,
 ): Promise<TranslationFileResult> {
-    const started = Date.now();
     const translator = options.createTranslatorForFile
         ? options.createTranslatorForFile(task.fileName)
         : createTranslator(options.settings, options.sourceLang, options.targetLang, options.isAborted);
     const result = await translator.translateFileContent(
         task.originalContent,
         (current, total, detail) => {
-            const fileProgress = (getWorkedFiles() / options.fileList.length) * 100;
-            const blockProgress = total > 0 ? (current / total) * (100 / options.fileList.length) : 0;
-            options.onProgress?.(fileProgress + blockProgress);
+            onProgress(current, total);
             options.onStatus?.(`[${task.fileOrdinal}/${options.fileList.length}] ${task.fileName} — ${detail} (${current}/${total} 블록)`);
         },
+        { scheduler },
     );
 
     return {
@@ -481,7 +498,6 @@ async function translateOneFile(
         logEntry: result.logEntry,
         aborted: !!result.aborted,
         incomplete: !!result.incomplete || Number(result.logEntry.errorBlocks || 0) > 0,
-        durationMs: Date.now() - started,
     };
 }
 
@@ -492,31 +508,33 @@ async function runTranslationQueue<T, R>(
     worker: (task: T) => Promise<R>,
     onSuccess: (result: R) => void,
     onFailure: (task: T, err: unknown) => void,
+    onStopped?: () => void,
 ): Promise<void> {
-    return new Promise((resolve) => {
-        let nextIndex = 0;
-        let active = 0;
-
-        const launch = () => {
-            while (active < workerCount && nextIndex < tasks.length && !isAborted()) {
+    let nextIndex = 0;
+    let failure: { error: unknown } | undefined;
+    const runWorker = async () => {
+        try {
+            while (nextIndex < tasks.length && !isAborted() && !failure) {
                 const task = tasks[nextIndex++];
-                active++;
-                worker(task).then(onSuccess, (err) => onFailure(task, err)).finally(() => {
-                    active--;
-                    if ((nextIndex >= tasks.length || isAborted()) && active === 0) {
-                        resolve();
-                    } else {
-                        launch();
-                    }
-                });
+                let result: R;
+                try {
+                    result = await worker(task);
+                } catch (error) {
+                    onFailure(task, error);
+                    continue;
+                }
+                onSuccess(result);
             }
-            if ((nextIndex >= tasks.length || isAborted()) && active === 0) {
-                resolve();
-            }
-        };
+        } catch (error) {
+            failure ??= { error };
+            onStopped?.();
+        }
+    };
 
-        launch();
-    });
+    // Completion callback failures stop the queue, but in-flight work must settle
+    // before the caller can release its directory lock or start another run.
+    await Promise.all(Array.from({ length: Math.min(workerCount, tasks.length) }, runWorker));
+    if (failure) throw failure.error;
 }
 
 function createFailureLogEntry(fileName: string, errors: string[], cached: boolean): TranslationLogEntry {
@@ -709,7 +727,7 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
             const failMsg = result.failedFiles.length > 0
                 ? `\n번역 실패: ${result.failedFiles.length}개 파일 (${result.failedFiles.slice(0, 5).join(', ')}${result.failedFiles.length > 5 ? ' ...' : ''})`
                 : '';
-            const workerMsg = workerCount > 1 ? `\n동시 번역 파일 수: ${workerCount}` : '';
+            const workerMsg = workerCount > 1 ? `\n동시 API 요청 수: ${workerCount}` : '';
             if (aborted) {
                 Tools.sendAlert(
                     `번역 중단 (${result.workedFiles}/${fileList.length} 파일 처리, ${durationSec}초 소요)${failMsg}${workerMsg}`
@@ -1018,26 +1036,4 @@ async function retranslateBlocksUnlocked(
     } catch (err: unknown) {
         return { success: false, error: (err as Error).message || String(err) };
     }
-}
-
-// Local block splitter (same logic as geminiTranslator's splitIntoBlocks)
-export function splitFileBlocks(lines: string[]): { separator: string; lines: string[] }[] {
-    const blocks: { separator: string; lines: string[] }[] = [];
-    let curSep = '';
-    let curLines: string[] = [];
-    for (const line of lines) {
-        if (isSeparatorLine(line)) {
-            if (curSep || curLines.length > 0) {
-                blocks.push({ separator: curSep, lines: [...curLines] });
-            }
-            curSep = line;
-            curLines = [];
-        } else {
-            curLines.push(line);
-        }
-    }
-    if (curSep || curLines.length > 0) {
-        blocks.push({ separator: curSep, lines: curLines });
-    }
-    return blocks;
 }

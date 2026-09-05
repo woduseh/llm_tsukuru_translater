@@ -31,6 +31,7 @@ import {
 } from './claudeTranslator';
 import { parseVertexServiceAccountJson } from './vertexCredentials';
 import type { Translator } from './translatorFactory';
+import { MAX_TRANSLATION_CONCURRENCY } from './translationRequestScheduler';
 
 export interface ProviderReadinessValidation {
   llmProvider: LlmProvider;
@@ -148,7 +149,7 @@ const providerRegistry = {
     ...LLM_PROVIDER_METADATA.gemini,
     configHint: 'Gemini API 키를 입력하면 번역, 재번역, JSON 검증 복구에 그대로 사용됩니다.',
     missingConfigMessage: 'Gemini API 설정이 완료되지 않았습니다. 메인 설정에서 API 키와 모델을 확인해주세요.',
-    concurrencyCap: LLM_PROVIDER_METADATA.gemini.maxRecommendedConcurrency,
+    concurrencyCap: MAX_TRANSLATION_CONCURRENCY,
     readinessValidator(settings: SettingsLike): ProviderReadinessValidation {
       const validation = createBaseReadiness(settings, 'gemini');
       requireModel(settings, validation);
@@ -165,7 +166,7 @@ const providerRegistry = {
     ...LLM_PROVIDER_METADATA.vertex,
     configHint: 'Google Cloud 서비스 계정 JSON 전체를 붙여넣고 Vertex 위치는 기본값 global을 사용하세요.',
     missingConfigMessage: 'Vertex AI 설정이 완료되지 않았습니다. 메인 설정에서 서비스 계정 JSON, 위치, 모델을 확인해주세요.',
-    concurrencyCap: LLM_PROVIDER_METADATA.vertex.maxRecommendedConcurrency,
+    concurrencyCap: MAX_TRANSLATION_CONCURRENCY,
     readinessValidator(settings: SettingsLike): ProviderReadinessValidation {
       const validation = createBaseReadiness(settings, 'vertex');
       requireModel(settings, validation);
@@ -184,7 +185,7 @@ const providerRegistry = {
     ...LLM_PROVIDER_METADATA.openai,
     configHint: 'OpenAI API 키와 모델을 입력하세요. 공식 Chat Completions API를 사용합니다.',
     missingConfigMessage: 'OpenAI 설정이 완료되지 않았습니다. API 키와 모델을 확인해주세요.',
-    concurrencyCap: LLM_PROVIDER_METADATA.openai.maxRecommendedConcurrency,
+    concurrencyCap: MAX_TRANSLATION_CONCURRENCY,
     readinessValidator(settings: SettingsLike): ProviderReadinessValidation {
       const validation = createBaseReadiness(settings, 'openai');
       requireModel(settings, validation);
@@ -201,7 +202,7 @@ const providerRegistry = {
     ...LLM_PROVIDER_METADATA['custom-openai'],
     configHint: 'LM Studio, LocalAI, vLLM 등 OpenAI Chat Completions 호환 /v1 Base URL을 입력하세요. API 키는 선택입니다.',
     missingConfigMessage: 'OpenAI 호환 API 설정이 완료되지 않았습니다. Base URL과 모델을 확인해주세요.',
-    concurrencyCap: LLM_PROVIDER_METADATA['custom-openai'].maxRecommendedConcurrency,
+    concurrencyCap: MAX_TRANSLATION_CONCURRENCY,
     readinessValidator(settings: SettingsLike): ProviderReadinessValidation {
       const validation = createBaseReadiness(settings, 'custom-openai');
       requireModel(settings, validation);
@@ -227,7 +228,7 @@ const providerRegistry = {
     ...LLM_PROVIDER_METADATA.claude,
     configHint: 'Claude API 키, 모델, 최대 토큰 수를 입력하세요. Anthropic Messages API를 사용합니다.',
     missingConfigMessage: 'Claude 설정이 완료되지 않았습니다. API 키, 모델, 최대 토큰 수를 확인해주세요.',
-    concurrencyCap: LLM_PROVIDER_METADATA.claude.maxRecommendedConcurrency,
+    concurrencyCap: MAX_TRANSLATION_CONCURRENCY,
     readinessValidator(settings: SettingsLike): ProviderReadinessValidation {
       const validation = createBaseReadiness(settings, 'claude');
       requireModel(settings, validation);

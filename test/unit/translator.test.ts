@@ -336,7 +336,7 @@ describe('isRetryableApiError', () => {
   });
 });
 
-// ─── splitFileBlocks (translator.ts local splitter) ─────────────────
+// ─── splitFileBlocks (line-array entry point) ───────────────────────
 
 describe('splitFileBlocks', () => {
   it('splits lines by numbered separator pattern', () => {
@@ -353,6 +353,18 @@ describe('splitFileBlocks', () => {
     expect(blocks).toHaveLength(0);
   });
 
+  it('distinguishes no lines from one empty line and preserves array elements', () => {
+    expect(splitFileBlocks([''])).toEqual([{ separator: '', lines: [''] }]);
+    expect(splitFileBlocks(['first\n--- 101 ---\nsecond', ''])).toEqual([
+      { separator: '', lines: ['first\n--- 101 ---\nsecond', ''] },
+    ]);
+  });
+
+  it('preserves Wolf separators, empty lines, and final newline through the legacy export', () => {
+    const content = 'preamble\n--- 101-0 ---\n\\C[1]hello\n\n--- 102-1 ---\nworld\n';
+    expect(reassembleBlocks(splitFileBlocks(content.split('\n')))).toBe(content);
+  });
+
   it('handles single line with no separator', () => {
     const blocks = splitFileBlocks(['hello']);
     expect(blocks).toHaveLength(1);
@@ -366,8 +378,7 @@ describe('splitFileBlocks', () => {
     expect(blocks[1]).toEqual({ separator: '--- 2 ---', lines: [] });
   });
 
-  it('uses broader separator pattern than geminiTranslator', () => {
-    // After fixing SEPARATOR_REGEX, both now accept any number
+  it('accepts any numbered separator', () => {
     const lines = ['a', '--- 999 ---', 'b'];
     const blocks = splitFileBlocks(lines);
     expect(blocks).toHaveLength(2);

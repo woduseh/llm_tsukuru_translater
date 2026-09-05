@@ -21,7 +21,7 @@ type IpcCallback = (...args: any[]) => void
 
 interface ElectronApi {
   send: (channel: string, ...args: unknown[]) => void
-  on: (channel: string, callback: IpcCallback) => void
+  on: (channel: string, callback: IpcCallback) => (() => void) | undefined
   once: (channel: string, callback: IpcCallback) => void
   removeAllListeners: (channel: string) => void
   invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
@@ -93,8 +93,8 @@ export const api = {
 
 /** Register an IPC listener that auto-cleans on component unmount */
 export function useIpcOn(channel: string, callback: IpcCallback) {
-  api.on(channel, callback)
+  const unsubscribe = api.on(channel, callback)
   onUnmounted(() => {
-    api.removeAllListeners(channel)
+    unsubscribe?.()
   })
 }

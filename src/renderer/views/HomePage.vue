@@ -42,16 +42,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import TitleBar from '../components/TitleBar.vue'
-import { api, useIpcOn } from '../composables/useIpc'
-
-useIpcOn('getGlobalSettings', (tt: Record<string, unknown>) => {
-  if (tt && tt.themeData) {
-    const root = document.documentElement
-    for (const [key, val] of Object.entries(tt.themeData as Record<string, string>)) {
-      root.style.setProperty(key, val)
-    }
-  }
-})
+import { api } from '../composables/useIpc'
 
 onMounted(() => {
   api.send('mainReady')

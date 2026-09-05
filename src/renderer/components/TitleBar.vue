@@ -22,8 +22,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { api } from '../composables/useIpc'
+import { ref, computed, onMounted } from 'vue'
+import { api, useIpcOn } from '../composables/useIpc'
 import Swal from 'sweetalert2'
 
 defineProps<{
@@ -100,15 +100,9 @@ async function onAbort() {
 }
 
 onMounted(() => {
-  api.on('loading', onLoading)
-  api.on('loadingTag', (tt: string) => { loadingTag.value = tt })
-  api.on('llmTranslating', (val: boolean) => { llmTranslating.value = val })
-})
-
-onUnmounted(() => {
-  api.removeAllListeners('loading')
-  api.removeAllListeners('loadingTag')
-  api.removeAllListeners('llmTranslating')
+  useIpcOn('loading', onLoading)
+  useIpcOn('loadingTag', (tt: string) => { loadingTag.value = tt })
+  useIpcOn('llmTranslating', (val: boolean) => { llmTranslating.value = val })
 })
 </script>
 

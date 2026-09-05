@@ -1,0 +1,1829 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-09-05T05:34:59.709Z",
+  "benchmark": "production-translation-synthetic-provider",
+  "environment": {
+    "node": "v24.14.0",
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor           ",
+    "logicalCpus": 16
+  },
+  "conditions": {
+    "runs": 3,
+    "warmups": 1,
+    "baselineDir": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\performance\\translation-2026-09-05\\baseline",
+    "beforeOnly": true,
+    "output": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\performance\\translation-2026-09-05\\before.json",
+    "model": "gemini-flash-latest",
+    "requestsPerScenario": 8,
+    "chunkSize": 1,
+    "translationUnit": "chunk",
+    "llmRequestsPerMinute": 0,
+    "maxRetries": 0,
+    "maxApiRetries": 0,
+    "provider": "Synthetic axios.post responses only; zero live network requests. This does not measure actual LLM quality or provider latency.",
+    "latency": "120 + (chunkId % 3) * 40 ms; source chunk IDs descend from 8 to 1 to permit out-of-order completion.",
+    "scope": "Production translateFilesWithCoordinator -> real registry/factory -> GeminiTranslator, including structural validation, atomic translation/cache/progress writes and fsync.",
+    "excluded": "Module build/load, fixture and backup preparation, post-run byte/structure/equality assertions, report generation and cleanup.",
+    "cache": "Fresh files and empty translation cache per sample. OS filesystem cache is not flushed. Warmups are retained but excluded from summary statistics.",
+    "order": "Forward/reverse variant order alternates every repetition; all samples and axios instrumentation run sequentially in one process.",
+    "payloadComparison": "Source payloads must match byte-for-byte across variants. Full request-envelope hashes and equality are reported separately to expose intentional API-envelope changes.",
+    "before": "Snapshot source with requested workers 8 resolved through production provider cap 1; original inter-chunk delay is retained.",
+    "current": "Requested workers 1/2/4/8 are each resolved through the production provider cap. Requests must never exceed that global cap."
+  },
+  "sources": {
+    "before": {
+      "files": {
+        "src/ts/libs/atomicFile.ts": "f370a2d64bd5edab8ffd8ff975ef0de405d627f2d25c5cc73a1451d2390cbd5d",
+        "src/ts/libs/claudeTranslator.ts": "9a440daf3f0afa129043b0ef43d5a9ff2c743f78fc93d6de195957ec572e93cd",
+        "src/ts/libs/concurrency.ts": "bce921cb5d30d21c4b527620a157632a53f303f362e95404102a15feb3e117e5",
+        "src/ts/libs/constants.ts": "04d7163faa635d4f893b8a90c5625ba36477aeecd5ab58aa65ba994914868a3b",
+        "src/ts/libs/geminiTranslator.ts": "7205feeec71bdef0e0864beb164fe4072c114d189cd315982091808968375cb9",
+        "src/ts/libs/openAiCompatibleTranslator.ts": "5a6ba1c46aa892ef75f96da1e353a1d5579c393fa1f147316454853435646793",
+        "src/ts/libs/projectTools.ts": "432e4eccb665d0810d611a7b28608b866deb85aa1023e772d620431a61464efd",
+        "src/ts/libs/providerRegistry.ts": "c90ff4b9f1d9d9a310147ca007c7f4a4c94170caccea1bb9d9914299936270e4",
+        "src/ts/libs/providerTranslationBase.ts": "0f83cf0480792a1b365bad1b2d15531e606e14341a47841a73e7ebcb3f0dce74",
+        "src/ts/libs/translationCore.ts": "ebfcf539edf9680cf7bcbc440d6f9197e4b3caacbf4f5258f59f219b6c8fa5e5",
+        "src/ts/libs/translationPrompt.ts": "a6867521586b8c047e6fddfdee39ee6d43ceb136a3d785655013a6ba9aca39ec",
+        "src/ts/libs/translationSyntax.ts": "5696037d4ec2cf213a3d1eb1888581e8a9cbdfdf1e7355d2d431c18114b31a37",
+        "src/ts/libs/translatorFactory.ts": "7bd49f9a380369aeda561c2e804bb57a00fbd663877474d759544fbbed138295",
+        "src/ts/libs/vertexCredentials.ts": "2e0f99721fd09fcb01d0c0ecebddcc61b01c62131006484ddf73bfd11cbd0601",
+        "src/ts/libs/vertexTranslator.ts": "f76c42ea4d786fe541aa80c224491cce7b1723ffacf02e9c61465d19fe96e876",
+        "src/ts/rpgmv/datas.ts": "e69fe8c078268f026129a3ca1127dbfb2b6ef89f8eedc46661b74c303f2f72a8",
+        "src/ts/rpgmv/styles.ts": "29ee1f452079d34b31ec19778ac4d743671a4fefe3d033851f0faa640fad0a17",
+        "src/ts/rpgmv/translator.ts": "c3dd204114de58a02e9e7a52e50a9855a01a47cf09da0c37c0681fae8002db22",
+        "src/types/llmProviderContract.ts": "0ea56db0c6a3f9eac95014dc2be8543916477f58b21941a1a38c06ad98156888",
+        "src/types/settings.ts": "3e810ceaede6fe865bee471759b2b89b98727999eafad5501abda12d7aa5c7de"
+      },
+      "bundleSha256": "d7f8930e4e4adb8fe682a27a348f147f867d697e317dff4992000b8e8d19b9b4",
+      "overriddenSources": [
+        "src/ts/libs/geminiTranslator.ts",
+        "src/ts/libs/providerRegistry.ts",
+        "src/ts/libs/providerTranslationBase.ts",
+        "src/ts/libs/translationCore.ts",
+        "src/ts/libs/translatorFactory.ts",
+        "src/ts/rpgmv/datas.ts",
+        "src/ts/rpgmv/translator.ts",
+        "src/types/llmProviderContract.ts",
+        "src/types/settings.ts"
+      ]
+    }
+  },
+  "scenarios": [
+    {
+      "name": "one-file-eight-chunks",
+      "files": 1,
+      "chunksPerFile": 8,
+      "totalChunks": 8,
+      "variants": {
+        "before": {
+          "warmups": [
+            {
+              "elapsedMs": 8465.5226,
+              "cpuMs": 0,
+              "cpuUserMs": 0,
+              "cpuSystemMs": 0,
+              "requestedWorkers": 8,
+              "resolvedWorkers": 1,
+              "progressEvents": 17,
+              "requestCount": 8,
+              "active": 0,
+              "activeMax": 1,
+              "requests": [
+                {
+                  "chunkId": 8,
+                  "sourceBytes": 76,
+                  "sourceSha256": "81b26b65290ad82e26b497eed4cd70a7e3cfea69372a829c8ab5803e201c221d",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "6e163eb6b7e046c60386665aebbbee2859de11e197331e6d8bc06a73c1843c3d",
+                  "userMessageSha256": "cf0f8bbf6991e3ddb47d3b6eb74204492f55e8be7f472b931a9fd3eca823c34d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 2.0628999999998996,
+                  "completedMs": 216.6796999999999
+                },
+                {
+                  "chunkId": 7,
+                  "sourceBytes": 76,
+                  "sourceSha256": "2e46c0fee2ba9f09efad0482242103a899a7316fd3d2a9a27b3a796ebe7af581",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "f1817e9b7d8ed84f4c3a371bdaf02cd6a0db9c9507a3d4618d3ab9edbbf8e9ad",
+                  "userMessageSha256": "539910756478d20a74ecfbf1af8b7e38e329cc4ccf249d91ab390356dc6d07df",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 1223.1650999999997,
+                  "completedMs": 1394.9222
+                },
+                {
+                  "chunkId": 6,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3014148b16709d2b9342016a3f172f7539677fb0d9236d424f972b19cfcc7371",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "0d0f2383d72bcb5b3d759b83164fd09ebc4f80a23aed5861190dc4813256ea21",
+                  "userMessageSha256": "360dfe977551fa9fe4455add7057632c5f2ab08c6a308595855490f39f60184c",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 2398.1728000000003,
+                  "completedMs": 2523.7843999999996
+                },
+                {
+                  "chunkId": 5,
+                  "sourceBytes": 76,
+                  "sourceSha256": "5998c53036dea8d20b25d23bb0983f04fa97ea62888ddbfaed995b5d594bc5a3",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "2a46164dc4f8629e7b8c14c26c1ff9023bebb16714a59ada395c83cc9498a0c4",
+                  "userMessageSha256": "e117ce6f01a184046284fbf0ad476b88ed3ef0a379a361678dc9d61f6d6af0d6",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 3536.5870999999997,
+                  "completedMs": 3740.1333999999997
+                },
+                {
+                  "chunkId": 4,
+                  "sourceBytes": 76,
+                  "sourceSha256": "217011aa86e03d3acc3734c1e10e1416bd281cb01423f7c29f4db281eb21d839",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "89590656051c863549ac6c48bfb28e9bebad158af5a8f4eae6f2832c1d298d99",
+                  "userMessageSha256": "5043a4d1ee401d14b7382c4aca48593556f76bfdc9c45794f9df217e587f743d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 4740.3719,
+                  "completedMs": 4912.9997
+                },
+                {
+                  "chunkId": 3,
+                  "sourceBytes": 76,
+                  "sourceSha256": "abaf1fe5a8b65914dc66cb6ec03d08ed70bee6aabc6b0cf0c9248ad78dbc7641",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "4e857670716bf2b4478642c2dca484b7f5cf6cf44c7a15927087076d52c7f0df",
+                  "userMessageSha256": "4a6a6231d2434f7415ea7060325f106fec863474267ee044c1526cb8dac3d18d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 5928.1678,
+                  "completedMs": 6053.4507
+                },
+                {
+                  "chunkId": 2,
+                  "sourceBytes": 76,
+                  "sourceSha256": "520008e1a237b1289f1fb2e3c2bdfbe0448839023241511bfeaba64804856ffb",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "d9a93a6237eb7aeb43fa33a9e7324fe05452e45276b10ae4237558de1a9ff8a9",
+                  "userMessageSha256": "df67b77d7e58dc4a68c1bfa38fe473368da05dd387eba0515e4f869e222c9f35",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 7069.6994,
+                  "completedMs": 7274.9340999999995
+                },
+                {
+                  "chunkId": 1,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3f4d7250dc929997ba30e7c0b017ee7b264b2cc8a8b6846ab7b1ef29bd8d249b",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "5d8bb102705f17839771350501726c464b885f6f43019f8d97c6fd069c07fe63",
+                  "userMessageSha256": "a9f63af48622d2f6f25e0a34bce81c87cf860ebe83870a498afd65ab6f26e620",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 8287.547600000002,
+                  "completedMs": 8459.459900000002
+                }
+              ],
+              "startedOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "completionOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "outOfOrderCompletion": false,
+              "outputBytes": 591,
+              "completedFiles": [
+                "Map001.txt"
+              ],
+              "validation": [
+                {
+                  "file": "Map001.txt",
+                  "bytes": 591,
+                  "sha256": "465aaf9d81d6bf5ff1b043a33a3b41a12446626d2bf6e59aa0af5bb966381024",
+                  "ok": true,
+                  "errors": []
+                }
+              ],
+              "cacheBytes": 900,
+              "progressBytes": 211,
+              "digest": {
+                "source": "eda133379a876b031b37bb9294b201b4d66e0d84e29b3113f8dc035cce825036",
+                "translatedFiles": "f5fa20232d77a6bfddabd3b4ec98b2d006e9ae12f2791bc51b0bc1fdb606a747",
+                "requestWorkload": "fdb112da71c541a4161b0d823ea6e04b00a93c6c674389f214ef3a2765bfc59a",
+                "userMessages": "089b2c3d1732ae0655f78c5f7df81905c01231f57e1a7c64a2cdabce915d9931",
+                "systemInstructions": "e21dfa5a9e97f2b3468bc721fa5a06f33e6b77fe2a8e092b34b0cb17d38d9526"
+              },
+              "requestPayloadSha256": "03fd7f87f067b252feb0f6bcaaa51d92d00fa90b086ab5fa44be243e74f9bcce"
+            }
+          ],
+          "samples": [
+            {
+              "elapsedMs": 8447.970200000002,
+              "cpuMs": 31,
+              "cpuUserMs": 31,
+              "cpuSystemMs": 0,
+              "requestedWorkers": 8,
+              "resolvedWorkers": 1,
+              "progressEvents": 17,
+              "requestCount": 8,
+              "active": 0,
+              "activeMax": 1,
+              "requests": [
+                {
+                  "chunkId": 8,
+                  "sourceBytes": 76,
+                  "sourceSha256": "81b26b65290ad82e26b497eed4cd70a7e3cfea69372a829c8ab5803e201c221d",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "6e163eb6b7e046c60386665aebbbee2859de11e197331e6d8bc06a73c1843c3d",
+                  "userMessageSha256": "cf0f8bbf6991e3ddb47d3b6eb74204492f55e8be7f472b931a9fd3eca823c34d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 0.6084000000009837,
+                  "completedMs": 201.20060000000012
+                },
+                {
+                  "chunkId": 7,
+                  "sourceBytes": 76,
+                  "sourceSha256": "2e46c0fee2ba9f09efad0482242103a899a7316fd3d2a9a27b3a796ebe7af581",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "f1817e9b7d8ed84f4c3a371bdaf02cd6a0db9c9507a3d4618d3ab9edbbf8e9ad",
+                  "userMessageSha256": "539910756478d20a74ecfbf1af8b7e38e329cc4ccf249d91ab390356dc6d07df",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 1216.2093999999997,
+                  "completedMs": 1389.3320000000003
+                },
+                {
+                  "chunkId": 6,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3014148b16709d2b9342016a3f172f7539677fb0d9236d424f972b19cfcc7371",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "0d0f2383d72bcb5b3d759b83164fd09ebc4f80a23aed5861190dc4813256ea21",
+                  "userMessageSha256": "360dfe977551fa9fe4455add7057632c5f2ab08c6a308595855490f39f60184c",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 2400.7204,
+                  "completedMs": 2523.0689
+                },
+                {
+                  "chunkId": 5,
+                  "sourceBytes": 76,
+                  "sourceSha256": "5998c53036dea8d20b25d23bb0983f04fa97ea62888ddbfaed995b5d594bc5a3",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "2a46164dc4f8629e7b8c14c26c1ff9023bebb16714a59ada395c83cc9498a0c4",
+                  "userMessageSha256": "e117ce6f01a184046284fbf0ad476b88ed3ef0a379a361678dc9d61f6d6af0d6",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 3523.5298000000003,
+                  "completedMs": 3728.4038
+                },
+                {
+                  "chunkId": 4,
+                  "sourceBytes": 76,
+                  "sourceSha256": "217011aa86e03d3acc3734c1e10e1416bd281cb01423f7c29f4db281eb21d839",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "89590656051c863549ac6c48bfb28e9bebad158af5a8f4eae6f2832c1d298d99",
+                  "userMessageSha256": "5043a4d1ee401d14b7382c4aca48593556f76bfdc9c45794f9df217e587f743d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 4743.2554,
+                  "completedMs": 4916.152400000001
+                },
+                {
+                  "chunkId": 3,
+                  "sourceBytes": 76,
+                  "sourceSha256": "abaf1fe5a8b65914dc66cb6ec03d08ed70bee6aabc6b0cf0c9248ad78dbc7641",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "4e857670716bf2b4478642c2dca484b7f5cf6cf44c7a15927087076d52c7f0df",
+                  "userMessageSha256": "4a6a6231d2434f7415ea7060325f106fec863474267ee044c1526cb8dac3d18d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 5930.367,
+                  "completedMs": 6054.033500000001
+                },
+                {
+                  "chunkId": 2,
+                  "sourceBytes": 76,
+                  "sourceSha256": "520008e1a237b1289f1fb2e3c2bdfbe0448839023241511bfeaba64804856ffb",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "d9a93a6237eb7aeb43fa33a9e7324fe05452e45276b10ae4237558de1a9ff8a9",
+                  "userMessageSha256": "df67b77d7e58dc4a68c1bfa38fe473368da05dd387eba0515e4f869e222c9f35",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 7068.2469,
+                  "completedMs": 7269.604100000002
+                },
+                {
+                  "chunkId": 1,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3f4d7250dc929997ba30e7c0b017ee7b264b2cc8a8b6846ab7b1ef29bd8d249b",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "5d8bb102705f17839771350501726c464b885f6f43019f8d97c6fd069c07fe63",
+                  "userMessageSha256": "a9f63af48622d2f6f25e0a34bce81c87cf860ebe83870a498afd65ab6f26e620",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 8270.498099999999,
+                  "completedMs": 8442.161900000001
+                }
+              ],
+              "startedOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "completionOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "outOfOrderCompletion": false,
+              "outputBytes": 591,
+              "completedFiles": [
+                "Map001.txt"
+              ],
+              "validation": [
+                {
+                  "file": "Map001.txt",
+                  "bytes": 591,
+                  "sha256": "465aaf9d81d6bf5ff1b043a33a3b41a12446626d2bf6e59aa0af5bb966381024",
+                  "ok": true,
+                  "errors": []
+                }
+              ],
+              "cacheBytes": 900,
+              "progressBytes": 211,
+              "digest": {
+                "source": "eda133379a876b031b37bb9294b201b4d66e0d84e29b3113f8dc035cce825036",
+                "translatedFiles": "f5fa20232d77a6bfddabd3b4ec98b2d006e9ae12f2791bc51b0bc1fdb606a747",
+                "requestWorkload": "fdb112da71c541a4161b0d823ea6e04b00a93c6c674389f214ef3a2765bfc59a",
+                "userMessages": "089b2c3d1732ae0655f78c5f7df81905c01231f57e1a7c64a2cdabce915d9931",
+                "systemInstructions": "e21dfa5a9e97f2b3468bc721fa5a06f33e6b77fe2a8e092b34b0cb17d38d9526"
+              },
+              "requestPayloadSha256": "03fd7f87f067b252feb0f6bcaaa51d92d00fa90b086ab5fa44be243e74f9bcce"
+            },
+            {
+              "elapsedMs": 8438.140599999999,
+              "cpuMs": 16,
+              "cpuUserMs": 16,
+              "cpuSystemMs": 0,
+              "requestedWorkers": 8,
+              "resolvedWorkers": 1,
+              "progressEvents": 17,
+              "requestCount": 8,
+              "active": 0,
+              "activeMax": 1,
+              "requests": [
+                {
+                  "chunkId": 8,
+                  "sourceBytes": 76,
+                  "sourceSha256": "81b26b65290ad82e26b497eed4cd70a7e3cfea69372a829c8ab5803e201c221d",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "6e163eb6b7e046c60386665aebbbee2859de11e197331e6d8bc06a73c1843c3d",
+                  "userMessageSha256": "cf0f8bbf6991e3ddb47d3b6eb74204492f55e8be7f472b931a9fd3eca823c34d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 0.6856999999981781,
+                  "completedMs": 202.5082999999977
+                },
+                {
+                  "chunkId": 7,
+                  "sourceBytes": 76,
+                  "sourceSha256": "2e46c0fee2ba9f09efad0482242103a899a7316fd3d2a9a27b3a796ebe7af581",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "f1817e9b7d8ed84f4c3a371bdaf02cd6a0db9c9507a3d4618d3ab9edbbf8e9ad",
+                  "userMessageSha256": "539910756478d20a74ecfbf1af8b7e38e329cc4ccf249d91ab390356dc6d07df",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 1214.4690999999984,
+                  "completedMs": 1387.1162999999979
+                },
+                {
+                  "chunkId": 6,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3014148b16709d2b9342016a3f172f7539677fb0d9236d424f972b19cfcc7371",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "0d0f2383d72bcb5b3d759b83164fd09ebc4f80a23aed5861190dc4813256ea21",
+                  "userMessageSha256": "360dfe977551fa9fe4455add7057632c5f2ab08c6a308595855490f39f60184c",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 2388.5217999999986,
+                  "completedMs": 2514.4640999999974
+                },
+                {
+                  "chunkId": 5,
+                  "sourceBytes": 76,
+                  "sourceSha256": "5998c53036dea8d20b25d23bb0983f04fa97ea62888ddbfaed995b5d594bc5a3",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "2a46164dc4f8629e7b8c14c26c1ff9023bebb16714a59ada395c83cc9498a0c4",
+                  "userMessageSha256": "e117ce6f01a184046284fbf0ad476b88ed3ef0a379a361678dc9d61f6d6af0d6",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 3517.4263999999966,
+                  "completedMs": 3721.1947999999975
+                },
+                {
+                  "chunkId": 4,
+                  "sourceBytes": 76,
+                  "sourceSha256": "217011aa86e03d3acc3734c1e10e1416bd281cb01423f7c29f4db281eb21d839",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "89590656051c863549ac6c48bfb28e9bebad158af5a8f4eae6f2832c1d298d99",
+                  "userMessageSha256": "5043a4d1ee401d14b7382c4aca48593556f76bfdc9c45794f9df217e587f743d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 4736.6711,
+                  "completedMs": 4908.536399999997
+                },
+                {
+                  "chunkId": 3,
+                  "sourceBytes": 76,
+                  "sourceSha256": "abaf1fe5a8b65914dc66cb6ec03d08ed70bee6aabc6b0cf0c9248ad78dbc7641",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "4e857670716bf2b4478642c2dca484b7f5cf6cf44c7a15927087076d52c7f0df",
+                  "userMessageSha256": "4a6a6231d2434f7415ea7060325f106fec863474267ee044c1526cb8dac3d18d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 5919.288099999998,
+                  "completedMs": 6045.467199999999
+                },
+                {
+                  "chunkId": 2,
+                  "sourceBytes": 76,
+                  "sourceSha256": "520008e1a237b1289f1fb2e3c2bdfbe0448839023241511bfeaba64804856ffb",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "d9a93a6237eb7aeb43fa33a9e7324fe05452e45276b10ae4237558de1a9ff8a9",
+                  "userMessageSha256": "df67b77d7e58dc4a68c1bfa38fe473368da05dd387eba0515e4f869e222c9f35",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 7046.231699999997,
+                  "completedMs": 7248.870199999998
+                },
+                {
+                  "chunkId": 1,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3f4d7250dc929997ba30e7c0b017ee7b264b2cc8a8b6846ab7b1ef29bd8d249b",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "5d8bb102705f17839771350501726c464b885f6f43019f8d97c6fd069c07fe63",
+                  "userMessageSha256": "a9f63af48622d2f6f25e0a34bce81c87cf860ebe83870a498afd65ab6f26e620",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 8260.788399999998,
+                  "completedMs": 8432.247099999997
+                }
+              ],
+              "startedOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "completionOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "outOfOrderCompletion": false,
+              "outputBytes": 591,
+              "completedFiles": [
+                "Map001.txt"
+              ],
+              "validation": [
+                {
+                  "file": "Map001.txt",
+                  "bytes": 591,
+                  "sha256": "465aaf9d81d6bf5ff1b043a33a3b41a12446626d2bf6e59aa0af5bb966381024",
+                  "ok": true,
+                  "errors": []
+                }
+              ],
+              "cacheBytes": 900,
+              "progressBytes": 211,
+              "digest": {
+                "source": "eda133379a876b031b37bb9294b201b4d66e0d84e29b3113f8dc035cce825036",
+                "translatedFiles": "f5fa20232d77a6bfddabd3b4ec98b2d006e9ae12f2791bc51b0bc1fdb606a747",
+                "requestWorkload": "fdb112da71c541a4161b0d823ea6e04b00a93c6c674389f214ef3a2765bfc59a",
+                "userMessages": "089b2c3d1732ae0655f78c5f7df81905c01231f57e1a7c64a2cdabce915d9931",
+                "systemInstructions": "e21dfa5a9e97f2b3468bc721fa5a06f33e6b77fe2a8e092b34b0cb17d38d9526"
+              },
+              "requestPayloadSha256": "03fd7f87f067b252feb0f6bcaaa51d92d00fa90b086ab5fa44be243e74f9bcce"
+            },
+            {
+              "elapsedMs": 8439.9961,
+              "cpuMs": 0,
+              "cpuUserMs": 0,
+              "cpuSystemMs": 0,
+              "requestedWorkers": 8,
+              "resolvedWorkers": 1,
+              "progressEvents": 17,
+              "requestCount": 8,
+              "active": 0,
+              "activeMax": 1,
+              "requests": [
+                {
+                  "chunkId": 8,
+                  "sourceBytes": 76,
+                  "sourceSha256": "81b26b65290ad82e26b497eed4cd70a7e3cfea69372a829c8ab5803e201c221d",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "6e163eb6b7e046c60386665aebbbee2859de11e197331e6d8bc06a73c1843c3d",
+                  "userMessageSha256": "cf0f8bbf6991e3ddb47d3b6eb74204492f55e8be7f472b931a9fd3eca823c34d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 0.5215000000025611,
+                  "completedMs": 202.1707000000024
+                },
+                {
+                  "chunkId": 7,
+                  "sourceBytes": 76,
+                  "sourceSha256": "2e46c0fee2ba9f09efad0482242103a899a7316fd3d2a9a27b3a796ebe7af581",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "f1817e9b7d8ed84f4c3a371bdaf02cd6a0db9c9507a3d4618d3ab9edbbf8e9ad",
+                  "userMessageSha256": "539910756478d20a74ecfbf1af8b7e38e329cc4ccf249d91ab390356dc6d07df",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 1202.8378000000012,
+                  "completedMs": 1374.8415000000023
+                },
+                {
+                  "chunkId": 6,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3014148b16709d2b9342016a3f172f7539677fb0d9236d424f972b19cfcc7371",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "0d0f2383d72bcb5b3d759b83164fd09ebc4f80a23aed5861190dc4813256ea21",
+                  "userMessageSha256": "360dfe977551fa9fe4455add7057632c5f2ab08c6a308595855490f39f60184c",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 2388.4757000000027,
+                  "completedMs": 2513.773400000002
+                },
+                {
+                  "chunkId": 5,
+                  "sourceBytes": 76,
+                  "sourceSha256": "5998c53036dea8d20b25d23bb0983f04fa97ea62888ddbfaed995b5d594bc5a3",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "2a46164dc4f8629e7b8c14c26c1ff9023bebb16714a59ada395c83cc9498a0c4",
+                  "userMessageSha256": "e117ce6f01a184046284fbf0ad476b88ed3ef0a379a361678dc9d61f6d6af0d6",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 3528.941700000003,
+                  "completedMs": 3729.802300000003
+                },
+                {
+                  "chunkId": 4,
+                  "sourceBytes": 76,
+                  "sourceSha256": "217011aa86e03d3acc3734c1e10e1416bd281cb01423f7c29f4db281eb21d839",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "89590656051c863549ac6c48bfb28e9bebad158af5a8f4eae6f2832c1d298d99",
+                  "userMessageSha256": "5043a4d1ee401d14b7382c4aca48593556f76bfdc9c45794f9df217e587f743d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 4732.4696,
+                  "completedMs": 4902.177800000001
+                },
+                {
+                  "chunkId": 3,
+                  "sourceBytes": 76,
+                  "sourceSha256": "abaf1fe5a8b65914dc66cb6ec03d08ed70bee6aabc6b0cf0c9248ad78dbc7641",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "4e857670716bf2b4478642c2dca484b7f5cf6cf44c7a15927087076d52c7f0df",
+                  "userMessageSha256": "4a6a6231d2434f7415ea7060325f106fec863474267ee044c1526cb8dac3d18d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 5917.021000000004,
+                  "completedMs": 6041.359500000002
+                },
+                {
+                  "chunkId": 2,
+                  "sourceBytes": 76,
+                  "sourceSha256": "520008e1a237b1289f1fb2e3c2bdfbe0448839023241511bfeaba64804856ffb",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "d9a93a6237eb7aeb43fa33a9e7324fe05452e45276b10ae4237558de1a9ff8a9",
+                  "userMessageSha256": "df67b77d7e58dc4a68c1bfa38fe473368da05dd387eba0515e4f869e222c9f35",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 7043.924600000002,
+                  "completedMs": 7248.252300000004
+                },
+                {
+                  "chunkId": 1,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3f4d7250dc929997ba30e7c0b017ee7b264b2cc8a8b6846ab7b1ef29bd8d249b",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "5d8bb102705f17839771350501726c464b885f6f43019f8d97c6fd069c07fe63",
+                  "userMessageSha256": "a9f63af48622d2f6f25e0a34bce81c87cf860ebe83870a498afd65ab6f26e620",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 8261.4129,
+                  "completedMs": 8434.1142
+                }
+              ],
+              "startedOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "completionOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "outOfOrderCompletion": false,
+              "outputBytes": 591,
+              "completedFiles": [
+                "Map001.txt"
+              ],
+              "validation": [
+                {
+                  "file": "Map001.txt",
+                  "bytes": 591,
+                  "sha256": "465aaf9d81d6bf5ff1b043a33a3b41a12446626d2bf6e59aa0af5bb966381024",
+                  "ok": true,
+                  "errors": []
+                }
+              ],
+              "cacheBytes": 900,
+              "progressBytes": 211,
+              "digest": {
+                "source": "eda133379a876b031b37bb9294b201b4d66e0d84e29b3113f8dc035cce825036",
+                "translatedFiles": "f5fa20232d77a6bfddabd3b4ec98b2d006e9ae12f2791bc51b0bc1fdb606a747",
+                "requestWorkload": "fdb112da71c541a4161b0d823ea6e04b00a93c6c674389f214ef3a2765bfc59a",
+                "userMessages": "089b2c3d1732ae0655f78c5f7df81905c01231f57e1a7c64a2cdabce915d9931",
+                "systemInstructions": "e21dfa5a9e97f2b3468bc721fa5a06f33e6b77fe2a8e092b34b0cb17d38d9526"
+              },
+              "requestPayloadSha256": "03fd7f87f067b252feb0f6bcaaa51d92d00fa90b086ab5fa44be243e74f9bcce"
+            }
+          ],
+          "summary": {
+            "elapsedMs": {
+              "median": 8439.9961,
+              "min": 8438.140599999999,
+              "max": 8447.970200000002
+            },
+            "cpuMs": {
+              "median": 16,
+              "min": 0,
+              "max": 31
+            },
+            "cpuUserMs": {
+              "median": 16,
+              "min": 0,
+              "max": 31
+            },
+            "cpuSystemMs": {
+              "median": 0,
+              "min": 0,
+              "max": 0
+            },
+            "requestCount": {
+              "median": 8,
+              "min": 8,
+              "max": 8
+            },
+            "activeMax": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "progressEvents": {
+              "median": 17,
+              "min": 17,
+              "max": 17
+            }
+          }
+        }
+      },
+      "executionOrder": [
+        {
+          "phase": "warmup",
+          "run": 1,
+          "variants": [
+            "before"
+          ]
+        },
+        {
+          "phase": "measured",
+          "run": 1,
+          "variants": [
+            "before"
+          ]
+        },
+        {
+          "phase": "measured",
+          "run": 2,
+          "variants": [
+            "before"
+          ]
+        },
+        {
+          "phase": "measured",
+          "run": 3,
+          "variants": [
+            "before"
+          ]
+        }
+      ],
+      "identicalTranslationBytes": true,
+      "identicalRequestWorkload": true,
+      "identicalFullRequestPayloads": true
+    },
+    {
+      "name": "four-files-two-chunks-each",
+      "files": 4,
+      "chunksPerFile": 2,
+      "totalChunks": 8,
+      "variants": {
+        "before": {
+          "warmups": [
+            {
+              "elapsedMs": 5447.0118,
+              "cpuMs": 16,
+              "cpuUserMs": 16,
+              "cpuSystemMs": 0,
+              "requestedWorkers": 8,
+              "resolvedWorkers": 1,
+              "progressEvents": 20,
+              "requestCount": 8,
+              "active": 0,
+              "activeMax": 1,
+              "requests": [
+                {
+                  "chunkId": 8,
+                  "sourceBytes": 76,
+                  "sourceSha256": "81b26b65290ad82e26b497eed4cd70a7e3cfea69372a829c8ab5803e201c221d",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "6e163eb6b7e046c60386665aebbbee2859de11e197331e6d8bc06a73c1843c3d",
+                  "userMessageSha256": "cf0f8bbf6991e3ddb47d3b6eb74204492f55e8be7f472b931a9fd3eca823c34d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 1.9743999999991502,
+                  "completedMs": 215.80719999999565
+                },
+                {
+                  "chunkId": 7,
+                  "sourceBytes": 76,
+                  "sourceSha256": "2e46c0fee2ba9f09efad0482242103a899a7316fd3d2a9a27b3a796ebe7af581",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "f1817e9b7d8ed84f4c3a371bdaf02cd6a0db9c9507a3d4618d3ab9edbbf8e9ad",
+                  "userMessageSha256": "539910756478d20a74ecfbf1af8b7e38e329cc4ccf249d91ab390356dc6d07df",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 1228.9933999999994,
+                  "completedMs": 1400.5818
+                },
+                {
+                  "chunkId": 6,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3014148b16709d2b9342016a3f172f7539677fb0d9236d424f972b19cfcc7371",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "0d0f2383d72bcb5b3d759b83164fd09ebc4f80a23aed5861190dc4813256ea21",
+                  "userMessageSha256": "360dfe977551fa9fe4455add7057632c5f2ab08c6a308595855490f39f60184c",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 1406.9113999999972,
+                  "completedMs": 1540.274599999997
+                },
+                {
+                  "chunkId": 5,
+                  "sourceBytes": 76,
+                  "sourceSha256": "5998c53036dea8d20b25d23bb0983f04fa97ea62888ddbfaed995b5d594bc5a3",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "2a46164dc4f8629e7b8c14c26c1ff9023bebb16714a59ada395c83cc9498a0c4",
+                  "userMessageSha256": "e117ce6f01a184046284fbf0ad476b88ed3ef0a379a361678dc9d61f6d6af0d6",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 2544.7019,
+                  "completedMs": 2750.035299999996
+                },
+                {
+                  "chunkId": 4,
+                  "sourceBytes": 76,
+                  "sourceSha256": "217011aa86e03d3acc3734c1e10e1416bd281cb01423f7c29f4db281eb21d839",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "89590656051c863549ac6c48bfb28e9bebad158af5a8f4eae6f2832c1d298d99",
+                  "userMessageSha256": "5043a4d1ee401d14b7382c4aca48593556f76bfdc9c45794f9df217e587f743d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 2756.4519999999975,
+                  "completedMs": 2921.814299999998
+                },
+                {
+                  "chunkId": 3,
+                  "sourceBytes": 76,
+                  "sourceSha256": "abaf1fe5a8b65914dc66cb6ec03d08ed70bee6aabc6b0cf0c9248ad78dbc7641",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "4e857670716bf2b4478642c2dca484b7f5cf6cf44c7a15927087076d52c7f0df",
+                  "userMessageSha256": "4a6a6231d2434f7415ea7060325f106fec863474267ee044c1526cb8dac3d18d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 3935.9672999999966,
+                  "completedMs": 4060.808299999997
+                },
+                {
+                  "chunkId": 2,
+                  "sourceBytes": 76,
+                  "sourceSha256": "520008e1a237b1289f1fb2e3c2bdfbe0448839023241511bfeaba64804856ffb",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "d9a93a6237eb7aeb43fa33a9e7324fe05452e45276b10ae4237558de1a9ff8a9",
+                  "userMessageSha256": "df67b77d7e58dc4a68c1bfa38fe473368da05dd387eba0515e4f869e222c9f35",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 4066.2460999999967,
+                  "completedMs": 4266.657800000001
+                },
+                {
+                  "chunkId": 1,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3f4d7250dc929997ba30e7c0b017ee7b264b2cc8a8b6846ab7b1ef29bd8d249b",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "5d8bb102705f17839771350501726c464b885f6f43019f8d97c6fd069c07fe63",
+                  "userMessageSha256": "a9f63af48622d2f6f25e0a34bce81c87cf860ebe83870a498afd65ab6f26e620",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 5268.752799999995,
+                  "completedMs": 5441.3897
+                }
+              ],
+              "startedOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "completionOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "outOfOrderCompletion": false,
+              "outputBytes": 588,
+              "completedFiles": [
+                "Map001.txt",
+                "Map002.txt",
+                "Map003.txt",
+                "Map004.txt"
+              ],
+              "validation": [
+                {
+                  "file": "Map001.txt",
+                  "bytes": 147,
+                  "sha256": "8e9f513dc4a745562ab7f0488bef4517e26760f9c06c3d75c23a0c6fad1e7f7b",
+                  "ok": true,
+                  "errors": []
+                },
+                {
+                  "file": "Map002.txt",
+                  "bytes": 147,
+                  "sha256": "784c2fe9bf9db06d7a8e3459b97e24f3280085be01404014985f465210b12361",
+                  "ok": true,
+                  "errors": []
+                },
+                {
+                  "file": "Map003.txt",
+                  "bytes": 147,
+                  "sha256": "741657adce8962df16f3dcf6f3be12546983bd8a36508bb86c8e51926f0fb34f",
+                  "ok": true,
+                  "errors": []
+                },
+                {
+                  "file": "Map004.txt",
+                  "bytes": 147,
+                  "sha256": "d7e83024f481d3f714ed71d6e4dfde0460117f6b5b4e71540a32097b8fa86533",
+                  "ok": true,
+                  "errors": []
+                }
+              ],
+              "cacheBytes": 1533,
+              "progressBytes": 265,
+              "digest": {
+                "source": "21e04a8b33397329ba5c40e87cdfec31a6e1ea45c06bd20688cd90ade0c13445",
+                "translatedFiles": "e75fcfc963ff72151105dffa05601ae93314f4de7d5263146aa7a81e34b1dbf0",
+                "requestWorkload": "fdb112da71c541a4161b0d823ea6e04b00a93c6c674389f214ef3a2765bfc59a",
+                "userMessages": "089b2c3d1732ae0655f78c5f7df81905c01231f57e1a7c64a2cdabce915d9931",
+                "systemInstructions": "e21dfa5a9e97f2b3468bc721fa5a06f33e6b77fe2a8e092b34b0cb17d38d9526"
+              },
+              "requestPayloadSha256": "03fd7f87f067b252feb0f6bcaaa51d92d00fa90b086ab5fa44be243e74f9bcce"
+            }
+          ],
+          "samples": [
+            {
+              "elapsedMs": 5472.631699999998,
+              "cpuMs": 31,
+              "cpuUserMs": 0,
+              "cpuSystemMs": 31,
+              "requestedWorkers": 8,
+              "resolvedWorkers": 1,
+              "progressEvents": 20,
+              "requestCount": 8,
+              "active": 0,
+              "activeMax": 1,
+              "requests": [
+                {
+                  "chunkId": 8,
+                  "sourceBytes": 76,
+                  "sourceSha256": "81b26b65290ad82e26b497eed4cd70a7e3cfea69372a829c8ab5803e201c221d",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "6e163eb6b7e046c60386665aebbbee2859de11e197331e6d8bc06a73c1843c3d",
+                  "userMessageSha256": "cf0f8bbf6991e3ddb47d3b6eb74204492f55e8be7f472b931a9fd3eca823c34d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 2.01759999999922,
+                  "completedMs": 214.8289999999979
+                },
+                {
+                  "chunkId": 7,
+                  "sourceBytes": 76,
+                  "sourceSha256": "2e46c0fee2ba9f09efad0482242103a899a7316fd3d2a9a27b3a796ebe7af581",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "f1817e9b7d8ed84f4c3a371bdaf02cd6a0db9c9507a3d4618d3ab9edbbf8e9ad",
+                  "userMessageSha256": "539910756478d20a74ecfbf1af8b7e38e329cc4ccf249d91ab390356dc6d07df",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 1227.0872999999992,
+                  "completedMs": 1399.2295000000013
+                },
+                {
+                  "chunkId": 6,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3014148b16709d2b9342016a3f172f7539677fb0d9236d424f972b19cfcc7371",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "0d0f2383d72bcb5b3d759b83164fd09ebc4f80a23aed5861190dc4813256ea21",
+                  "userMessageSha256": "360dfe977551fa9fe4455add7057632c5f2ab08c6a308595855490f39f60184c",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 1405.0772999999972,
+                  "completedMs": 1540.2172999999966
+                },
+                {
+                  "chunkId": 5,
+                  "sourceBytes": 76,
+                  "sourceSha256": "5998c53036dea8d20b25d23bb0983f04fa97ea62888ddbfaed995b5d594bc5a3",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "2a46164dc4f8629e7b8c14c26c1ff9023bebb16714a59ada395c83cc9498a0c4",
+                  "userMessageSha256": "e117ce6f01a184046284fbf0ad476b88ed3ef0a379a361678dc9d61f6d6af0d6",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 2555.5331000000006,
+                  "completedMs": 2758.2894000000015
+                },
+                {
+                  "chunkId": 4,
+                  "sourceBytes": 76,
+                  "sourceSha256": "217011aa86e03d3acc3734c1e10e1416bd281cb01423f7c29f4db281eb21d839",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "89590656051c863549ac6c48bfb28e9bebad158af5a8f4eae6f2832c1d298d99",
+                  "userMessageSha256": "5043a4d1ee401d14b7382c4aca48593556f76bfdc9c45794f9df217e587f743d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 2764.3804999999993,
+                  "completedMs": 2930.547099999996
+                },
+                {
+                  "chunkId": 3,
+                  "sourceBytes": 76,
+                  "sourceSha256": "abaf1fe5a8b65914dc66cb6ec03d08ed70bee6aabc6b0cf0c9248ad78dbc7641",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "4e857670716bf2b4478642c2dca484b7f5cf6cf44c7a15927087076d52c7f0df",
+                  "userMessageSha256": "4a6a6231d2434f7415ea7060325f106fec863474267ee044c1526cb8dac3d18d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 3942.052499999998,
+                  "completedMs": 4068.971400000002
+                },
+                {
+                  "chunkId": 2,
+                  "sourceBytes": 76,
+                  "sourceSha256": "520008e1a237b1289f1fb2e3c2bdfbe0448839023241511bfeaba64804856ffb",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "d9a93a6237eb7aeb43fa33a9e7324fe05452e45276b10ae4237558de1a9ff8a9",
+                  "userMessageSha256": "df67b77d7e58dc4a68c1bfa38fe473368da05dd387eba0515e4f869e222c9f35",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 4075.0745000000024,
+                  "completedMs": 4289.331899999997
+                },
+                {
+                  "chunkId": 1,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3f4d7250dc929997ba30e7c0b017ee7b264b2cc8a8b6846ab7b1ef29bd8d249b",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "5d8bb102705f17839771350501726c464b885f6f43019f8d97c6fd069c07fe63",
+                  "userMessageSha256": "a9f63af48622d2f6f25e0a34bce81c87cf860ebe83870a498afd65ab6f26e620",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 5293.003499999999,
+                  "completedMs": 5465.109899999996
+                }
+              ],
+              "startedOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "completionOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "outOfOrderCompletion": false,
+              "outputBytes": 588,
+              "completedFiles": [
+                "Map001.txt",
+                "Map002.txt",
+                "Map003.txt",
+                "Map004.txt"
+              ],
+              "validation": [
+                {
+                  "file": "Map001.txt",
+                  "bytes": 147,
+                  "sha256": "8e9f513dc4a745562ab7f0488bef4517e26760f9c06c3d75c23a0c6fad1e7f7b",
+                  "ok": true,
+                  "errors": []
+                },
+                {
+                  "file": "Map002.txt",
+                  "bytes": 147,
+                  "sha256": "784c2fe9bf9db06d7a8e3459b97e24f3280085be01404014985f465210b12361",
+                  "ok": true,
+                  "errors": []
+                },
+                {
+                  "file": "Map003.txt",
+                  "bytes": 147,
+                  "sha256": "741657adce8962df16f3dcf6f3be12546983bd8a36508bb86c8e51926f0fb34f",
+                  "ok": true,
+                  "errors": []
+                },
+                {
+                  "file": "Map004.txt",
+                  "bytes": 147,
+                  "sha256": "d7e83024f481d3f714ed71d6e4dfde0460117f6b5b4e71540a32097b8fa86533",
+                  "ok": true,
+                  "errors": []
+                }
+              ],
+              "cacheBytes": 1533,
+              "progressBytes": 265,
+              "digest": {
+                "source": "21e04a8b33397329ba5c40e87cdfec31a6e1ea45c06bd20688cd90ade0c13445",
+                "translatedFiles": "e75fcfc963ff72151105dffa05601ae93314f4de7d5263146aa7a81e34b1dbf0",
+                "requestWorkload": "fdb112da71c541a4161b0d823ea6e04b00a93c6c674389f214ef3a2765bfc59a",
+                "userMessages": "089b2c3d1732ae0655f78c5f7df81905c01231f57e1a7c64a2cdabce915d9931",
+                "systemInstructions": "e21dfa5a9e97f2b3468bc721fa5a06f33e6b77fe2a8e092b34b0cb17d38d9526"
+              },
+              "requestPayloadSha256": "03fd7f87f067b252feb0f6bcaaa51d92d00fa90b086ab5fa44be243e74f9bcce"
+            },
+            {
+              "elapsedMs": 5439.914499999999,
+              "cpuMs": 30,
+              "cpuUserMs": 15,
+              "cpuSystemMs": 15,
+              "requestedWorkers": 8,
+              "resolvedWorkers": 1,
+              "progressEvents": 20,
+              "requestCount": 8,
+              "active": 0,
+              "activeMax": 1,
+              "requests": [
+                {
+                  "chunkId": 8,
+                  "sourceBytes": 76,
+                  "sourceSha256": "81b26b65290ad82e26b497eed4cd70a7e3cfea69372a829c8ab5803e201c221d",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "6e163eb6b7e046c60386665aebbbee2859de11e197331e6d8bc06a73c1843c3d",
+                  "userMessageSha256": "cf0f8bbf6991e3ddb47d3b6eb74204492f55e8be7f472b931a9fd3eca823c34d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 1.752199999995355,
+                  "completedMs": 203.27649999999994
+                },
+                {
+                  "chunkId": 7,
+                  "sourceBytes": 76,
+                  "sourceSha256": "2e46c0fee2ba9f09efad0482242103a899a7316fd3d2a9a27b3a796ebe7af581",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "f1817e9b7d8ed84f4c3a371bdaf02cd6a0db9c9507a3d4618d3ab9edbbf8e9ad",
+                  "userMessageSha256": "539910756478d20a74ecfbf1af8b7e38e329cc4ccf249d91ab390356dc6d07df",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 1208.0018999999957,
+                  "completedMs": 1372.6722999999984
+                },
+                {
+                  "chunkId": 6,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3014148b16709d2b9342016a3f172f7539677fb0d9236d424f972b19cfcc7371",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "0d0f2383d72bcb5b3d759b83164fd09ebc4f80a23aed5861190dc4813256ea21",
+                  "userMessageSha256": "360dfe977551fa9fe4455add7057632c5f2ab08c6a308595855490f39f60184c",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 1378.444199999998,
+                  "completedMs": 1512.702099999995
+                },
+                {
+                  "chunkId": 5,
+                  "sourceBytes": 76,
+                  "sourceSha256": "5998c53036dea8d20b25d23bb0983f04fa97ea62888ddbfaed995b5d594bc5a3",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "2a46164dc4f8629e7b8c14c26c1ff9023bebb16714a59ada395c83cc9498a0c4",
+                  "userMessageSha256": "e117ce6f01a184046284fbf0ad476b88ed3ef0a379a361678dc9d61f6d6af0d6",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 2527.3053,
+                  "completedMs": 2731.023399999998
+                },
+                {
+                  "chunkId": 4,
+                  "sourceBytes": 76,
+                  "sourceSha256": "217011aa86e03d3acc3734c1e10e1416bd281cb01423f7c29f4db281eb21d839",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "89590656051c863549ac6c48bfb28e9bebad158af5a8f4eae6f2832c1d298d99",
+                  "userMessageSha256": "5043a4d1ee401d14b7382c4aca48593556f76bfdc9c45794f9df217e587f743d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 2737.133299999994,
+                  "completedMs": 2902.9366999999984
+                },
+                {
+                  "chunkId": 3,
+                  "sourceBytes": 76,
+                  "sourceSha256": "abaf1fe5a8b65914dc66cb6ec03d08ed70bee6aabc6b0cf0c9248ad78dbc7641",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "4e857670716bf2b4478642c2dca484b7f5cf6cf44c7a15927087076d52c7f0df",
+                  "userMessageSha256": "4a6a6231d2434f7415ea7060325f106fec863474267ee044c1526cb8dac3d18d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 3906.3397999999943,
+                  "completedMs": 4030.8119000000006
+                },
+                {
+                  "chunkId": 2,
+                  "sourceBytes": 76,
+                  "sourceSha256": "520008e1a237b1289f1fb2e3c2bdfbe0448839023241511bfeaba64804856ffb",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "d9a93a6237eb7aeb43fa33a9e7324fe05452e45276b10ae4237558de1a9ff8a9",
+                  "userMessageSha256": "df67b77d7e58dc4a68c1bfa38fe473368da05dd387eba0515e4f869e222c9f35",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 4036.6843999999983,
+                  "completedMs": 4247.304499999998
+                },
+                {
+                  "chunkId": 1,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3f4d7250dc929997ba30e7c0b017ee7b264b2cc8a8b6846ab7b1ef29bd8d249b",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "5d8bb102705f17839771350501726c464b885f6f43019f8d97c6fd069c07fe63",
+                  "userMessageSha256": "a9f63af48622d2f6f25e0a34bce81c87cf860ebe83870a498afd65ab6f26e620",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 5262.944199999998,
+                  "completedMs": 5433.813399999999
+                }
+              ],
+              "startedOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "completionOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "outOfOrderCompletion": false,
+              "outputBytes": 588,
+              "completedFiles": [
+                "Map001.txt",
+                "Map002.txt",
+                "Map003.txt",
+                "Map004.txt"
+              ],
+              "validation": [
+                {
+                  "file": "Map001.txt",
+                  "bytes": 147,
+                  "sha256": "8e9f513dc4a745562ab7f0488bef4517e26760f9c06c3d75c23a0c6fad1e7f7b",
+                  "ok": true,
+                  "errors": []
+                },
+                {
+                  "file": "Map002.txt",
+                  "bytes": 147,
+                  "sha256": "784c2fe9bf9db06d7a8e3459b97e24f3280085be01404014985f465210b12361",
+                  "ok": true,
+                  "errors": []
+                },
+                {
+                  "file": "Map003.txt",
+                  "bytes": 147,
+                  "sha256": "741657adce8962df16f3dcf6f3be12546983bd8a36508bb86c8e51926f0fb34f",
+                  "ok": true,
+                  "errors": []
+                },
+                {
+                  "file": "Map004.txt",
+                  "bytes": 147,
+                  "sha256": "d7e83024f481d3f714ed71d6e4dfde0460117f6b5b4e71540a32097b8fa86533",
+                  "ok": true,
+                  "errors": []
+                }
+              ],
+              "cacheBytes": 1533,
+              "progressBytes": 265,
+              "digest": {
+                "source": "21e04a8b33397329ba5c40e87cdfec31a6e1ea45c06bd20688cd90ade0c13445",
+                "translatedFiles": "e75fcfc963ff72151105dffa05601ae93314f4de7d5263146aa7a81e34b1dbf0",
+                "requestWorkload": "fdb112da71c541a4161b0d823ea6e04b00a93c6c674389f214ef3a2765bfc59a",
+                "userMessages": "089b2c3d1732ae0655f78c5f7df81905c01231f57e1a7c64a2cdabce915d9931",
+                "systemInstructions": "e21dfa5a9e97f2b3468bc721fa5a06f33e6b77fe2a8e092b34b0cb17d38d9526"
+              },
+              "requestPayloadSha256": "03fd7f87f067b252feb0f6bcaaa51d92d00fa90b086ab5fa44be243e74f9bcce"
+            },
+            {
+              "elapsedMs": 5458.6846000000005,
+              "cpuMs": 48,
+              "cpuUserMs": 32,
+              "cpuSystemMs": 16,
+              "requestedWorkers": 8,
+              "resolvedWorkers": 1,
+              "progressEvents": 20,
+              "requestCount": 8,
+              "active": 0,
+              "activeMax": 1,
+              "requests": [
+                {
+                  "chunkId": 8,
+                  "sourceBytes": 76,
+                  "sourceSha256": "81b26b65290ad82e26b497eed4cd70a7e3cfea69372a829c8ab5803e201c221d",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "6e163eb6b7e046c60386665aebbbee2859de11e197331e6d8bc06a73c1843c3d",
+                  "userMessageSha256": "cf0f8bbf6991e3ddb47d3b6eb74204492f55e8be7f472b931a9fd3eca823c34d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 1.84599999999773,
+                  "completedMs": 214.43860000000132
+                },
+                {
+                  "chunkId": 7,
+                  "sourceBytes": 76,
+                  "sourceSha256": "2e46c0fee2ba9f09efad0482242103a899a7316fd3d2a9a27b3a796ebe7af581",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "f1817e9b7d8ed84f4c3a371bdaf02cd6a0db9c9507a3d4618d3ab9edbbf8e9ad",
+                  "userMessageSha256": "539910756478d20a74ecfbf1af8b7e38e329cc4ccf249d91ab390356dc6d07df",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 1224.6964999999982,
+                  "completedMs": 1398.2690000000002
+                },
+                {
+                  "chunkId": 6,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3014148b16709d2b9342016a3f172f7539677fb0d9236d424f972b19cfcc7371",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "0d0f2383d72bcb5b3d759b83164fd09ebc4f80a23aed5861190dc4813256ea21",
+                  "userMessageSha256": "360dfe977551fa9fe4455add7057632c5f2ab08c6a308595855490f39f60184c",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 1405.4942999999985,
+                  "completedMs": 1539.188900000001
+                },
+                {
+                  "chunkId": 5,
+                  "sourceBytes": 76,
+                  "sourceSha256": "5998c53036dea8d20b25d23bb0983f04fa97ea62888ddbfaed995b5d594bc5a3",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "2a46164dc4f8629e7b8c14c26c1ff9023bebb16714a59ada395c83cc9498a0c4",
+                  "userMessageSha256": "e117ce6f01a184046284fbf0ad476b88ed3ef0a379a361678dc9d61f6d6af0d6",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 2553.319199999998,
+                  "completedMs": 2756.265999999996
+                },
+                {
+                  "chunkId": 4,
+                  "sourceBytes": 76,
+                  "sourceSha256": "217011aa86e03d3acc3734c1e10e1416bd281cb01423f7c29f4db281eb21d839",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "89590656051c863549ac6c48bfb28e9bebad158af5a8f4eae6f2832c1d298d99",
+                  "userMessageSha256": "5043a4d1ee401d14b7382c4aca48593556f76bfdc9c45794f9df217e587f743d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 2763.072,
+                  "completedMs": 2925.3157999999967
+                },
+                {
+                  "chunkId": 3,
+                  "sourceBytes": 76,
+                  "sourceSha256": "abaf1fe5a8b65914dc66cb6ec03d08ed70bee6aabc6b0cf0c9248ad78dbc7641",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "4e857670716bf2b4478642c2dca484b7f5cf6cf44c7a15927087076d52c7f0df",
+                  "userMessageSha256": "4a6a6231d2434f7415ea7060325f106fec863474267ee044c1526cb8dac3d18d",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 120,
+                  "startedMs": 3936.6598999999987,
+                  "completedMs": 4061.446299999996
+                },
+                {
+                  "chunkId": 2,
+                  "sourceBytes": 76,
+                  "sourceSha256": "520008e1a237b1289f1fb2e3c2bdfbe0448839023241511bfeaba64804856ffb",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "d9a93a6237eb7aeb43fa33a9e7324fe05452e45276b10ae4237558de1a9ff8a9",
+                  "userMessageSha256": "df67b77d7e58dc4a68c1bfa38fe473368da05dd387eba0515e4f869e222c9f35",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 200,
+                  "startedMs": 4067.046300000002,
+                  "completedMs": 4280.5268
+                },
+                {
+                  "chunkId": 1,
+                  "sourceBytes": 76,
+                  "sourceSha256": "3f4d7250dc929997ba30e7c0b017ee7b264b2cc8a8b6846ab7b1ef29bd8d249b",
+                  "payloadBytes": 3902,
+                  "payloadSha256": "5d8bb102705f17839771350501726c464b885f6f43019f8d97c6fd069c07fe63",
+                  "userMessageSha256": "a9f63af48622d2f6f25e0a34bce81c87cf860ebe83870a498afd65ab6f26e620",
+                  "systemInstructionSha256": "b2916b4929c369e0d0f04bc607d05dfc366e645c2c4538841d75b05d466327b6",
+                  "roles": [
+                    "user",
+                    "model"
+                  ],
+                  "syntheticDelayMs": 160,
+                  "startedMs": 5280.576500000003,
+                  "completedMs": 5451.978999999999
+                }
+              ],
+              "startedOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "completionOrder": [
+                8,
+                7,
+                6,
+                5,
+                4,
+                3,
+                2,
+                1
+              ],
+              "outOfOrderCompletion": false,
+              "outputBytes": 588,
+              "completedFiles": [
+                "Map001.txt",
+                "Map002.txt",
+                "Map003.txt",
+                "Map004.txt"
+              ],
+              "validation": [
+                {
+                  "file": "Map001.txt",
+                  "bytes": 147,
+                  "sha256": "8e9f513dc4a745562ab7f0488bef4517e26760f9c06c3d75c23a0c6fad1e7f7b",
+                  "ok": true,
+                  "errors": []
+                },
+                {
+                  "file": "Map002.txt",
+                  "bytes": 147,
+                  "sha256": "784c2fe9bf9db06d7a8e3459b97e24f3280085be01404014985f465210b12361",
+                  "ok": true,
+                  "errors": []
+                },
+                {
+                  "file": "Map003.txt",
+                  "bytes": 147,
+                  "sha256": "741657adce8962df16f3dcf6f3be12546983bd8a36508bb86c8e51926f0fb34f",
+                  "ok": true,
+                  "errors": []
+                },
+                {
+                  "file": "Map004.txt",
+                  "bytes": 147,
+                  "sha256": "d7e83024f481d3f714ed71d6e4dfde0460117f6b5b4e71540a32097b8fa86533",
+                  "ok": true,
+                  "errors": []
+                }
+              ],
+              "cacheBytes": 1533,
+              "progressBytes": 265,
+              "digest": {
+                "source": "21e04a8b33397329ba5c40e87cdfec31a6e1ea45c06bd20688cd90ade0c13445",
+                "translatedFiles": "e75fcfc963ff72151105dffa05601ae93314f4de7d5263146aa7a81e34b1dbf0",
+                "requestWorkload": "fdb112da71c541a4161b0d823ea6e04b00a93c6c674389f214ef3a2765bfc59a",
+                "userMessages": "089b2c3d1732ae0655f78c5f7df81905c01231f57e1a7c64a2cdabce915d9931",
+                "systemInstructions": "e21dfa5a9e97f2b3468bc721fa5a06f33e6b77fe2a8e092b34b0cb17d38d9526"
+              },
+              "requestPayloadSha256": "03fd7f87f067b252feb0f6bcaaa51d92d00fa90b086ab5fa44be243e74f9bcce"
+            }
+          ],
+          "summary": {
+            "elapsedMs": {
+              "median": 5458.6846000000005,
+              "min": 5439.914499999999,
+              "max": 5472.631699999998
+            },
+            "cpuMs": {
+              "median": 31,
+              "min": 30,
+              "max": 48
+            },
+            "cpuUserMs": {
+              "median": 15,
+              "min": 0,
+              "max": 32
+            },
+            "cpuSystemMs": {
+              "median": 16,
+              "min": 15,
+              "max": 31
+            },
+            "requestCount": {
+              "median": 8,
+              "min": 8,
+              "max": 8
+            },
+            "activeMax": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "progressEvents": {
+              "median": 20,
+              "min": 20,
+              "max": 20
+            }
+          }
+        }
+      },
+      "executionOrder": [
+        {
+          "phase": "warmup",
+          "run": 1,
+          "variants": [
+            "before"
+          ]
+        },
+        {
+          "phase": "measured",
+          "run": 1,
+          "variants": [
+            "before"
+          ]
+        },
+        {
+          "phase": "measured",
+          "run": 2,
+          "variants": [
+            "before"
+          ]
+        },
+        {
+          "phase": "measured",
+          "run": 3,
+          "variants": [
+            "before"
+          ]
+        }
+      ],
+      "identicalTranslationBytes": true,
+      "identicalRequestWorkload": true,
+      "identicalFullRequestPayloads": true
+    }
+  ],
+  "identicalRequestWorkloadAcrossScenarios": true
+}

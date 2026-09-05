@@ -148,7 +148,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, toRaw } from 'vue'
-import { api } from '../composables/useIpc'
+import { api, useIpcOn } from '../composables/useIpc'
 import { DEFAULT_LLM_PROVIDER, DEFAULT_LLM_VERTEX_LOCATION } from '../../types/settings'
 import { getRendererLlmProviderMetadata, getRendererLlmProviderUiText } from '../../types/llmProviderContract'
 
@@ -232,7 +232,7 @@ function closeSettings() {
 }
 
 onMounted(() => {
-  api.on('settings', (arg: unknown) => {
+  useIpcOn('settings', (arg: unknown) => {
     const s = arg as Record<string, any>
     for (const key of Object.keys(settings)) {
       if (s[key] !== undefined) (settings as any)[key] = s[key]
@@ -244,12 +244,6 @@ onMounted(() => {
       extractPlusText.value = (s.extractPlus as number[]).map(String).join('\n')
     }
     settings.llmVertexLocation = String(settings.llmVertexLocation || DEFAULT_LLM_VERTEX_LOCATION).trim() || DEFAULT_LLM_VERTEX_LOCATION
-    if (s.themeData) {
-      const root = document.documentElement
-      for (const [key, val] of Object.entries(s.themeData as Record<string, string>)) {
-        root.style.setProperty(key, val)
-      }
-    }
   })
   api.send('settingsReady')
 })

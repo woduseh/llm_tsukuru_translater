@@ -1,0 +1,1343 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-09-05T05:03:47.627Z",
+  "environment": {
+    "node": "v24.14.0",
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor           ",
+    "logicalCpus": 16
+  },
+  "conditions": {
+    "counts": [
+      200,
+      2000
+    ],
+    "maps": 10,
+    "runs": 5,
+    "warmups": 1,
+    "baselineDir": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\performance\\2026-09-05\\baseline",
+    "output": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\performance\\2026-09-05\\comparison.json",
+    "data": "generated parseable Wolf v3 maps with multiline/empty/null/control-code dialogue",
+    "cache": "Fresh fixture per sample; OS filesystem cache is NOT flushed. Warmup runs excluded from summaries.",
+    "order": "Variants alternate AB/BA each repetition; all operations execute serially in one process.",
+    "scope": "extractWolfFolder + makeText, and complete wolfAppyier including validation, staging, fsync and commit; fixture creation and equality assertions excluded",
+    "ipc": "Production progress calls counted; Electron IPC transport/rendering is not included.",
+    "eventLoop": "5ms heartbeat gaps include timers and synchronous stages; not a browser frame-time metric."
+  },
+  "sources": {
+    "before": {
+      "src/appContext.ts": "de7347292edc2c118bab20f31924dfe3a0bed0d91c430752baf78feb4eb9d54b",
+      "src/ts/libs/fileIO.ts": "d400d91a40446bc215bbb0457a319f2dc76522d74ad6be9e95165b23452cade3",
+      "src/ts/libs/metadataValidation.ts": "675c8d4ffbfe2da6916ced1dd5b9fe1557977f70628a9033deabc91819973275",
+      "src/ts/libs/projectTools.ts": "432e4eccb665d0810d611a7b28608b866deb85aa1023e772d620431a61464efd",
+      "src/ts/rpgmv/globalutils.ts": "d5bafe42e8f6c1f9a6756af04933809984065ba290b324f5f7714fea7b87ebc7",
+      "src/ts/wolf/apply/applyWolf.ts": "49145f280fd4fdab04981d43ec583ae2806b1b22a5289f0521706b11a651c560",
+      "src/ts/wolf/extract/ext_events.ts": "20c50361e916aef5d7782f4823c40eed501b8baaf49715fbfd08f50820892b0d",
+      "src/ts/wolf/extract/extractor.ts": "0e985e4b37f600d57997366942435ea544e3aa4d9c203153fed4823dce695200",
+      "src/ts/wolf/extract/makeText.ts": "317ef98a271e4d35ba189c647ecf0fe58c690559f832b6c6c2bcdb81c6392b15",
+      "src/ts/wolf/extract/wolfExtData.ts": "714a80e05ef12a344c17c3cc12d849795e79dd08e97b25627ac8e1bb6b9729eb",
+      "src/ts/wolf/parser/Map.ts": "2e2600e803c8d678b729620014e6d4657b48d31af7fce5f0814b34eb6d04b9fb",
+      "src/ts/wolf/parser/constants.ts": "1187ad05011fa4915eecb47daeb882cf9bbbe7b9c20d142a68d5ef7455826e39",
+      "src/ts/wolf/parser/io.ts": "ea35fccf496fab1ea06ee87779a3c0e69e4ec53c14b11e079ac89c21275340a9",
+      "src/ts/wolf/parser/patternBased.ts": "b10f052b7e0d6b1c91e5df58acc3ba496b9724e3ed2d51e8d95c2818fc404025",
+      "src/ts/wolf/paths.ts": "8497405ae321bce2f952575cad1bbf8b4e0faa903fd93ead3106c98cc5409d72",
+      "src/types/guards.ts": "796d9d315487761da5753a464279c7dd37d9561d71a132125e7f19e33d8d0a79",
+      "src/utils.ts": "1740389a8ce2ec5bedd99d0da6a296d05f35628c8844f94cd4a4451458066ce4",
+      "test/utils/wolfMapFixture.ts": "b8b4e79b3134734316f321338b1568322c89ba157e9ad5cda72fe2643670a249"
+    },
+    "current": {
+      "src/appContext.ts": "de7347292edc2c118bab20f31924dfe3a0bed0d91c430752baf78feb4eb9d54b",
+      "src/ts/libs/fileIO.ts": "d400d91a40446bc215bbb0457a319f2dc76522d74ad6be9e95165b23452cade3",
+      "src/ts/libs/metadataValidation.ts": "675c8d4ffbfe2da6916ced1dd5b9fe1557977f70628a9033deabc91819973275",
+      "src/ts/libs/projectTools.ts": "432e4eccb665d0810d611a7b28608b866deb85aa1023e772d620431a61464efd",
+      "src/ts/rpgmv/globalutils.ts": "d5bafe42e8f6c1f9a6756af04933809984065ba290b324f5f7714fea7b87ebc7",
+      "src/ts/wolf/apply/applyWolf.ts": "39b2a9e6ce06b307b399035d200d0e59efa8f0d9b33d43f7400ff9374dfbdcc1",
+      "src/ts/wolf/extract/ext_events.ts": "20c50361e916aef5d7782f4823c40eed501b8baaf49715fbfd08f50820892b0d",
+      "src/ts/wolf/extract/extractor.ts": "0e985e4b37f600d57997366942435ea544e3aa4d9c203153fed4823dce695200",
+      "src/ts/wolf/extract/makeText.ts": "53247a304d7402022469a8829db330782169f3df1520bc312d129cf58875763a",
+      "src/ts/wolf/extract/wolfExtData.ts": "714a80e05ef12a344c17c3cc12d849795e79dd08e97b25627ac8e1bb6b9729eb",
+      "src/ts/wolf/parser/Map.ts": "2e2600e803c8d678b729620014e6d4657b48d31af7fce5f0814b34eb6d04b9fb",
+      "src/ts/wolf/parser/constants.ts": "1187ad05011fa4915eecb47daeb882cf9bbbe7b9c20d142a68d5ef7455826e39",
+      "src/ts/wolf/parser/io.ts": "ea35fccf496fab1ea06ee87779a3c0e69e4ec53c14b11e079ac89c21275340a9",
+      "src/ts/wolf/parser/patternBased.ts": "b10f052b7e0d6b1c91e5df58acc3ba496b9724e3ed2d51e8d95c2818fc404025",
+      "src/ts/wolf/paths.ts": "8497405ae321bce2f952575cad1bbf8b4e0faa903fd93ead3106c98cc5409d72",
+      "src/types/guards.ts": "796d9d315487761da5753a464279c7dd37d9561d71a132125e7f19e33d8d0a79",
+      "src/utils.ts": "1740389a8ce2ec5bedd99d0da6a296d05f35628c8844f94cd4a4451458066ce4",
+      "test/utils/wolfMapFixture.ts": "b8b4e79b3134734316f321338b1568322c89ba157e9ad5cda72fe2643670a249"
+    }
+  },
+  "scenarios": [
+    {
+      "strings": 200,
+      "maps": 10,
+      "variants": {
+        "before": {
+          "warmups": [
+            {
+              "extract": {
+                "elapsedMs": 3211.0625,
+                "cpuMs": 15,
+                "progressEvents": 212,
+                "timerCount": 210,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 204,
+                "maxHeartbeatGapMs": 19.028000000000247
+              },
+              "apply": {
+                "elapsedMs": 212.55169999999998,
+                "cpuMs": 188,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 630,
+                  "existsSync": 222,
+                  "lstatSync": 210,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 212.58619999999974
+              },
+              "digest": {
+                "source": "461c00a68d890e89cd32ff535dbd6e80ed2873022e1c8620c316f7e9a46a830c",
+                "extractedText": "d98d4b865a74f4049e8852a9d3edb480d42d76af4681b5ee9afdb450a2d12926",
+                "metadata": "69a21a717fdd8f3d3e8035a72bcde777e7c430830e8a4c2191a3332252b40a61",
+                "appliedMaps": "ab292aeeaff98aa10aa46ea73a47a3ce1ad7d946132b1ea2edcf2376c3e462d9"
+              }
+            }
+          ],
+          "samples": [
+            {
+              "extract": {
+                "elapsedMs": 3212.8547999999996,
+                "cpuMs": 47,
+                "progressEvents": 212,
+                "timerCount": 210,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 204,
+                "maxHeartbeatGapMs": 20.29609999999957
+              },
+              "apply": {
+                "elapsedMs": 211.7452999999996,
+                "cpuMs": 171,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 630,
+                  "existsSync": 222,
+                  "lstatSync": 210,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 211.78150000000005
+              },
+              "digest": {
+                "source": "461c00a68d890e89cd32ff535dbd6e80ed2873022e1c8620c316f7e9a46a830c",
+                "extractedText": "d98d4b865a74f4049e8852a9d3edb480d42d76af4681b5ee9afdb450a2d12926",
+                "metadata": "69a21a717fdd8f3d3e8035a72bcde777e7c430830e8a4c2191a3332252b40a61",
+                "appliedMaps": "ab292aeeaff98aa10aa46ea73a47a3ce1ad7d946132b1ea2edcf2376c3e462d9"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 3150.3902,
+                "cpuMs": 15,
+                "progressEvents": 212,
+                "timerCount": 210,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 201,
+                "maxHeartbeatGapMs": 19.612600000000384
+              },
+              "apply": {
+                "elapsedMs": 198.6123000000007,
+                "cpuMs": 187,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 630,
+                  "existsSync": 222,
+                  "lstatSync": 210,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 198.6278000000002
+              },
+              "digest": {
+                "source": "461c00a68d890e89cd32ff535dbd6e80ed2873022e1c8620c316f7e9a46a830c",
+                "extractedText": "d98d4b865a74f4049e8852a9d3edb480d42d76af4681b5ee9afdb450a2d12926",
+                "metadata": "69a21a717fdd8f3d3e8035a72bcde777e7c430830e8a4c2191a3332252b40a61",
+                "appliedMaps": "ab292aeeaff98aa10aa46ea73a47a3ce1ad7d946132b1ea2edcf2376c3e462d9"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 3215.9781999999996,
+                "cpuMs": 63,
+                "progressEvents": 212,
+                "timerCount": 210,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 206,
+                "maxHeartbeatGapMs": 20.159999999999854
+              },
+              "apply": {
+                "elapsedMs": 270.78479999999945,
+                "cpuMs": 313,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 630,
+                  "existsSync": 222,
+                  "lstatSync": 210,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 270.8073999999997
+              },
+              "digest": {
+                "source": "461c00a68d890e89cd32ff535dbd6e80ed2873022e1c8620c316f7e9a46a830c",
+                "extractedText": "d98d4b865a74f4049e8852a9d3edb480d42d76af4681b5ee9afdb450a2d12926",
+                "metadata": "69a21a717fdd8f3d3e8035a72bcde777e7c430830e8a4c2191a3332252b40a61",
+                "appliedMaps": "ab292aeeaff98aa10aa46ea73a47a3ce1ad7d946132b1ea2edcf2376c3e462d9"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 3230.761200000001,
+                "cpuMs": 0,
+                "progressEvents": 212,
+                "timerCount": 210,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 206,
+                "maxHeartbeatGapMs": 19.4913000000015
+              },
+              "apply": {
+                "elapsedMs": 229.15879999999743,
+                "cpuMs": 234,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 630,
+                  "existsSync": 222,
+                  "lstatSync": 210,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 229.1808000000019
+              },
+              "digest": {
+                "source": "461c00a68d890e89cd32ff535dbd6e80ed2873022e1c8620c316f7e9a46a830c",
+                "extractedText": "d98d4b865a74f4049e8852a9d3edb480d42d76af4681b5ee9afdb450a2d12926",
+                "metadata": "69a21a717fdd8f3d3e8035a72bcde777e7c430830e8a4c2191a3332252b40a61",
+                "appliedMaps": "ab292aeeaff98aa10aa46ea73a47a3ce1ad7d946132b1ea2edcf2376c3e462d9"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 3179.8929000000026,
+                "cpuMs": 0,
+                "progressEvents": 212,
+                "timerCount": 210,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 206,
+                "maxHeartbeatGapMs": 19.46099999999933
+              },
+              "apply": {
+                "elapsedMs": 205.59149999999863,
+                "cpuMs": 204,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 630,
+                  "existsSync": 222,
+                  "lstatSync": 210,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 205.61189999999988
+              },
+              "digest": {
+                "source": "461c00a68d890e89cd32ff535dbd6e80ed2873022e1c8620c316f7e9a46a830c",
+                "extractedText": "d98d4b865a74f4049e8852a9d3edb480d42d76af4681b5ee9afdb450a2d12926",
+                "metadata": "69a21a717fdd8f3d3e8035a72bcde777e7c430830e8a4c2191a3332252b40a61",
+                "appliedMaps": "ab292aeeaff98aa10aa46ea73a47a3ce1ad7d946132b1ea2edcf2376c3e462d9"
+              }
+            }
+          ],
+          "summary": {
+            "extract": {
+              "elapsedMs": {
+                "median": 3212.8547999999996,
+                "min": 3150.3902,
+                "max": 3230.761200000001
+              },
+              "cpuMs": {
+                "median": 15,
+                "min": 0,
+                "max": 63
+              },
+              "progressEvents": {
+                "median": 212,
+                "min": 212,
+                "max": 212
+              },
+              "timerCount": {
+                "median": 210,
+                "min": 210,
+                "max": 210
+              },
+              "maxHeartbeatGapMs": {
+                "median": 19.612600000000384,
+                "min": 19.46099999999933,
+                "max": 20.29609999999957
+              }
+            },
+            "apply": {
+              "elapsedMs": {
+                "median": 211.7452999999996,
+                "min": 198.6123000000007,
+                "max": 270.78479999999945
+              },
+              "cpuMs": {
+                "median": 204,
+                "min": 171,
+                "max": 313
+              },
+              "progressEvents": {
+                "median": 2,
+                "min": 2,
+                "max": 2
+              },
+              "timerCount": {
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "maxHeartbeatGapMs": {
+                "median": 211.78150000000005,
+                "min": 198.6278000000002,
+                "max": 270.8073999999997
+              }
+            }
+          }
+        },
+        "current": {
+          "warmups": [
+            {
+              "extract": {
+                "elapsedMs": 177.8144,
+                "cpuMs": 0,
+                "progressEvents": 13,
+                "timerCount": 11,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 11,
+                "maxHeartbeatGapMs": 20.801800000000014
+              },
+              "apply": {
+                "elapsedMs": 39.89209999999997,
+                "cpuMs": 16,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 30,
+                  "existsSync": 22,
+                  "lstatSync": 10,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 39.92230000000001
+              },
+              "digest": {
+                "source": "461c00a68d890e89cd32ff535dbd6e80ed2873022e1c8620c316f7e9a46a830c",
+                "extractedText": "d98d4b865a74f4049e8852a9d3edb480d42d76af4681b5ee9afdb450a2d12926",
+                "metadata": "69a21a717fdd8f3d3e8035a72bcde777e7c430830e8a4c2191a3332252b40a61",
+                "appliedMaps": "ab292aeeaff98aa10aa46ea73a47a3ce1ad7d946132b1ea2edcf2376c3e462d9"
+              }
+            }
+          ],
+          "samples": [
+            {
+              "extract": {
+                "elapsedMs": 148.97109999999975,
+                "cpuMs": 78,
+                "progressEvents": 13,
+                "timerCount": 11,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 10,
+                "maxHeartbeatGapMs": 16.19839999999931
+              },
+              "apply": {
+                "elapsedMs": 39.968700000000354,
+                "cpuMs": 32,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 30,
+                  "existsSync": 22,
+                  "lstatSync": 10,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 39.98739999999998
+              },
+              "digest": {
+                "source": "461c00a68d890e89cd32ff535dbd6e80ed2873022e1c8620c316f7e9a46a830c",
+                "extractedText": "d98d4b865a74f4049e8852a9d3edb480d42d76af4681b5ee9afdb450a2d12926",
+                "metadata": "69a21a717fdd8f3d3e8035a72bcde777e7c430830e8a4c2191a3332252b40a61",
+                "appliedMaps": "ab292aeeaff98aa10aa46ea73a47a3ce1ad7d946132b1ea2edcf2376c3e462d9"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 166.75860000000011,
+                "cpuMs": 15,
+                "progressEvents": 13,
+                "timerCount": 11,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 10,
+                "maxHeartbeatGapMs": 19.761599999999817
+              },
+              "apply": {
+                "elapsedMs": 38.586199999999735,
+                "cpuMs": 16,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 30,
+                  "existsSync": 22,
+                  "lstatSync": 10,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 38.60910000000058
+              },
+              "digest": {
+                "source": "461c00a68d890e89cd32ff535dbd6e80ed2873022e1c8620c316f7e9a46a830c",
+                "extractedText": "d98d4b865a74f4049e8852a9d3edb480d42d76af4681b5ee9afdb450a2d12926",
+                "metadata": "69a21a717fdd8f3d3e8035a72bcde777e7c430830e8a4c2191a3332252b40a61",
+                "appliedMaps": "ab292aeeaff98aa10aa46ea73a47a3ce1ad7d946132b1ea2edcf2376c3e462d9"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 172.32619999999952,
+                "cpuMs": 0,
+                "progressEvents": 13,
+                "timerCount": 11,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 10,
+                "maxHeartbeatGapMs": 20.111000000000786
+              },
+              "apply": {
+                "elapsedMs": 43.3109000000004,
+                "cpuMs": 15,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 30,
+                  "existsSync": 22,
+                  "lstatSync": 10,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 43.32790000000023
+              },
+              "digest": {
+                "source": "461c00a68d890e89cd32ff535dbd6e80ed2873022e1c8620c316f7e9a46a830c",
+                "extractedText": "d98d4b865a74f4049e8852a9d3edb480d42d76af4681b5ee9afdb450a2d12926",
+                "metadata": "69a21a717fdd8f3d3e8035a72bcde777e7c430830e8a4c2191a3332252b40a61",
+                "appliedMaps": "ab292aeeaff98aa10aa46ea73a47a3ce1ad7d946132b1ea2edcf2376c3e462d9"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 161.84270000000106,
+                "cpuMs": 0,
+                "progressEvents": 13,
+                "timerCount": 11,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 9,
+                "maxHeartbeatGapMs": 19.362700000001496
+              },
+              "apply": {
+                "elapsedMs": 39.02760000000126,
+                "cpuMs": 32,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 30,
+                  "existsSync": 22,
+                  "lstatSync": 10,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 39.04539999999906
+              },
+              "digest": {
+                "source": "461c00a68d890e89cd32ff535dbd6e80ed2873022e1c8620c316f7e9a46a830c",
+                "extractedText": "d98d4b865a74f4049e8852a9d3edb480d42d76af4681b5ee9afdb450a2d12926",
+                "metadata": "69a21a717fdd8f3d3e8035a72bcde777e7c430830e8a4c2191a3332252b40a61",
+                "appliedMaps": "ab292aeeaff98aa10aa46ea73a47a3ce1ad7d946132b1ea2edcf2376c3e462d9"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 157.52449999999953,
+                "cpuMs": 16,
+                "progressEvents": 13,
+                "timerCount": 11,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 9,
+                "maxHeartbeatGapMs": 18.787599999999657
+              },
+              "apply": {
+                "elapsedMs": 39.67519999999786,
+                "cpuMs": 32,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 30,
+                  "existsSync": 22,
+                  "lstatSync": 10,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 39.693600000002334
+              },
+              "digest": {
+                "source": "461c00a68d890e89cd32ff535dbd6e80ed2873022e1c8620c316f7e9a46a830c",
+                "extractedText": "d98d4b865a74f4049e8852a9d3edb480d42d76af4681b5ee9afdb450a2d12926",
+                "metadata": "69a21a717fdd8f3d3e8035a72bcde777e7c430830e8a4c2191a3332252b40a61",
+                "appliedMaps": "ab292aeeaff98aa10aa46ea73a47a3ce1ad7d946132b1ea2edcf2376c3e462d9"
+              }
+            }
+          ],
+          "summary": {
+            "extract": {
+              "elapsedMs": {
+                "median": 161.84270000000106,
+                "min": 148.97109999999975,
+                "max": 172.32619999999952
+              },
+              "cpuMs": {
+                "median": 15,
+                "min": 0,
+                "max": 78
+              },
+              "progressEvents": {
+                "median": 13,
+                "min": 13,
+                "max": 13
+              },
+              "timerCount": {
+                "median": 11,
+                "min": 11,
+                "max": 11
+              },
+              "maxHeartbeatGapMs": {
+                "median": 19.362700000001496,
+                "min": 16.19839999999931,
+                "max": 20.111000000000786
+              }
+            },
+            "apply": {
+              "elapsedMs": {
+                "median": 39.67519999999786,
+                "min": 38.586199999999735,
+                "max": 43.3109000000004
+              },
+              "cpuMs": {
+                "median": 32,
+                "min": 15,
+                "max": 32
+              },
+              "progressEvents": {
+                "median": 2,
+                "min": 2,
+                "max": 2
+              },
+              "timerCount": {
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "maxHeartbeatGapMs": {
+                "median": 39.693600000002334,
+                "min": 38.60910000000058,
+                "max": 43.32790000000023
+              }
+            }
+          }
+        }
+      },
+      "identicalOutputs": true
+    },
+    {
+      "strings": 2000,
+      "maps": 10,
+      "variants": {
+        "before": {
+          "warmups": [
+            {
+              "extract": {
+                "elapsedMs": 30818.884799999996,
+                "cpuMs": 125,
+                "progressEvents": 2012,
+                "timerCount": 2010,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 1982,
+                "maxHeartbeatGapMs": 27.02850000000035
+              },
+              "apply": {
+                "elapsedMs": 1670.3651000000027,
+                "cpuMs": 1687,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 6030,
+                  "existsSync": 2022,
+                  "lstatSync": 2010,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 1670.3863000000056
+              },
+              "digest": {
+                "source": "deda12f2cf0944935485c8fe87d11b2c27186c23928e9c03cef0025cdfd20bb5",
+                "extractedText": "f801c7ad942658757e4fbd19eb4fd90b94e138070360cbaa8aed40386e5f7d49",
+                "metadata": "3bbcb2f68d24d223f39bfe7e30675705affbf180fa5297862d3c6ef8842ce191",
+                "appliedMaps": "a60badaecbc6327359fbee89c7a1a9a8e4c07c2c28f69341e266fcca38553d7f"
+              }
+            }
+          ],
+          "samples": [
+            {
+              "extract": {
+                "elapsedMs": 30858.790200000003,
+                "cpuMs": 62,
+                "progressEvents": 2012,
+                "timerCount": 2010,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 1984,
+                "maxHeartbeatGapMs": 23.95560000000114
+              },
+              "apply": {
+                "elapsedMs": 2246.200199999992,
+                "cpuMs": 2219,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 6030,
+                  "existsSync": 2022,
+                  "lstatSync": 2010,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 2246.2216000000044
+              },
+              "digest": {
+                "source": "deda12f2cf0944935485c8fe87d11b2c27186c23928e9c03cef0025cdfd20bb5",
+                "extractedText": "f801c7ad942658757e4fbd19eb4fd90b94e138070360cbaa8aed40386e5f7d49",
+                "metadata": "3bbcb2f68d24d223f39bfe7e30675705affbf180fa5297862d3c6ef8842ce191",
+                "appliedMaps": "a60badaecbc6327359fbee89c7a1a9a8e4c07c2c28f69341e266fcca38553d7f"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 30771.09169999999,
+                "cpuMs": 156,
+                "progressEvents": 2012,
+                "timerCount": 2010,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 1977,
+                "maxHeartbeatGapMs": 25.185599999997066
+              },
+              "apply": {
+                "elapsedMs": 1573.9765000000043,
+                "cpuMs": 1578,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 6030,
+                  "existsSync": 2022,
+                  "lstatSync": 2010,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 1573.9940999999963
+              },
+              "digest": {
+                "source": "deda12f2cf0944935485c8fe87d11b2c27186c23928e9c03cef0025cdfd20bb5",
+                "extractedText": "f801c7ad942658757e4fbd19eb4fd90b94e138070360cbaa8aed40386e5f7d49",
+                "metadata": "3bbcb2f68d24d223f39bfe7e30675705affbf180fa5297862d3c6ef8842ce191",
+                "appliedMaps": "a60badaecbc6327359fbee89c7a1a9a8e4c07c2c28f69341e266fcca38553d7f"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 30821.12689999999,
+                "cpuMs": 126,
+                "progressEvents": 2012,
+                "timerCount": 2010,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 1976,
+                "maxHeartbeatGapMs": 23.85779999999795
+              },
+              "apply": {
+                "elapsedMs": 1701.539300000004,
+                "cpuMs": 1609,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 6030,
+                  "existsSync": 2022,
+                  "lstatSync": 2010,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 1701.5581999999995
+              },
+              "digest": {
+                "source": "deda12f2cf0944935485c8fe87d11b2c27186c23928e9c03cef0025cdfd20bb5",
+                "extractedText": "f801c7ad942658757e4fbd19eb4fd90b94e138070360cbaa8aed40386e5f7d49",
+                "metadata": "3bbcb2f68d24d223f39bfe7e30675705affbf180fa5297862d3c6ef8842ce191",
+                "appliedMaps": "a60badaecbc6327359fbee89c7a1a9a8e4c07c2c28f69341e266fcca38553d7f"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 30933.31330000001,
+                "cpuMs": 141,
+                "progressEvents": 2012,
+                "timerCount": 2010,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 1984,
+                "maxHeartbeatGapMs": 25.50600000002305
+              },
+              "apply": {
+                "elapsedMs": 1946.1557999999786,
+                "cpuMs": 1843,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 6030,
+                  "existsSync": 2022,
+                  "lstatSync": 2010,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 1946.1763999999966
+              },
+              "digest": {
+                "source": "deda12f2cf0944935485c8fe87d11b2c27186c23928e9c03cef0025cdfd20bb5",
+                "extractedText": "f801c7ad942658757e4fbd19eb4fd90b94e138070360cbaa8aed40386e5f7d49",
+                "metadata": "3bbcb2f68d24d223f39bfe7e30675705affbf180fa5297862d3c6ef8842ce191",
+                "appliedMaps": "a60badaecbc6327359fbee89c7a1a9a8e4c07c2c28f69341e266fcca38553d7f"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 30846.73180000001,
+                "cpuMs": 95,
+                "progressEvents": 2012,
+                "timerCount": 2010,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 1982,
+                "maxHeartbeatGapMs": 24.50759999998263
+              },
+              "apply": {
+                "elapsedMs": 1610.1929999999993,
+                "cpuMs": 1515,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 6030,
+                  "existsSync": 2022,
+                  "lstatSync": 2010,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 1610.2105000000156
+              },
+              "digest": {
+                "source": "deda12f2cf0944935485c8fe87d11b2c27186c23928e9c03cef0025cdfd20bb5",
+                "extractedText": "f801c7ad942658757e4fbd19eb4fd90b94e138070360cbaa8aed40386e5f7d49",
+                "metadata": "3bbcb2f68d24d223f39bfe7e30675705affbf180fa5297862d3c6ef8842ce191",
+                "appliedMaps": "a60badaecbc6327359fbee89c7a1a9a8e4c07c2c28f69341e266fcca38553d7f"
+              }
+            }
+          ],
+          "summary": {
+            "extract": {
+              "elapsedMs": {
+                "median": 30846.73180000001,
+                "min": 30771.09169999999,
+                "max": 30933.31330000001
+              },
+              "cpuMs": {
+                "median": 126,
+                "min": 62,
+                "max": 156
+              },
+              "progressEvents": {
+                "median": 2012,
+                "min": 2012,
+                "max": 2012
+              },
+              "timerCount": {
+                "median": 2010,
+                "min": 2010,
+                "max": 2010
+              },
+              "maxHeartbeatGapMs": {
+                "median": 24.50759999998263,
+                "min": 23.85779999999795,
+                "max": 25.50600000002305
+              }
+            },
+            "apply": {
+              "elapsedMs": {
+                "median": 1701.539300000004,
+                "min": 1573.9765000000043,
+                "max": 2246.200199999992
+              },
+              "cpuMs": {
+                "median": 1609,
+                "min": 1515,
+                "max": 2219
+              },
+              "progressEvents": {
+                "median": 2,
+                "min": 2,
+                "max": 2
+              },
+              "timerCount": {
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "maxHeartbeatGapMs": {
+                "median": 1701.5581999999995,
+                "min": 1573.9940999999963,
+                "max": 2246.2216000000044
+              }
+            }
+          }
+        },
+        "current": {
+          "warmups": [
+            {
+              "extract": {
+                "elapsedMs": 186.3155000000006,
+                "cpuMs": 15,
+                "progressEvents": 13,
+                "timerCount": 11,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 10,
+                "maxHeartbeatGapMs": 29.981700000000274
+              },
+              "apply": {
+                "elapsedMs": 50.8778999999995,
+                "cpuMs": 31,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 30,
+                  "existsSync": 22,
+                  "lstatSync": 10,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 50.89970000000176
+              },
+              "digest": {
+                "source": "deda12f2cf0944935485c8fe87d11b2c27186c23928e9c03cef0025cdfd20bb5",
+                "extractedText": "f801c7ad942658757e4fbd19eb4fd90b94e138070360cbaa8aed40386e5f7d49",
+                "metadata": "3bbcb2f68d24d223f39bfe7e30675705affbf180fa5297862d3c6ef8842ce191",
+                "appliedMaps": "a60badaecbc6327359fbee89c7a1a9a8e4c07c2c28f69341e266fcca38553d7f"
+              }
+            }
+          ],
+          "samples": [
+            {
+              "extract": {
+                "elapsedMs": 159.2332000000024,
+                "cpuMs": 16,
+                "progressEvents": 13,
+                "timerCount": 11,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 8,
+                "maxHeartbeatGapMs": 29.08419999999751
+              },
+              "apply": {
+                "elapsedMs": 57.800399999992806,
+                "cpuMs": 47,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 30,
+                  "existsSync": 22,
+                  "lstatSync": 10,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 57.82039999999688
+              },
+              "digest": {
+                "source": "deda12f2cf0944935485c8fe87d11b2c27186c23928e9c03cef0025cdfd20bb5",
+                "extractedText": "f801c7ad942658757e4fbd19eb4fd90b94e138070360cbaa8aed40386e5f7d49",
+                "metadata": "3bbcb2f68d24d223f39bfe7e30675705affbf180fa5297862d3c6ef8842ce191",
+                "appliedMaps": "a60badaecbc6327359fbee89c7a1a9a8e4c07c2c28f69341e266fcca38553d7f"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 174.0174999999872,
+                "cpuMs": 32,
+                "progressEvents": 13,
+                "timerCount": 11,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 10,
+                "maxHeartbeatGapMs": 26.00209999999788
+              },
+              "apply": {
+                "elapsedMs": 50.1649000000034,
+                "cpuMs": 15,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 30,
+                  "existsSync": 22,
+                  "lstatSync": 10,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 50.1872999999905
+              },
+              "digest": {
+                "source": "deda12f2cf0944935485c8fe87d11b2c27186c23928e9c03cef0025cdfd20bb5",
+                "extractedText": "f801c7ad942658757e4fbd19eb4fd90b94e138070360cbaa8aed40386e5f7d49",
+                "metadata": "3bbcb2f68d24d223f39bfe7e30675705affbf180fa5297862d3c6ef8842ce191",
+                "appliedMaps": "a60badaecbc6327359fbee89c7a1a9a8e4c07c2c28f69341e266fcca38553d7f"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 131.65849999999045,
+                "cpuMs": 47,
+                "progressEvents": 13,
+                "timerCount": 11,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 7,
+                "maxHeartbeatGapMs": 29.33849999998347
+              },
+              "apply": {
+                "elapsedMs": 47.45730000000913,
+                "cpuMs": 16,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 30,
+                  "existsSync": 22,
+                  "lstatSync": 10,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 47.476299999980256
+              },
+              "digest": {
+                "source": "deda12f2cf0944935485c8fe87d11b2c27186c23928e9c03cef0025cdfd20bb5",
+                "extractedText": "f801c7ad942658757e4fbd19eb4fd90b94e138070360cbaa8aed40386e5f7d49",
+                "metadata": "3bbcb2f68d24d223f39bfe7e30675705affbf180fa5297862d3c6ef8842ce191",
+                "appliedMaps": "a60badaecbc6327359fbee89c7a1a9a8e4c07c2c28f69341e266fcca38553d7f"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 142.01639999999315,
+                "cpuMs": 63,
+                "progressEvents": 13,
+                "timerCount": 11,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 8,
+                "maxHeartbeatGapMs": 25.42249999998603
+              },
+              "apply": {
+                "elapsedMs": 52.60950000002049,
+                "cpuMs": 78,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 30,
+                  "existsSync": 22,
+                  "lstatSync": 10,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 52.62840000001597
+              },
+              "digest": {
+                "source": "deda12f2cf0944935485c8fe87d11b2c27186c23928e9c03cef0025cdfd20bb5",
+                "extractedText": "f801c7ad942658757e4fbd19eb4fd90b94e138070360cbaa8aed40386e5f7d49",
+                "metadata": "3bbcb2f68d24d223f39bfe7e30675705affbf180fa5297862d3c6ef8842ce191",
+                "appliedMaps": "a60badaecbc6327359fbee89c7a1a9a8e4c07c2c28f69341e266fcca38553d7f"
+              }
+            },
+            {
+              "extract": {
+                "elapsedMs": 152.2550999999803,
+                "cpuMs": 94,
+                "progressEvents": 13,
+                "timerCount": 11,
+                "fsCalls": {
+                  "realpathSync": 1,
+                  "existsSync": 1,
+                  "lstatSync": 0,
+                  "readFileSync": 10,
+                  "writeFileSync": 2,
+                  "fsyncSync": 0,
+                  "renameSync": 1
+                },
+                "heartbeats": 8,
+                "maxHeartbeatGapMs": 25.3918999999878
+              },
+              "apply": {
+                "elapsedMs": 48.25479999999516,
+                "cpuMs": 46,
+                "progressEvents": 2,
+                "timerCount": 0,
+                "fsCalls": {
+                  "realpathSync": 30,
+                  "existsSync": 22,
+                  "lstatSync": 10,
+                  "readFileSync": 32,
+                  "writeFileSync": 10,
+                  "fsyncSync": 10,
+                  "renameSync": 20
+                },
+                "heartbeats": 0,
+                "maxHeartbeatGapMs": 48.26910000000498
+              },
+              "digest": {
+                "source": "deda12f2cf0944935485c8fe87d11b2c27186c23928e9c03cef0025cdfd20bb5",
+                "extractedText": "f801c7ad942658757e4fbd19eb4fd90b94e138070360cbaa8aed40386e5f7d49",
+                "metadata": "3bbcb2f68d24d223f39bfe7e30675705affbf180fa5297862d3c6ef8842ce191",
+                "appliedMaps": "a60badaecbc6327359fbee89c7a1a9a8e4c07c2c28f69341e266fcca38553d7f"
+              }
+            }
+          ],
+          "summary": {
+            "extract": {
+              "elapsedMs": {
+                "median": 152.2550999999803,
+                "min": 131.65849999999045,
+                "max": 174.0174999999872
+              },
+              "cpuMs": {
+                "median": 47,
+                "min": 16,
+                "max": 94
+              },
+              "progressEvents": {
+                "median": 13,
+                "min": 13,
+                "max": 13
+              },
+              "timerCount": {
+                "median": 11,
+                "min": 11,
+                "max": 11
+              },
+              "maxHeartbeatGapMs": {
+                "median": 26.00209999999788,
+                "min": 25.3918999999878,
+                "max": 29.33849999998347
+              }
+            },
+            "apply": {
+              "elapsedMs": {
+                "median": 50.1649000000034,
+                "min": 47.45730000000913,
+                "max": 57.800399999992806
+              },
+              "cpuMs": {
+                "median": 46,
+                "min": 15,
+                "max": 78
+              },
+              "progressEvents": {
+                "median": 2,
+                "min": 2,
+                "max": 2
+              },
+              "timerCount": {
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "maxHeartbeatGapMs": {
+                "median": 50.1872999999905,
+                "min": 47.476299999980256,
+                "max": 57.82039999999688
+              }
+            }
+          }
+        }
+      },
+      "identicalOutputs": true
+    }
+  ]
+}

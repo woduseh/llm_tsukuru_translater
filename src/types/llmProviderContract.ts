@@ -44,7 +44,7 @@ export const LLM_PROVIDER_METADATA = {
     id: 'gemini',
     displayName: 'Gemini API',
     defaultModel: 'gemini-2.5-flash',
-    modelSuggestions: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+    modelSuggestions: ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'],
     settingFields: [
       {
         key: 'llmApiKey',

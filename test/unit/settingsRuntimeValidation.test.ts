@@ -25,6 +25,7 @@ describe('sanitizeStoredSettings', () => {
       llmMaxApiRetries: -1,
       llmTimeout: 5,
       llmParallelWorkers: 0,
+      llmRequestsPerMinute: -1,
       oneMapFile: 'yes',
       llmVertexLocation: '',
       unknownSetting: 'should be dropped',
@@ -39,6 +40,25 @@ describe('sanitizeStoredSettings', () => {
     expect(sanitized.llmMaxApiRetries).toBe(5);
     expect(sanitized.llmTimeout).toBe(600);
     expect(sanitized.llmParallelWorkers).toBe(1);
+    expect(sanitized.llmRequestsPerMinute).toBe(0);
+  });
+
+  it('loads eight requests and RPM limits without changing a user-selected model', () => {
+    expect(sanitizeStoredSettings({
+      llmProvider: 'gemini',
+      llmModel: 'my-custom-gemini-model',
+      llmParallelWorkers: 8,
+      llmRequestsPerMinute: 60_000,
+    })).toMatchObject({ llmModel: 'my-custom-gemini-model', llmParallelWorkers: 8, llmRequestsPerMinute: 60_000 });
+    expect(sanitizeStoredSettings({ llmParallelWorkers: 3 }).llmRequestsPerMinute).toBe(0);
+  });
+
+  it.each([9, 16, 2.5, '4', NaN, Infinity])('falls back to one request for invalid saved concurrency %s', (value) => {
+    expect(sanitizeStoredSettings({ llmParallelWorkers: value }).llmParallelWorkers).toBe(1);
+  });
+
+  it.each([-1, 60_001, 1.5, '30', NaN, Infinity])('falls back to no separate RPM limit for invalid saved RPM %s', (value) => {
+    expect(sanitizeStoredSettings({ llmRequestsPerMinute: value }).llmRequestsPerMinute).toBe(0);
   });
 
   it('migrates only retired project-default models for their matching provider', () => {
@@ -73,6 +93,7 @@ describe('applyValidatedSettingsUpdate', () => {
       llmMaxApiRetries: 8,
       llmTimeout: 300,
       llmParallelWorkers: 4,
+      llmRequestsPerMinute: 120,
       llmVertexLocation: '',
     });
 
@@ -82,6 +103,7 @@ describe('applyValidatedSettingsUpdate', () => {
     expect(updated.llmMaxApiRetries).toBe(8);
     expect(updated.llmTimeout).toBe(300);
     expect(updated.llmParallelWorkers).toBe(4);
+    expect(updated.llmRequestsPerMinute).toBe(120);
     expect(updated.llmVertexLocation).toBe('global');
   });
 
@@ -101,7 +123,20 @@ describe('applyValidatedSettingsUpdate', () => {
     })).toThrow(/llmTimeout/);
 
     expect(() => applyValidatedSettingsUpdate(createCurrentSettings(), {
-      llmParallelWorkers: 17,
+      llmParallelWorkers: 9,
     })).toThrow(/llmParallelWorkers/);
+  });
+
+  it.each([0, 60_000])('accepts the RPM boundary %s with eight simultaneous requests', (rpm) => {
+    const current = createCurrentSettings();
+    const updated = applyValidatedSettingsUpdate(current, { llmParallelWorkers: 8, llmRequestsPerMinute: rpm });
+
+    expect(updated).toMatchObject({ llmParallelWorkers: 8, llmRequestsPerMinute: rpm, llmModel: current.llmModel });
+    expect(current.llmParallelWorkers).toBe(defaultSettings.llmParallelWorkers);
+  });
+
+  it.each([-1, 60_001, 1.5, '30', NaN, Infinity])('rejects invalid RPM update %s', (value) => {
+    expect(() => applyValidatedSettingsUpdate(createCurrentSettings(), { llmRequestsPerMinute: value }))
+      .toThrow(/llmRequestsPerMinute/);
   });
 });

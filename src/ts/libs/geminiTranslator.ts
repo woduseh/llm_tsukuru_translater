@@ -2,6 +2,7 @@ import axios from 'axios';
 import type { AppSettings } from '../../types/settings';
 import { buildTranslationSystemPrompt, buildTranslationUserMessage, getLanguageName, stripMarkdownFences } from './translationPrompt';
 import { ProviderTranslationBase, createProviderTranslatorConfig, type ProviderTranslatorConfig } from './providerTranslationBase';
+import { copyRetryMetadata } from './providerRetry';
 
 interface GeminiConfig extends ProviderTranslatorConfig {
     apiKey: string;
@@ -22,7 +23,7 @@ function normalizeGeminiError(error: unknown, apiKey: string): Error {
     const normalized = new Error(`Gemini API error: ${redactedMessage}`) as Error & { code?: string };
     const code = (error as { code?: unknown })?.code;
     if (typeof code === 'string') normalized.code = code;
-    return normalized;
+    return copyRetryMetadata(error, normalized);
 }
 
 export class GeminiTranslator extends ProviderTranslationBase {
@@ -41,14 +42,16 @@ export class GeminiTranslator extends ProviderTranslationBase {
         const userMessage = buildTranslationUserMessage(text);
         const targetLangName = getLanguageName(this.config.targetLang);
         const prefill = `(지침을 숙지했습니다. ${targetLangName} 리라이팅 결과를 출력합니다.)\n`;
+        // Latest aliases can advance to models that reject a trailing model prefill.
+        const model = this.config.model.replace(/^models\//, '');
+        const requiresUserFinalTurn = model.endsWith('-latest') || /^gemini-3\.8-flash(?:$|-)/.test(model);
+        const contents = [{ role: 'user', parts: [{ text: userMessage }] }];
+        if (!requiresUserFinalTurn) contents.push({ role: 'model', parts: [{ text: prefill }] });
         let response;
         try {
             response = await axios.post(this.apiUrl, {
                 system_instruction: { parts: [{ text: systemInstruction }] },
-                contents: [
-                    { role: 'user', parts: [{ text: userMessage }] },
-                    { role: 'model', parts: [{ text: prefill }] }
-                ],
+                contents,
                 safetySettings: [
                     { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
                     { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },

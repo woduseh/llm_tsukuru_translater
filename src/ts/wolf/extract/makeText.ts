@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { performance } from 'node:perf_hooks';
 import { decodeEncoding } from '../../../utils'
 import { sleep } from '../../rpgmv/globalutils';
 import Tools from '../../libs/projectTools';
@@ -15,9 +16,15 @@ function setProgressBar(now:number, max:number, multipl=50){
 export default async function makeText(ctx: AppContext, extractRoot: string){
     const ext = ctx.WolfExtData
     let texts:{[key:string]:string[]} = {}
+    let sliceStarted = 0
     for(let i =0;i<ext.length;i++){
-        setProgressBar(i,ext.length)
-        await sleep(1)
+        // Yield real event-loop time for IPC without a timer and progress event
+        // for every string. A single large string can exceed this work budget.
+        if(i === 0 || performance.now() - sliceStarted >= 8){
+            setProgressBar(i,ext.length)
+            await sleep(0)
+            sliceStarted = performance.now()
+        }
         let decoded = (decodeEncoding(ext[i].str.str, ctx.WolfMetadata)).replaceAll('\\','\\\\')
         if(decoded.endsWith('\0')){
             decoded = decoded.substring(0,decoded.length-1)

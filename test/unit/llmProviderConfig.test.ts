@@ -68,6 +68,7 @@ describe('buildLlmStartWindowState', () => {
     expect(state).toMatchObject({
       llmSortOrder: 'size-desc',
       llmParallelWorkers: defaultSettings.llmParallelWorkers,
+      llmRequestsPerMinute: 0,
       llmReady: true,
       llmProvider: 'vertex',
       llmVertexLocation: 'global',
@@ -77,6 +78,33 @@ describe('buildLlmStartWindowState', () => {
     });
     expect(state).not.toHaveProperty('llmApiKey');
     expect(state).not.toHaveProperty('llmVertexServiceAccountJson');
+  });
+
+  it('exposes request limits while keeping every provider credential out of the start window', () => {
+    const settings = createSettings({
+      llmParallelWorkers: 8,
+      llmRequestsPerMinute: 120,
+      llmOpenAiApiKey: 'openai-secret',
+      llmCustomApiKey: 'custom-secret',
+      llmClaudeApiKey: 'claude-secret',
+    });
+
+    const state = buildLlmStartWindowState(settings);
+
+    expect(state).toMatchObject({ llmParallelWorkers: 8, llmRequestsPerMinute: 120 });
+    for (const key of ['llmApiKey', 'llmOpenAiApiKey', 'llmCustomApiKey', 'llmClaudeApiKey', 'llmVertexServiceAccountJson']) {
+      expect(state).not.toHaveProperty(key);
+    }
+    expect(settings.llmModel).toBe('gemini-2.5-pro');
+  });
+
+  it('uses safe request limits for legacy and out-of-range stored values', () => {
+    expect(buildLlmStartWindowState(createSettings({ llmParallelWorkers: undefined, llmRequestsPerMinute: undefined })))
+      .toMatchObject({ llmParallelWorkers: 1, llmRequestsPerMinute: 0 });
+    expect(buildLlmStartWindowState(createSettings({ llmParallelWorkers: 16, llmRequestsPerMinute: 60_001 })))
+      .toMatchObject({ llmParallelWorkers: 8, llmRequestsPerMinute: 60_000 });
+    expect(buildLlmStartWindowState(createSettings({ llmParallelWorkers: 1.5, llmRequestsPerMinute: '60' })))
+      .toMatchObject({ llmParallelWorkers: 1, llmRequestsPerMinute: 0 });
   });
 });
 

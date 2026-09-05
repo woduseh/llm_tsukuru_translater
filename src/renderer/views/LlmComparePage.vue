@@ -123,7 +123,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { api } from '../composables/useIpc'
+import { api, useIpcOn } from '../composables/useIpc'
 import { splitBlocks, checkMismatch, autoFixBlock, isBlockUntranslated, removeDuplicateHeaders, blocksToLines, checkMismatchBlocks, hasAnyUntranslatedBlock } from '../compareUtils'
 import type { Block } from '../compareUtils'
 import { haveSameTranslationLineStructure, isTranslationTextFileName } from '../../ts/libs/translationSyntax'
@@ -680,10 +680,10 @@ function onRetranslateResult(result: RetranslateResult) {
 let resizeObs: ResizeObserver | null = null
 
 onMounted(() => {
-  api.on('initCompare', (dir: string) => loadFiles(dir))
-  api.on('retranslateProgress', onRetranslateProgress)
-  api.on('retranslateFileDone', onRetranslateResult)
-  api.on('retranslateBlocksDone', onRetranslateResult)
+  useIpcOn('initCompare', (dir: string) => loadFiles(dir))
+  useIpcOn('retranslateProgress', onRetranslateProgress)
+  useIpcOn('retranslateFileDone', onRetranslateResult)
+  useIpcOn('retranslateBlocksDone', onRetranslateResult)
 
   document.addEventListener('keydown', onKeydown)
 
@@ -703,9 +703,6 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   if (scrollRafId) cancelAnimationFrame(scrollRafId)
   resizeObs?.disconnect()
-  for (const ch of ['initCompare', 'retranslateProgress', 'retranslateFileDone', 'retranslateBlocksDone']) {
-    api.removeAllListeners(ch)
-  }
 })
 
 function onKeydown(e: KeyboardEvent) {

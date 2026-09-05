@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "patch-1788571908362",
+  "kind": "translation-patch",
+  "createdAt": "2026-09-05T01:31:48.363Z",
+  "path": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\mcp-audit-20260905\\.llm-tsukuru-agent\\artifacts\\translation-patch-patch-1788571908362.json",
+  "redactions": [],
+  "payload": {
+    "patch": {
+      "schemaVersion": 1,
+      "patchId": "patch-1788571908362",
+      "createdAt": "2026-09-05T01:31:48.362Z",
+      "dryRunOnly": true,
+      "targetPath": "target.txt",
+      "operations": [
+        {
+          "opId": "op-001",
+          "kind": "replace-line",
+          "targetPath": "target.txt",
+          "lineNumber": 2,
+          "originalText": "",
+          "replacementText": "Filled"
+        }
+      ],
+      "invariantPolicy": {
+        "preserveLineCount": true,
+        "requiresAlignmentProofForLineCountChange": true
+      }
+    },
+    "validation": {
+      "schemaVersion": 1,
+      "valid": true,
+      "lineCountPreserved": true,
+      "findings": []
+    }
+  }
+}

@@ -26,11 +26,17 @@ RPG Maker MV/MZ 및 Wolf RPG Editor 게임의 텍스트를 추출·번역·적�
 ### 개발 환경 설정
 
 ```bash
-# 의존성 설치
-npm install
+# 체크아웃마다 lockfile 기준 설치 (Electron 다운로드와 설치 스크립트 필요)
+npm ci
 
-# 개발 모드 실행
-npm start
+# 런타임·의존성·프로세스/포트 접근 사전 진단
+npm run doctor
+
+# 메인/MCP 빌드 → Vite 준비 → 격리된 Electron 실행
+npm run dev
+
+# 홈 화면의 Vue/preload 준비 신호 확인 후 자동 종료
+npm run dev -- --smoke
 
 # TypeScript 타입 검사
 npm run typecheck
@@ -41,6 +47,10 @@ npm test
 # 린트 실행
 npm run lint
 ```
+
+`dev`는 실행별 임시 포트와 설정·로그·세션 프로필을 사용해요. 앱을 닫거나 Ctrl+C로 종료하면 서버와 개인 상태를 정리하고 `artifacts/dev/latest.json` 및 실행별 로그를 남겨요. 개발 프로필의 설정은 유지되지 않으며 메인/preload 변경은 `dev`를 다시 실행해야 반영돼요. 평소 사용자 설정으로 빌드된 앱을 실행하려면 `npm start`를 사용하세요.
+
+변경 후에는 `npm run verify:plan` → `npm run verify`를 사용하세요. 실제 Electron 동작 검사는 `npm run harness:ui`, 전체 결정적 검사는 `npm run verify:full`이에요. 환경 진단 통과나 홈 화면 smoke만으로 번역·적용 동작이 검증되지는 않아요. 실패 진단과 검증 범위는 [HARNESS.md](docs/HARNESS.md)를 참조하세요.
 
 ### 프로덕션 빌드
 

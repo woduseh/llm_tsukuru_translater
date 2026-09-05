@@ -62,6 +62,37 @@ describe('harness command execution', () => {
       cwd: process.cwd(), stdio: 'inherit',
     });
   });
+
+  it.each([false, true])('builds the MCP bundle only when core must supply its own build (reuse=%s)', async (reuseBuild) => {
+    const runCommand = vi.fn();
+    const buildMainIfNeeded = vi.fn();
+    const workspaceBoundary = new Error('stop before the real MCP workspace and subprocess');
+    const corePath = path.join(process.cwd(), 'scripts/harness/core.cjs');
+    await new Promise<void>((resolve, reject) => {
+      const harnessShared = {
+        ...shared,
+        runCommand,
+        buildMainIfNeeded,
+        loadCompiledModule: () => ({}),
+        makeTempDir: () => { throw workspaceBoundary; },
+        writeTaskManifest: () => 'in-memory',
+        runCases: async (_suite: string, cases: Array<{ id: string; run: () => Promise<unknown> }>) => {
+          const bundled = cases.find(testCase => testCase.id === 'bundled-mcp-stdio');
+          if (!bundled) throw new Error('Missing real bundled MCP case');
+          await expect(bundled.run()).rejects.toBe(workspaceBoundary);
+          return { total: 0, failed: 0 };
+        },
+        writeHarnessResult: () => resolve(),
+        writeFatalHarnessResult: (_suite: string, error: unknown) => reject(error),
+      };
+      vm.runInNewContext(fs.readFileSync(corePath, 'utf8'), {
+        process: { env: reuseBuild ? { LLM_TSUKURU_SKIP_BUILD: '1' } : {}, exitCode: 0 },
+        require: (id: string) => id === './_shared.cjs' ? harnessShared : require(id),
+      }, { filename: corePath });
+    });
+    expect(buildMainIfNeeded).toHaveBeenCalledOnce();
+    expect(runCommand.mock.calls).toEqual(reuseBuild ? [] : [['npm', ['run', 'build:mcp']]]);
+  });
 });
 
 describe('harness result reliability', () => {

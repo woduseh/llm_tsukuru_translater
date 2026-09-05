@@ -192,7 +192,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import TitleBar from '../components/TitleBar.vue'
 import AgentTerminalPane from '../components/AgentTerminalPane.vue'
@@ -217,14 +217,35 @@ import type { AgentExecutableDetectionResult } from '../../agent/agentExecutable
 import type { AgentWorkspaceStatus } from '../../agent/agentWorkspaceStatus'
 import type { TerminalSessionKind } from '../../types/agentWorkspace'
 
-const workspace = reactive(createAgentWorkspaceViewModel())
+const workspaceTemplate = createAgentWorkspaceViewModel()
 const route = useRoute()
 const { sessions: terminalSessions, launch } = useTerminalSessions()
 const { refresh: refreshApprovals } = useMutationApprovals()
-const activeAgentPresetId = ref<AgentCliPreset['id']>(workspace.agentPresets[0].id)
+const activeAgentPresetId = ref<AgentCliPreset['id']>(workspaceTemplate.agentPresets[0].id)
 const activeCommandPresetId = ref('')
 const selectedPrompt = ref('')
 const liveStatus = ref<AgentWorkspaceStatus | null>(null)
+const executableDetections = ref<AgentExecutableDetectionResult | null>(null)
+const workspace = computed(() => ({
+  ...workspaceTemplate,
+  agentPresets: workspaceTemplate.agentPresets.map((preset) => {
+    const detected = executableDetections.value?.results.find((entry) => entry.id === preset.id)
+    const executable = createExecutableDetectionHint(preset.executable.executableNames, detected?.status)
+    return {
+      ...preset,
+      executable,
+      mcpStatus: liveStatus.value ? derivePresetMcpStatus(preset.id, {
+        serverAvailable: liveStatus.value.mcp.serverAvailable,
+        executableAvailable: executable.detectionStatus === 'available',
+        projectSelected: liveStatus.value.project.selected,
+      }) : preset.mcpStatus,
+    }
+  }),
+  timeline: deriveAgentTimeline({
+    projectSelected: liveStatus.value?.project.selected ?? false,
+    mcpServerAvailable: liveStatus.value?.mcp.serverAvailable ?? false,
+  }),
+}))
 const activeSessionId = ref('')
 const launchBusy = ref(false)
 const launchMessage = ref('')
@@ -254,10 +275,10 @@ const activeSession = computed(() => {
   return terminalSessions.value.find((session) => session.sessionId === activeSessionId.value) ?? null
 })
 const activeAgentPreset = computed(() => {
-  return workspace.agentPresets.find((preset) => preset.id === activeAgentPresetId.value) ?? workspace.agentPresets[0]
+  return workspace.value.agentPresets.find((preset) => preset.id === activeAgentPresetId.value) ?? workspace.value.agentPresets[0]
 })
 const activeCommandPreset = computed(() => {
-  return workspace.presets.find((preset) => preset.id === activeCommandPresetId.value) ?? null
+  return workspace.value.presets.find((preset) => preset.id === activeCommandPresetId.value) ?? null
 })
 const recommendedPrompt = computed(() => {
   const preset = activeCommandPreset.value
@@ -283,9 +304,9 @@ async function focusShellTerminal() {
 let refreshing = false
 
 onMounted(async () => {
+  window.addEventListener('focus', handleWindowFocus)
   await Promise.all([refreshAll(), refreshApprovals()])
   await focusRequestedApproval()
-  window.addEventListener('focus', handleWindowFocus)
 })
 
 onUnmounted(() => {
@@ -333,21 +354,8 @@ async function refreshAll() {
   refreshing = true
   try {
     await Promise.all([detectExecutables(), refreshStatus()])
-    applyLiveMcpStatus()
   } finally {
     refreshing = false
-  }
-}
-
-function applyLiveMcpStatus() {
-  const serverAvailable = liveStatus.value?.mcp.serverAvailable ?? false
-  const projectSelected = liveStatus.value?.project.selected ?? false
-  for (const preset of workspace.agentPresets) {
-    preset.mcpStatus = derivePresetMcpStatus(preset.id, {
-      serverAvailable,
-      executableAvailable: preset.executable.detectionStatus === 'available',
-      projectSelected,
-    })
   }
 }
 
@@ -356,30 +364,22 @@ async function refreshStatus() {
     const status = (await api.invoke('getAgentWorkspaceStatus')) as AgentWorkspaceStatus | undefined
     if (!status) return
     liveStatus.value = status
-    workspace.timeline = deriveAgentTimeline({
-      projectSelected: status.project.selected,
-      mcpServerAvailable: status.mcp.serverAvailable,
-    })
   } catch {
-    // Best-effort; the default (waiting) timeline stays in place on failure.
+    // Keep the last successful environment snapshot on transient IPC failures.
   }
 }
 
 async function detectExecutables() {
   try {
-    const payload = workspace.agentPresets.map((preset) => ({
+    const payload = workspaceTemplate.agentPresets.map((preset) => ({
       id: preset.id,
       executableNames: preset.executable.executableNames,
     }))
     const result = (await api.invoke('detectAgentExecutables', payload)) as AgentExecutableDetectionResult | undefined
     if (!result || !Array.isArray(result.results)) return
-    for (const entry of result.results) {
-      const preset = workspace.agentPresets.find((candidate) => candidate.id === entry.id)
-      if (!preset) continue
-      preset.executable = createExecutableDetectionHint(preset.executable.executableNames, entry.status)
-    }
+    executableDetections.value = result
   } catch {
-    // Detection is best-effort; leave the default "not yet probed" hint on failure.
+    // Keep this page's last successful executable probe on transient IPC failures.
   }
 }
 

@@ -28,3 +28,5 @@ audit_report.html
 res/mcp-agent-server.cjs
 /artifacts/harness/
 /artifacts/verify/
+/artifacts/dev/
+/artifacts/doctor/

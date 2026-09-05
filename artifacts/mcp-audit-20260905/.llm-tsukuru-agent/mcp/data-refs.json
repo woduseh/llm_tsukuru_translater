@@ -1,0 +1,84 @@
+{
+  "ref-1788571885966-79198ab0664c48": {
+    "schemaVersion": 1,
+    "refId": "ref-1788571885966-79198ab0664c48",
+    "scope": "session",
+    "kind": "translation-patch",
+    "projectRoot": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\mcp-audit-20260905",
+    "createdAt": "2026-09-05T01:31:25.966Z",
+    "target": {
+      "type": "artifact-json",
+      "path": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\mcp-audit-20260905\\.llm-tsukuru-agent\\artifacts\\translation-patch-patch-1788571885963.json"
+    },
+    "redaction": {
+      "redacted": false,
+      "redactions": []
+    },
+    "metadata": {
+      "toolName": "patch.propose",
+      "targetPath": "target.txt"
+    }
+  },
+  "ref-1788571886024-36e46d1581cbd": {
+    "schemaVersion": 1,
+    "refId": "ref-1788571886024-36e46d1581cbd",
+    "scope": "session",
+    "kind": "alignment-map",
+    "projectRoot": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\mcp-audit-20260905",
+    "createdAt": "2026-09-05T01:31:26.024Z",
+    "target": {
+      "type": "artifact-json",
+      "path": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\mcp-audit-20260905\\.llm-tsukuru-agent\\artifacts\\alignment-map-alignment-1788571885986.json"
+    },
+    "redaction": {
+      "redacted": false,
+      "redactions": []
+    },
+    "metadata": {
+      "toolName": "alignment.inspect",
+      "sourcePath": "source-large.txt",
+      "targetPath": "target-large.txt"
+    }
+  },
+  "ref-1788571908366-5db59a14a130a8": {
+    "schemaVersion": 1,
+    "refId": "ref-1788571908366-5db59a14a130a8",
+    "scope": "session",
+    "kind": "translation-patch",
+    "projectRoot": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\mcp-audit-20260905",
+    "createdAt": "2026-09-05T01:31:48.366Z",
+    "target": {
+      "type": "artifact-json",
+      "path": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\mcp-audit-20260905\\.llm-tsukuru-agent\\artifacts\\translation-patch-patch-1788571908362.json"
+    },
+    "redaction": {
+      "redacted": false,
+      "redactions": []
+    },
+    "metadata": {
+      "toolName": "patch.propose",
+      "targetPath": "target.txt"
+    }
+  },
+  "ref-1788571908421-546c20531974a8": {
+    "schemaVersion": 1,
+    "refId": "ref-1788571908421-546c20531974a8",
+    "scope": "session",
+    "kind": "alignment-map",
+    "projectRoot": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\mcp-audit-20260905",
+    "createdAt": "2026-09-05T01:31:48.421Z",
+    "target": {
+      "type": "artifact-json",
+      "path": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\mcp-audit-20260905\\.llm-tsukuru-agent\\artifacts\\alignment-map-alignment-1788571908386.json"
+    },
+    "redaction": {
+      "redacted": false,
+      "redactions": []
+    },
+    "metadata": {
+      "toolName": "alignment.inspect",
+      "sourcePath": "source-large.txt",
+      "targetPath": "target-large.txt"
+    }
+  }
+}

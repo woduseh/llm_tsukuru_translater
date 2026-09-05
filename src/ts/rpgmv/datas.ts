@@ -41,6 +41,7 @@ export const settings: AppSettings = {
     llmMaxApiRetries: 5,
     llmTimeout: 600,
     llmParallelWorkers: 1,
+    llmRequestsPerMinute: 0,
     llmTranslationUnit: 'chunk',
     llmTargetLang: 'ko',
     llmSourceLang: 'ja',

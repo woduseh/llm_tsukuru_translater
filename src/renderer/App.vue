@@ -22,10 +22,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AgentTerminalDrawer from './components/AgentTerminalDrawer.vue'
-import { api } from './composables/useIpc'
+import { useIpcOn } from './composables/useIpc'
 import { useMutationApprovals } from './composables/useMutationApprovals'
 import Swal from 'sweetalert2'
 import { AGENT_WORKSPACE_ROUTE } from './agentWorkspaceModel'
@@ -37,6 +37,16 @@ const terminalDrawerRoutes = new Set(['/', '/mvmz', '/wolf'])
 const showGlobalTerminalDrawer = computed(() => terminalDrawerRoutes.has(route.path))
 const showApprovalBanner = computed(() => route.path !== AGENT_WORKSPACE_ROUTE && pendingCount.value > 0)
 
+for (const channel of ['getGlobalSettings', 'settings', 'llmSettings', 'verifySettings']) {
+  useIpcOn(channel, (settings: Record<string, unknown>) => {
+    if (settings && settings.themeData) {
+      for (const [key, value] of Object.entries(settings.themeData as Record<string, string>)) {
+        document.documentElement.style.setProperty(key, value)
+      }
+    }
+  })
+}
+
 function openApprovalQueue() {
   const first = pendingApprovals.value[0]
   if (!first) return
@@ -46,25 +56,22 @@ function openApprovalQueue() {
   })
 }
 
-// Global alert handler shared across all pages
-onMounted(() => {
-  api.on('alert', (tt: unknown) => {
-    if (typeof tt === 'string') {
-      Swal.fire({ icon: 'success', title: tt })
-    } else if (tt && typeof tt === 'object') {
-      const obj = tt as Record<string, unknown>
-      Swal.fire({
-        icon: (obj.icon as any) || 'info',
-        title: (obj.message as string) || '',
-      })
-    }
-  })
+useIpcOn('alert', (tt: unknown) => {
+  if (typeof tt === 'string') {
+    Swal.fire({ icon: 'success', title: tt })
+  } else if (tt && typeof tt === 'object') {
+    const obj = tt as Record<string, unknown>
+    Swal.fire({
+      icon: (obj.icon as any) || 'info',
+      title: (obj.message as string) || '',
+    })
+  }
+})
 
-  api.on('alert_free', (tt: unknown) => {
-    if (typeof tt === 'string') {
-      Swal.fire({ icon: 'info', title: tt })
-    }
-  })
+useIpcOn('alert_free', (tt: unknown) => {
+  if (typeof tt === 'string') {
+    Swal.fire({ icon: 'info', title: tt })
+  }
 })
 </script>
 

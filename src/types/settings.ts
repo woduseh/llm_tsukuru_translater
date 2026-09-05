@@ -38,6 +38,7 @@ export interface AppSettings {
   llmMaxApiRetries: number;
   llmTimeout: number;
   llmParallelWorkers: number;
+  llmRequestsPerMinute?: number;
   llmTranslationUnit: string;
   llmTargetLang: string;
   llmSourceLang?: string;

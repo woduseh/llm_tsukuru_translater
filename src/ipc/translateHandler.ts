@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import * as eztrans from '../ts/rpgmv/translator.js';
 import { buildLlmStartWindowState } from '../ts/libs/llmProviderConfig';
+import { normalizeTranslationConcurrency, normalizeTranslationRpm } from '../ts/libs/translationRequestScheduler';
 import { generateGuidelineDraft } from '../ts/libs/guidelineGenerator';
 import { scanProjectTranslationProfile, type ProjectTranslationProfile } from '../ts/libs/projectProfile';
 import { storage } from './shared';
@@ -60,10 +61,9 @@ export function registerTranslateHandlers(ctx: AppContext) {
   })
 
   ipcMain.on('llmSettingsApply', (ev, data) => {
-    const llmParallelWorkers = Number.isInteger(data.llmParallelWorkers)
-      ? Math.min(16, Math.max(1, data.llmParallelWorkers))
-      : 1;
-    ctx.settings = { ...ctx.settings, llmSortOrder: data.llmSortOrder, llmParallelWorkers };
+    const llmParallelWorkers = normalizeTranslationConcurrency(data?.llmParallelWorkers);
+    const llmRequestsPerMinute = normalizeTranslationRpm(data?.llmRequestsPerMinute);
+    ctx.settings = { ...ctx.settings, llmSortOrder: data?.llmSortOrder, llmParallelWorkers, llmRequestsPerMinute };
     storage.set('settings', JSON.stringify(ctx.settings));
 
     if (llmPendingArg) {

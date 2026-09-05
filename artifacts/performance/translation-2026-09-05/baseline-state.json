@@ -1,0 +1,24 @@
+{
+  "capturedAt": "2026-09-05T05:25:20.989Z",
+  "sourceHashes": {
+    "src/ts/libs/providerTranslationBase.ts": "0f83cf0480792a1b365bad1b2d15531e606e14341a47841a73e7ebcb3f0dce74",
+    "src/ts/libs/translationCore.ts": "ebfcf539edf9680cf7bcbc440d6f9197e4b3caacbf4f5258f59f219b6c8fa5e5",
+    "src/ts/libs/geminiTranslator.ts": "7205feeec71bdef0e0864beb164fe4072c114d189cd315982091808968375cb9",
+    "src/ts/libs/translatorFactory.ts": "7bd49f9a380369aeda561c2e804bb57a00fbd663877474d759544fbbed138295",
+    "src/ts/libs/providerRegistry.ts": "c90ff4b9f1d9d9a310147ca007c7f4a4c94170caccea1bb9d9914299936270e4",
+    "src/ts/rpgmv/translator.ts": "c3dd204114de58a02e9e7a52e50a9855a01a47cf09da0c37c0681fae8002db22",
+    "src/types/llmProviderContract.ts": "0ea56db0c6a3f9eac95014dc2be8543916477f58b21941a1a38c06ad98156888",
+    "src/types/settings.ts": "3e810ceaede6fe865bee471759b2b89b98727999eafad5501abda12d7aa5c7de",
+    "src/ts/libs/llmProviderConfig.ts": "494546bce573f98ff3f9c3c08a739752941220f8c7d67151e1f50e5a737e7058",
+    "src/ipc/translateHandler.ts": "55b57bf5affd71f77b07d3f534d2ed1cef220cfa3d48eb7d5d90a0cdeebdde64",
+    "src/renderer/views/LlmSettingsPage.vue": "b3726cb9340d8ca0168638bb0cc1b30fa64c49df2d34c8d0d5b9ac8e610b8f52",
+    "src/ts/libs/settingsRuntimeValidation.ts": "522fc9b9fc67d3a696302defa0f9d97ea83b7cb7ec01d8551c4e58c3f97d8edb",
+    "src/ts/rpgmv/datas.ts": "e69fe8c078268f026129a3ca1127dbfb2b6ef89f8eedc46661b74c303f2f72a8"
+  },
+  "previousVerification": {
+    "status": "passed",
+    "sourceChanged": false,
+    "reportPath": "C:\\Users\\wodus\\ai-workspace\\llm_tsukuru_translater\\artifacts\\verify\\2026-09-05T05-12-16-550Z-31048-dd3a24\\result.json"
+  },
+  "baselineUnitTests": 718
+}

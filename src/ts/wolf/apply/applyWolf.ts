@@ -6,7 +6,7 @@ import { readTextFile } from '../../libs/fileIO';
 import { validateWolfParallelApplySafety, type WolfParallelApplyPlan } from '../../libs/metadataValidation';
 import { AppContext } from '../../../appContext';
 import type { extData } from '../types';
-import type { WolfProjectPaths } from '../paths';
+import type { ResolvedWolfSource, WolfProjectPaths } from '../paths';
 import { resolveWolfExtractRootForApply, resolveWolfSourceFile } from '../paths';
 import { decodeEncoding, encodeEncoding } from '../../../utils';
 
@@ -69,9 +69,20 @@ export function normalizeWolfSources(
 ): NormalizedWolfSources {
   const normalizedCache: Record<string, Buffer> = {};
   const diskPaths: Record<string, string> = {};
+  // This normalization is synchronous. Resolve each raw path once within this
+  // call; aliases still pass the resolver and later applies revalidate the disk.
+  const resolvedSources = new Map<string, ResolvedWolfSource>();
+  const resolveSource = (sourceFile: string): ResolvedWolfSource => {
+    let resolved = resolvedSources.get(sourceFile);
+    if (!resolved) {
+      resolved = resolveWolfSourceFile(paths, sourceFile);
+      resolvedSources.set(sourceFile, resolved);
+    }
+    return resolved;
+  };
 
   for (const [sourceFile, bytes] of Object.entries(cache)) {
-    const resolved = resolveWolfSourceFile(paths, sourceFile);
+    const resolved = resolveSource(sourceFile);
     const existing = normalizedCache[resolved.sourceFile];
     const normalizedBytes = Buffer.from(bytes);
     if (existing && !existing.equals(normalizedBytes)) {
@@ -82,7 +93,7 @@ export function normalizeWolfSources(
   }
 
   const normalizedExt = ext.map((entry) => {
-    const resolved = resolveWolfSourceFile(paths, entry.sourceFile);
+    const resolved = resolveSource(entry.sourceFile);
     diskPaths[resolved.sourceFile] = resolved.diskPath;
     return {
       ...entry,

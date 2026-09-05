@@ -3,8 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const app = vi.hoisted(() => ({ setPath: vi.fn(), setAppLogsPath: vi.fn() }));
-vi.mock('electron', () => ({ app }));
+const app = vi.hoisted(() => ({ setPath: vi.fn(), setAppLogsPath: vi.fn(), once: vi.fn(), quit: vi.fn(), isPackaged: false }));
+const ipcMain = vi.hoisted(() => ({ once: vi.fn() }));
+vi.mock('electron', () => ({ app, ipcMain }));
 
 describe('UI harness profile isolation', () => {
   let workspace: string;
@@ -15,9 +16,12 @@ describe('UI harness profile isolation', () => {
     workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'ui-profile-test-'));
     vi.stubEnv('LLM_TSUKURU_UI_HARNESS_SCENARIO', '');
     vi.stubEnv('LLM_TSUKURU_UI_HARNESS_USER_DATA', '');
+    vi.stubEnv('LLM_TSUKURU_DEV_USER_DATA', '');
+    vi.stubEnv('LLM_TSUKURU_DEV_SMOKE', '');
   });
 
   afterEach(() => {
+    for (const [event, callback] of app.once.mock.calls) if (event === 'will-quit') callback();
     vi.unstubAllEnvs();
     fs.rmSync(workspace, { recursive: true, force: true });
   });

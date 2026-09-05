@@ -57,7 +57,7 @@ describe('provider registry', () => {
       credentialSettingKeys: ['llmApiKey'],
       secretSettingKeys: ['llmApiKey'],
       defaultModel: 'gemini-2.5-flash',
-      concurrencyCap: 1,
+      concurrencyCap: 8,
     });
     expect(defaultSettings.llmModel).toBe(getProviderRegistryEntry('gemini').defaultModel);
     expect(getProviderRegistryEntry('vertex')).toMatchObject({
@@ -65,26 +65,26 @@ describe('provider registry', () => {
       credentialSettingKeys: ['llmVertexServiceAccountJson', 'llmVertexLocation'],
       secretSettingKeys: ['llmVertexServiceAccountJson'],
       defaultModel: 'gemini-2.5-pro',
-      concurrencyCap: 1,
+      concurrencyCap: 8,
     });
     expect(getProviderRegistryEntry('openai')).toMatchObject({
       displayName: 'OpenAI',
       credentialSettingKeys: ['llmOpenAiApiKey'],
       secretSettingKeys: ['llmOpenAiApiKey'],
       defaultModel: 'gpt-4o-mini',
-      concurrencyCap: 2,
+      concurrencyCap: 8,
     });
     expect(getProviderRegistryEntry('custom-openai')).toMatchObject({
       displayName: 'OpenAI 호환 API',
       credentialSettingKeys: ['llmCustomBaseUrl', 'llmCustomApiKey'],
       secretSettingKeys: ['llmCustomApiKey'],
-      concurrencyCap: 2,
+      concurrencyCap: 8,
     });
     expect(getProviderRegistryEntry('claude')).toMatchObject({
       displayName: 'Claude',
       credentialSettingKeys: ['llmClaudeApiKey'],
       secretSettingKeys: ['llmClaudeApiKey'],
-      concurrencyCap: 2,
+      concurrencyCap: 8,
     });
   });
 

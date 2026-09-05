@@ -76,12 +76,14 @@ Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-speci
 
 - `providerTranslationBase.ts` owns common provider configuration and translation retry/chunk handling. `translationPrompt.ts` builds prompts, preserving the existing Google/standard wording variants. `translationCore.ts` shares API error parsing; `providerRegistry.ts` owns provider selection and cache/config fingerprints.
 - Compare and verify views derive filters and editing indicators from their source state with Vue computed values. Compare problem navigation includes unmatched blocks on either side.
+- Agent Workspace keeps environment and executable-detection responses per page instance, deriving preset readiness and the timeline from those signals without modifying shared preset definitions.
+- The file translation coordinator uses bounded async workers. Provider failures remain per-file results; completion-handler failures stop new work and propagate after in-flight workers settle, before the directory lock is released. Bulk translation and retranslation share the same line-array block parser.
 - JSON Verify uses the pure `setAtPath` from `src/ts/rpgmv/verify.ts` locally; the actual file write still goes through validated main-process IPC.
 
 ## Build and IPC Details
 
 - `tsconfig.main.json` extends `tsconfig.json` and compiles main-process code into `dist-main/`; Vite builds Vue into `dist-renderer/`. Generated output is not source.
-- Vue uses hash routing for packaged `file://` URLs. `useIpcOn` removes listeners on component unmount. Add IPC channels to the whitelist for their actual direction in `src/preload.ts`.
+- Vue uses hash routing for packaged `file://` URLs. `App.vue` receives global theme updates across routes. `useIpcOn` disposes only its own subscription on component unmount, using the unsubscribe callback returned by preload `api.on`. Add IPC channels to the whitelist for their actual direction in `src/preload.ts`.
 - Sub-window route components mount after `did-finish-load`. Main retains pending data until the component sends its ready signal from `onMounted`; see `toolsHandler.ts` for compare/verify examples.
 - Existing windows use `sandbox: false` for the current Node-dependent preload. This is an implementation dependency to reassess when changing preload, not a requirement for every future window.
 

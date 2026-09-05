@@ -12,10 +12,6 @@ const DEFAULT_REPRO_COMMANDS = {
   'harness-live': 'npm run harness:live',
 };
 
-function npmCommand() {
-  return 'npm';
-}
-
 function runCommand(command, args, options = {}) {
   const spawnOptions = {
     cwd: projectRoot,
@@ -60,12 +56,12 @@ function runCommand(command, args, options = {}) {
 
 function buildMainIfNeeded() {
   if (process.env.LLM_TSUKURU_SKIP_BUILD === '1') return;
-  runCommand(npmCommand(), ['run', 'build:ts']);
+  runCommand('npm', ['run', 'build:ts']);
 }
 
-function buildAppIfNeeded() {
+function buildAppIfNeeded(options = {}) {
   if (process.env.LLM_TSUKURU_SKIP_BUILD === '1') return;
-  runCommand(npmCommand(), ['run', 'build:app']);
+  runCommand('npm', ['run', 'build:app'], options);
 }
 
 function readJson(filePath) {
@@ -296,7 +292,6 @@ module.exports = {
   loadCompiledModule,
   makeTempDir,
   normalizeHarnessResult,
-  npmCommand,
   projectRoot,
   readJson,
   relativeArtifactPath,

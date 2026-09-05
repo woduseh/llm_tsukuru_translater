@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import { isSeparatorLine } from './translationSyntax';
+import { copyRetryMetadata, getProviderErrorStatus } from './providerRetry';
 
 export { isSeparatorLine, SEPARATOR_REGEX } from './translationSyntax';
 
@@ -43,7 +44,10 @@ export interface TranslationLog {
 }
 
 export function splitIntoBlocks(content: string): TranslationBlock[] {
-  const allLines = content.split('\n');
+  return splitFileBlocks(content.split('\n'));
+}
+
+export function splitFileBlocks(allLines: readonly string[]): TranslationBlock[] {
   const blocks: TranslationBlock[] = [];
   let currentSep = '';
   let currentLines: string[] = [];
@@ -153,8 +157,7 @@ export function getApiErrorMessage(error: unknown): string {
 }
 
 export function getApiErrorStatus(error: unknown): number | undefined {
-  const status = (error as { response?: { status?: unknown } })?.response?.status;
-  return typeof status === 'number' ? status : undefined;
+  return getProviderErrorStatus(error);
 }
 
 export function normalizeProviderApiError(error: unknown, provider: string, secret?: string): Error {
@@ -166,7 +169,7 @@ export function normalizeProviderApiError(error: unknown, provider: string, secr
     : status === 429 ? 'rate limit (429)'
       : (error as { code?: unknown })?.code === 'ECONNABORTED' ? 'timeout'
         : 'error';
-  return new Error(`${provider} API ${reason}: ${message}`);
+  return copyRetryMetadata(error, new Error(`${provider} API ${reason}: ${message}`));
 }
 
 export function isPermanentApiError(error: unknown): boolean {
@@ -178,6 +181,8 @@ export function isPermanentApiError(error: unknown): boolean {
 
 export function isRetryableApiError(error: unknown): boolean {
   if (!error) return false;
+  const status = getApiErrorStatus(error);
+  if (status === 429 || status === 500 || status === 502 || status === 503 || status === 504) return true;
   const msg = String((error as Record<string, unknown>).message || error).toLowerCase();
   return msg.includes('429') || msg.includes('503') || msg.includes('resource_exhausted')
     || msg.includes('rate limit') || msg.includes('quota') || msg.includes('overloaded')

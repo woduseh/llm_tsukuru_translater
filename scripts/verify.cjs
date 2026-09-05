@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const { spawn, execFileSync } = require('node:child_process');
 
 const projectRoot = path.resolve(__dirname, '..');
-const FAST = ['typecheck-main', 'typecheck-renderer', 'lint', 'unit'];
+const FAST = ['tooling', 'typecheck-main', 'typecheck-renderer', 'lint', 'unit'];
 
 function parseArgs(args) {
   const options = { full: false, plan: false, base: undefined };
@@ -60,7 +60,8 @@ function createPlan(files, options = {}) {
   }
   const checks = [...FAST];
   if (full || integration || ui) checks.push('clean-main', 'build-main');
-  if (full || ui) checks.push('build-renderer', 'build-mcp');
+  if (full || ui) checks.push('build-renderer');
+  if (full || integration || ui) checks.push('build-mcp');
   if (full || integration) checks.push('core', 'eval');
   if (full || ui) checks.push('ui');
   if (full) checks.push('package-smoke');
@@ -95,6 +96,7 @@ function definitions(plan, root) {
   const node = (args, depends = []) => ({ command: process.execPath, args, depends });
   const harness = (name, depends) => ({ ...node([`scripts/harness/${name}.cjs`], depends), harness: true });
   return {
+    tooling: node(['--test', '--experimental-test-isolation=none', 'test/tooling/*.test.cjs']),
     'typecheck-main': node([cli('typescript/bin/tsc'), '-p', 'tsconfig.main.json', '--noEmit']),
     'typecheck-renderer': node([cli('vue-tsc/bin/vue-tsc.js'), '-p', 'tsconfig.renderer.json', '--noEmit']),
     lint: node([cli('eslint/bin/eslint.js'), 'src/**/*.ts', 'src/renderer/**/*.vue', 'main.ts']),
@@ -103,7 +105,7 @@ function definitions(plan, root) {
     'build-main': node([cli('typescript/bin/tsc'), '-p', 'tsconfig.main.json'], ['clean-main']),
     'build-renderer': node([cli('vite/bin/vite.js'), 'build', '--config', 'vite.renderer.config.ts']),
     'build-mcp': node(['scripts/build-mcp-server.mjs']),
-    core: harness('core', ['build-main']),
+    core: harness('core', ['build-main', 'build-mcp']),
     eval: harness('eval', ['build-main']),
     ui: harness('ui', ['build-main', 'build-renderer', 'build-mcp']),
     'package-smoke': harness('package-smoke', []),
@@ -140,24 +142,59 @@ function writeReport(file, report) {
   fs.renameSync(temp, file);
 }
 
-async function runPlan(plan, options = {}) {
-  const root = options.root || projectRoot;
-  const execute = options.execute || executeCheck;
-  const fingerprint = options.fingerprint || (() => sourceFingerprint(root));
+function createRunReport(plan, root) {
   const id = `${new Date().toISOString().replace(/[:.]/g, '-')}-${process.pid}-${crypto.randomBytes(3).toString('hex')}`;
   const outputDir = path.join(root, 'artifacts', 'verify', id);
   fs.mkdirSync(outputDir, { recursive: true });
   const reportPath = path.join(outputDir, 'result.json');
   const latestPath = path.join(root, 'artifacts', 'verify', 'latest.json');
-  const report = { schemaVersion: 1, id, status: 'running', startedAt: new Date().toISOString(), node: process.version, ...plan, checks: [], sourceFingerprint: fingerprint(), reportPath };
+  const report = { schemaVersion: 1, id, status: 'running', startedAt: new Date().toISOString(), node: process.version, ...plan, checks: [], reportPath };
   const save = () => { writeReport(reportPath, report); writeReport(latestPath, report); };
+  return { outputDir, report, save };
+}
+
+function preparationFailureHint(error, phase) {
+  if (['EPERM', 'EACCES'].includes(error.code)) {
+    return `Verification could not complete ${phase}: the environment denied a required process or file operation. Check Git/process/file access before rerunning; this is not a test assertion failure.`;
+  }
+  if (phase.startsWith('git-')) {
+    return 'Verification could not prepare the checkout. Check that Git can run and the requested --base ref exists before rerunning.';
+  }
+  if (phase === 'check-definitions') {
+    return 'Verification could not resolve its check tools. Install dependencies from the lockfile with npm ci before rerunning.';
+  }
+  return `Verification could not complete ${phase}. Inspect the recorded error and rerun; no verified final checkout has been established.`;
+}
+
+function writePreparationFailure(root, error, phase, plan) {
+  const { report, save } = createRunReport(plan, root);
+  Object.assign(report, {
+    status: 'failed',
+    error: { message: error.message, code: error.code, phase },
+    failureHint: preparationFailureHint(error, phase),
+    completedAt: new Date().toISOString(),
+  });
+  save();
+  return report;
+}
+
+async function runPlan(plan, options = {}) {
+  const root = options.root || projectRoot;
+  const execute = options.execute || executeCheck;
+  const fingerprint = options.fingerprint || (() => sourceFingerprint(root));
+  const { outputDir, report, save } = createRunReport(plan, root);
   save();
   // Always validate this checkout; inherited opt-ins must not switch to a live
-  // provider, packaged executable, or reuse old compiled output.
+  // provider, packaged executable, another checkout's dev server, or reuse old
+  // compiled output. Electron must launch as the app, not as a Node process.
   const env = { ...process.env };
-  for (const key of ['LLM_TSUKURU_SKIP_BUILD', 'LLM_TSUKURU_UI_HARNESS_EXECUTABLE', 'LLM_TSUKURU_PACKAGE_SMOKE']) delete env[key];
+  for (const key of ['LLM_TSUKURU_SKIP_BUILD', 'LLM_TSUKURU_UI_HARNESS_EXECUTABLE', 'LLM_TSUKURU_PACKAGE_SMOKE', 'VITE_DEV_SERVER_URL', 'ELECTRON_RUN_AS_NODE']) delete env[key];
+  let phase = 'source-fingerprint';
   try {
+    report.sourceFingerprint = fingerprint();
+    phase = 'check-definitions';
     const specs = options.definitions || (plan.checks.length ? definitions(plan, root) : {});
+    phase = 'checks';
     for (const name of plan.checks) {
       const spec = specs[name];
       if (!spec) throw new Error(`Missing check definition: ${name}`);
@@ -187,7 +224,8 @@ async function runPlan(plan, options = {}) {
             if (evidence.schemaVersion !== 1 || evidence.suite !== `harness-${name}`
               || !allowedStatuses.includes(evidence.status) || evidence.fatal || evidence.failed > 0
               || !Array.isArray(evidence.cases) || evidence.cases.length === 0
-              || evidence.cases.some(c => !['passed', 'skipped'].includes(c.status))) {
+              || evidence.cases.some(c => !c || !allowedStatuses.includes(c.status))
+              || !evidence.cases.some(c => c.status === 'passed')) {
               throw new Error('Harness artifact is missing valid success evidence despite exit code 0');
             }
             record.harnessStatus = evidence.status;
@@ -204,33 +242,55 @@ async function runPlan(plan, options = {}) {
       }
       save();
     }
+    phase = 'final-source-fingerprint';
     report.finalSourceFingerprint = fingerprint();
     report.sourceChanged = report.sourceFingerprint !== report.finalSourceFingerprint;
     report.status = report.sourceChanged ? 'stale' : report.checks.some(check => ['failed', 'blocked'].includes(check.status)) ? 'failed' : report.checks.length ? 'passed' : 'skipped';
     if (report.sourceChanged) report.failureHint = 'Source changed during verification. Rerun against the final checkout; these results are stale.';
   } catch (error) {
     report.status = 'failed';
-    report.error = { message: error.message, code: error.code };
+    report.error = { message: error.message, code: error.code, phase };
+    report.failureHint = preparationFailureHint(error, phase);
   }
   report.completedAt = new Date().toISOString();
   save();
   return report;
 }
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
-  const files = changedFiles(projectRoot, options.base);
-  const plan = createPlan(files, options);
-  plan.base = options.base || 'HEAD';
-  plan.head = git(projectRoot, ['rev-parse', 'HEAD']).trim();
-  if (options.plan) { console.log(JSON.stringify(plan, null, 2)); return; }
-  console.log(`[verify] ${plan.mode}: ${files.length} changed files, ${plan.checks.length} checks`);
-  const result = await runPlan(plan);
+async function main(args = process.argv.slice(2), dependencies = {}) {
+  const root = dependencies.root || projectRoot;
+  let options;
+  let plan;
+  let phase = 'arguments';
+  try {
+    options = parseArgs(args);
+    phase = 'git-changes';
+    const files = (dependencies.changedFiles || changedFiles)(root, options.base);
+    plan = createPlan(files, options);
+    plan.base = options.base || 'HEAD';
+    phase = 'git-head';
+    plan.head = dependencies.readHead ? dependencies.readHead(root) : git(root, ['rev-parse', 'HEAD']).trim();
+  } catch (error) {
+    // Planning remains read-only, including failed planning attempts.
+    if (options?.plan || args.includes('--plan')) throw error;
+    console.error(`[verify] failed during ${phase}: ${error.message}`);
+    const report = writePreparationFailure(root, error, phase, plan || {
+      mode: options?.full ? 'full' : 'changed', base: options?.base || 'HEAD',
+      files: [], reasons: ['Verification stopped during preparation; no checks ran.'],
+    });
+    console.error(`[verify] ${report.failureHint}`);
+    console.log(`[verify] failed: ${report.reportPath}`);
+    return { exitCode: 1, report };
+  }
+  if (options.plan) { console.log(JSON.stringify(plan, null, 2)); return { exitCode: 0, plan }; }
+  console.log(`[verify] ${plan.mode}: ${plan.files.length} changed files, ${plan.checks.length} checks`);
+  const result = await runPlan(plan, { root });
   console.log(`[verify] ${result.status}: ${result.reportPath}`);
   if (!result.checks.length) console.log(plan.reasons.join('\n'));
   if (result.failureHint) console.error(result.failureHint);
-  process.exitCode = ['passed', 'skipped'].includes(result.status) ? 0 : 1;
+  return { exitCode: ['passed', 'skipped'].includes(result.status) ? 0 : 1, report: result };
 }
 
-module.exports = { parseArgs, changedFiles, createPlan, sourceFingerprint, definitions, executeCheck, runPlan };
-if (require.main === module) main().catch(error => { console.error(`[verify] ${error.stack || error}`); process.exitCode = 1; });
+module.exports = { parseArgs, changedFiles, createPlan, sourceFingerprint, definitions, executeCheck, runPlan, main };
+if (require.main === module) main().then(result => { process.exitCode = result.exitCode; })
+  .catch(error => { console.error(`[verify] ${error.stack || error}`); process.exitCode = 1; });

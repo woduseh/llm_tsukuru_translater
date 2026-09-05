@@ -29,14 +29,37 @@
     </div>
 
     <div class="form-group">
-      <label for="parallelWorkers">동시 번역 파일 수</label>
-      <select id="parallelWorkers" class="select-input" v-model.number="parallelWorkers">
-        <option :value="1">1 (기본, 가장 안전)</option>
+      <label for="parallelWorkers">동시 API 요청 수</label>
+      <select id="parallelWorkers" class="select-input" v-model.number="parallelWorkers" aria-describedby="parallelWorkersHint" :aria-invalid="concurrencyError ? 'true' : 'false'">
+        <option :value="1">1 (기본)</option>
         <option :value="2">2</option>
         <option :value="3">3</option>
         <option :value="4">4</option>
+        <option v-if="savedConcurrencyOption !== undefined" :value="savedConcurrencyOption">{{ savedConcurrencyOption }} (저장된 값)</option>
+        <option :value="8">8 (고급)</option>
       </select>
+      <p id="parallelWorkersHint" class="field-hint">여러 파일과 청크의 API 요청을 합산한 동시 실행 한도예요.</p>
+      <p v-if="currentProvider === 'gemini'" class="field-hint">Gemini Flash latest는 무료 사용 또는 한도를 아직 확인하지 않았다면 1로 시작하세요.</p>
+      <p class="field-hint">유료 사용은 2로 시작해 실제 RPM/TPM 여유를 확인한 뒤 4로 늘리세요. 8은 충분히 측정한 뒤 사용하는 고급 설정이에요.</p>
     </div>
+
+    <div class="form-group">
+      <label for="requestsPerMinute">분당 API 요청 수 (RPM)</label>
+      <input
+        id="requestsPerMinute"
+        type="number"
+        class="select-input"
+        v-model.number="requestsPerMinute"
+        min="0"
+        :max="MAX_TRANSLATION_RPM"
+        step="1"
+        aria-describedby="requestsPerMinuteHint"
+        :aria-invalid="rpmError ? 'true' : 'false'"
+      />
+      <p id="requestsPerMinuteHint" class="field-hint">0이면 앱의 별도 RPM 속도 제한을 적용하지 않아요. 동시 API 요청 수 제한은 유지돼요.</p>
+      <p class="field-hint">{{ currentProvider === 'gemini' ? 'AI Studio' : '제공자 콘솔' }}에 표시된 실제 RPM의 80%를 시작값으로 권장해요. 이 앱이 권장하는 여유폭이며, TPM 한도도 따로 확인하세요.</p>
+    </div>
+    <p v-if="requestSettingsError" id="requestSettingsError" class="validation-error" role="alert">{{ requestSettingsError }}</p>
 
     <section class="guideline-panel" data-harness-guideline-panel>
       <div class="panel-header">
@@ -106,14 +129,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import Swal from 'sweetalert2'
-import { api } from '../composables/useIpc'
+import { api, useIpcOn } from '../composables/useIpc'
 import { getRendererLlmProviderUiText } from '../../types/llmProviderContract'
+import { MAX_TRANSLATION_CONCURRENCY, MAX_TRANSLATION_RPM } from '../../ts/libs/translationRequestScheduler'
 import type { ProjectTranslationProfile } from '../../ts/libs/projectProfile'
 
 const translationMode = ref('untranslated')
 const resetProgress = ref(false)
 const sortOrder = ref('name-asc')
-const parallelWorkers = ref(1)
+const parallelWorkers = ref<number | string>(1)
+const requestsPerMinute = ref<number | string>(0)
 const llmReady = ref(false)
 const currentProvider = ref('gemini')
 const sourceLang = ref('ja')
@@ -122,8 +147,18 @@ const providerConfigHint = computed(() => getRendererLlmProviderUiText(currentPr
 const missingConfigMessage = computed(() => getRendererLlmProviderUiText(currentProvider.value).missingConfigMessage)
 const submitted = ref(false)
 const feedbackMessage = ref('')
-const startDisabled = computed(() => !llmReady.value || submitted.value)
-const startButtonTitle = computed(() => llmReady.value ? '선택한 옵션으로 번역을 시작합니다' : missingConfigMessage.value)
+const concurrencyError = computed(() => typeof parallelWorkers.value === 'number'
+  && Number.isInteger(parallelWorkers.value) && parallelWorkers.value >= 1 && parallelWorkers.value <= MAX_TRANSLATION_CONCURRENCY
+  ? '' : `동시 API 요청 수는 1~${MAX_TRANSLATION_CONCURRENCY} 범위의 정수로 선택하세요.`)
+const rpmError = computed(() => typeof requestsPerMinute.value === 'number'
+  && Number.isInteger(requestsPerMinute.value) && requestsPerMinute.value >= 0 && requestsPerMinute.value <= MAX_TRANSLATION_RPM
+  ? '' : `RPM은 0~${MAX_TRANSLATION_RPM} 범위의 정수로 입력하세요. 0은 별도 RPM 제한 없음이에요.`)
+const requestSettingsError = computed(() => concurrencyError.value || rpmError.value)
+const savedConcurrencyOption = computed(() => typeof parallelWorkers.value === 'number'
+  && !concurrencyError.value && ![1, 2, 3, 4, 8].includes(parallelWorkers.value) ? parallelWorkers.value : undefined)
+const startDisabled = computed(() => !llmReady.value || submitted.value || !!requestSettingsError.value)
+const startButtonTitle = computed(() => !llmReady.value ? missingConfigMessage.value
+  : requestSettingsError.value || '선택한 옵션으로 번역을 시작합니다')
 
 const profile = ref<ProjectTranslationProfile | null>(null)
 const guidelineDraft = ref('')
@@ -149,21 +184,16 @@ const profileSummary = computed(() => {
 const currentPromptCharCount = computed(() => currentCustomPrompt.value.length)
 
 onMounted(() => {
-  api.on('llmSettings', (arg: unknown) => {
+  useIpcOn('llmSettings', (arg: unknown) => {
     const s = arg as Record<string, any>
     sortOrder.value = s.llmSortOrder || 'name-asc'
-    parallelWorkers.value = Number.isInteger(s.llmParallelWorkers) ? s.llmParallelWorkers : 1
+    parallelWorkers.value = s.llmParallelWorkers === undefined ? 1 : s.llmParallelWorkers
+    requestsPerMinute.value = s.llmRequestsPerMinute === undefined ? 0 : s.llmRequestsPerMinute
     llmReady.value = !!s.llmReady
     currentProvider.value = typeof s.llmProvider === 'string' ? s.llmProvider : 'gemini'
     sourceLang.value = typeof s.llmSourceLang === 'string' ? s.llmSourceLang : 'ja'
     targetLang.value = typeof s.llmTargetLang === 'string' ? s.llmTargetLang : 'ko'
     currentCustomPrompt.value = typeof s.llmCustomPrompt === 'string' ? s.llmCustomPrompt : ''
-    if (s.themeData) {
-      const root = document.documentElement
-      for (const [key, val] of Object.entries(s.themeData as Record<string, string>)) {
-        root.style.setProperty(key, val)
-      }
-    }
   })
   api.send('llmSettingsReady')
 })
@@ -241,6 +271,7 @@ async function applyGuideline() {
 
 function start() {
   if (submitted.value) return
+  if (requestSettingsError.value) return
   if (!llmReady.value) {
     feedbackMessage.value = missingConfigMessage.value
     Swal.fire({
@@ -259,6 +290,7 @@ function start() {
     llmResetProgress: resetProgress.value,
     llmSortOrder: sortOrder.value,
     llmParallelWorkers: parallelWorkers.value,
+    llmRequestsPerMinute: requestsPerMinute.value,
     llmTranslationMode: translationMode.value,
   })
 }
@@ -303,6 +335,8 @@ h3 { font-size: 15px; margin: 0 0 6px; }
   display: flex; align-items: center; gap: 8px; cursor: pointer;
 }
 .hint { font-size: 12px; color: var(--subtle); }
+.field-hint { margin: 6px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.validation-error { margin: 8px 0 14px; font-size: 12px; color: var(--Danger, #ff9b9b); }
 .config-hint { font-size: 12px; color: var(--muted); margin-top: 16px; }
 .guideline-panel {
   margin-top: 20px; padding: 15px; border: var(--border); border-radius: 8px;

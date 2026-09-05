@@ -1,5 +1,6 @@
 import type { AppSettings } from '../../types/settings';
 import type { LlmProviderSecretSettingKey } from '../../types/llmProviderContract';
+import { normalizeTranslationConcurrency, normalizeTranslationRpm } from './translationRequestScheduler';
 import {
   getAllProviderSecretSettingKeys,
   getProviderRegistryEntry,
@@ -16,6 +17,7 @@ export type LlmSettingsValidation = ProviderReadinessValidation;
 export interface LlmStartWindowState extends Pick<LlmSettingsValidation, 'llmProvider' | 'llmVertexLocation' | 'llmReady' | 'llmHasApiKey' | 'llmHasVertexServiceAccountJson'> {
   llmSortOrder: string;
   llmParallelWorkers: number;
+  llmRequestsPerMinute: number;
   llmSourceLang: string;
   llmTargetLang: string;
   llmCustomPrompt: string;
@@ -63,7 +65,8 @@ export function validateLlmSettings(settings: AppSettings): LlmSettingsValidatio
 export function buildLlmStartWindowState(settings: AppSettings): LlmStartWindowState {
   return {
     llmSortOrder: settings.llmSortOrder || 'name-asc',
-    llmParallelWorkers: settings.llmParallelWorkers || 1,
+    llmParallelWorkers: normalizeTranslationConcurrency(settings.llmParallelWorkers),
+    llmRequestsPerMinute: normalizeTranslationRpm(settings.llmRequestsPerMinute),
     llmSourceLang: settings.llmSourceLang || 'ja',
     llmTargetLang: settings.llmTargetLang || 'ko',
     llmCustomPrompt: settings.llmCustomPrompt || '',

@@ -6,6 +6,7 @@ import { settings as defaultSettings } from '../rpgmv/datas';
 import { isBoolean, isNumber, isRecord, isString } from '../../types/guards';
 import { LLM_PROVIDER_METADATA } from '../../types/llmProviderContract';
 import { isKnownLlmProvider } from './providerRegistry';
+import { MAX_TRANSLATION_CONCURRENCY, MAX_TRANSLATION_RPM } from './translationRequestScheduler';
 
 const BOOLEAN_KEYS = [
   'extractJs',
@@ -52,7 +53,8 @@ const INTEGER_RANGE_RULES = {
   llmMaxApiRetries: { min: 0, max: 20 },
   llmTimeout: { min: 30, max: 3600 },
   llmMaxTokens: { min: 1, max: 200000 },
-  llmParallelWorkers: { min: 1, max: 16 },
+  llmParallelWorkers: { min: 1, max: MAX_TRANSLATION_CONCURRENCY },
+  llmRequestsPerMinute: { min: 0, max: MAX_TRANSLATION_RPM },
 } as const;
 
 const TRANSLATION_UNITS = ['chunk', 'file'] as const;

@@ -4,17 +4,19 @@ import { createApp, nextTick, type App } from 'vue'
 import path from 'node:path'
 import LlmComparePage from '../../src/renderer/views/LlmComparePage.vue'
 
-const { listeners, send } = vi.hoisted(() => ({
-  listeners: new Map<string, (...args: string[]) => unknown>(),
-  send: vi.fn(),
-}))
-vi.mock('../../src/renderer/composables/useIpc', () => ({
-  api: {
-    on: (channel: string, callback: (...args: string[]) => unknown) => listeners.set(channel, callback),
+const { listeners, send } = vi.hoisted(() => {
+  const listeners = new Map<string, (...args: string[]) => unknown>()
+  const send = vi.fn()
+  window.api = {
+    on: (channel: string, callback: (...args: string[]) => unknown) => {
+      listeners.set(channel, callback)
+      return () => listeners.delete(channel)
+    },
     removeAllListeners: (channel: string) => listeners.delete(channel),
     send,
-  },
-}))
+  } as unknown as Window['api']
+  return { listeners, send }
+})
 
 describe('compare page editing', () => {
   let app: App

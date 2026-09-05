@@ -9,7 +9,6 @@ const {
   defaultExport,
   loadCompiledModule,
   makeTempDir,
-  npmCommand,
   projectRoot,
   runCases,
   runCommand,
@@ -186,6 +185,7 @@ async function runBundledMcpStartupFailure(projectPath, timeoutMs = 5000) {
 
 async function main() {
   buildMainIfNeeded();
+  if (process.env.LLM_TSUKURU_SKIP_BUILD !== '1') runCommand('npm', ['run', 'build:mcp']);
 
   const translationCore = loadCompiledModule('src/ts/libs/translationCore.js');
   const llmProviderConfig = loadCompiledModule('src/ts/libs/llmProviderConfig.js');
@@ -218,7 +218,6 @@ async function main() {
       id: 'bundled-mcp-stdio',
       title: 'bundled MCP server completes a real stdio handshake and tool call',
       run: async () => {
-        runCommand(npmCommand(), ['run', 'build:mcp']);
         const workspace = makeTempDir('llm-tsukuru-mcp-bundle-');
         try {
           const response = await runBundledMcpConversation(workspace);
