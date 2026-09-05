@@ -1,4 +1,5 @@
 <template>
+  <section class="translation-page" :class="{ embedded }">
   <div id="container" data-harness-view="llm-settings" :data-llm-ready="llmReady ? 'true' : 'false'" :data-provider="currentProvider">
     <p class="window-eyebrow">TRANSLATION JOB</p>
     <h2>번역</h2>
@@ -122,6 +123,7 @@
         id="guidelineDraft"
         class="guideline-textarea"
         v-model="guidelineDraft"
+        :disabled="generateBusy || applyBusy"
         placeholder="프로필 스캔 후 지침 생성을 누르면 여기에 초안이 표시됩니다."
         data-harness-guideline-draft
       ></textarea>
@@ -143,7 +145,7 @@
   </div>
 
   <div class="button-bar">
-    <button class="btn" @click="cancel">취소</button>
+    <button class="btn" @click="cancel">{{ embedded ? '이전 작업으로' : '취소' }}</button>
     <button
       class="btn primary"
       :disabled="startDisabled"
@@ -152,15 +154,20 @@
       @click="start"
     >{{ submitted ? '시작 중...' : '번역 시작' }}</button>
   </div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import Swal from 'sweetalert2'
+import { workspaceOperationRunning } from '../composables/useWorkspaceNavigation'
+import { mergeWorkspaceDraft, workspaceDrafts } from '../composables/useWorkspaceDrafts'
 import { api, useIpcOn } from '../composables/useIpc'
 import { getRendererLlmProviderMetadata, getRendererLlmProviderUiText } from '../../types/llmProviderContract'
 import { MAX_TRANSLATION_CONCURRENCY, MAX_TRANSLATION_RPM } from '../../ts/libs/translationRequestScheduler'
 import type { ProjectTranslationProfile } from '../../ts/libs/projectProfile'
+
+const { embedded = false } = defineProps<{ embedded?: boolean }>()
 
 const translationMode = ref('untranslated')
 const resetProgress = ref(false)
@@ -188,8 +195,8 @@ const requestSettingsError = computed(() => concurrencyError.value || rpmError.v
 watch(requestSettingsError, error => { if (error) advancedOpen.value = true })
 const savedConcurrencyOption = computed(() => typeof parallelWorkers.value === 'number'
   && !concurrencyError.value && ![1, 2, 3, 4, 8].includes(parallelWorkers.value) ? parallelWorkers.value : undefined)
-const startDisabled = computed(() => !llmReady.value || submitted.value || !!requestSettingsError.value)
-const startButtonTitle = computed(() => !llmReady.value ? missingConfigMessage.value
+const startDisabled = computed(() => !llmReady.value || workspaceOperationRunning() || !!requestSettingsError.value)
+const startButtonTitle = computed(() => workspaceOperationRunning() ? '현재 작업을 마친 뒤 번역을 시작하세요.' : !llmReady.value ? missingConfigMessage.value
   : requestSettingsError.value || '선택한 옵션으로 번역을 시작합니다')
 
 const profile = ref<ProjectTranslationProfile | null>(null)
@@ -215,20 +222,52 @@ const profileSummary = computed(() => {
 })
 const currentPromptCharCount = computed(() => currentCustomPrompt.value.length)
 
+const executionSnapshot = () => ({ sortOrder: sortOrder.value, parallelWorkers: parallelWorkers.value, requestsPerMinute: requestsPerMinute.value, translationMode: translationMode.value, resetProgress: resetProgress.value })
+let executionBaseline = executionSnapshot()
+let appliedDraft = ''
+watch([sortOrder, parallelWorkers, requestsPerMinute, translationMode, resetProgress, guidelineDraft], () => {
+  workspaceDrafts.translationDirty = JSON.stringify(executionSnapshot()) !== JSON.stringify(executionBaseline) || guidelineDraft.value !== appliedDraft
+}, { flush: 'sync' })
+watch([submitted, scanBusy, generateBusy, applyBusy], () => {
+  workspaceDrafts.translationBusy = submitted.value || scanBusy.value || generateBusy.value || applyBusy.value
+}, { flush: 'sync' })
+onUnmounted(() => {
+  workspaceDrafts.translationDirty = false
+  workspaceDrafts.translationBusy = false
+})
+
 onMounted(() => {
   useIpcOn('llmSettings', (arg: unknown) => {
     const s = arg as Record<string, any>
-    sortOrder.value = s.llmSortOrder || 'name-asc'
-    parallelWorkers.value = s.llmParallelWorkers === undefined ? 1 : s.llmParallelWorkers
-    requestsPerMinute.value = s.llmRequestsPerMinute === undefined ? 0 : s.llmRequestsPerMinute
+    const incoming = { ...executionBaseline,
+      sortOrder: s.llmSortOrder || 'name-asc',
+      parallelWorkers: s.llmParallelWorkers === undefined ? 1 : s.llmParallelWorkers,
+      requestsPerMinute: s.llmRequestsPerMinute === undefined ? 0 : s.llmRequestsPerMinute,
+    }
+    const merged = mergeWorkspaceDraft(executionSnapshot(), executionBaseline, incoming)
+    executionBaseline = incoming
+    sortOrder.value = merged.sortOrder
+    parallelWorkers.value = merged.parallelWorkers
+    requestsPerMinute.value = merged.requestsPerMinute
     llmReady.value = !!s.llmReady
     currentProvider.value = typeof s.llmProvider === 'string' ? s.llmProvider : 'gemini'
     currentModel.value = typeof s.llmModel === 'string' ? s.llmModel : ''
     sourceLang.value = typeof s.llmSourceLang === 'string' ? s.llmSourceLang : 'ja'
     targetLang.value = typeof s.llmTargetLang === 'string' ? s.llmTargetLang : 'ko'
     currentCustomPrompt.value = typeof s.llmCustomPrompt === 'string' ? s.llmCustomPrompt : ''
+    workspaceDrafts.translationDirty = JSON.stringify(executionSnapshot()) !== JSON.stringify(executionBaseline) || guidelineDraft.value !== appliedDraft
   })
-  api.send('llmSettingsReady')
+  useIpcOn('llmSettingsApplyResult', (arg: { success: boolean }) => {
+    submitted.value = false
+    if (arg.success) {
+      executionBaseline = executionSnapshot()
+      workspaceDrafts.translationDirty = guidelineDraft.value !== appliedDraft
+      feedbackMessage.value = '번역 작업이 시작되었습니다. 프로젝트에서 진행 상황을 확인하세요.'
+    } else {
+      feedbackMessage.value = '번역을 시작하지 못했습니다. 프로젝트와 설정을 확인하세요.'
+    }
+  })
+  if (!embedded) api.send('llmSettingsReady')
 })
 
 function languageLabel(language: string): string {
@@ -295,6 +334,8 @@ async function applyGuideline() {
       mode: guidelineMergeMode.value,
     }) as { llmCustomPrompt?: string }
     currentCustomPrompt.value = result.llmCustomPrompt || currentCustomPrompt.value
+    appliedDraft = guidelineDraft.value
+    workspaceDrafts.translationDirty = JSON.stringify(executionSnapshot()) !== JSON.stringify(executionBaseline)
     feedbackMessage.value = '번역 지침이 사용자 프롬프트에 반영되었습니다.'
     await Swal.fire({
       icon: 'success',
@@ -313,7 +354,7 @@ async function applyGuideline() {
 }
 
 function start() {
-  if (submitted.value) return
+  if (workspaceOperationRunning()) return
   if (requestSettingsError.value) return
   if (!llmReady.value) {
     feedbackMessage.value = missingConfigMessage.value
@@ -357,9 +398,12 @@ function showError(title: string, text: string) {
     color: 'var(--mainColor)',
   })
 }
+onActivated(() => { if (embedded) api.send('llmSettingsReady') })
 </script>
 
 <style scoped>
+.translation-page { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.translation-page.embedded #container { width: 100%; max-width: 1040px; align-self: center; box-sizing: border-box; }
 #container {
   padding: 22px 26px; flex: 1; overflow-y: auto;
 }

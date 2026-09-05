@@ -14,12 +14,13 @@ const mocks = vi.hoisted(() => ({
   existsSync: vi.fn(() => false),
   retranslateFile: vi.fn(),
   retranslateBlocks: vi.fn(),
+  compareContents: { send: vi.fn() },
 }));
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() }, ipcMain: { on: mocks.on, handle: mocks.handle } }));
 vi.mock('fs', () => ({ default: { existsSync: mocks.existsSync } }));
 vi.mock('../../src/ipc/shared', () => ({ storage: { set: mocks.storageSet } }));
 vi.mock('../../src/ipc/toolsHandler', () => ({
-  getLLMCompareWindow: () => ({ isDestroyed: mocks.isDestroyed, webContents: { send: mocks.send } }),
+  getLLMCompareWindow: () => ({ isDestroyed: mocks.isDestroyed, webContents: mocks.compareContents }),
 }));
 vi.mock('../../src/ts/rpgmv/translator.js', () => ({
   retranslateFile: mocks.retranslateFile,
@@ -35,7 +36,10 @@ function handler(registrations: typeof mocks.on, channel: string) {
   return entry[1];
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.compareContents.send = mocks.send;
+});
 
 describe('translation request settings IPC', () => {
   it.each([
@@ -81,7 +85,7 @@ describe('retranslation IPC', () => {
       return { success: true };
     });
     registerTranslateHandlers(ctx);
-    await handler(mocks.on, `retranslate${kind}`)({}, request);
+    await handler(mocks.on, `retranslate${kind}`)({ sender: mocks.compareContents }, request);
 
     const args = [kind === 'File' ? path.join(request.dir, 'Extract') : path.join(request.dir, '_Extract', 'Texts'), request.fileName];
     expect(translator).toHaveBeenCalledWith(...args, ...(kind === 'Blocks' ? [request.blockIndices] : []), 'en', 'ko', ctx, expect.any(Function), 'original');
@@ -94,7 +98,7 @@ describe('retranslation IPC', () => {
   it('reports a rejected translation on its corresponding completion channel', async () => {
     mocks.retranslateBlocks.mockRejectedValue(new Error('failed'));
     registerTranslateHandlers(new AppContext());
-    await handler(mocks.on, 'retranslateBlocks')({}, request);
+    await handler(mocks.on, 'retranslateBlocks')({ sender: mocks.compareContents }, request);
     expect(mocks.send).toHaveBeenCalledWith('retranslateBlocksDone', expect.objectContaining({ success: false, error: 'failed', requestId: 'request-1' }));
   });
 
@@ -102,7 +106,14 @@ describe('retranslation IPC', () => {
     mocks.isDestroyed.mockReturnValueOnce(true);
     mocks.retranslateFile.mockResolvedValue({ success: true });
     registerTranslateHandlers(new AppContext());
-    await handler(mocks.on, 'retranslateFile')({}, request);
+    await handler(mocks.on, 'retranslateFile')({ sender: mocks.compareContents }, request);
+    expect(mocks.send).not.toHaveBeenCalled();
+  });
+
+  it('rejects retranslation from another renderer', async () => {
+    registerTranslateHandlers(new AppContext());
+    await handler(mocks.on, 'retranslateFile')({ sender: {} }, request);
+    expect(mocks.retranslateFile).not.toHaveBeenCalled();
     expect(mocks.send).not.toHaveBeenCalled();
   });
 });

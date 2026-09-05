@@ -42,7 +42,7 @@ Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-speci
 
 - `HomePage.vue`: entry landing page
 - `MvMzPage.vue` and `WolfPage.vue`: main operator screens
-- `LlmSettingsPage.vue`: translation-launch window
+- `LlmSettingsPage.vue`: translation-launch tab (also supports a standalone window)
 - `LlmComparePage.vue`: block mismatch and untranslated review
 - `JsonVerifyPage.vue`: structural verification, repair, and LLM shift repair
 - `AgentWorkspacePage.vue`: approval queue, environment status, MCP setup, CLI presets, and real terminal sessions
@@ -60,6 +60,30 @@ instructions; request tuning and guideline generation are expandable. Compare an
 keep selected-item actions contextual and file-wide operations expandable. Native checkbox
 labels support keyboard selection; the comparison editor exposes line/structure diagnostics
 without modifying separators or intentional empty lines.
+
+### Single-window workspace
+
+Main-window requests for translation, comparison, JSON verification, and settings now send
+`workspaceNavigate` instead of creating another BrowserWindow. `App.vue` owns the persistent
+title bar, project header, review navigation, and activity status. Its project-keyed KeepAlive
+preserves each tool's editing state when switching tabs, including through home and AI tools.
+Selecting a different project disposes all cached views. Before opening the native project
+picker, the renderer blocks active operations and confirms discarding unsaved text/settings/drafts.
+Inline settings open/save/close must never emit `worked`: that signal belongs to project operations.
+Standalone tool callers retain their window behavior; inline close actions navigate back and must
+never close `ctx.mainWindow`.
+
+`useReviewWorkspace` shares measured counts and the current filename between text and JSON
+review. Exact filename stems link the two views; this does not infer JSON-path-to-block mapping.
+First mounts send `compareReady`/`verifyReady` with `fresh: true`, while KeepAlive reactivations
+request readiness without discarding edits. Explicit disk reload/recheck actions refresh external
+changes and confirm discarding outstanding edits or repair previews. Wolf text status reads
+`_Extract/Texts`; JSON review is available for MV/MZ only.
+
+`useWorkspaceDrafts` retains locally edited fields when refreshed persisted settings arrive.
+Settings save success/failure and translation-submit acknowledgements release their own UI locks.
+The AI tool tab can prepare a read-only review prompt for the selected file; preparation neither
+starts a CLI nor transmits the file. The existing terminal and mutation-approval flow remain explicit.
 
 ## Agent and MCP Boundaries
 

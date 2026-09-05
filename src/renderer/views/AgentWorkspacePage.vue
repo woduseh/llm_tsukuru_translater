@@ -13,6 +13,16 @@
 
     <AgentApprovalQueue :focus-approval-id="focusApprovalId" />
 
+    <section v-if="reviewWorkspace.focusedFile && activeProject.path" class="review-context panel" data-harness-ai-review-context>
+      <div>
+        <p class="eyebrow">현재 검수 문맥</p>
+        <h2>{{ reviewWorkspace.focusedFile }}</h2>
+        <p>선택한 파일의 번역과 구조를 검토할 요청을 준비해요. 실행 전 프롬프트를 확인할 수 있어요.</p>
+      </div>
+      <button type="button" class="btn-secondary" @click="selectedPrompt = reviewPrompt">검토 프롬프트 준비</button>
+      <pre>{{ reviewPrompt }}</pre>
+    </section>
+
     <section class="workspace-grid">
       <div class="panel navigator">
         <h2>명령 프리셋</h2>
@@ -198,6 +208,8 @@ import TitleBar from '../components/TitleBar.vue'
 import AgentTerminalPane from '../components/AgentTerminalPane.vue'
 import AgentApprovalQueue from '../components/AgentApprovalQueue.vue'
 import { api } from '../composables/useIpc'
+import { activeProject } from '../composables/useProjectSession'
+import { reviewWorkspace } from '../composables/useReviewWorkspace'
 import {
   createAgentWorkspaceViewModel,
   chooseActiveTerminalSessionId,
@@ -224,6 +236,13 @@ const { refresh: refreshApprovals } = useMutationApprovals()
 const activeAgentPresetId = ref<AgentCliPreset['id']>(workspaceTemplate.agentPresets[0].id)
 const activeCommandPresetId = ref('')
 const selectedPrompt = ref('')
+const reviewPrompt = computed(() => [
+  `프로젝트: ${activeProject.path}`,
+  `검수 파일: ${reviewWorkspace.focusedFile}`,
+  '이 파일과 대응하는 원문·번역 데이터를 찾아 문맥, 용어 일관성, 구분자, 빈 줄, 제어 코드를 검토해 주세요.',
+  '같은 파일명이라도 JSON 위치와 텍스트 블록이 일치한다고 추측하지 말고 실제 대응 관계를 확인하세요.',
+  '먼저 문제와 근거를 보고하고 수정 제안을 제시해 주세요. 파일을 직접 변경하지 마세요.',
+].join('\n'))
 const liveStatus = ref<AgentWorkspaceStatus | null>(null)
 const executableDetections = ref<AgentExecutableDetectionResult | null>(null)
 const workspace = computed(() => ({
@@ -430,6 +449,11 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
 </script>
 
 <style scoped>
+.review-context { margin-bottom: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.review-context > div { flex: 1; min-width: 0; }
+.review-context p { color: var(--muted); font-size: 12px; }
+.review-context pre { width: 100%; padding: 12px; background: var(--Highlight2); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); font-size: 12px; }
+
 .agent-workspace {
   flex: 1;
   overflow: auto;

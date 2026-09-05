@@ -24,6 +24,7 @@ export const RECEIVE_CHANNELS = [
   'initVerify', 'verifySettings', 'verifyLlmRepairProgress', 'verifyLlmRepairDone', 'verifyApplyJsonDone',
   'set-allowed-paths', 'replace-allowed-paths',
   'terminalEvent', 'terminalSessions', 'approvalQueueChanged',
+  'workspaceNavigate', 'settingsSaved', 'settingsSaveFailed', 'llmSettingsApplyResult',
 ] as const;
 
 export type SendChannel = typeof SEND_CHANNELS[number];

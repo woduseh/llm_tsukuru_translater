@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp, nextTick, type App } from 'vue'
+import { workspaceDrafts } from '../../src/renderer/composables/useWorkspaceDrafts'
 import LlmSettingsPage from '../../src/renderer/views/LlmSettingsPage.vue'
 
 const { listeners, send } = vi.hoisted(() => {
@@ -128,4 +129,28 @@ describe('translation request settings page', () => {
 
     expect(send).toHaveBeenCalledWith('llmSettingsApply', expect.objectContaining({ llmParallelWorkers: 6, llmRequestsPerMinute: 60 }))
   })
+  it('refreshes the saved profile while retaining edited execution options and guideline drafts', async () => {
+    await setRpm('120')
+    const draft = host.querySelector<HTMLTextAreaElement>('#guidelineDraft')!
+    draft.value = 'Keep character names consistent'
+    draft.dispatchEvent(new Event('input', { bubbles: true }))
+    await loadSettings({ llmModel: 'updated-model', llmSourceLang: 'en', llmTargetLang: 'ko', llmRequestsPerMinute: 30 })
+    expect(host.querySelector<HTMLInputElement>('#requestsPerMinute')!.value).toBe('120')
+    expect(host.querySelector('.job-summary')!.textContent).toContain('updated-model')
+    expect(draft.value).toBe('Keep character names consistent')
+    expect(workspaceDrafts.translationDirty).toBe(true)
+  })
+
+  it('releases the submit lock on a failed start without losing selected options', async () => {
+    await setRpm('120')
+    startButton().click()
+    expect(workspaceDrafts.translationBusy).toBe(true)
+    listeners.get('llmSettingsApplyResult')!({ success: false })
+    await nextTick()
+    expect(startButton().disabled).toBe(false)
+    expect(workspaceDrafts.translationBusy).toBe(false)
+    expect(workspaceDrafts.translationDirty).toBe(true)
+    expect(host.querySelector<HTMLInputElement>('#requestsPerMinute')!.value).toBe('120')
+  })
+
 });

@@ -150,14 +150,16 @@ describe('renderer IPC ownership', () => {
       ['/json-verify', 'verifySettings'],
       ['/', 'getGlobalSettings'],
     ]
+    const cachedConsumers = new Set<string>()
     for (const [index, [route, channel]] of visits.entries()) {
       await router.push(route)
       await nextTick()
+      if (channel !== 'getGlobalSettings') cachedConsumers.add(channel)
       expect(ipcRenderer.listenerCount('getGlobalSettings'), route).toBe(1)
       for (const settingsChannel of ['settings', 'llmSettings', 'verifySettings']) {
-        // Each subwindow has its page data consumer and the app theme consumer.
+        // Cached workspace tabs retain exactly one data consumer plus the app theme consumer.
         expect(ipcRenderer.listenerCount(settingsChannel), `${route}: ${settingsChannel}`)
-          .toBe(settingsChannel === channel ? 2 : 1)
+          .toBe(cachedConsumers.has(settingsChannel) ? 2 : 1)
       }
       const color = `rgb(${index}, 20, 30)`
       ipcRenderer.emit(channel, {}, {

@@ -51,21 +51,22 @@ import { api, useIpcOn } from '../composables/useIpc'
 import TitleBar from '../components/TitleBar.vue'
 import ProjectSnapshot from '../components/ProjectSnapshot.vue'
 import { useProjectSession } from '../composables/useProjectSession'
+import { chooseWorkspaceProject, workspaceOperationRunning } from '../composables/useWorkspaceNavigation'
 import Swal from 'sweetalert2'
 
 const { folderPath, mode, running } = useProjectSession('wolf')
 const hasFolder = computed(() => folderPath.value.trim().length > 0)
 const hasMode = computed(() => mode.value === 0 || mode.value === 1)
-const canRun = computed(() => hasFolder.value && hasMode.value && !running.value)
+const canRun = computed(() => hasFolder.value && hasMode.value && !workspaceOperationRunning())
 const runButtonTitle = computed(() => {
-  if (running.value) return '작업이 진행 중입니다'
+  if (workspaceOperationRunning()) return '작업이 진행 중입니다'
   if (!hasFolder.value) return '프로젝트 폴더를 먼저 선택하세요'
   if (!hasMode.value) return '추출 또는 적용을 선택하세요'
   return mode.value === 0 ? '추출을 시작합니다' : '적용을 시작합니다'
 })
 
 function guardRunning(): boolean {
-  if (running.value) {
+  if (workspaceOperationRunning()) {
     Swal.fire({ icon: 'error', text: '이미 다른 작업이 시행중입니다!' })
     return true
   }
@@ -73,7 +74,7 @@ function guardRunning(): boolean {
 }
 
 function selectFolder() {
-  api.send('select_folder', 'wolf_folder_input')
+  void chooseWorkspaceProject('wolf')
 }
 
 function run() {
@@ -97,7 +98,6 @@ function run() {
 function openSettings() {
   if (guardRunning()) return
   api.send('settings')
-  running.value = true
 }
 
 function openLLMTranslate() {

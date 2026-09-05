@@ -19,7 +19,9 @@ const message = ref('')
 function refresh() {
   if (!props.folder) { message.value = '프로젝트 폴더를 선택하면 추출 파일 상태를 확인할 수 있어요.'; return }
   try {
-    const root = window.nodePath.join(props.folder, props.engine === 'wolf' ? '_Extract' : 'Extract')
+    const root = props.engine === 'wolf'
+      ? window.nodePath.join(props.folder, '_Extract', 'Texts')
+      : window.nodePath.join(props.folder, 'Extract')
     if (!window.nodeFs.existsSync(root)) { message.value = '추출 폴더 없음 · 먼저 텍스트를 추출하세요.'; return }
     const count = window.nodeFs.readdirSync(root).filter(name => name.toLowerCase().endsWith('.txt')).length
     message.value = count ? `추출 텍스트 ${count}개 파일 · 번역 및 검수 도구에서 내용을 확인하세요.` : '추출 폴더 있음 · 최상위 텍스트 파일 없음'

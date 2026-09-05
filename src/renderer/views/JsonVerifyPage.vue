@@ -1,6 +1,7 @@
 <template>
   <div
     class="verify-layout"
+    :class="{ embedded }"
     data-harness-view="json-verify"
     :data-file-count="files.length"
     :data-total-issues="totalIssueCount"
@@ -39,10 +40,12 @@
           <span v-for="(item, index) in summaryItems" :key="`${item.class}-${index}`" :class="item.class">{{ item.text }}</span>
         </div>
         <div class="action-buttons">
+          <button :disabled="loading || llmRepairing || verifyWriting || !dataDir" @click="recheckFromDisk">다시 검사</button>
           <button data-harness-shift-repair :disabled="!llmButtonEnabled" @click="llmRepairShift" :title="llmRepairTitle">
             {{ llmButtonText }}
           </button>
-          <button :disabled="verifyWriting" @click="close">닫기</button>
+          <button v-if="embedded && reviewWorkspace.projectDir && currentFileName" :disabled="verifyWriting || llmRepairing" @click="openTranslation">같은 파일의 번역 보기</button>
+          <button v-if="!embedded" :disabled="verifyWriting" @click="close">닫기</button>
         </div>
         <div v-if="selectedIssues.size > 0" class="action-buttons selection-toolbar">
           <span class="selection-count">{{ selectedIssues.size }}개 선택</span>
@@ -156,10 +159,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, watchEffect } from 'vue'
 import { api, useIpcOn } from '../composables/useIpc'
+import { reviewWorkspace, resetReviewWorkspace, findReviewFileIndex, normalizeReviewDirectory } from '../composables/useReviewWorkspace'
 import { getRendererLlmProviderUiText } from '../../types/llmProviderContract'
 import { setAtPath } from '../../ts/rpgmv/verify'
+
+defineProps<{ embedded?: boolean }>()
 
 interface VerifyIssue {
   path: string; type: string; severity: 'error' | 'warning'; message: string;
@@ -194,6 +200,22 @@ const previewSamples = ref<{ orig: string; trans: string; path: string }[]>([])
 const jsonChangeLine = ref(false)
 const llmReady = ref(false)
 const currentProvider = ref('gemini')
+const dataDir = ref('')
+
+watchEffect(() => {
+  if (!dataDir.value || reviewWorkspace.projectDir !== dataDir.value) return
+  Object.assign(reviewWorkspace.structure, {
+    fileCount: files.value.length,
+    issueCount: files.value.reduce((sum, file) => sum + file.issues.length, 0),
+    busy: loading.value || llmRepairing.value || verifyWriting.value,
+    loaded: !loading.value,
+  })
+})
+
+function openTranslation() {
+  reviewWorkspace.focusedFile = files.value[currentIdx.value]?.name ?? ''
+  api.send('openLLMCompare', reviewWorkspace.projectDir)
+}
 
 interface VerifyApplyJsonResult {
   requestId: string
@@ -335,7 +357,21 @@ const summaryItems = computed<SummaryItem[]>(() => {
   return parts
 })
 
+function recheckFromDisk() {
+  if (!dataDir.value || loading.value || llmRepairing.value || verifyWriting.value) return
+  if (llmRepairResults.value.length > 0 && !window.confirm('아직 적용하지 않은 LLM 수정 미리보기를 버리고 다시 검사할까요?')) return
+  reviewWorkspace.focusedFile = files.value[currentIdx.value]?.name ?? ''
+  loadFiles(dataDir.value)
+}
+
 function loadFiles(dir: string) {
+  dir = normalizeReviewDirectory(dir)
+  if (reviewWorkspace.projectDir !== dir) resetReviewWorkspace(dir)
+  dataDir.value = dir
+  searchQuery.value = ''; filterErrors.value = false; filterWarnings.value = false
+  issueSeverityFilter.value = 'all'
+  previewSamples.value = []
+  statusText.value = ''; statusClass.value = ''
   loading.value = true
   llmRepairing.value = false
   llmRepairResults.value = []
@@ -381,11 +417,8 @@ function loadFiles(dir: string) {
         })
       }
     }
-    if (files.value.length > 0 && files.value[0].issues.length === 0) {
-      loadPreview(files.value[0])
-    } else {
-      previewSamples.value = []
-    }
+    const focusedIdx = findReviewFileIndex(files.value, reviewWorkspace.focusedFile)
+    if (files.value.length > 0) selectFile(Math.max(0, focusedIdx))
   } catch (error) {
     statusText.value = `❌ 파일을 불러오지 못했습니다: ${(error as Error).message}`
     statusClass.value = 'status-error'
@@ -412,6 +445,7 @@ const filteredFiles = computed(() => {
 function selectFile(idx: number) {
   if (llmRepairing.value || verifyWriting.value) return
   currentIdx.value = idx
+  reviewWorkspace.focusedFile = files.value[idx]?.name ?? ''
   selectedIssues.value = new Set()
   llmRepairResults.value = []
   llmRepairContext.value = null
@@ -753,16 +787,24 @@ onMounted(() => {
       llmRepairContext.value = null
     }
   })
-  api.send('verifyReady')
+  api.send('verifyReady', { fresh: true })
 })
 onUnmounted(() => {
   for (const pending of pendingVerifyWrites.values()) clearTimeout(pending.timeoutId)
   pendingVerifyWrites.clear()
 })
+onActivated(() => {
+  api.send('verifyReady')
+  if (reviewWorkspace.projectDir !== dataDir.value) return
+  const idx = findReviewFileIndex(files.value, reviewWorkspace.focusedFile)
+  if (idx === currentIdx.value && idx >= 0) reviewWorkspace.focusedFile = files.value[idx].name
+  if (idx >= 0 && idx !== currentIdx.value) selectFile(idx)
+})
 </script>
 
 <style scoped>
 .verify-layout { display: flex; height: 100vh; }
+.verify-layout.embedded { flex: 1; height: 100%; min-height: 0; min-width: 0; }
 .sidebar { width: 240px; flex-shrink: 0; border-right: var(--border); background: #0c1216; display: flex; flex-direction: column; }
 .panel-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
 .sidebar-header { padding: 12px; border-bottom: var(--border); }

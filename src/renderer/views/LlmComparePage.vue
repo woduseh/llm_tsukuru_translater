@@ -1,6 +1,7 @@
 <template>
   <div
     class="compare-layout"
+    :class="{ embedded }"
     data-harness-view="llm-compare"
     :data-file-count="files.length"
     :data-mismatch-count="mismatchFileCount"
@@ -45,6 +46,7 @@
             <span v-for="(item, index) in summaryItems" :key="`${item.class}-${index}`" :class="item.class">{{ item.text }}</span>
           </div>
           <button class="primary-action" :disabled="!isDirty" @click="saveFile">변경 저장</button>
+          <button :disabled="loading || busy || retranslating || !dataDir" @click="reloadFromDisk">디스크에서 다시 읽기</button>
         </div>
         <div class="toolbar-row">
           <div class="nav-buttons">
@@ -124,11 +126,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, onActivated, onDeactivated, watchEffect, nextTick } from 'vue'
 import { api, useIpcOn } from '../composables/useIpc'
+import { reviewWorkspace, resetReviewWorkspace, findReviewFileIndex, normalizeReviewDirectory } from '../composables/useReviewWorkspace'
 import { splitBlocks, checkMismatch, autoFixBlock, isBlockUntranslated, removeDuplicateHeaders, blocksToLines, checkMismatchBlocks, hasAnyUntranslatedBlock } from '../compareUtils'
 import type { Block } from '../compareUtils'
 import { haveSameTranslationLineStructure, isTranslationTextFileName } from '../../ts/libs/translationSyntax'
+
+defineProps<{ embedded?: boolean }>()
 
 interface FileEntry {
   name: string; origPath: string; transPath: string;
@@ -150,7 +155,20 @@ const isDirty = computed(() => !!dirty[files.value[currentIdx.value]?.name])
 const loading = ref(true)
 const busy = ref(false)
 const busyMessage = ref('')
-let dataDir = ''
+const dataDir = ref('')
+let active = true
+
+watchEffect(() => {
+  if (!dataDir.value || reviewWorkspace.projectDir !== dataDir.value) return
+  Object.assign(reviewWorkspace.text, {
+    fileCount: files.value.length,
+    mismatchCount: files.value.filter(file => file.mismatch).length,
+    untranslatedCount: files.value.filter(file => file.untranslated).length,
+    dirty: Object.values(dirty).some(Boolean),
+    busy: busy.value || retranslating.value || loading.value,
+    loaded: !loading.value,
+  })
+})
 
 interface RetranslateRequest {
   requestId: string
@@ -286,13 +304,28 @@ function checkFileUntranslated(origContent: string, transContent: string): boole
   return hasAnyUntranslatedBlock(splitBlocks(origContent.split('\n')), splitBlocks(transContent.split('\n')))
 }
 
+async function reloadFromDisk() {
+  if (!dataDir.value || loading.value || busy.value || retranslating.value) return
+  if (Object.values(dirty).some(Boolean) && !window.confirm('저장하지 않은 편집을 버리고 디스크의 번역을 다시 읽을까요?')) return
+  reviewWorkspace.focusedFile = files.value[currentIdx.value]?.name ?? ''
+  await loadFiles(dataDir.value)
+}
+
 async function loadFiles(dir: string) {
+  dir = normalizeReviewDirectory(dir)
+  if (reviewWorkspace.projectDir !== dir) resetReviewWorkspace(dir)
+  dataDir.value = dir
+  for (const key of Object.keys(dirty)) delete dirty[key]
+  origBlocks.value = []; transBlocks.value = []; frozenHeights.value = []
+  selectedBlocks.value = new Set()
+  currentIdx.value = 0
+  searchQuery.value = ''; filterMismatch.value = false; filterUntranslated.value = false
+  saveStatus.value = ''
   loading.value = true
   busy.value = true
   busyMessage.value = '파일 비교 중...'
   await yieldToUI()
   try {
-    dataDir = dir
     const wolfExtDir = window.nodePath.join(dir, '_Extract', 'Texts')
     const wolfBkDir = wolfExtDir + '_backup'
     const mvExtDir = window.nodePath.join(dir, 'Extract')
@@ -320,9 +353,15 @@ async function loadFiles(dir: string) {
       const untranslated = origContent === transContent || hasAnyUntranslatedBlock(ob, tb)
       files.value.push({ name, origPath, transPath, mismatch, untranslated })
     }
-    currentIdx.value = 0
+    const focusedIdx = findReviewFileIndex(files.value, reviewWorkspace.focusedFile)
+    currentIdx.value = Math.max(0, focusedIdx)
     selectedBlocks.value = new Set()
     renderBlocks()
+    if (reviewWorkspace.focusedFile && focusedIdx < 0) {
+      saveStatus.value = `${reviewWorkspace.focusedFile}에 대응하는 추출 텍스트 파일이 없어요. 파일 목록에서 대상을 선택해 주세요.`
+    } else {
+      reviewWorkspace.focusedFile = files.value[currentIdx.value]?.name ?? ''
+    }
   } catch (error) {
     files.value = []
     console.error('Failed to load compare files:', error)
@@ -355,6 +394,7 @@ async function selectFile(idx: number) {
   await yieldToUI()
   try {
     currentIdx.value = idx
+    reviewWorkspace.focusedFile = files.value[idx]?.name ?? ''
     renderBlocks()
   } finally {
     busy.value = false
@@ -546,11 +586,11 @@ async function saveFile() {
 }
 
 function retranslateFile() {
-  if (files.value.length === 0 || !dataDir) return
+  if (files.value.length === 0 || !dataDir.value) return
   const request = beginRetranslation()
   if (!request) return
   api.send('retranslateFile', {
-    dir: dataDir,
+    dir: dataDir.value,
     fileName: request.fileName,
     requestId: request.requestId,
     expectedContent: request.expectedContent,
@@ -558,12 +598,12 @@ function retranslateFile() {
 }
 
 function retranslateSelected() {
-  if (files.value.length === 0 || !dataDir || selectedBlocks.value.size === 0) return
+  if (files.value.length === 0 || !dataDir.value || selectedBlocks.value.size === 0) return
   const indices = Array.from(selectedBlocks.value).sort((a, b) => a - b)
   const request = beginRetranslation()
   if (!request) return
   api.send('retranslateBlocks', {
-    dir: dataDir,
+    dir: dataDir.value,
     fileName: request.fileName,
     requestId: request.requestId,
     expectedContent: request.expectedContent,
@@ -572,12 +612,12 @@ function retranslateSelected() {
 }
 
 function retranslateUntranslated() {
-  if (files.value.length === 0 || !dataDir || untranslatedBlocks.value.size === 0) return
+  if (files.value.length === 0 || !dataDir.value || untranslatedBlocks.value.size === 0) return
   const indices = Array.from(untranslatedBlocks.value).sort((a, b) => a - b)
   const request = beginRetranslation()
   if (!request) return
   api.send('retranslateBlocks', {
-    dir: dataDir,
+    dir: dataDir.value,
     fileName: request.fileName,
     requestId: request.requestId,
     expectedContent: request.expectedContent,
@@ -629,7 +669,9 @@ function navigateFile(dir: 1 | -1) {
   for (let i = 0; i < files.value.length; i++) {
     const idx = ((start + dir * i) % files.value.length + files.value.length) % files.value.length
     if (files.value[idx].mismatch || files.value[idx].untranslated) {
-      currentIdx.value = idx; renderBlocks(); return
+      currentIdx.value = idx
+      reviewWorkspace.focusedFile = files.value[idx].name
+      renderBlocks(); return
     }
   }
 }
@@ -715,7 +757,7 @@ onMounted(() => {
     resizeObs.observe(viewportEl.value)
   }
 
-  api.send('compareReady')
+  api.send('compareReady', { fresh: true })
 })
 
 onUnmounted(() => {
@@ -724,14 +766,33 @@ onUnmounted(() => {
   resizeObs?.disconnect()
 })
 
+onActivated(async () => {
+  active = true
+  api.send('compareReady')
+  if (reviewWorkspace.projectDir === dataDir.value) {
+    const idx = findReviewFileIndex(files.value, reviewWorkspace.focusedFile)
+    if (idx === currentIdx.value && idx >= 0) reviewWorkspace.focusedFile = files.value[idx].name
+    if (idx >= 0 && idx !== currentIdx.value && !isDirty.value) await selectFile(idx)
+    else if (idx >= 0 && idx !== currentIdx.value && isDirty.value) saveStatus.value = '현재 편집 내용을 저장한 뒤 관련 파일로 이동해 주세요'
+    else if (reviewWorkspace.focusedFile && idx < 0) saveStatus.value = `${reviewWorkspace.focusedFile}에 대응하는 추출 텍스트 파일이 없어요. 파일 목록에서 대상을 선택해 주세요.`
+  }
+  await nextTick()
+  if (viewportEl.value) {
+    viewportHeight.value = viewportEl.value.clientHeight || 600
+    viewportEl.value.scrollTop = scrollTop.value
+  }
+})
+onDeactivated(() => { active = false })
+
 function onKeydown(e: KeyboardEvent) {
-  if (busy.value || retranslating.value) return
+  if (!active || busy.value || retranslating.value) return
   if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveFile() }
 }
 </script>
 
 <style scoped>
 .compare-layout { display: flex; height: 100vh; position: relative; }
+.compare-layout.embedded { flex: 1; height: 100%; min-height: 0; min-width: 0; }
 
 /* Loading overlay */
 .loading-overlay {

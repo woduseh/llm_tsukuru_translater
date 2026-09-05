@@ -19,11 +19,23 @@ export function registerTranslateHandlers(ctx: AppContext) {
   let llmPendingArg: LlmProjectArg | null = null;
   let guidelineGenerationAbort = false;
 
+  const closeSettings = (route = 'back') => {
+    if (!llmSettingsWindow || llmSettingsWindow.isDestroyed()) return;
+    if (llmSettingsWindow === ctx.mainWindow) {
+      llmSettingsWindow.webContents.send('workspaceNavigate', { route });
+    } else llmSettingsWindow.close();
+  };
+
   ipcMain.on('openLLMSettings',(ev, arg) => {
     try {
       llmPendingArg = coerceLlmProjectArg(arg);
     } catch (err: unknown) {
       ctx.mainWindow?.webContents.send('alert', { icon: 'error', message: (err as Error).message || String(err) });
+      return;
+    }
+    if (ctx.mainWindow && ev.sender === ctx.mainWindow.webContents) {
+      llmSettingsWindow = ctx.mainWindow;
+      ctx.mainWindow.webContents.send('workspaceNavigate', { route: '/llm-settings' });
       return;
     }
     if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
@@ -54,13 +66,15 @@ export function registerTranslateHandlers(ctx: AppContext) {
     });
   })
 
-  ipcMain.on('llmSettingsReady', () => {
+  ipcMain.on('llmSettingsReady', (ev) => {
+    if (ev.sender !== llmSettingsWindow?.webContents) return;
     if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
       llmSettingsWindow.webContents.send('llmSettings', buildLlmStartWindowState(ctx.settings));
     }
   })
 
   ipcMain.on('llmSettingsApply', (ev, data) => {
+    if (llmSettingsWindow && ev.sender !== llmSettingsWindow.webContents) return;
     const llmParallelWorkers = normalizeTranslationConcurrency(data?.llmParallelWorkers);
     const llmRequestsPerMinute = normalizeTranslationRpm(data?.llmRequestsPerMinute);
     ctx.settings = { ...ctx.settings, llmSortOrder: data?.llmSortOrder, llmParallelWorkers, llmRequestsPerMinute };
@@ -73,11 +87,11 @@ export function registerTranslateHandlers(ctx: AppContext) {
       } catch (err: unknown) {
         log.warn('Blocked LLM translation for invalid project path:', err);
         ctx.mainWindow?.webContents.send('alert', { icon: 'error', message: (err as Error).message || String(err) });
+        ev.sender.send('llmSettingsApplyResult', { success: false });
         return;
       }
-      if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
-        llmSettingsWindow.close();
-      }
+      ev.sender.send('llmSettingsApplyResult', { success: true });
+      closeSettings(`/${validatedProject.game}`);
       ctx.llmAbort = false;
       const a = {
         dir: Buffer.from(validatedProject.dir, 'utf8').toString('base64'),
@@ -91,8 +105,9 @@ export function registerTranslateHandlers(ctx: AppContext) {
       ctx.mainWindow!.webContents.send('loading', 1);
       eztrans.trans(null, a, ctx);
       llmPendingArg = null;
-    } else if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
-      llmSettingsWindow.close();
+    } else {
+      ev.sender?.send('llmSettingsApplyResult', { success: true });
+      closeSettings();
     }
   })
 
@@ -151,10 +166,9 @@ export function registerTranslateHandlers(ctx: AppContext) {
     ctx.llmAbort = true;
   })
 
-  ipcMain.on('llmSettingsClose', () => {
-    if (llmSettingsWindow && !llmSettingsWindow.isDestroyed()) {
-      llmSettingsWindow.close();
-    }
+  ipcMain.on('llmSettingsClose', (ev) => {
+    if (ev.sender !== llmSettingsWindow?.webContents) return;
+    closeSettings();
   })
 
   interface RetranslateRequest {
@@ -165,12 +179,16 @@ export function registerTranslateHandlers(ctx: AppContext) {
   }
 
   async function retranslate(
+    sender: Electron.WebContents,
     data: RetranslateRequest,
     doneChannel: 'retranslateFileDone' | 'retranslateBlocksDone',
     translate: (extractDir: string, onProgress: (message: string) => void) => Promise<{ success: boolean; error?: string }>,
   ): Promise<void> {
+    // Capture the request's target before awaiting the provider. A newly opened
+    // compare surface must never receive another window's in-flight result.
+    const win = getLLMCompareWindow();
+    if (!win || win.isDestroyed() || sender !== win.webContents) return;
     const send = (channel: 'retranslateProgress' | typeof doneChannel, payload: object) => {
-      const win = getLLMCompareWindow();
       if (win && !win.isDestroyed()) {
         win.webContents.send(channel, { ...payload, requestId: data.requestId, fileName: data.fileName });
       }
@@ -188,8 +206,8 @@ export function registerTranslateHandlers(ctx: AppContext) {
     }
   }
 
-  ipcMain.on('retranslateFile', (_ev, data: RetranslateRequest) => {
-    return retranslate(data, 'retranslateFileDone', (extractDir, onProgress) => eztrans.retranslateFile(
+  ipcMain.on('retranslateFile', (ev, data: RetranslateRequest) => {
+    return retranslate(ev.sender, data, 'retranslateFileDone', (extractDir, onProgress) => eztrans.retranslateFile(
       extractDir,
       data.fileName,
       ctx.settings.llmSourceLang || 'ja',
@@ -200,8 +218,8 @@ export function registerTranslateHandlers(ctx: AppContext) {
     ));
   });
 
-  ipcMain.on('retranslateBlocks', (_ev, data: RetranslateRequest & { blockIndices: number[] }) => {
-    return retranslate(data, 'retranslateBlocksDone', (extractDir, onProgress) => eztrans.retranslateBlocks(
+  ipcMain.on('retranslateBlocks', (ev, data: RetranslateRequest & { blockIndices: number[] }) => {
+    return retranslate(ev.sender, data, 'retranslateBlocksDone', (extractDir, onProgress) => eztrans.retranslateBlocks(
       extractDir,
       data.fileName,
       data.blockIndices,

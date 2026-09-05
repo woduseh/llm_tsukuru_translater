@@ -199,7 +199,8 @@ async function selectProject(ctx: AppContext, dataDir: string, timeoutMs: number
   const showOpenDialog = dialog.showOpenDialog;
   dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [dataDir] })) as typeof dialog.showOpenDialog;
   try {
-    await click(win, '[data-harness-view="mvmz"] .project-header .btn-secondary');
+    const projectPicker = await snapshot(win, `document.querySelector('[data-harness-workspace-shell] .change-project') ? '[data-harness-workspace-shell] .change-project' : '[data-harness-view="mvmz"] .project-header .btn-secondary'`);
+    await click(win, String(projectPicker));
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
       const selectedPath = await snapshot(win, `document.querySelector('.project-path span')?.textContent`);
@@ -258,7 +259,8 @@ async function openLlmSettingsSnapshot(ctx: AppContext, llmReady: boolean, targe
   // Allow the disabled-to-ready button transition to settle before visual evidence.
   await delay(200);
   await captureScreen(win, captureDir, llmReady ? 'translation-ready' : 'translation-missing');
-  win.close();
+  if (win === ctx.mainWindow) await click(win, '.button-bar .btn');
+  else win.close();
   await waitForWindowClose('/llm-settings', timeoutMs);
   return result;
 }
@@ -369,6 +371,16 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
     await waitForSelector(mainWindow, '[data-harness-view="mvmz"]', stepTimeoutMs);
     const restoredProjectPath = await snapshot(mainWindow, `document.querySelector('.project-path span')?.textContent`);
     if (restoredProjectPath !== scenario.compareDir) throw new Error('Returning from home lost the selected project.');
+    mainWindow.webContents.send('llmTranslating', true);
+    mainWindow.webContents.send('loading', 25);
+    await mainWindow.webContents.executeJavaScript(`location.hash = '#/'`, true);
+    await waitForSelector(mainWindow, '[data-harness-view="home"]', stepTimeoutMs);
+    await click(mainWindow, '[data-harness-resume-project]');
+    await waitForSelector(mainWindow, '[data-harness-workspace-shell]', stepTimeoutMs);
+    const persistentAbort = await snapshot(mainWindow, `Array.from(document.querySelectorAll('.abort-btn')).some(button => button.getBoundingClientRect().width > 0)`);
+    if (!persistentAbort) throw new Error('Home navigation lost the running job abort control.');
+    mainWindow.webContents.send('llmTranslating', false);
+    mainWindow.webContents.send('loading', 0);
     await mainWindow.webContents.executeJavaScript(`location.hash = '#/'`, true);
     await waitForSelector(mainWindow, '[data-harness-view="home"]', stepTimeoutMs);
     const approvalTargetPath = path.join(path.dirname(scenario.compareDir), 'Harness', 'Approval.txt');
@@ -542,6 +554,13 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
     });
 
     checkpoint('compare-window');
+    // One isolated fixture project has both text and JSON representations so
+    // the production workspace can exercise cross-tool file context.
+    fs.mkdirSync(path.join(scenario.compareDir, 'Backup'), { recursive: true });
+    for (const name of ['Map001.json', 'Map002.json']) {
+      fs.copyFileSync(path.join(scenario.verifyDir, name), path.join(scenario.compareDir, name));
+      fs.copyFileSync(path.join(scenario.verifyDir, 'Backup', name), path.join(scenario.compareDir, 'Backup', name));
+    }
     await selectProject(ctx, scenario.compareDir, stepTimeoutMs);
     await click(mainWindow, '.pipeline > button:nth-child(3)');
     const compareWindow = await waitForWindow('/llm-compare', stepTimeoutMs);
@@ -564,6 +583,57 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       loading: 'false',
     });
     screenshots.compare = await captureScreen(compareWindow, diagnosticDir, 'compare');
+
+    checkpoint('workspace-review-tabs');
+    if (compareWindow !== mainWindow) throw new Error('Review must be inside the main workspace.');
+    await compareWindow.webContents.executeJavaScript(`(() => {
+      const editor = document.querySelector('.block-editor');
+      editor.value = '검수 초안\\n';
+      editor.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('.select-indicator input').click();
+    })()`, true);
+    await click(mainWindow, '[data-workspace-review="structure"]');
+    await waitForSelector(mainWindow, '[data-harness-view="json-verify"]', stepTimeoutMs);
+    await waitForAttributeValue(mainWindow, '[data-harness-view="json-verify"]', 'data-file-count', '2', stepTimeoutMs);
+    const sameFile = await snapshot(mainWindow, `document.querySelector('.issues-file-name')?.textContent?.trim()`);
+    if (sameFile !== 'Map001.json') throw new Error('Review tabs did not preserve the selected file context.');
+    screenshots.unifiedStructure = await captureScreen(mainWindow, diagnosticDir, 'workspace-structure');
+    await click(mainWindow, '[data-workspace-review="text"]');
+    await waitForSelector(mainWindow, '[data-harness-view="llm-compare"]', stepTimeoutMs);
+    const preservedDraft = await snapshot(mainWindow, `({
+      value: document.querySelector('.block-editor')?.value,
+      selected: document.querySelector('.select-indicator input')?.checked,
+      saveEnabled: !document.querySelector('.toolbar .primary-action')?.disabled,
+      dirtyBadge: document.querySelector('[data-workspace-tab="review"]')?.textContent.includes('미저장'),
+      summaryLoaded: !document.querySelector('[data-workspace-review="text"]')?.textContent.includes('미확인'),
+      focusedFile: document.querySelector('.focused-file')?.textContent,
+      terminalInStatus: document.querySelector('.agent-chip')?.getBoundingClientRect().top >= document.querySelector('.workspace-status')?.getBoundingClientRect().top,
+    })`);
+    assertSnapshotValues('reviewDraft', preservedDraft, {
+      value: '검수 초안\n', selected: true, saveEnabled: true,
+      dirtyBadge: true, summaryLoaded: true, focusedFile: 'Map001.txt', terminalInStatus: true,
+    });
+    screenshots.unifiedReview = await captureScreen(mainWindow, diagnosticDir, 'workspace-review');
+    await click(mainWindow, '.toolbar .primary-action');
+
+    checkpoint('workspace-settings-draft');
+    await click(mainWindow, '[data-workspace-tab="settings"]');
+    await waitForSelector(mainWindow, '#llmModel', stepTimeoutMs);
+    await mainWindow.webContents.executeJavaScript(`(() => {
+      const model = document.querySelector('#llmModel');
+      model.value = 'workspace-unsaved-model';
+      model.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`, true);
+    await click(mainWindow, '[data-workspace-tab="review"]');
+    await waitForSelector(mainWindow, '[data-harness-view="llm-compare"]', stepTimeoutMs);
+    await click(mainWindow, '[data-workspace-tab="settings"]');
+    await waitForSelector(mainWindow, '#llmModel', stepTimeoutMs);
+    const preservedModel = await snapshot(mainWindow, `document.querySelector('#llmModel')?.value`);
+    if (preservedModel !== 'workspace-unsaved-model') throw new Error('Tab switch overwrote unsaved settings.');
+    screenshots.settings = await captureScreen(mainWindow, diagnosticDir, 'workspace-settings');
+    await click(mainWindow, '.button-bar .btn');
+    await waitForSelector(mainWindow, '[data-harness-view="llm-compare"]', stepTimeoutMs);
+    if (BrowserWindow.getAllWindows().length !== 1) throw new Error('Tool navigation opened an extra window.');
 
     checkpoint('json-verify-window');
     await selectProject(ctx, scenario.verifyDir, stepTimeoutMs);
@@ -595,6 +665,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       status: 'passed',
       completedAt: new Date().toISOString(),
       cases: [
+        { id: 'unified-workspace', title: 'Single window review context and unsaved text/settings survive tab switches', status: 'passed', durationMs: 0, details: { sameFile, preservedDraft, preservedModel, windowCount: 1 } },
         { id: 'project-session', title: 'Project file count and home return preserve actual session context', status: 'passed', durationMs: 0, details: { projectFiles, restoredProjectPath } },
         { id: 'home-window', title: 'home window exposes stable harness state', status: 'passed', durationMs: 0, details: home },
         { id: 'mvmz-empty-state', title: 'MV/MZ empty state leads with project selection', status: 'passed', durationMs: 0, details: mvmzEmpty },
@@ -608,7 +679,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
         { id: 'json-verify-window', title: 'JSON verify window summarizes fixture issues', status: 'passed', durationMs: 0, details: verify },
       ],
       metrics: {
-        caseCount: 10,
+        caseCount: 12,
         deterministic: true,
       },
       artifacts: {

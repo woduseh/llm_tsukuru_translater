@@ -1,5 +1,5 @@
 <template>
-  <aside class="agent-terminal" :class="{ open: isOpen }" data-harness-agent-terminal>
+  <aside class="agent-terminal" :class="{ open: isOpen, docked }" data-harness-agent-terminal>
     <button
       v-if="!isOpen"
       class="agent-chip"
@@ -74,6 +74,8 @@ import { chooseActiveTerminalSessionId, sessionStateLabel } from '../agentWorksp
 import { useTerminalSessions } from '../composables/useTerminalSessions'
 import type { TerminalSessionKind } from '../../types/agentWorkspace'
 
+defineProps<{ docked?: boolean }>()
+
 const { sessions, refresh, launch } = useTerminalSessions()
 const isOpen = ref(false)
 const isLarge = ref(false)
@@ -125,6 +127,11 @@ function closeDrawer() {
 }
 
 .agent-chip, .drawer { pointer-events: auto; }
+
+.agent-terminal.docked { bottom: 2px; }
+.agent-terminal.docked.open { bottom: 36px; }
+.docked .agent-chip { height: 28px; max-width: 150px; padding: 3px 10px; font-size: 12px; }
+.docked .agent-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .agent-chip {
   margin-left: auto;

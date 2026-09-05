@@ -10,7 +10,19 @@ import { AppContext } from '../appContext';
 import { PROJECT_ROOT } from '../projectRoot';
 
 export function registerSettingsHandlers(ctx: AppContext) {
-  ipcMain.on('settings', () => {
+  const closeSettings = () => {
+    if (!ctx.settingsWindow || ctx.settingsWindow.isDestroyed()) return;
+    if (ctx.settingsWindow === ctx.mainWindow) {
+      ctx.settingsWindow.webContents.send('workspaceNavigate', { route: 'back' });
+    } else ctx.settingsWindow.close();
+  };
+
+  ipcMain.on('settings', (ev) => {
+    if (ctx.mainWindow && ev.sender === ctx.mainWindow.webContents) {
+      ctx.settingsWindow = ctx.mainWindow;
+      ctx.mainWindow.webContents.send('workspaceNavigate', { route: '/settings' });
+      return;
+    }
     ctx.settingsWindow = new BrowserWindow({
       width: 800,
       height: 900,
@@ -35,34 +47,35 @@ export function registerSettingsHandlers(ctx: AppContext) {
     });
   })
 
-  ipcMain.on('settingsReady', () => {
+  ipcMain.on('settingsReady', (ev) => {
+    if (ev.sender !== ctx.settingsWindow?.webContents) return;
     if (ctx.settingsWindow && !ctx.settingsWindow.isDestroyed()) {
       ctx.settingsWindow.webContents.send('settings', ctx.settings);
     }
   })
 
   ipcMain.on('applysettings', (ev, arg) => {
+    if (ctx.settingsWindow && ev.sender !== ctx.settingsWindow.webContents) return;
     try {
       ctx.settings = applyValidatedSettingsUpdate(ctx.settings, arg)
     } catch (error) {
+      ev.sender.send('settingsSaveFailed');
       sendError(ctx, (error as Error).message)
-      worked(ctx)
+      if (ev.sender !== ctx.mainWindow?.webContents) worked(ctx)
       return
     }
     storage.set('settings', JSON.stringify(ctx.settings))
     ctx.settings.themeData = (Themes as Record<string, Record<string, string>>)[ctx.settings.theme] ?? {}
+    ev.sender.send('settingsSaved', ctx.settings);
     ctx.mainWindow!.webContents.send('getGlobalSettings', sanitizeSettingsForRenderer(ctx.settings));
-    if (ctx.settingsWindow && !ctx.settingsWindow.isDestroyed()) {
-      ctx.settingsWindow.close()
-    }
-    worked(ctx)
+    closeSettings()
+    if (ev.sender !== ctx.mainWindow?.webContents) worked(ctx)
   })
 
-  ipcMain.on('closesettings', () => {
-    if (ctx.settingsWindow && !ctx.settingsWindow.isDestroyed()) {
-      ctx.settingsWindow.close()
-    }
-    worked(ctx)
+  ipcMain.on('closesettings', (ev) => {
+    if (ev.sender !== ctx.settingsWindow?.webContents) return;
+    closeSettings()
+    if (ev.sender !== ctx.mainWindow?.webContents) worked(ctx)
   })
 
   ipcMain.on('gamePatcher', (ev, dir) => {

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createApp, nextTick, type App } from 'vue'
+import { createApp, nextTick, h, KeepAlive, ref, type App } from 'vue'
 import path from 'node:path'
 import LlmComparePage from '../../src/renderer/views/LlmComparePage.vue'
+import { resetReviewWorkspace, reviewWorkspace } from '../../src/renderer/composables/useReviewWorkspace'
 
 const { listeners, send } = vi.hoisted(() => {
   const listeners = new Map<string, (...args: string[]) => unknown>()
@@ -24,6 +25,8 @@ describe('compare page editing', () => {
   let disk: Map<string, string>
 
   beforeEach(() => {
+    resetReviewWorkspace()
+    send.mockClear()
     disk = new Map()
     host = document.createElement('div')
     document.body.append(host)
@@ -145,5 +148,84 @@ describe('compare page editing', () => {
     expect(disk.get('/game/Extract/Map001.txt')).toBe('--- 1 ---\n안녕\n')
     expect(host.querySelectorAll('.file-item')).toHaveLength(0)
     expect(host.querySelector('.badge-dirty')).toBeNull()
+  })
+
+  it('preserves unsaved edits on tab switches and ignores save shortcuts while inactive', async () => {
+    disk.set('/game/Extract_backup/Map001.txt', 'hello')
+    disk.set('/game/Extract/Map001.txt', '안녕')
+    const visible = ref(true)
+    app = createApp({ render: () => h(KeepAlive, () => visible.value ? h(LlmComparePage, { embedded: true }) : h('div')) })
+    app.mount(host)
+    await listeners.get('initCompare')!('/game')
+    await nextTick()
+    const editor = host.querySelector<HTMLTextAreaElement>('.block-editor')!
+    editor.value = '저장 전 편집'
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+    expect(reviewWorkspace.text.dirty).toBe(true)
+    visible.value = false
+    await nextTick()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true }))
+    await nextTick()
+    expect(disk.get('/game/Extract/Map001.txt')).toBe('안녕')
+    visible.value = true
+    await nextTick()
+    expect(host.querySelector<HTMLTextAreaElement>('.block-editor')!.value).toBe('저장 전 편집')
+    expect(reviewWorkspace.text.dirty).toBe(true)
+    expect(host.querySelector('.compare-layout.embedded')).not.toBeNull()
+    expect(send.mock.calls.filter(call => call[0] === 'compareReady' && call[1]?.fresh)).toHaveLength(1)
+  })
+
+  it('resets dirty state, filters and editor contents for a newly initialized project', async () => {
+    await load('hello', '안녕')
+    const editor = host.querySelector<HTMLTextAreaElement>('.block-editor')!
+    editor.value = '저장 전 편집'
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+    host.querySelector<HTMLInputElement>('.search-input')!.value = 'Map001'
+    host.querySelector<HTMLInputElement>('.search-input')!.dispatchEvent(new Event('input'))
+    await nextTick()
+    disk.set('/other/Extract_backup/Map002.txt', 'world')
+    disk.set('/other/Extract/Map002.txt', '세계')
+    await listeners.get('initCompare')!('/other')
+    await nextTick()
+    expect(reviewWorkspace.projectDir).toBe('/other')
+    expect(reviewWorkspace.text.dirty).toBe(false)
+    expect(host.querySelector<HTMLInputElement>('.search-input')!.value).toBe('')
+    expect(host.querySelector<HTMLTextAreaElement>('.block-editor')!.value).toBe('세계')
+    expect(disk.get('/game/Extract/Map001.txt')).toBe('안녕')
+  })
+
+  it('explains when a structure file has no corresponding extracted text', async () => {
+    resetReviewWorkspace('/game')
+    reviewWorkspace.focusedFile = 'System.json'
+    await load('hello', '안녕')
+    expect(host.querySelector('.save-status')!.textContent).toContain('System.json에 대응하는 추출 텍스트 파일이 없어요')
+  })
+
+  it('refreshes externally translated files and summaries from disk', async () => {
+    await load('hello', 'hello')
+    expect(send).toHaveBeenCalledWith('compareReady', { fresh: true })
+    expect(reviewWorkspace.text.untranslatedCount).toBe(1)
+    disk.set('/game/Extract/Map001.txt', '새 번역')
+    button('디스크에서 다시 읽기').click()
+    await vi.waitFor(() => expect(host.querySelector<HTMLTextAreaElement>('.block-editor')!.value).toBe('새 번역'))
+    expect(reviewWorkspace.text.untranslatedCount).toBe(0)
+  })
+
+  it('keeps dirty edits if disk refresh is cancelled and discards only on confirmation', async () => {
+    await load('hello', '안녕')
+    const editor = host.querySelector<HTMLTextAreaElement>('.block-editor')!
+    editor.value = '저장 전 편집'
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    button('디스크에서 다시 읽기').click()
+    await nextTick()
+    expect(editor.value).toBe('저장 전 편집')
+    expect(reviewWorkspace.text.dirty).toBe(true)
+    confirm.mockReturnValue(true)
+    button('디스크에서 다시 읽기').click()
+    await vi.waitFor(() => expect(host.querySelector<HTMLTextAreaElement>('.block-editor')!.value).toBe('안녕'))
+    expect(reviewWorkspace.text.dirty).toBe(false)
   })
 })

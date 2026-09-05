@@ -1,4 +1,5 @@
 <template>
+  <section class="settings-page" :class="{ embedded }">
   <div id="container">
     <!-- General settings -->
     <div class="settings-group">
@@ -141,16 +142,20 @@
   </div>
 
   <div class="button-bar">
-    <button class="btn btn-primary" @click="applySettings">적용</button>
-    <button class="btn" @click="closeSettings">취소</button>
+    <button class="btn btn-primary" :disabled="saving" @click="applySettings">{{ saving ? '저장 중...' : '적용' }}</button>
+    <button class="btn" :disabled="saving" @click="closeSettings">변경 취소</button>
   </div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, toRaw } from 'vue'
+import { computed, onActivated, onMounted, onUnmounted, reactive, ref, toRaw, watch } from 'vue'
+import { mergeWorkspaceDraft, workspaceDrafts } from '../composables/useWorkspaceDrafts'
 import { api, useIpcOn } from '../composables/useIpc'
 import { DEFAULT_LLM_PROVIDER, DEFAULT_LLM_VERTEX_LOCATION } from '../../types/settings'
 import { getRendererLlmProviderMetadata, getRendererLlmProviderUiText } from '../../types/llmProviderContract'
+
+const { embedded = false } = defineProps<{ embedded?: boolean }>()
 
 const settings = reactive<Record<string, any>>({
   loadingText: false, JsonChangeLine: false, DoNotTransHangul: false, ExtractAddLine: false,
@@ -163,7 +168,7 @@ const settings = reactive<Record<string, any>>({
   llmVertexServiceAccountJson: '', llmVertexLocation: DEFAULT_LLM_VERTEX_LOCATION,
   llmSourceLang: 'ja', llmTargetLang: 'ko', llmTranslationUnit: 'file',
   llmChunkSize: 30, llmMaxRetries: 2, llmMaxApiRetries: 5, llmTimeout: 600,
-  llmCustomPrompt: '',
+  llmCustomPrompt: '', extractPlus: [], extractSomeScript2: [], theme: 'Dracula',
 })
 
 const extractPlusText = ref('')
@@ -207,7 +212,17 @@ const targetLangs = [
   { value: 'tr', label: '터키어' },
 ]
 
+const snapshot = () => JSON.parse(JSON.stringify({ ...toRaw(settings), extractPlusText: extractPlusText.value, extractSomeScript2Text: extractSomeScript2Text.value })) as Record<string, any>
+let baseline = snapshot()
+let pendingSnapshot: Record<string, any> | undefined
+const saving = ref(false)
+watch([settings, extractPlusText, extractSomeScript2Text], () => {
+  workspaceDrafts.settingsDirty = JSON.stringify(snapshot()) !== JSON.stringify(baseline)
+}, { deep: true, flush: 'sync' })
+onUnmounted(() => { workspaceDrafts.settingsDirty = false })
+
 function applySettings() {
+  if (saving.value) return
   // Parse extractPlus
   const extP: number[] = []
   for (const val of extractPlusText.value.split('\n')) {
@@ -218,6 +233,8 @@ function applySettings() {
   settings.extractSomeScript2 = extractSomeScript2Text.value.split('\n')
   settings.llmVertexLocation = String(settings.llmVertexLocation || DEFAULT_LLM_VERTEX_LOCATION).trim() || DEFAULT_LLM_VERTEX_LOCATION
   settings.theme = 'Dracula'
+  pendingSnapshot = snapshot()
+  saving.value = true
   api.send('applysettings', { ...toRaw(settings) })
 }
 
@@ -228,28 +245,43 @@ function onProviderChanged(event: Event) {
 }
 
 function closeSettings() {
+  Object.assign(settings, Object.fromEntries(Object.entries(baseline).filter(([key]) => !['extractPlusText', 'extractSomeScript2Text'].includes(key))))
+  extractPlusText.value = baseline.extractPlusText
+  extractSomeScript2Text.value = baseline.extractSomeScript2Text
+  workspaceDrafts.settingsDirty = false
   api.send('closesettings')
 }
 
 onMounted(() => {
   useIpcOn('settings', (arg: unknown) => {
     const s = arg as Record<string, any>
-    for (const key of Object.keys(settings)) {
-      if (s[key] !== undefined) (settings as any)[key] = s[key]
-    }
-    if (s.extractSomeScript2) {
-      extractSomeScript2Text.value = (s.extractSomeScript2 as string[]).join('\n')
-    }
-    if (s.extractPlus) {
-      extractPlusText.value = (s.extractPlus as number[]).map(String).join('\n')
-    }
-    settings.llmVertexLocation = String(settings.llmVertexLocation || DEFAULT_LLM_VERTEX_LOCATION).trim() || DEFAULT_LLM_VERTEX_LOCATION
+    const incoming = { ...baseline }
+    for (const key of Object.keys(settings)) if (s[key] !== undefined) incoming[key] = s[key]
+    incoming.extractSomeScript2Text = (s.extractSomeScript2 || []).join('\n')
+    incoming.extractPlusText = (s.extractPlus || []).map(String).join('\n')
+    incoming.llmVertexLocation = String(incoming.llmVertexLocation || DEFAULT_LLM_VERTEX_LOCATION).trim() || DEFAULT_LLM_VERTEX_LOCATION
+    const merged = mergeWorkspaceDraft(snapshot(), baseline, incoming)
+    baseline = incoming
+    for (const key of Object.keys(settings)) settings[key] = merged[key]
+    extractPlusText.value = merged.extractPlusText
+    extractSomeScript2Text.value = merged.extractSomeScript2Text
+    workspaceDrafts.settingsDirty = JSON.stringify(snapshot()) !== JSON.stringify(baseline)
   })
-  api.send('settingsReady')
+  useIpcOn('settingsSaveFailed', () => { saving.value = false; pendingSnapshot = undefined })
+  useIpcOn('settingsSaved', () => {
+    if (pendingSnapshot) baseline = pendingSnapshot
+    pendingSnapshot = undefined
+    saving.value = false
+    workspaceDrafts.settingsDirty = JSON.stringify(snapshot()) !== JSON.stringify(baseline)
+  })
+  if (!embedded) api.send('settingsReady')
 })
+onActivated(() => { if (embedded) api.send('settingsReady') })
 </script>
 
 <style scoped>
+.settings-page { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.settings-page.embedded #container { width: 100%; max-width: 980px; align-self: center; box-sizing: border-box; }
 #container {
   padding: 16px 20px;
   overflow-y: auto;

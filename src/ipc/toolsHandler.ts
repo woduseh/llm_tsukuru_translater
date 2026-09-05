@@ -18,12 +18,43 @@ export function getLLMCompareWindow(): Electron.BrowserWindow | null {
 }
 
 export function registerToolsHandlers(ctx: AppContext) {
+  llmCompareWindow = null;
   let jsonVerifyWindow: Electron.BrowserWindow | null = null;
   let pendingCompareDir: string | null = null;
+  let activeCompareDir: string | null = null;
   let pendingVerifyDir: string | null = null;
   let activeVerifyDir: string | null = null;
 
+  const isMainRoute = (route: string) => ctx.mainWindow?.webContents.getURL().split('#')[1]?.split('?')[0] === route;
+  const initializeCompare = (fresh = false) => {
+    const dir = pendingCompareDir ?? (fresh ? activeCompareDir : null);
+    if (dir && llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+      llmCompareWindow.webContents.send(llmCompareWindow === ctx.mainWindow ? 'set-allowed-paths' : 'replace-allowed-paths', [dir]);
+      llmCompareWindow.webContents.send('initCompare', dir);
+      pendingCompareDir = null;
+    }
+  };
+  const initializeVerify = (fresh = false) => {
+    const dir = pendingVerifyDir ?? (fresh ? activeVerifyDir : null);
+    if (dir && jsonVerifyWindow && !jsonVerifyWindow.isDestroyed()) {
+      jsonVerifyWindow.webContents.send(jsonVerifyWindow === ctx.mainWindow ? 'set-allowed-paths' : 'replace-allowed-paths', [dir]);
+      jsonVerifyWindow.webContents.send('initVerify', dir);
+      pendingVerifyDir = null;
+    }
+  };
+
   ipcMain.on('openLLMCompare', (ev, dir: string) => {
+    if (ctx.mainWindow && ev.sender === ctx.mainWindow.webContents) {
+      if (llmCompareWindow !== ctx.mainWindow || activeCompareDir !== path.resolve(dir)) {
+        pendingCompareDir = dir;
+        activeCompareDir = path.resolve(dir);
+      }
+      llmCompareWindow = ctx.mainWindow;
+      if (isMainRoute('/llm-compare')) initializeCompare();
+      ctx.mainWindow.webContents.send('workspaceNavigate', { route: '/llm-compare' });
+      return;
+    }
+    activeCompareDir = path.resolve(dir);
     if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
       llmCompareWindow.webContents.send('replace-allowed-paths', [dir]);
       llmCompareWindow.webContents.send('initCompare', dir);
@@ -55,21 +86,31 @@ export function registerToolsHandlers(ctx: AppContext) {
     });
   })
 
-  ipcMain.on('llmCompareClose', () => {
+  ipcMain.on('llmCompareClose', (ev) => {
+    if (ev.sender !== llmCompareWindow?.webContents) return;
     if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
-      llmCompareWindow.close();
+      if (llmCompareWindow === ctx.mainWindow) {
+        llmCompareWindow.webContents.send('workspaceNavigate', { route: 'back' });
+      } else llmCompareWindow.close();
     }
   })
 
-  ipcMain.on('compareReady', () => {
-    if (pendingCompareDir && llmCompareWindow && !llmCompareWindow.isDestroyed()) {
-      llmCompareWindow.webContents.send('replace-allowed-paths', [pendingCompareDir]);
-      llmCompareWindow.webContents.send('initCompare', pendingCompareDir);
-      pendingCompareDir = null;
-    }
+  ipcMain.on('compareReady', (ev, options?: { fresh?: boolean }) => {
+    if (ev.sender !== llmCompareWindow?.webContents) return;
+    initializeCompare(options?.fresh === true);
   })
 
   ipcMain.on('openJsonVerify', (ev, dir: string) => {
+    if (ctx.mainWindow && ev.sender === ctx.mainWindow.webContents) {
+      if (jsonVerifyWindow !== ctx.mainWindow || activeVerifyDir !== path.resolve(dir)) {
+        pendingVerifyDir = dir;
+      }
+      activeVerifyDir = path.resolve(dir);
+      jsonVerifyWindow = ctx.mainWindow;
+      if (isMainRoute('/json-verify')) initializeVerify();
+      ctx.mainWindow.webContents.send('workspaceNavigate', { route: '/json-verify' });
+      return;
+    }
     activeVerifyDir = path.resolve(dir);
     if (jsonVerifyWindow && !jsonVerifyWindow.isDestroyed()) {
       jsonVerifyWindow.webContents.send('replace-allowed-paths', [dir]);
@@ -104,14 +145,11 @@ export function registerToolsHandlers(ctx: AppContext) {
     });
   })
 
-  ipcMain.on('verifyReady', () => {
+  ipcMain.on('verifyReady', (ev, options?: { fresh?: boolean }) => {
+    if (ev.sender !== jsonVerifyWindow?.webContents) return;
     if (jsonVerifyWindow && !jsonVerifyWindow.isDestroyed()) {
       jsonVerifyWindow.webContents.send('verifySettings', buildVerifyWindowState(ctx.settings));
-      if (pendingVerifyDir) {
-        jsonVerifyWindow.webContents.send('replace-allowed-paths', [pendingVerifyDir]);
-        jsonVerifyWindow.webContents.send('initVerify', pendingVerifyDir);
-        pendingVerifyDir = null;
-      }
+      initializeVerify(options?.fresh === true);
     }
   })
 
@@ -192,9 +230,9 @@ export function registerToolsHandlers(ctx: AppContext) {
     items: LlmRepairItem[];
   }
 
-  ipcMain.on('verifyLlmRepair', async (_ev, request: LlmRepairRequest) => {
+  ipcMain.on('verifyLlmRepair', async (ev, request: LlmRepairRequest) => {
     const win = jsonVerifyWindow;
-    if (!win || win.isDestroyed()) return;
+    if (!win || win.isDestroyed() || ev.sender !== win.webContents) return;
     const send = (ch: string, ...args: unknown[]) => {
       if (win && !win.isDestroyed()) win.webContents.send(ch, ...args);
     };
