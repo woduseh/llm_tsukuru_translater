@@ -1,5 +1,3 @@
-import path from 'path'
-import fs from 'fs'
 import iconv from 'iconv-lite'
 
 export function decodeEncoding(buffer:Uint8Array, wolfMetadata: { ver: 2 | 3 | -1 }){
@@ -30,32 +28,4 @@ export function encodeEncoding(text: string, wolfMetadata: { ver: 2 | 3 | -1 }):
         return Buffer.from(text, 'utf-8')
     }
     throw new Error('Wolf 데이터 버전을 확인할 수 없어 문자열을 인코딩할 수 없습니다.')
-}
-
-export function getAllFileInDir(Directory:string, ext:null|string = null) {
-    let Files:string[] = [];
-
-    function ThroughDirectory(Directory: string) {
-        fs.readdirSync(Directory).forEach(File => {
-            const Absolute = path.join(Directory, File);
-            if (fs.statSync(Absolute).isDirectory()){
-                ThroughDirectory(Absolute);
-                return
-            }
-            else{
-                if(ext){
-                    if(path.extname(Absolute) === ext){
-                        Files.push(Absolute);
-                    }
-                }
-                else{
-                    Files.push(Absolute);
-                }
-                return
-            }
-        });
-    }
-
-    ThroughDirectory(Directory);
-    return Files
 }

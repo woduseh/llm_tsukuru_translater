@@ -1,5 +1,4 @@
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
-import { redactSecretLikeValues } from './contractsValidation';
 
 export interface AppBridgeTokenRecord {
   tokenHash: string;
@@ -38,10 +37,6 @@ export function validateAppBridgeToken(
   const expected = Buffer.from(record.tokenHash, 'hex');
   const actual = Buffer.from(candidateHash, 'hex');
   return expected.length === actual.length && timingSafeEqual(expected, actual);
-}
-
-export function redactBridgeTokenPayload<T extends Record<string, unknown>>(payload: T): T {
-  return redactSecretLikeValues(payload as never).value as unknown as T;
 }
 
 function hashBridgeToken(token: string): string {

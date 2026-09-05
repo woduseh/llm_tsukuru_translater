@@ -9,10 +9,6 @@
     "forceConsistentCasingInFileNames": true,
     "jsx": "preserve",
     "lib": ["ESNext", "DOM"],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/renderer/*"]
-    },
     "types": ["vite/client", "node"]
   },
   "include": ["src/renderer/**/*.ts", "src/renderer/**/*.vue"]

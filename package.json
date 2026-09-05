@@ -4,11 +4,9 @@
   "description": "LLM Tsukuru Translater",
   "main": "dist-main/main.js",
   "scripts": {
-    "codepage": "chcp 65001",
-    "start2": "electron . start",
-    "start": "npm-run-all --parallel codepage start2",
+    "start": "electron .",
     "dev:renderer": "vite --config vite.renderer.config.ts",
-    "dev:electron": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron . start",
+    "dev:electron": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
     "dev": "npm-run-all --parallel dev:renderer dev:electron",
     "typecheck:main": "tsc -p tsconfig.main.json --noEmit",
     "typecheck:renderer": "vue-tsc -p tsconfig.renderer.json --noEmit",
@@ -37,12 +35,8 @@
   "author": "Jackdu",
   "license": "GPL-3.0",
   "devDependencies": {
-    "@types/adm-zip": "^0.5.7",
-    "@types/aes-js": "^3.1.4",
     "@types/fs-extra": "^11.0.4",
     "@types/js-yaml": "^4.0.9",
-    "@types/jsdom": "^28.0.0",
-    "@types/lodash": "^4.17.24",
     "@types/node": "^22.20.1",
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
@@ -58,13 +52,13 @@
     "typescript": "^5.9.3",
     "vitest": "^4.0.18",
     "vue-eslint-parser": "^10.4.1",
-    "vue-tsc": "^3.3.8"
+    "vue-tsc": "^3.3.8",
+    "jsdom": "^28.1.0"
   },
   "dependencies": {
     "@msgpack/msgpack": "^3.1.3",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
-    "aes-js": "^3.1.2",
     "axios": "^1.13.6",
     "electron-log": "^5.4.3",
     "electron-store": "^8.2.0",
@@ -72,12 +66,9 @@
     "fast-csv": "^5.0.5",
     "fast-glob": "^3.3.3",
     "fs-extra": "^11.3.3",
-    "glob": "^13.0.6",
     "google-auth-library": "^10.6.2",
     "iconv-lite": "^0.7.2",
     "js-yaml": "^4.1.0",
-    "jsdom": "^28.1.0",
-    "lodash": "^4.17.21",
     "node-pty": "^1.1.0",
     "open": "^8.4.0",
     "sweetalert2": "^11.26.21",
@@ -89,8 +80,7 @@
     "appId": "net.electron.LlmTsukuruTranslater",
     "asar": true,
     "asarUnpack": [
-      "node_modules/node-pty/**",
-      "node_modules/@homebridge/node-pty-prebuilt-multiarch/**"
+      "node_modules/node-pty/**"
     ],
     "files": [
       "dist-main/**",
@@ -103,37 +93,19 @@
       "!test/**",
       "!src/**"
     ],
-    "extraResources": [],
-    "protocols": {
-      "name": "LlmTsukuruTranslater",
-      "schemes": [
-        "LlmTsukuruTranslater"
-      ]
-    },
     "win": {
       "target": [
         "portable",
         "nsis"
       ],
-      "icon": "./res/icon.ico",
-      "files": [
-        "!gruntfile.js",
-        "!README.md",
-        "!notarize.js",
-        "!.env",
-        "!minify.js",
-        "!.git/*",
-        "!resources/mac/*"
-      ]
+      "icon": "./res/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
     "directories": {
-      "buildResources": "./resources/installer/",
-      "output": "./dist/",
-      "app": "./"
+      "output": "./dist/"
     }
   }
 }

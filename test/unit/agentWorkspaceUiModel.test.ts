@@ -4,15 +4,12 @@ import {
   applyTerminalEvent,
   chooseActiveTerminalSessionId,
   createAgentWorkspaceViewModel,
-  createCommandPreview,
   mcpStatusLabel,
   mergeTerminalSession,
-  noProjectGuidance,
-  providerNotReadyGuidance,
   sessionStateLabel,
-  shouldPersistTerminalOutput,
 } from '../../src/renderer/agentWorkspaceModel'
 import type { TerminalSessionSummary } from '../../src/types/agentWorkspace'
+import { createTerminalCommandPreview } from '../../src/terminalCommandPresets'
 import { createMockTerminalEvent } from '../utils/terminalFixtures'
 
 describe('agent workspace UI model', () => {
@@ -44,17 +41,14 @@ describe('agent workspace UI model', () => {
   })
 
   it('quotes command paths containing spaces', () => {
-    expect(createCommandPreview('codex', ['--cwd', 'C:\\Game Project'])).toBe('codex --cwd "C:\\Game Project"')
+    expect(createTerminalCommandPreview('codex', ['--cwd', 'C:\\Game Project'])).toBe('codex --cwd "C:\\Game Project"')
   })
 
-  it('exposes MCP enabled/degraded/disconnected UX states and setup guidance', () => {
+  it('exposes MCP enabled/degraded/disconnected UX states', () => {
     const workspace = createAgentWorkspaceViewModel()
 
     expect(workspace.mcpStatusCards.map((state) => state.status)).toEqual(['enabled', 'degraded', 'disconnected'])
     expect(mcpStatusLabel('degraded')).toBe('MCP 준비 필요')
-    expect(providerNotReadyGuidance()).toContain('번역 제공자')
-    expect(providerNotReadyGuidance()).toContain('설정 화면')
-    expect(noProjectGuidance()).toContain('선택된 프로젝트가 없습니다')
   })
 
   it('renders supported session states through stable labels', () => {
@@ -69,10 +63,9 @@ describe('agent workspace UI model', () => {
     const updated = applyTerminalEvent(session, event)
 
     expect(session.persistOutput).toBe(false)
-    expect(shouldPersistTerminalOutput(session)).toBe(false)
     expect(updated.latestSequence).toBe(4)
     expect(updated.sessionId).toBe('term-event')
-    expect(shouldPersistTerminalOutput(updated)).toBe(false)
+    expect(updated.persistOutput).toBe(false)
   })
 })
 

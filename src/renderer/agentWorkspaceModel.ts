@@ -1,6 +1,5 @@
 import type {
   TerminalEvent,
-  TerminalEventKind,
   TerminalSessionKind,
   TerminalSessionState,
   TerminalSessionSummary,
@@ -98,15 +97,6 @@ export const SESSION_STATE_LABELS: Record<AgentTerminalSessionState, string> = {
   reconnecting: '다시 연결 중',
 }
 
-export const TERMINAL_EVENT_LABELS: Record<TerminalEventKind, string> = {
-  stdout: 'stdout',
-  stderr: 'stderr',
-  exit: 'exit',
-  started: 'started',
-  error: 'error',
-  truncated: 'truncated',
-}
-
 export const MCP_STATUS_LABELS: Record<McpConnectionStatus, string> = {
   enabled: 'MCP 연결 준비됨',
   degraded: 'MCP 준비 필요',
@@ -150,10 +140,6 @@ export function applyTerminalEvent(session: TerminalSessionSummary, event: Termi
     latestSequence: Math.max(session.latestSequence, event.sequence),
     exitCode: event.exitCode ?? session.exitCode,
   }
-}
-
-export function shouldPersistTerminalOutput(session: TerminalSessionSummary): boolean {
-  return session.persistOutput && session.outputRetention === 'persisted'
 }
 
 export const AGENT_COMMAND_PRESETS: AgentCommandPreset[] = [
@@ -301,7 +287,7 @@ export function createAgentCliPreset(options: {
     terminalKind: options.terminalKind,
     executable: createExecutableDetectionHint(options.executableNames),
     command: options.command,
-    commandPreview: createCommandPreview(options.command.executable, options.command.args),
+    commandPreview: createTerminalCommandPreview(options.command.executable, options.command.args),
     starterPrompts: DEFAULT_STARTER_PROMPTS,
     mcpStatus: options.mcpStatus,
     mcpMessage: options.mcpMessage,
@@ -320,20 +306,8 @@ export function createExecutableDetectionHint(executableNames: string[], status:
   }
 }
 
-export function createCommandPreview(executable: string, args: string[]): string {
-  return createTerminalCommandPreview(executable, args)
-}
-
 export function mcpStatusLabel(status: McpConnectionStatus): string {
   return MCP_STATUS_LABELS[status]
-}
-
-export function providerNotReadyGuidance(): string {
-  return '번역 제공자가 준비되지 않았습니다. 설정 화면에서만 인증 정보를 입력한 뒤 번역 전 준비 상태를 다시 확인하세요.'
-}
-
-export function noProjectGuidance(): string {
-  return '선택된 프로젝트가 없습니다. 에이전트 작업을 실행하기 전에 RPG Maker MV/MZ 또는 Wolf RPG 프로젝트를 선택하세요.'
 }
 
 /**

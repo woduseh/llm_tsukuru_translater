@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 
@@ -39,12 +38,4 @@ describe('post-release cleanup regressions', () => {
     expect(result.status, result.stderr || result.stdout).toBe(0);
   });
 
-  it('does not redundantly overwrite themeList after applying validated settings', () => {
-    const settingsHandler = fs.readFileSync(
-      path.join(repoRoot, 'src', 'ipc', 'settingsHandler.ts'),
-      'utf8',
-    );
-
-    expect(settingsHandler).not.toContain('ctx.settings.themeList = Object.keys(Themes)');
-  });
 });

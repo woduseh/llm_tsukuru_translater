@@ -24,19 +24,6 @@ export function readTextFile(filePath: string, encoding: BufferEncoding = 'utf-8
 }
 
 /**
- * Read and parse a JSON file with BOM handling.
- * Throws a descriptive FileIOError on failure.
- */
-export function readJsonFile<T = unknown>(filePath: string): T {
-    const text = readTextFile(filePath);
-    try {
-        return JSON.parse(text) as T;
-    } catch (err) {
-        throw new FileIOError(`JSON 파싱 실패: ${filePath}`, filePath, 'parse', err);
-    }
-}
-
-/**
  * Write text to a file.
  * Throws a descriptive FileIOError on failure.
  */
@@ -48,25 +35,12 @@ export function writeTextFile(filePath: string, content: string, encoding: Buffe
     }
 }
 
-/**
- * Serialize and write JSON to a file.
- * Throws a descriptive FileIOError on failure.
- */
-export function writeJsonFile(filePath: string, data: unknown, indent: number | string = 2): void {
-    try {
-        const json = JSON.stringify(data, null, indent);
-        fs.writeFileSync(filePath, json, 'utf-8');
-    } catch (err) {
-        throw new FileIOError(`JSON 파일을 쓸 수 없습니다: ${filePath}`, filePath, 'write', err);
-    }
-}
-
 export class FileIOError extends Error {
     public readonly filePath: string;
-    public readonly operation: 'read' | 'write' | 'parse';
+    public readonly operation: 'read' | 'write';
     public readonly cause: unknown;
 
-    constructor(message: string, filePath: string, operation: 'read' | 'write' | 'parse', cause: unknown) {
+    constructor(message: string, filePath: string, operation: 'read' | 'write', cause: unknown) {
         super(message);
         this.name = 'FileIOError';
         this.filePath = filePath;

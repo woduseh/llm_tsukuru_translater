@@ -95,18 +95,6 @@ export const ignores = [
     'Weapons.json'
 ]
 
-export const translateable = [
-    '<profile:',
-    '<desc1:',
-    '<desc2:',
-    '<desc3:',
-    '<SG説明',
-    '<SG説明2:',
-    "<namePop:",
-    "<SGカテゴリ:",
-    '<shop_mes:',
-]
-
 export const hanguls= /[ㄱ-ㅎㅏ-ㅣ가-힣]/;
 
 export const beautifyCodes = [

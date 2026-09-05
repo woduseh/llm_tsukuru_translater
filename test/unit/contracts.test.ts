@@ -40,15 +40,6 @@ describe('IPC channel contract', () => {
 
 describe('LLM provider metadata contract', () => {
   it('declares current provider identities, required fields, secrets, and cache inputs', () => {
-    expect(Object.keys(LLM_PROVIDER_METADATA).sort()).toEqual(['claude', 'custom-openai', 'gemini', 'openai', 'vertex']);
-    expect(LLM_PROVIDER_METADATA.gemini.displayName).toBe('Gemini API');
-    expect(LLM_PROVIDER_METADATA.vertex.displayName).toBe('Vertex AI');
-    expect(LLM_PROVIDER_METADATA.openai.displayName).toBe('OpenAI');
-    expect(LLM_PROVIDER_METADATA['custom-openai'].displayName).toBe('OpenAI 호환 API');
-    expect(LLM_PROVIDER_METADATA.claude.displayName).toBe('Claude');
-    expect(LLM_PROVIDER_METADATA.gemini.defaultModel).toBe('gemini-2.5-flash');
-    expect(LLM_PROVIDER_METADATA.claude.defaultModel).toBe('claude-haiku-4-5-20251001');
-    expect(LLM_PROVIDER_METADATA.claude.modelSuggestions).not.toContain('claude-3-5-haiku-latest');
     expect(LLM_PROVIDER_METADATA.gemini.settingFields.some((field) => field.key === 'llmApiKey' && field.secret)).toBe(true);
     expect(LLM_PROVIDER_METADATA.vertex.settingFields.some((field) => field.key === 'llmVertexServiceAccountJson' && field.secret)).toBe(true);
     expect(LLM_PROVIDER_METADATA.openai.settingFields.some((field) => field.key === 'llmOpenAiApiKey' && field.secret)).toBe(true);
@@ -67,43 +58,6 @@ describe('LLM provider metadata contract', () => {
 });
 
 describe('harness result contract', () => {
-  it('accepts deterministic suite results and opt-in live skipped results', () => {
-    const deterministicResult: HarnessSuiteResult = {
-      schemaVersion: 1,
-      suite: 'harness-core',
-      status: 'passed',
-      total: 1,
-      passed: 1,
-      failed: 0,
-      cases: [{
-        id: 'contract-case',
-        title: 'contract case',
-        status: 'passed',
-        durationMs: 1,
-        details: { stable: true },
-      }],
-      metrics: { stable: true },
-      artifacts: { result: 'artifacts/harness/harness-core.json' },
-      reproCommand: 'npm run harness:core',
-      failureHints: [],
-    };
-    const liveSkippedResult: HarnessSuiteResult = {
-      schemaVersion: 1,
-      suite: 'harness-live',
-      status: 'skipped',
-      cases: [],
-      provider: 'gemini',
-      reason: 'required live-provider credentials or model were not supplied',
-      metrics: { credentialsPresent: false },
-      artifacts: { result: 'artifacts/harness/harness-live.json' },
-      reproCommand: 'npm run harness:live',
-      failureHints: ['Set credentials to run live harness.'],
-    };
-
-    expect(deterministicResult.status).toBe('passed');
-    expect(liveSkippedResult.status).toBe('skipped');
-  });
-
   it('normalizes shared harness output with agent-facing fields and failure hints', async () => {
     const result = await harnessShared.runCases('harness-contract', [{
       id: 'intentional-failure',

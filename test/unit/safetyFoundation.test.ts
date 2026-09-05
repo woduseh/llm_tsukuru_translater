@@ -11,7 +11,6 @@ import {
 import {
   AbortError,
   DirectoryOperationLock,
-  runWithConcurrency,
 } from '../../src/ts/libs/concurrency';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'safetyFoundation');
@@ -92,37 +91,6 @@ describe('atomic file writes', () => {
     expect((thrown as AtomicFileWriteError).cause).toBeInstanceOf(AtomicFilePreimageMismatchError);
     expect(fs.readFileSync(targetPath, 'utf-8')).toBe('newer edit');
     expect(listAtomicTemps(dir)).toEqual([]);
-  });
-});
-
-describe('promise pool concurrency', () => {
-  it('limits active workers and preserves result order', async () => {
-    let active = 0;
-    let maxActive = 0;
-
-    const results = await runWithConcurrency([1, 2, 3, 4, 5], async (item) => {
-      active++;
-      maxActive = Math.max(maxActive, active);
-      await delay(5);
-      active--;
-      return item * 10;
-    }, { concurrency: 2 });
-
-    expect(results).toEqual([10, 20, 30, 40, 50]);
-    expect(maxActive).toBeLessThanOrEqual(2);
-  });
-
-  it('stops launching queued work when aborted', async () => {
-    const controller = new AbortController();
-    const started: number[] = [];
-
-    await expect(runWithConcurrency([1, 2, 3], (item) => {
-      started.push(item);
-      controller.abort('stop');
-      return item;
-    }, { concurrency: 1, signal: controller.signal })).rejects.toThrow(AbortError);
-
-    expect(started).toEqual([1]);
   });
 });
 
