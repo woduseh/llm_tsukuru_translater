@@ -18,7 +18,6 @@ Typecheck, app build, lint (0 errors, 87 existing warnings), and 629 tests acros
 ## Remaining evidence gaps
 
 - **Real Wolf runtime:** deterministic tests cover archive collisions and rollback, but a real game/wolfdec run has not confirmed decryption, recoverable archive naming, translation/apply, and runtime loading from loose `Data/**` end to end.
-- **JSON Verify UI:** IPC/write-path tests cover path escape, invalid JSON, and stale preimages. Electron interaction still needs coverage for selected revert, current/all repair, LLM preview/apply, and an external-edit race.
 - **External/runtime conditions:** live providers, the installer artifact, and antivirus/file-lock interference were not validated by this work. Earlier packaged approval/terminal checks in completed milestones do not close these specific gaps.
 
 No additional deterministic P1/P2 implementation defect was known at that checkpoint. Live-provider and packaged checks remain opt-in; relevant commands are in [Harness](../../HARNESS.md).

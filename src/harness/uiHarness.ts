@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { AppContext } from '../appContext';
 import log from '../logger';
+import { exerciseJsonReview } from './jsonReviewHarness';
 
 interface UiHarnessScenario {
   compareDir: string;
@@ -659,12 +660,16 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
     });
     screenshots.verify = await captureScreen(verifyWindow, diagnosticDir, 'verify');
 
+    checkpoint('json-verify-actions');
+    const jsonReviewCases = await exerciseJsonReview(verifyWindow, scenario.verifyDir, stepTimeoutMs);
+
     const result: UiHarnessResult = {
       schemaVersion: 1,
       suite: 'harness-ui',
       status: 'passed',
       completedAt: new Date().toISOString(),
       cases: [
+        ...jsonReviewCases,
         { id: 'unified-workspace', title: 'Single window review context and unsaved text/settings survive tab switches', status: 'passed', durationMs: 0, details: { sameFile, preservedDraft, preservedModel, windowCount: 1 } },
         { id: 'project-session', title: 'Project file count and home return preserve actual session context', status: 'passed', durationMs: 0, details: { projectFiles, restoredProjectPath } },
         { id: 'home-window', title: 'home window exposes stable harness state', status: 'passed', durationMs: 0, details: home },
@@ -679,7 +684,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
         { id: 'json-verify-window', title: 'JSON verify window summarizes fixture issues', status: 'passed', durationMs: 0, details: verify },
       ],
       metrics: {
-        caseCount: 12,
+        caseCount: 12 + jsonReviewCases.length,
         deterministic: true,
       },
       artifacts: {

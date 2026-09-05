@@ -119,4 +119,80 @@ describe('structure review workspace', () => {
     await nextTick()
     expect(host.querySelector('.llm-preview')).toBeNull()
   })
+
+  async function startRepair() {
+    listeners.get('initVerify')!('/game')
+    listeners.get('verifySettings')!({ llmReady: true })
+    await nextTick()
+    host.querySelector<HTMLInputElement>('.issue-checkbox input')!.click()
+    await nextTick()
+    host.querySelector<HTMLButtonElement>('[data-harness-shift-repair]')!.click()
+    await nextTick()
+    return send.mock.calls.find(call => call[0] === 'verifyLlmRepair')![1]
+  }
+
+  async function finishRepair(request: { requestId: string }) {
+    listeners.get('verifyLlmRepairDone')!({ requestId: request.requestId, success: true, results: [{ path: '$.name', origText: 'original', newText: '수정' }] })
+    await nextTick()
+  }
+
+  it('locks structure writes while an LLM repair is running and unlocks after completion', async () => {
+    window.verify.verifyJsonIntegrity = () => [{ path: '$.name', type: 'text_shift', severity: 'error', message: 'shift', origValue: 'original' }]
+    app = createApp(JsonVerifyPage, { embedded: true })
+    app.mount(host)
+    const request = await startRepair()
+    const buttons = ['선택 되돌리기', '현재 파일 수정', '전체 수정'].map(label =>
+      [...host.querySelectorAll('button')].find(button => button.textContent === label)!)
+    for (const button of buttons) {
+      expect(button.disabled).toBe(true)
+      button.click()
+    }
+    expect(send.mock.calls.some(call => call[0] === 'verifyApplyJson')).toBe(false)
+    expect(window.verify.repairJson).not.toHaveBeenCalled()
+    await finishRepair(request)
+    for (const button of buttons) expect(button.disabled).toBe(false)
+  })
+
+  it('preserves previews on same-file selection and requires confirmation to select another file', async () => {
+    window.verify.verifyJsonIntegrity = () => [{ path: '$.name', type: 'text_shift', severity: 'error', message: 'shift', origValue: 'original' }]
+    app = createApp(JsonVerifyPage, { embedded: true })
+    app.mount(host)
+    await finishRepair(await startRepair())
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const fileButtons = host.querySelectorAll<HTMLButtonElement>('.file-item')
+    fileButtons[0].click()
+    await nextTick()
+    expect(confirm).not.toHaveBeenCalled()
+    expect(host.querySelector('.llm-preview')).not.toBeNull()
+    fileButtons[1].click()
+    await nextTick()
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(host.querySelector('.issues-file-name')!.textContent).toBe('Map001.json')
+    expect(host.querySelector('.llm-preview')).not.toBeNull()
+    confirm.mockReturnValue(true)
+    fileButtons[1].click()
+    await nextTick()
+    expect(host.querySelector('.issues-file-name')!.textContent).toBe('Map002.json')
+    expect(reviewWorkspace.focusedFile).toBe('Map002.json')
+    expect(host.querySelector('.llm-preview')).toBeNull()
+  })
+
+  it('keeps unapplied previews when another tab changes the focused file without prompting', async () => {
+    window.verify.verifyJsonIntegrity = () => [{ path: '$.name', type: 'text_shift', severity: 'error', message: 'shift', origValue: 'original' }]
+    const visible = ref(true)
+    app = createApp({ render: () => h(KeepAlive, () => visible.value ? h(JsonVerifyPage, { embedded: true }) : h('div')) })
+    app.mount(host)
+    await finishRepair(await startRepair())
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    visible.value = false
+    await nextTick()
+    reviewWorkspace.focusedFile = 'Map002.txt'
+    visible.value = true
+    await nextTick()
+    expect(confirm).not.toHaveBeenCalled()
+    expect(host.querySelector('.issues-file-name')!.textContent).toBe('Map001.json')
+    expect(reviewWorkspace.focusedFile).toBe('Map001.json')
+    expect(host.querySelector('.llm-preview')).not.toBeNull()
+    expect(host.querySelector('[role="status"]')!.textContent).toContain('미리보기를 유지했어요')
+  })
 })

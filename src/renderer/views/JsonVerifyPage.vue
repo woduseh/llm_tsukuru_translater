@@ -49,15 +49,15 @@
         </div>
         <div v-if="selectedIssues.size > 0" class="action-buttons selection-toolbar">
           <span class="selection-count">{{ selectedIssues.size }}개 선택</span>
-          <button :disabled="verifyWriting" @click="revertSelected" title="선택한 항목을 원본 값으로 되돌립니다">선택 되돌리기</button>
+          <button :disabled="verifyWriting || llmRepairing" @click="revertSelected" title="선택한 항목을 원본 값으로 되돌립니다">선택 되돌리기</button>
           <button :disabled="verifyWriting" @click="selectedIssues.clear()">선택 해제</button>
         </div>
         <details class="batch-actions">
           <summary>파일 단위 자동 수정</summary>
           <p>원본 구조를 기준으로 수정해요. 번역 값이 원본으로 되돌아갈 수 있어요.</p>
           <div class="action-buttons">
-            <button :disabled="!currentHasIssues || verifyWriting" @click="repairCurrentFile">현재 파일 수정</button>
-            <button :disabled="!anyHasIssues || verifyWriting" @click="repairAll">전체 수정</button>
+            <button :disabled="!currentHasIssues || verifyWriting || llmRepairing" @click="repairCurrentFile">현재 파일 수정</button>
+            <button :disabled="!anyHasIssues || verifyWriting || llmRepairing" @click="repairAll">전체 수정</button>
           </div>
         </details>
         <div class="status" :class="statusClass" role="status">{{ statusText }}</div>
@@ -444,6 +444,10 @@ const filteredFiles = computed(() => {
 
 function selectFile(idx: number) {
   if (llmRepairing.value || verifyWriting.value) return
+  if (llmRepairResults.value.length > 0) {
+    if (idx === currentIdx.value) return
+    if (!window.confirm('아직 적용하지 않은 LLM 수정 미리보기를 버리고 다른 파일을 열까요?')) return
+  }
   currentIdx.value = idx
   reviewWorkspace.focusedFile = files.value[idx]?.name ?? ''
   selectedIssues.value = new Set()
@@ -524,6 +528,7 @@ function refreshFileIssues(idx: number) {
 }
 
 async function revertSelected() {
+  if (llmRepairing.value || verifyWriting.value) return
   const f = files.value[currentIdx.value]
   if (!f || selectedIssues.value.size === 0) return
   verifyWriting.value = true
@@ -593,6 +598,7 @@ async function repairFile(idx: number): Promise<{ success: boolean; fixed: numbe
 }
 
 async function repairCurrentFile() {
+  if (llmRepairing.value || verifyWriting.value) return
   verifyWriting.value = true
   try {
     const result = await repairFile(currentIdx.value)
@@ -614,6 +620,7 @@ async function repairCurrentFile() {
 }
 
 async function repairAll() {
+  if (llmRepairing.value || verifyWriting.value) return
   verifyWriting.value = true
   let repaired = 0, failed = 0, totalFixed = 0, totalRemaining = 0
   try {
@@ -798,7 +805,15 @@ onActivated(() => {
   if (reviewWorkspace.projectDir !== dataDir.value) return
   const idx = findReviewFileIndex(files.value, reviewWorkspace.focusedFile)
   if (idx === currentIdx.value && idx >= 0) reviewWorkspace.focusedFile = files.value[idx].name
-  if (idx >= 0 && idx !== currentIdx.value) selectFile(idx)
+  if (idx >= 0 && idx !== currentIdx.value) {
+    if (llmRepairResults.value.length > 0) {
+      reviewWorkspace.focusedFile = files.value[currentIdx.value]?.name ?? ''
+      statusText.value = '적용하지 않은 LLM 수정 미리보기를 유지했어요. 적용하거나 취소한 뒤 다른 파일을 선택해주세요.'
+      statusClass.value = ''
+      return
+    }
+    selectFile(idx)
+  }
 })
 </script>
 

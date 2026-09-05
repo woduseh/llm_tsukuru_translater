@@ -49,6 +49,13 @@ UI runs with temporary settings, user-data, session and log directories. It igno
 
 UI workspaces retain `build.log` and, once Electron starts, `electron.log`, `progress.json` and home/compare/verify PNGs. Failure capture is best-effort: `diagnostics.json` contains structural window state, with no form values or HTML dump. `npm run harness:ui -- --fail-at home` changes the expected fixture heading and must exit nonzero. Check for the home-stage assertion; a build/setup failure or a package that ignores the fault scenario does not establish that assertion ran. UI assertions/screenshots do not establish visual fidelity or full real-game compatibility. Tooling tests use Vite/Electron stand-ins and establish orchestration contracts only.
 
+JSON review action coverage lives in `src/harness/jsonReviewHarness.ts`. It clicks the real
+Electron renderer and checks disk contents for selected revert, current/all structural repair,
+partial failure, LLM preview cancellation/application, and external edits both before application
+and between renderer validation and the main-process write. Only `verifyLlmRepair` responses are
+stubbed; saves use the production IPC and atomic writer. This establishes deterministic interaction
+and file-integrity behavior, not live-provider output quality or real-game compatibility.
+
 Vitest also mounts the real compare Vue component in jsdom (`test/unit/comparePage.test.ts`) to exercise editing, badges, navigation and saving. The in-process MCP client helper is under `test/utils/`; production protocol behavior is exercised through the actual stdio handler and bundled-server harness.
 
 Harness regression tests inject incorrect verifier results, corrupt translations and native module load failures. Native PTY fallback is checked against the real adapter and terminal service in `test/unit/packageHarness.test.ts`; package smoke alone does not establish fallback behavior. The eval score is the pass percentage of its fixture corpus, not a general translation-quality score.
