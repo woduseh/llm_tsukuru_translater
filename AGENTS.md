@@ -3,7 +3,7 @@
 Electron + Vue desktop translator for RPG Maker MV/MZ and Wolf RPG Editor. This is the repository's single coding-agent entry point.
 
 - Preserve extracted text line-number alignment with `.extracteddata`, separators, control codes, and intentional empty lines. These determine where translations are applied.
-- Choose implementation and verification to match the change. Add regression coverage for changed behavior; stop once relevant checks pass unless new evidence warrants more work. Default tests/CI use fixtures and mocks; live providers are opt-in.
+- Choose implementation and verification to match the change. Add regression coverage for changed behavior; once the requested implementation and deliverables are ready and relevant checks pass, do not broaden or repeat verification without new evidence. Complete remaining authorized work and handoff before ending the task. Default tests/CI use fixtures and mocks; live providers are opt-in.
 - The app's game-project MCP approval rules describe product behavior, not permission requirements for editing this repository.
 
 For a verification loop, use `npm run verify:plan` to see checks and selection reasons, then `npm run verify` to execute them. It includes staged, unstaged, deleted and untracked files. For committed branch work use `npm run verify -- --base <ref>`; `npm run verify:full` runs all deterministic CI gates. Focused tests remain useful during implementation.
