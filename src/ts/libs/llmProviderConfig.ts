@@ -19,6 +19,7 @@ export interface LlmStartWindowState extends Pick<LlmSettingsValidation, 'llmPro
   llmParallelWorkers: number;
   llmRequestsPerMinute: number;
   llmSourceLang: string;
+  llmModel: string;
   llmTargetLang: string;
   llmCustomPrompt: string;
   themeData: Record<string, string>;
@@ -68,6 +69,7 @@ export function buildLlmStartWindowState(settings: AppSettings): LlmStartWindowS
     llmParallelWorkers: normalizeTranslationConcurrency(settings.llmParallelWorkers),
     llmRequestsPerMinute: normalizeTranslationRpm(settings.llmRequestsPerMinute),
     llmSourceLang: settings.llmSourceLang || 'ja',
+    llmModel: settings.llmModel || '',
     llmTargetLang: settings.llmTargetLang || 'ko',
     llmCustomPrompt: settings.llmCustomPrompt || '',
     themeData: settings.themeData || {},

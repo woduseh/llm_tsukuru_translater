@@ -13,12 +13,14 @@
         <button type="button" class="btn-secondary" @click="selectFolder">{{ hasFolder ? '프로젝트 변경' : '폴더 선택' }}</button>
         <p>{{ folderPath || 'Wolf RPG 게임 폴더를 선택하면 작업을 시작할 수 있습니다.' }}</p>
       </header>
-      <div class="wolf-pipeline" aria-label="번역 작업 단계">
+      <div class="wolf-pipeline" aria-label="번역 작업 도구">
         <button type="button" :class="{ current: !hasFolder || mode === 0 }" @click="hasFolder ? mode = 0 : selectFolder()"><b>1</b><span>추출<small>{{ !hasFolder ? '폴더 필요' : mode === 0 ? '선택됨' : '준비' }}</small></span></button>
-        <button type="button" :disabled="!hasFolder" @click="openLLMTranslate"><b>2</b><span>번역<small>{{ hasFolder ? '실행 가능' : '대기' }}</small></span></button>
-        <button type="button" :disabled="!hasFolder" @click="openLLMCompare"><b>3</b><span>검수<small>{{ hasFolder ? '비교 열기' : '대기' }}</small></span></button>
-        <button type="button" :class="{ current: mode === 1 }" :disabled="!hasFolder" @click="mode = 1"><b>4</b><span>적용<small>{{ mode === 1 ? '선택됨' : '대기' }}</small></span></button>
+        <button type="button" :disabled="!hasFolder" @click="openLLMTranslate"><b>2</b><span>번역<small>{{ hasFolder ? '범위 설정' : '폴더 필요' }}</small></span></button>
+        <button type="button" :disabled="!hasFolder" @click="openLLMCompare"><b>3</b><span>검수<small>{{ hasFolder ? '문제 확인' : '폴더 필요' }}</small></span></button>
+        <button type="button" :class="{ current: mode === 1 }" :disabled="!hasFolder" @click="mode = 1"><b>4</b><span>적용<small>{{ mode === 1 ? '선택됨' : '검수 후 적용' }}</small></span></button>
       </div>
+      <ProjectSnapshot v-if="hasFolder" :folder="folderPath" engine="wolf" />
+
       <div class="wolf-work">
         <section class="wolf-current">
           <p>현재 작업</p>
@@ -44,14 +46,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { api, useIpcOn } from '../composables/useIpc'
 import TitleBar from '../components/TitleBar.vue'
+import ProjectSnapshot from '../components/ProjectSnapshot.vue'
+import { useProjectSession } from '../composables/useProjectSession'
 import Swal from 'sweetalert2'
 
-const folderPath = ref('')
-const mode = ref(-1)
-const running = ref(false)
+const { folderPath, mode, running } = useProjectSession('wolf')
 const hasFolder = computed(() => folderPath.value.trim().length > 0)
 const hasMode = computed(() => mode.value === 0 || mode.value === 1)
 const canRun = computed(() => hasFolder.value && hasMode.value && !running.value)
@@ -118,7 +120,7 @@ function openLLMCompare() {
 }
 
 onMounted(() => {
-  api.send('setheight', 550)
+  api.send('setheight', 700)
 
   useIpcOn('set_path', (tt: Record<string, string>) => {
     if (tt && tt.type === 'wolf_folder_input') {
@@ -127,7 +129,7 @@ onMounted(() => {
     }
   })
 
-  useIpcOn('worked', () => { running.value = false })
+
 
   useIpcOn('alert2', async () => {
     const { isDenied } = await Swal.fire({
@@ -198,4 +200,12 @@ onMounted(() => {
 .wolf-capability-note p { margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .wolf-capability-note p:last-child { margin-bottom: 0; color: var(--subtle); }
 .wolf-capability-note strong { color: var(--mainColor); }
+
+.console-body, .wolf-body { overflow-y: auto; padding-bottom: 56px; }
+.pipeline, .wolf-pipeline { flex-shrink: 0; }
+.work-grid, .wolf-work { flex: none; }
+@media (max-width: 680px) {
+  .work-grid, .wolf-work { grid-template-columns: 1fr; }
+  .current-task, .wolf-current { border-right: 0; border-bottom: var(--border); }
+}
 </style>

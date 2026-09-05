@@ -29,6 +29,9 @@ import { useIpcOn } from './composables/useIpc'
 import { useMutationApprovals } from './composables/useMutationApprovals'
 import Swal from 'sweetalert2'
 import { AGENT_WORKSPACE_ROUTE } from './agentWorkspaceModel'
+import { projectBusy } from './composables/useProjectSession'
+
+useIpcOn('worked', () => { projectBusy.value = false })
 
 const route = useRoute()
 const router = useRouter()

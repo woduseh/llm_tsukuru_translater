@@ -16,8 +16,8 @@
       @click="$emit('settings')"
       aria-label="설정 열기"
     >설정</button>
-    <div class="icon minimize" @click="api.send('minimize')">&#x2013;</div>
-    <div class="icon close" @click="api.send('close')">&times;</div>
+    <button type="button" class="icon minimize" aria-label="창 최소화" @click="api.send('minimize')">&#x2013;</button>
+    <button type="button" class="icon close" aria-label="앱 닫기" @click="api.send('close')">&times;</button>
   </div>
 </template>
 
@@ -129,6 +129,7 @@ onMounted(() => {
   font-size: 11px; opacity: 0.6; font-weight: 500; z-index: 1;
 }
 .icon {
+  border: 0; background: transparent;
   -webkit-app-region: no-drag;
   width: 40px; height: 38px;
   display: flex; align-items: center; justify-content: center;

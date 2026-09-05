@@ -9,9 +9,18 @@
     <section class="home-main">
       <header>
         <p class="eyebrow">LOCALIZATION WORKSPACE</p>
-        <h1>번역 프로젝트를 시작하세요</h1>
-        <p class="subtitle">게임 엔진을 선택하면 추출부터 검수와 적용까지 한 흐름으로 이어집니다.</p>
+        <h1>{{ activeProject.path ? '프로젝트 작업을 이어가세요' : '번역 프로젝트를 시작하세요' }}</h1>
+        <p class="subtitle">{{ activeProject.path ? '열려 있는 프로젝트로 돌아가거나 다른 게임 프로젝트를 선택하세요.' : '게임 엔진을 선택하면 추출부터 검수와 적용까지 한 흐름으로 이어집니다.' }}</p>
       </header>
+
+      <section v-if="activeProject.path" class="resume-project" aria-label="열려 있는 프로젝트">
+        <div>
+          <span class="eyebrow">열려 있는 프로젝트 · {{ activeProject.engine === 'wolf' ? 'Wolf RPG' : 'MV / MZ' }}</span>
+          <h2>{{ projectName }}</h2>
+          <p :title="activeProject.path">{{ activeProject.path }}</p>
+        </div>
+        <button type="button" class="btn-run" data-harness-resume-project @click="$router.push('/' + activeProject.engine)">작업공간으로 돌아가기</button>
+      </section>
 
       <div class="engine-list" aria-label="프로젝트 유형">
         <button type="button" @click="$router.push('/mvmz')">
@@ -26,7 +35,7 @@
           <span class="engine-code">WOLF</span>
           <span>
             <strong>Wolf RPG 프로젝트</strong>
-            <small>DB · 커먼 이벤트 · 맵 이벤트</small>
+            <small>맵 이벤트 대사 · DB / 커먼 이벤트 미지원</small>
           </span>
           <b>시작</b>
         </button>
@@ -40,9 +49,19 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import TitleBar from '../components/TitleBar.vue'
 import { api } from '../composables/useIpc'
+import { activeProject } from '../composables/useProjectSession'
+
+const projectName = computed(() => {
+  const parts = activeProject.path.replaceAll('\\', '/').split('/').filter(Boolean)
+  if (activeProject.engine === 'mvmz' && parts.at(-1)?.toLowerCase() === 'data') {
+    parts.pop()
+    if (parts.at(-1)?.toLowerCase() === 'www') parts.pop()
+  }
+  return parts.at(-1) || activeProject.path
+})
 
 onMounted(() => {
   api.send('mainReady')
@@ -50,6 +69,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.resume-project { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 20px 0 0; padding: 20px; border: var(--border); border-left: 3px solid var(--Accent); border-radius: 8px; background: var(--Highlight1); }
+.resume-project > div { min-width: 0; }
+.resume-project h2 { margin-top: 5px; font-size: 20px; }
+.resume-project p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.resume-project button { flex-shrink: 0; }
 .home-console { flex: 1; min-height: 0; display: grid; grid-template-columns: 112px 1fr; }
 .home-rail { padding: 18px 12px; border-right: var(--border); background: #0c1216; display: flex; flex-direction: column; gap: 10px; }
 .home-rail strong { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #50616a; border-radius: 8px; color: var(--Healthy); }
@@ -57,7 +81,7 @@ onMounted(() => {
 .home-rail .rail-current { margin-top: 20px; background: #182329; border-left: 3px solid var(--Accent); color: var(--mainColor); font-weight: 800; }
 .home-rail button { margin-top: auto; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
 .home-rail button:hover { color: var(--mainColor); background: #172027; }
-.home-main { padding: 30px 34px 22px; display: flex; flex-direction: column; min-width: 0; }
+.home-main { padding: 24px 30px 64px; display: flex; flex-direction: column; min-width: 0; overflow-y: auto; }
 .eyebrow { color: var(--Healthy); font-size: 11px; font-weight: 800; letter-spacing: 1.1px; }
 .home-main h1 { margin-top: 6px; font-size: 28px; letter-spacing: -.6px; }
 .home-main header > p:last-child { margin-top: 7px; color: var(--muted); }
@@ -72,4 +96,7 @@ onMounted(() => {
 .engine-list button:hover b { border-color: #9d6d18; color: #ffc04a; }
 .home-main footer { margin-top: auto; padding-top: 16px; border-top: var(--border); display: flex; align-items: center; color: var(--muted); font-size: 12px; }
 .home-main footer i { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--Success); }
+@media (max-width: 850px) {
+  .resume-project { align-items: flex-start; flex-direction: column; }
+}
 </style>

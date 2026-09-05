@@ -176,7 +176,7 @@ describe('renderer IPC ownership', () => {
         expect(host.querySelector('[data-harness-view="llm-settings"]')?.getAttribute('data-llm-ready')).toBe('true')
         expect(host.querySelector<HTMLSelectElement>('#parallelWorkers')!.value).toBe('3')
       } else if (channel === 'verifySettings') {
-        expect(host.querySelector('.action-buttons button:nth-child(2)')?.textContent).toContain('줄밀림 LLM 수정')
+        expect(host.querySelector('[data-harness-shift-repair]')?.textContent).toContain('줄밀림 LLM 수정')
       }
     }
     for (const channel of ['getGlobalSettings', 'settings', 'llmSettings', 'verifySettings']) {

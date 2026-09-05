@@ -2,7 +2,27 @@
   <div id="container" data-harness-view="llm-settings" :data-llm-ready="llmReady ? 'true' : 'false'" :data-provider="currentProvider">
     <p class="window-eyebrow">TRANSLATION JOB</p>
     <h2>번역</h2>
+    <p class="intro">사용할 번역 설정과 실행 범위를 확인하세요.</p>
 
+    <section class="job-summary" aria-label="번역 설정 요약" data-harness-job-summary>
+      <div class="summary-heading">
+        <h3>이번 번역에 사용할 설정</h3>
+        <span class="ready-state" :class="{ ready: llmReady }">{{ llmReady ? '설정 준비됨' : '설정 확인 필요' }}</span>
+      </div>
+      <dl class="summary-grid">
+        <div><dt>언어</dt><dd>{{ languageLabel(sourceLang) }} → {{ languageLabel(targetLang) }}</dd></div>
+        <div><dt>제공자</dt><dd>{{ providerName }}</dd></div>
+        <div class="model-summary"><dt>모델</dt><dd>{{ currentModel || '설정 확인 필요' }}</dd></div>
+      </dl>
+      <details class="prompt-details">
+        <summary>현재 사용자 지침 <span>{{ currentPromptCharCount ? `${currentPromptCharCount}자` : '추가 지침 없음' }}</span></summary>
+        <pre v-if="currentCustomPrompt" class="current-prompt">{{ currentCustomPrompt }}</pre>
+        <p v-else class="field-hint">별도 사용자 지침 없이 기본 번역 프롬프트를 사용해요.</p>
+      </details>
+      <p class="field-hint">언어·모델·사용자 지침은 앱 설정에서 변경할 수 있어요.</p>
+    </section>
+
+    <section class="execution-scope" aria-label="번역 실행 범위">
     <div class="form-group">
       <label for="translationMode">번역 범위</label>
       <select id="translationMode" class="select-input" v-model="translationMode">
@@ -18,6 +38,10 @@
       </label>
     </div>
 
+    </section>
+    <details class="disclosure-panel" :open="advancedOpen" @toggle="advancedOpen = ($event.target as HTMLDetailsElement).open">
+      <summary>고급 실행 설정 <span>{{ parallelWorkers }}개 동시 요청 · {{ requestsPerMinute === 0 ? 'RPM 제한 없음' : `${requestsPerMinute} RPM` }}</span></summary>
+      <div class="disclosure-content">
     <div class="form-group">
       <label for="sortOrder">번역 순서</label>
       <select id="sortOrder" class="select-input" v-model="sortOrder">
@@ -60,11 +84,14 @@
       <p class="field-hint">{{ currentProvider === 'gemini' ? 'AI Studio' : '제공자 콘솔' }}에 표시된 실제 RPM의 80%를 시작값으로 권장해요. 이 앱이 권장하는 여유폭이며, TPM 한도도 따로 확인하세요.</p>
     </div>
     <p v-if="requestSettingsError" id="requestSettingsError" class="validation-error" role="alert">{{ requestSettingsError }}</p>
+      </div>
+    </details>
 
-    <section class="guideline-panel" data-harness-guideline-panel>
+    <details class="guideline-panel disclosure-panel" data-harness-guideline-panel>
+      <summary>프로젝트 번역 지침 생성 <span>선택 사항</span></summary>
+      <div class="disclosure-content">
       <div class="panel-header">
         <div>
-          <h3>프로젝트 번역 지침 생성</h3>
           <p class="warning">
             스캔한 요약 프로필(용어/이름/패턴 일부)만 현재 LLM 제공자에 전송합니다.
             API 비용이 발생할 수 있으며, 생성 후 반드시 미리보기와 편집을 거쳐 반영하세요.
@@ -109,7 +136,8 @@
           {{ applyBusy ? '반영 중...' : '3. 프롬프트에 반영' }}
         </button>
       </div>
-    </section>
+      </div>
+    </details>
 
     <p id="providerConfigHint" class="config-hint" role="status">{{ feedbackMessage || providerConfigHint }}</p>
   </div>
@@ -127,10 +155,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import Swal from 'sweetalert2'
 import { api, useIpcOn } from '../composables/useIpc'
-import { getRendererLlmProviderUiText } from '../../types/llmProviderContract'
+import { getRendererLlmProviderMetadata, getRendererLlmProviderUiText } from '../../types/llmProviderContract'
 import { MAX_TRANSLATION_CONCURRENCY, MAX_TRANSLATION_RPM } from '../../ts/libs/translationRequestScheduler'
 import type { ProjectTranslationProfile } from '../../ts/libs/projectProfile'
 
@@ -141,6 +169,9 @@ const parallelWorkers = ref<number | string>(1)
 const requestsPerMinute = ref<number | string>(0)
 const llmReady = ref(false)
 const currentProvider = ref('gemini')
+const currentModel = ref('')
+const providerName = computed(() => getRendererLlmProviderMetadata(currentProvider.value).displayName)
+const advancedOpen = ref(false)
 const sourceLang = ref('ja')
 const targetLang = ref('ko')
 const providerConfigHint = computed(() => getRendererLlmProviderUiText(currentProvider.value).configHint)
@@ -154,6 +185,7 @@ const rpmError = computed(() => typeof requestsPerMinute.value === 'number'
   && Number.isInteger(requestsPerMinute.value) && requestsPerMinute.value >= 0 && requestsPerMinute.value <= MAX_TRANSLATION_RPM
   ? '' : `RPM은 0~${MAX_TRANSLATION_RPM} 범위의 정수로 입력하세요. 0은 별도 RPM 제한 없음이에요.`)
 const requestSettingsError = computed(() => concurrencyError.value || rpmError.value)
+watch(requestSettingsError, error => { if (error) advancedOpen.value = true })
 const savedConcurrencyOption = computed(() => typeof parallelWorkers.value === 'number'
   && !concurrencyError.value && ![1, 2, 3, 4, 8].includes(parallelWorkers.value) ? parallelWorkers.value : undefined)
 const startDisabled = computed(() => !llmReady.value || submitted.value || !!requestSettingsError.value)
@@ -191,12 +223,23 @@ onMounted(() => {
     requestsPerMinute.value = s.llmRequestsPerMinute === undefined ? 0 : s.llmRequestsPerMinute
     llmReady.value = !!s.llmReady
     currentProvider.value = typeof s.llmProvider === 'string' ? s.llmProvider : 'gemini'
+    currentModel.value = typeof s.llmModel === 'string' ? s.llmModel : ''
     sourceLang.value = typeof s.llmSourceLang === 'string' ? s.llmSourceLang : 'ja'
     targetLang.value = typeof s.llmTargetLang === 'string' ? s.llmTargetLang : 'ko'
     currentCustomPrompt.value = typeof s.llmCustomPrompt === 'string' ? s.llmCustomPrompt : ''
   })
   api.send('llmSettingsReady')
 })
+
+function languageLabel(language: string): string {
+  const labels: Record<string, string> = {
+    ja: '일본어', ko: '한국어', en: '영어', 'zh-CN': '중국어 간체', 'zh-TW': '중국어 정체',
+    fr: '프랑스어', es: '스페인어', ru: '러시아어', de: '독일어', pt: '포르투갈어',
+    it: '이탈리아어', th: '태국어', vi: '베트남어', ar: '아랍어', pl: '폴란드어',
+    nl: '네덜란드어', tr: '터키어',
+  }
+  return labels[language] || language
+}
 
 async function scanProfile() {
   if (scanBusy.value) return
@@ -321,27 +364,45 @@ function showError(title: string, text: string) {
   padding: 22px 26px; flex: 1; overflow-y: auto;
 }
 .window-eyebrow { color: var(--Healthy); font-size: 11px; font-weight: 900; letter-spacing: 1.1px; }
-h2 { font-size: 24px; font-weight: 800; margin: 2px 0 20px; }
+h2 { font-size: 24px; font-weight: 800; margin: 2px 0 6px; }
 h3 { font-size: 15px; margin: 0 0 6px; }
+.intro { margin: 0 0 20px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.job-summary { padding: 16px; border: var(--border); border-radius: 10px; background: var(--Highlight1); }
+.summary-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.summary-heading h3 { margin: 0; }
+.ready-state { padding: 4px 8px; border: var(--border); border-radius: 5px; font-size: 11px; color: var(--muted); }
+.ready-state.ready { color: var(--Healthy); }
+.summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+.summary-grid > div { min-width: 0; }
+.summary-grid dt { color: var(--muted); font-size: 12px; margin-bottom: 5px; }
+.summary-grid dd { margin: 0; font-size: 14px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
+.model-summary { grid-column: 1 / -1; }
+.prompt-details { padding-top: 12px; border-top: var(--border); }
+summary { cursor: pointer; font-size: 13px; font-weight: 700; line-height: 1.6; }
+summary span { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 6px; }
+summary:focus-visible, .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--Accent); outline-offset: 3px; }
+.current-prompt { margin: 12px 0; max-height: 220px; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px; line-height: 1.7; }
+.execution-scope { margin-top: 22px; }
+.disclosure-panel { margin-top: 12px; border: var(--border); border-radius: 8px; background: var(--Highlight1); }
+.disclosure-panel > summary { padding: 14px; }
+.disclosure-content { padding: 0 14px 14px; }
 .form-group { margin-bottom: 14px; }
 .form-group label { display: block; font-size: 13px; margin-bottom: 5px; color: var(--muted); }
 .select-input {
-  width: 100%; padding: 9px 11px;
+  width: 100%; padding: 9px 11px; box-sizing: border-box;
   background: var(--Highlight3); border: var(--border); border-radius: 6px;
   color: var(--mainColor); font-size: 13px;
 }
 .select-input.compact { width: auto; min-width: 210px; }
 .checkbox-group label {
-  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  display: flex; align-items: flex-start; gap: 8px; cursor: pointer; color: var(--mainColor); line-height: 1.5;
 }
+.checkbox-group input { margin-top: 3px; }
+.checkbox-group .hint { display: block; margin-top: 3px; }
 .hint { font-size: 12px; color: var(--subtle); }
 .field-hint { margin: 6px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .validation-error { margin: 8px 0 14px; font-size: 12px; color: var(--Danger, #ff9b9b); }
 .config-hint { font-size: 12px; color: var(--muted); margin-top: 16px; }
-.guideline-panel {
-  margin-top: 20px; padding: 15px; border: var(--border); border-radius: 8px;
-  background: #131b20;
-}
 .warning { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .guideline-actions {
   display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
@@ -377,4 +438,11 @@ h3 { font-size: 15px; margin: 0 0 6px; }
 }
 .btn.primary:hover:not(:disabled) { background: var(--AccentHover); }
 .btn:disabled { opacity: 0.45; cursor: default; filter: grayscale(0.2); }
+@media (max-width: 420px) {
+  #container { padding: 18px 14px; }
+  .summary-grid { grid-template-columns: 1fr; }
+  .select-input.compact { width: 100%; min-width: 0; }
+  .button-bar { padding: 12px 14px; }
+  .disclosure-panel > summary span { display: block; margin-left: 16px; }
+}
 </style>

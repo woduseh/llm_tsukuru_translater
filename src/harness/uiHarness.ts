@@ -217,7 +217,7 @@ async function selectProject(ctx: AppContext, dataDir: string, timeoutMs: number
   }
 }
 
-async function openLlmSettingsSnapshot(ctx: AppContext, llmReady: boolean, targetDir: string, timeoutMs: number): Promise<unknown> {
+async function openLlmSettingsSnapshot(ctx: AppContext, llmReady: boolean, targetDir: string, timeoutMs: number, captureDir: string): Promise<unknown> {
   ctx.settings.llmProvider = 'gemini';
   ctx.settings.llmApiKey = llmReady ? 'harness-key' : '';
   ctx.settings.llmModel = llmReady ? 'gemini-harness' : '';
@@ -249,9 +249,15 @@ async function openLlmSettingsSnapshot(ctx: AppContext, llmReady: boolean, targe
       generateGuidelineDisabled: Boolean(generateButton?.disabled),
       applyGuidelineDisabled: Boolean(applyButton?.disabled),
       promptNote: document.querySelector('.prompt-note')?.textContent?.trim(),
+      model: document.querySelector('.model-summary dd')?.textContent?.trim(),
+      advancedCollapsed: !document.querySelector('.disclosure-panel')?.open,
+      startDisabled: document.querySelector('.button-bar .primary')?.disabled,
     };
   })()`);
 
+  // Allow the disabled-to-ready button transition to settle before visual evidence.
+  await delay(200);
+  await captureScreen(win, captureDir, llmReady ? 'translation-ready' : 'translation-missing');
   win.close();
   await waitForWindowClose('/llm-settings', timeoutMs);
   return result;
@@ -350,7 +356,19 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
 
     checkpoint('project-selection-and-approval');
     await selectProject(ctx, scenario.compareDir, stepTimeoutMs);
+    await click(mainWindow, '[data-harness-project-snapshot] button');
+    const projectFiles = await snapshot(mainWindow, `document.querySelector('[data-harness-project-snapshot] [role="status"]')?.textContent`);
+    if (!String(projectFiles).includes('2개 파일')) throw new Error('Project snapshot must report the real extracted fixture count.');
+    screenshots.project = await captureScreen(mainWindow, diagnosticDir, 'project');
     const bridgeManifest = JSON.parse(fs.readFileSync(ctx.agentBridgeServer!.manifestPath, 'utf8')) as { token: string };
+    await mainWindow.webContents.executeJavaScript(`location.hash = '#/'`, true);
+    await waitForSelector(mainWindow, '[data-harness-view="home"]', stepTimeoutMs);
+    await waitForSelector(mainWindow, '[data-harness-resume-project]', stepTimeoutMs);
+    screenshots.resume = await captureScreen(mainWindow, diagnosticDir, 'resume');
+    await click(mainWindow, '[data-harness-resume-project]');
+    await waitForSelector(mainWindow, '[data-harness-view="mvmz"]', stepTimeoutMs);
+    const restoredProjectPath = await snapshot(mainWindow, `document.querySelector('.project-path span')?.textContent`);
+    if (restoredProjectPath !== scenario.compareDir) throw new Error('Returning from home lost the selected project.');
     await mainWindow.webContents.executeJavaScript(`location.hash = '#/'`, true);
     await waitForSelector(mainWindow, '[data-harness-view="home"]', stepTimeoutMs);
     const approvalTargetPath = path.join(path.dirname(scenario.compareDir), 'Harness', 'Approval.txt');
@@ -499,7 +517,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
     }
 
     checkpoint('llm-settings-missing');
-    const llmSettingsMissing = await openLlmSettingsSnapshot(ctx, false, scenario.compareDir, stepTimeoutMs);
+    const llmSettingsMissing = await openLlmSettingsSnapshot(ctx, false, scenario.compareDir, stepTimeoutMs, diagnosticDir);
     assertSnapshotValues('llmSettingsMissing', llmSettingsMissing, {
       llmReady: 'false',
       provider: 'gemini',
@@ -509,8 +527,12 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       applyGuidelineDisabled: true,
     });
     checkpoint('llm-settings-ready');
-    const llmSettingsReady = await openLlmSettingsSnapshot(ctx, true, scenario.compareDir, stepTimeoutMs);
+    const llmSettingsReady = await openLlmSettingsSnapshot(ctx, true, scenario.compareDir, stepTimeoutMs, diagnosticDir);
+    screenshots.translation = path.join(diagnosticDir, 'translation-ready.png');
     assertSnapshotValues('llmSettingsReady', llmSettingsReady, {
+      model: 'gemini-harness',
+      advancedCollapsed: true,
+      startDisabled: false,
       llmReady: 'true',
       provider: 'gemini',
       parallelWorkers: '4',
@@ -573,6 +595,7 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
       status: 'passed',
       completedAt: new Date().toISOString(),
       cases: [
+        { id: 'project-session', title: 'Project file count and home return preserve actual session context', status: 'passed', durationMs: 0, details: { projectFiles, restoredProjectPath } },
         { id: 'home-window', title: 'home window exposes stable harness state', status: 'passed', durationMs: 0, details: home },
         { id: 'mvmz-empty-state', title: 'MV/MZ empty state leads with project selection', status: 'passed', durationMs: 0, details: mvmzEmpty },
         { id: 'wolf-empty-state', title: 'Wolf empty state leads with project selection', status: 'passed', durationMs: 0, details: wolfEmpty },

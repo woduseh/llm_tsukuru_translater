@@ -17,10 +17,12 @@ export function createWindow(ctx: AppContext) {
   loadSettings(ctx)
   setOPath(ctx)
   const mainWindow = new BrowserWindow({
-    width: 800,
-    height: defaultHeight,
+    width: 1100,
+    height: Math.max(defaultHeight, 760),
+    minWidth: 760,
+    minHeight: 550,
     show: false,
-    resizable: false,
+    resizable: true,
     autoHideMenuBar: true,
     frame: false,
     webPreferences: {
@@ -88,9 +90,12 @@ export function registerWindowHandlers(ctx: AppContext) {
   })
 
   ipcMain.on('setheight', (ev,arg) =>{
-    ctx.mainWindow!.setResizable(true);
-    ctx.mainWindow!.setSize(800, arg, false)
-    ctx.mainWindow!.setResizable(false)
+    // Preserve the user's workspace size when navigating between tools.
+    if (typeof arg !== 'number' || !Number.isFinite(arg)) return;
+    const [width, height] = ctx.mainWindow!.getSize();
+    if (height < arg && !ctx.mainWindow!.isMaximized()) {
+      ctx.mainWindow!.setSize(width, Math.min(Math.max(arg, 550), 1000), false);
+    }
   })
 
   ipcMain.on('app_version', (event) => {

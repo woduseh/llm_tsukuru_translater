@@ -65,17 +65,54 @@ describe('compare page editing', () => {
     return match
   }
 
+  it('reveals selection actions through a focusable checkbox and clears the selection', async () => {
+    await load('--- 1 ---\nhello', '--- 1 ---\n안녕')
+    expect(host.querySelector('.selection-toolbar')).toBeNull()
+    expect(host.querySelector<HTMLDetailsElement>('.batch-actions')!.open).toBe(false)
+    const checkbox = host.querySelector<HTMLInputElement>('.select-indicator input')!
+    expect(checkbox.tabIndex).toBe(0)
+    expect(checkbox.getAttribute('aria-label')).toBe('1번 블록 선택')
+    checkbox.focus()
+    expect(document.activeElement).toBe(checkbox)
+    checkbox.click()
+    await nextTick()
+    expect(host.querySelector('.selection-toolbar')!.textContent).toContain('1개 선택')
+    button('선택 해제').click()
+    await nextTick()
+    expect(checkbox.checked).toBe(false)
+    expect(host.querySelector('.selection-toolbar')).toBeNull()
+  })
+
+  it('explains line mismatches and grows the virtual row when editing adds a line', async () => {
+    await load('--- 1 ---\nhello\nworld', '--- 1 ---\n안녕')
+    expect(host.querySelector('#block-diagnosis-0')!.textContent).toBe('번역 1줄 · 1줄 부족')
+    const editor = host.querySelector<HTMLTextAreaElement>('.block-editor')!
+    expect(editor.getAttribute('aria-describedby')).toBe('block-diagnosis-0')
+    const row = host.querySelector<HTMLElement>('.block-row')!
+    const previousHeight = parseInt(row.style.height)
+    editor.value = '안녕\n세계\n추가'
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+    expect(host.querySelector('#block-diagnosis-0')!.textContent).toBe('번역 3줄 · 1줄 초과')
+    expect(parseInt(row.style.height)).toBeGreaterThan(previousHeight)
+  })
+
   it('updates untranslated badges immediately after fixing selected block lines', async () => {
     await load('--- 1 ---\nhello\n', '--- 1 ---\nhello')
     expect(host.querySelector('.badge-untranslated-block')).toBeNull()
-    expect(button('저장').disabled).toBe(true)
+    expect(button('변경 저장').disabled).toBe(true)
     host.querySelector<HTMLElement>('.select-indicator')!.click()
     await nextTick()
     button('선택 블록 자동 수정').click()
     await nextTick()
     expect(host.querySelector('.block.error-lines')).toBeNull()
     expect(host.querySelector('.badge-untranslated-block')).not.toBeNull()
-    expect(button('저장').disabled).toBe(false)
+    expect(button('변경 저장').disabled).toBe(false)
+  })
+
+  it('distinguishes control-code mismatches from line-count mismatches', async () => {
+    await load('--- 1 ---\nhello \\V[1]', '--- 1 ---\n안녕')
+    expect(host.querySelector('#block-diagnosis-0')!.textContent).toBe('번역 1줄 · 제어 코드 불일치')
   })
 
   it('navigates to translation-only blocks and keeps edited text aligned when deleting one', async () => {
@@ -90,7 +127,7 @@ describe('compare page editing', () => {
     expect(host.querySelectorAll('.block-editor')).toHaveLength(1)
     expect(host.querySelector<HTMLTextAreaElement>('.block-editor')!.value).toBe('안녕')
     expect(button('블록 ▶').disabled).toBe(true)
-    expect(button('저장').disabled).toBe(false)
+    expect(button('변경 저장').disabled).toBe(false)
   })
 
   it('keeps mismatch filters in sync after saving edits without losing separators or empty lines', async () => {
@@ -103,8 +140,8 @@ describe('compare page editing', () => {
     editor.dispatchEvent(new Event('input', { bubbles: true }))
     await nextTick()
     expect(host.querySelector('.block.error-lines')).toBeNull()
-    button('저장').click()
-    await vi.waitFor(() => expect(button('저장').disabled).toBe(true))
+    button('변경 저장').click()
+    await vi.waitFor(() => expect(button('변경 저장').disabled).toBe(true))
     expect(disk.get('/game/Extract/Map001.txt')).toBe('--- 1 ---\n안녕\n')
     expect(host.querySelectorAll('.file-item')).toHaveLength(0)
     expect(host.querySelector('.badge-dirty')).toBeNull()

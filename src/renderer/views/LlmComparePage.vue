@@ -16,7 +16,8 @@
     <!-- Left: File list -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <input type="text" v-model="searchQuery" class="search-input" placeholder="파일 검색...">
+        <div class="panel-title">번역 검수</div>
+        <input type="text" v-model="searchQuery" class="search-input" placeholder="파일 검색..." aria-label="검수 파일 검색">
         <div class="filter-row">
           <label><input type="checkbox" v-model="filterMismatch"> 불일치</label>
           <label><input type="checkbox" v-model="filterUntranslated"> 미번역</label>
@@ -43,37 +44,38 @@
           <div class="summary">
             <span v-for="(item, index) in summaryItems" :key="`${item.class}-${index}`" :class="item.class">{{ item.text }}</span>
           </div>
+          <button class="primary-action" :disabled="!isDirty" @click="saveFile">변경 저장</button>
+        </div>
+        <div class="toolbar-row">
           <div class="nav-buttons">
             <button @click="navigateFile(-1)" title="이전 문제 파일">◀ 파일</button>
             <button @click="navigateFile(1)" title="다음 문제 파일">파일 ▶</button>
             <button :disabled="!hasProblems" @click="navigateBlock(-1)" title="이전 불일치 블록">◀ 블록</button>
             <button :disabled="!hasProblems" @click="navigateBlock(1)" title="다음 불일치 블록">블록 ▶</button>
           </div>
+          <span class="save-status" role="status">{{ saveStatus || (isDirty ? '저장하지 않은 변경이 있어요' : '블록을 선택하면 수정·재번역할 수 있어요') }}</span>
         </div>
-        <div class="toolbar-row">
-          <span class="group-label">자동 수정</span>
-          <span class="selection-count">{{ selectedBlocks.size > 0 ? `${selectedBlocks.size}개 선택` : '' }}</span>
+        <div v-if="selectedBlocks.size > 0" class="toolbar-row selection-toolbar">
+          <span class="selection-count">{{ selectedBlocks.size }}개 선택</span>
           <button :disabled="selectedBlocks.size === 0" @click="deleteSelectedBlocks"
             title="선택한 번역 블록 삭제">선택 블록 삭제</button>
           <button :disabled="selectedBlocks.size === 0" @click="autoFixSelected"
             title="선택 블록 자동 수정: 빈줄 추가/제거, 구분자 수정">선택 블록 자동 수정</button>
-          <button :disabled="files.length === 0" @click="autoFixCurrentFile"
-            title="현재 파일의 모든 불일치 블록 자동 수정: 빈줄 추가/제거, 구분자 수정">파일 불일치 자동 수정</button>
-          <button :disabled="files.length === 0" @click="autoFixAllMapFiles"
-            title="모든 Map***.txt 파일의 불일치 블록 자동 수정 (Map 파일만 안전하게 자동 수정 가능)">전체 불일치 자동 수정</button>
+          <button :disabled="retranslating" @click="retranslateSelected">선택 블록 재번역</button>
+          <button @click="selectedBlocks.clear()">선택 해제</button>
         </div>
-        <div class="toolbar-row">
-          <span class="group-label">재번역</span>
-          <button :disabled="selectedBlocks.size === 0 || retranslating" @click="retranslateSelected">선택 블록 재번역</button>
-          <button :disabled="!hasUntranslatedBlocks || retranslating" @click="retranslateUntranslated"
-            title="현재 파일의 미번역 블록만 재번역">미번역 블록 재번역</button>
-          <button :disabled="files.length === 0 || retranslating" @click="retranslateFile">전체 파일 재번역</button>
-        </div>
-        <div class="toolbar-row">
-          <span class="group-label">저장</span>
-          <button :disabled="!isDirty" @click="saveFile">저장</button>
-          <span class="save-status">{{ saveStatus }}</span>
-        </div>
+        <details class="batch-actions">
+          <summary>파일 단위 수정·재번역</summary>
+          <div class="toolbar-row">
+            <button :disabled="files.length === 0" @click="autoFixCurrentFile"
+              title="현재 파일의 모든 불일치 블록 자동 수정: 빈줄 추가/제거, 구분자 수정">파일 불일치 자동 수정</button>
+            <button :disabled="files.length === 0" @click="autoFixAllMapFiles"
+              title="모든 Map***.txt 파일의 불일치 블록 자동 수정 (Map 파일만 안전하게 자동 수정 가능)">전체 불일치 자동 수정</button>
+            <button :disabled="!hasUntranslatedBlocks || retranslating" @click="retranslateUntranslated"
+              title="현재 파일의 미번역 블록만 재번역">미번역 블록 재번역</button>
+            <button :disabled="files.length === 0 || retranslating" @click="retranslateFile">전체 파일 재번역</button>
+          </div>
+        </details>
       </div>
 
       <!-- Fixed column headers -->
@@ -86,17 +88,17 @@
       <div class="blocks-viewport" ref="viewportEl" @scroll="onViewportScroll">
         <div :style="{ height: totalHeight + 'px', position: 'relative' }">
           <div :style="{ transform: `translateY(${spacerTop}px)`, padding: '8px' }">
-            <div v-for="i in visibleIndices" :key="i" class="block-row">
+            <div v-for="i in visibleIndices" :key="i" class="block-row" :style="{ height: (frozenHeights[i] - 4) + 'px' }">
               <div class="block-cell">
                 <div class="block" :class="blockClass(i)">
-                  <div class="select-indicator" @click.stop="toggleSelection(i)">
-                    <input type="checkbox" :checked="selectedBlocks.has(i)" tabindex="-1" @click.prevent>
-                  </div>
+                  <label class="select-indicator">
+                    <input type="checkbox" :checked="selectedBlocks.has(i)" :aria-label="`${i + 1}번 블록 선택`" @change="toggleSelection(i)">
+                  </label>
                   <div v-if="origBlocks[i]?.sep" class="sep-label">{{ origBlocks[i].sep }}</div>
                   <pre>{{ origBlocks[i]?.lines.join('\n') }}</pre>
                   <div class="block-badges">
                     <span v-if="untranslatedBlocks.has(i)" class="badge badge-untranslated-block">미번역</span>
-                    <span class="line-count">{{ origBlocks[i]?.lines.length }}줄</span>
+                    <span class="line-count">원문 {{ origBlocks[i]?.lines.length ?? 0 }}줄</span>
                   </div>
                 </div>
               </div>
@@ -104,12 +106,12 @@
                 <div class="block" :class="[blockClass(i), selectedBlocks.has(i) ? 'selected' : '']" :data-block-idx="i">
                   <button class="block-delete-btn" @click.stop="deleteBlock(i)" title="이 번역 블록 삭제">✕</button>
                   <div v-if="transBlocks[i]?.sep" class="sep-label">{{ transBlocks[i].sep }}</div>
-                  <textarea class="block-editor" :value="transBlocks[i]?.lines.join('\n')"
-                    :rows="Math.max(origBlocks[i]?.lines.length || transBlocks[i]?.lines.length || 1, 1)"
+                  <textarea class="block-editor" :value="transBlocks[i]?.lines.join('\n')" :aria-label="`${i + 1}번 블록 번역 편집`" :aria-describedby="`block-diagnosis-${i}`" spellcheck="false" wrap="off"
+                    :disabled="!transBlocks[i]" :rows="Math.max(origBlocks[i]?.lines.length || transBlocks[i]?.lines.length || 1, 1)"
                     @input="onBlockEdit(i, $event)"></textarea>
                   <div class="block-badges">
                     <span v-if="untranslatedBlocks.has(i)" class="badge badge-untranslated-block">미번역</span>
-                    <span class="line-count">{{ transBlocks[i]?.lines.length }}줄</span>
+                    <span class="line-count" :id="`block-diagnosis-${i}`" :class="{ 'diagnosis-error': blockClass(i) !== 'ok' && blockClass(i) !== 'untranslated' }">{{ blockDiagnosis(i) }}</span>
                   </div>
                 </div>
               </div>
@@ -177,7 +179,8 @@ const viewportEl = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const viewportHeight = ref(600)
 const frozenHeights = ref<number[]>([])
-const BLOCK_BASE_H = 48
+// Padding, diagnosis footer, row gap, and room for a horizontal scrollbar.
+const BLOCK_BASE_H = 68
 const BLOCK_LINE_H = 18
 const BLOCK_SEP_H = 20
 const OVERSCAN = 5
@@ -192,13 +195,15 @@ function computeBlockHeights() {
   const n = Math.max(origBlocks.value.length, transBlocks.value.length)
   const h: number[] = []
   for (let i = 0; i < n; i++) {
-    const ob = origBlocks.value[i]
-    const tb = transBlocks.value[i]
-    const lines = Math.max(ob?.lines.length || 0, tb?.lines.length || 0, 1)
-    const sep = (ob?.sep || tb?.sep) ? 1 : 0
-    h.push(BLOCK_BASE_H + lines * BLOCK_LINE_H + sep * BLOCK_SEP_H)
+    h.push(blockHeight(i))
   }
   frozenHeights.value = h
+}
+
+function blockHeight(i: number): number {
+  const ob = origBlocks.value[i], tb = transBlocks.value[i]
+  const lines = Math.max(ob?.lines.length || 0, tb?.lines.length || 0, 1)
+  return BLOCK_BASE_H + lines * BLOCK_LINE_H + (ob?.sep || tb?.sep ? BLOCK_SEP_H : 0)
 }
 
 const blockOffsets = computed(() => {
@@ -387,10 +392,24 @@ function blockClass(i: number): string {
   return 'ok'
 }
 
+function blockDiagnosis(i: number): string {
+  const ob = origBlocks.value[i], tb = transBlocks.value[i]
+  if (!tb) return '번역 블록 없음'
+  if (!ob) return '대응하는 원문 블록 없음'
+  const count = `번역 ${tb.lines.length}줄`
+  const difference = tb.lines.length - ob.lines.length
+  if (ob.sep !== tb.sep) return `${count} · 구분자 불일치`
+  if (difference !== 0) return `${count} · ${Math.abs(difference)}줄 ${difference < 0 ? '부족' : '초과'}`
+  if (ob.lines.some((line, index) => (line === '') !== (tb.lines[index] === ''))) return `${count} · 빈 줄 위치 불일치`
+  if (!haveSameTranslationLineStructure(ob.lines, tb.lines)) return `${count} · 제어 코드 불일치`
+  return `${count} · 구조 일치`
+}
+
 function onBlockEdit(i: number, event: Event) {
   const ta = event.target as HTMLTextAreaElement
   const newLines = ta.value.split('\n')
   transBlocks.value[i].lines = newLines
+  frozenHeights.value[i] = blockHeight(i)
   dirty[files.value[currentIdx.value].name] = true
   saveStatus.value = ''
 }
@@ -728,7 +747,8 @@ function onKeydown(e: KeyboardEvent) {
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-text { font-size: 13px; color: var(--mainColor); opacity: 0.8; }
 
-.sidebar { width: 240px; border-right: var(--border); background: #0c1216; display: flex; flex-direction: column; }
+.sidebar { width: 240px; flex-shrink: 0; border-right: var(--border); background: #0c1216; display: flex; flex-direction: column; }
+.panel-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
 .sidebar-header { padding: 12px; border-bottom: var(--border); }
 .search-input {
   width: 100%; padding: 6px 8px; background: var(--Highlight1); border: var(--border);
@@ -750,20 +770,20 @@ function onKeydown(e: KeyboardEvent) {
 .badge-untranslated { background: rgba(139,233,253,0.15); color: #8be9fd; }
 .badge-ok { background: rgba(80,250,123,0.15); color: #50fa7b; }
 
-.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 
-/* Toolbar - vertical layout with 4 rows */
+/* Keep navigation visible; reveal batch commands on demand. */
 .toolbar {
-  padding: 8px 12px; border-bottom: var(--border); background: #10171b;
-  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 16px; border-bottom: var(--border); background: #10171b;
+  display: flex; flex-direction: column; gap: 10px;
   flex-shrink: 0;
 }
-.toolbar-row { display: flex; align-items: center; gap: 8px; }
+.toolbar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; white-space: nowrap; }
-.nav-buttons { display: flex; gap: 3px; align-items: center; margin-left: auto; }
+.nav-buttons { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .group-label { font-size: 10px; color: var(--subtle); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; min-width: 48px; }
 .nav-buttons button, .toolbar-row button {
-  padding: 3px 8px; font-size: 11px; background: var(--Highlight1);
+  padding: 7px 10px; font-size: 12px; background: var(--Highlight1);
   border: var(--border); border-radius: 4px; color: var(--mainColor);
   cursor: pointer; font-family: inherit; transition: var(--transition); white-space: nowrap;
 }
@@ -771,6 +791,10 @@ function onKeydown(e: KeyboardEvent) {
 .nav-buttons button:disabled, .toolbar-row button:disabled { opacity: 0.3; cursor: default; }
 .selection-count { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .save-status { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.toolbar-row .primary-action { margin-left: auto; background: var(--accent); color: #111820; font-weight: 700; }
+.batch-actions summary { cursor: pointer; color: var(--muted); font-size: 12px; width: fit-content; padding: 4px 0; }
+.batch-actions[open] summary { margin-bottom: 8px; }
+.selection-toolbar { padding: 8px; border-radius: 6px; background: rgba(255,176,32,.08); }
 
 /* Fixed column headers */
 .blocks-header {
@@ -778,18 +802,18 @@ function onKeydown(e: KeyboardEvent) {
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 .col-header {
-  flex: 1; font-size: 11px; font-weight: 700; opacity: 0.4;
-  padding: 4px 8px 6px;
+  flex: 1; font-size: 12px; font-weight: 700; color: var(--muted);
+  padding: 10px 8px;
 }
 
 /* Virtual-scrolled viewport */
-.blocks-viewport { flex: 1; overflow-y: auto; }
+.blocks-viewport { flex: 1; min-height: 0; overflow-y: auto; }
 .block-row { display: flex; gap: 8px; margin-bottom: 4px; }
 .block-cell { flex: 1; min-width: 0; }
 .block {
   padding: 8px 10px; border-radius: 6px; position: relative;
   background: var(--Highlight1); border: 1px solid transparent; font-size: 12px;
-  box-sizing: border-box; height: 100%;
+  box-sizing: border-box; height: 100%; display: flex; flex-direction: column;
 }
 .block-cell:first-child .block { padding-left: 40px; }
 .block.ok { border-color: rgba(80,250,123,0.1); }
@@ -800,30 +824,34 @@ function onKeydown(e: KeyboardEvent) {
 .select-indicator {
   position: absolute; top: 0; left: 0; width: 32px; height: 100%;
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; opacity: 0.4; transition: var(--transition);
+  cursor: pointer; transition: var(--transition);
   background: rgba(255,255,255,0.02); border-right: 1px solid rgba(255,255,255,0.04);
 }
 .select-indicator:hover { opacity: 1; background: rgba(255,176,32,.12); }
 .select-indicator input[type="checkbox"] {
   width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent);
 }
-.sep-label { font-size: 10px; opacity: 0.3; margin-bottom: 4px; }
+.sep-label { font-size: 11px; line-height: 16px; height: 16px; flex-shrink: 0; color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow-x: auto; }
 .block-delete-btn {
   position: absolute; top: 4px; right: 4px; z-index: 1;
   width: 20px; height: 20px; padding: 0; border: none; border-radius: 4px;
   background: rgba(255,85,85,0.15); color: #ff5555; font-size: 12px; line-height: 20px;
   cursor: pointer; opacity: 0; transition: opacity 0.15s;
 }
-.block:hover .block-delete-btn { opacity: 0.6; }
+.block:hover .block-delete-btn, .block:focus-within .block-delete-btn { opacity: 1; }
 .block-delete-btn:hover { opacity: 1 !important; background: rgba(255,85,85,0.3); }
-.block-badges { position: absolute; bottom: 4px; right: 8px; display: flex; gap: 6px; align-items: center; }
+.block-badges { display: flex; gap: 6px; align-items: center; justify-content: flex-end; height: 22px; flex-shrink: 0; overflow-x: auto; white-space: nowrap; }
 .badge-untranslated-block { font-size: 8px; padding: 1px 4px; border-radius: 3px; background: rgba(139,233,253,0.15); color: #8be9fd; }
-.line-count { font-size: 9px; opacity: 0.3; }
-pre { margin: 0; white-space: pre-wrap; word-break: break-all; font-size: 12px; font-family: inherit; }
+.line-count { font-size: 11px; color: var(--muted); }
+.diagnosis-error { color: #ffb1a8; }
+pre { margin: 0; white-space: pre; font-size: 13px; line-height: 18px; font-family: inherit; flex: 1; min-height: 0; overflow: auto; }
 .block-editor {
   width: 100%; background: transparent; border: none; color: var(--mainColor);
-  font-size: 12px; font-family: inherit; resize: none; outline: none;
+  font-size: 13px; line-height: 18px; font-family: inherit; resize: none; padding: 0; flex: 1; min-height: 0; box-sizing: border-box;
 }
+button:focus-visible, input:focus-visible, summary:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.select-indicator:focus-within { background: rgba(255,176,32,.12); }
+@media (max-width: 900px) { .sidebar { width: 190px; } .save-status { white-space: normal; } }
 :deep(.summary-error) { color: #ff5555; }
 :deep(.summary-warn) { color: #f1fa8c; }
 :deep(.summary-ok) { color: #50fa7b; }

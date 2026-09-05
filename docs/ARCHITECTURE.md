@@ -47,6 +47,20 @@ Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-speci
 - `JsonVerifyPage.vue`: structural verification, repair, and LLM shift repair
 - `AgentWorkspacePage.vue`: approval queue, environment status, MCP setup, CLI presets, and real terminal sessions
 
+The main workspace is resizable. `useProjectSession` retains only the active, already selected
+project and extraction/application tab for the current renderer session; the home page offers
+a return action. It does not persist paths or grant filesystem access. Selecting a different
+engine's project replaces this session context. `ProjectSnapshot` reports the current top-level
+extracted text file count through the existing restricted preload bridge, refreshing on focus,
+operation completion, or explicit refresh. This is file presence evidence, not translation or
+verification completion. The pipeline buttons are tool navigation, not completion indicators.
+
+Translation launch summarizes the configured language, provider, model, and optional user
+instructions; request tuning and guideline generation are expandable. Compare and JSON review
+keep selected-item actions contextual and file-wide operations expandable. Native checkbox
+labels support keyboard selection; the comparison editor exposes line/structure diagnostics
+without modifying separators or intentional empty lines.
+
 ## Agent and MCP Boundaries
 
 - Translation and apply execution remain app UI responsibilities.

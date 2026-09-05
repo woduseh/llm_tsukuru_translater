@@ -10,7 +10,8 @@
     <!-- Left: File list -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <input type="text" v-model="searchQuery" class="search-input" placeholder="파일 검색...">
+        <div class="panel-title">구조 검수</div>
+        <input type="text" v-model="searchQuery" class="search-input" placeholder="파일 검색..." aria-label="구조 검수 파일 검색">
         <div class="filter-row">
           <label><input type="checkbox" v-model="filterErrors"> 오류</label>
           <label><input type="checkbox" v-model="filterWarnings"> 경고</label>
@@ -38,16 +39,25 @@
           <span v-for="(item, index) in summaryItems" :key="`${item.class}-${index}`" :class="item.class">{{ item.text }}</span>
         </div>
         <div class="action-buttons">
-          <span class="selection-count" v-if="selectedIssues.size > 0">{{ selectedIssues.size }}개 선택</span>
-          <button :disabled="selectedIssues.size === 0 || verifyWriting" @click="revertSelected" title="선택한 항목을 원본 값으로 되돌립니다">선택 되돌리기</button>
-          <button :disabled="!llmButtonEnabled" @click="llmRepairShift" :title="llmRepairTitle">
+          <button data-harness-shift-repair :disabled="!llmButtonEnabled" @click="llmRepairShift" :title="llmRepairTitle">
             {{ llmButtonText }}
           </button>
-          <button :disabled="!currentHasIssues || verifyWriting" @click="repairCurrentFile">현재 파일 수정</button>
-          <button :disabled="!anyHasIssues || verifyWriting" @click="repairAll">전체 수정</button>
           <button :disabled="verifyWriting" @click="close">닫기</button>
         </div>
-        <div class="status" :class="statusClass">{{ statusText }}</div>
+        <div v-if="selectedIssues.size > 0" class="action-buttons selection-toolbar">
+          <span class="selection-count">{{ selectedIssues.size }}개 선택</span>
+          <button :disabled="verifyWriting" @click="revertSelected" title="선택한 항목을 원본 값으로 되돌립니다">선택 되돌리기</button>
+          <button :disabled="verifyWriting" @click="selectedIssues.clear()">선택 해제</button>
+        </div>
+        <details class="batch-actions">
+          <summary>파일 단위 자동 수정</summary>
+          <p>원본 구조를 기준으로 수정해요. 번역 값이 원본으로 되돌아갈 수 있어요.</p>
+          <div class="action-buttons">
+            <button :disabled="!currentHasIssues || verifyWriting" @click="repairCurrentFile">현재 파일 수정</button>
+            <button :disabled="!anyHasIssues || verifyWriting" @click="repairAll">전체 수정</button>
+          </div>
+        </details>
+        <div class="status" :class="statusClass" role="status">{{ statusText }}</div>
       </div>
 
       <div class="issues-panel">
@@ -55,13 +65,13 @@
 
         <!-- 심각도 필터 탭 -->
         <div v-if="currentIssues.length > 0" class="severity-tabs">
-          <button :class="{ active: issueSeverityFilter === 'all' }" @click="issueSeverityFilter = 'all'">
+          <button :class="{ active: issueSeverityFilter === 'all' }" :aria-pressed="issueSeverityFilter === 'all'" @click="issueSeverityFilter = 'all'">
             전체 ({{ currentIssues.length }})
           </button>
-          <button :class="{ active: issueSeverityFilter === 'error' }" @click="issueSeverityFilter = 'error'">
+          <button :class="{ active: issueSeverityFilter === 'error' }" :aria-pressed="issueSeverityFilter === 'error'" @click="issueSeverityFilter = 'error'">
             ❌ 오류 ({{ currentErrorCount }})
           </button>
-          <button :class="{ active: issueSeverityFilter === 'warning' }" @click="issueSeverityFilter = 'warning'">
+          <button :class="{ active: issueSeverityFilter === 'warning' }" :aria-pressed="issueSeverityFilter === 'warning'" @click="issueSeverityFilter = 'warning'">
             ⚠ 경고 ({{ currentWarningCount }})
           </button>
         </div>
@@ -92,7 +102,8 @@
           </div>
         </div>
 
-        <div v-if="currentIssues.length === 0 && llmRepairResults.length === 0" class="no-issues">
+        <div v-if="loading" class="no-issues-filter" role="status">파일 구조를 검사하고 있어요…</div>
+        <div v-else-if="currentIssues.length === 0 && llmRepairResults.length === 0" class="no-issues">
           <div class="no-issues-header">✓ 구조적 문제가 없습니다</div>
           <div v-if="previewSamples.length > 0" class="preview-section">
             <div class="preview-title">번역 미리보기 ({{ previewSamples.length }}건)</div>
@@ -114,15 +125,19 @@
         </div>
         <div v-for="item in filteredIssueItems" :key="item.origIdx"
           class="issue-item" :class="[item.issue.severity, selectedIssues.has(item.origIdx) ? 'selected' : '']">
-          <div class="issue-checkbox" @click.stop="toggleIssue(item.origIdx)">
-            <input type="checkbox" :checked="selectedIssues.has(item.origIdx)" tabindex="-1" @click.prevent>
-          </div>
+          <label class="issue-checkbox">
+            <input type="checkbox" :checked="selectedIssues.has(item.origIdx)" :aria-label="`${typeLabel(item.issue.type)}: ${item.issue.path} 선택`" :disabled="verifyWriting || llmRepairing" @change="toggleIssue(item.origIdx)">
+          </label>
           <div class="issue-content">
             <div class="issue-header">
               <div class="issue-type">{{ typeLabel(item.issue.type) }}</div>
-              <div class="issue-path">{{ item.issue.path }}</div>
+              <span class="issue-severity">{{ item.issue.severity === 'error' ? '오류' : '경고' }}</span>
             </div>
             <div class="issue-message">{{ item.issue.message }}</div>
+            <details class="issue-location">
+              <summary>JSON 위치 보기</summary>
+              <code class="issue-path">{{ item.issue.path }}</code>
+            </details>
             <div v-if="item.issue.origValue !== undefined || item.issue.transValue !== undefined" class="issue-values">
               <div class="value-row" v-if="item.issue.origValue !== undefined">
                 <span class="value-label">원본:</span>
@@ -748,7 +763,8 @@ onUnmounted(() => {
 
 <style scoped>
 .verify-layout { display: flex; height: 100vh; }
-.sidebar { width: 240px; border-right: var(--border); background: #0c1216; display: flex; flex-direction: column; }
+.sidebar { width: 240px; flex-shrink: 0; border-right: var(--border); background: #0c1216; display: flex; flex-direction: column; }
+.panel-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
 .sidebar-header { padding: 12px; border-bottom: var(--border); }
 .search-input {
   width: 100%; padding: 6px 8px; background: var(--Highlight1); border: var(--border);
@@ -770,47 +786,51 @@ onUnmounted(() => {
 .badge-ok { background: rgba(80,250,123,0.2); color: #50fa7b; }
 .badge-repaired { background: rgba(241,250,140,0.2); color: #f1fa8c; }
 
-.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 .toolbar {
-  padding: 9px 12px; border-bottom: var(--border); background: #10171b;
+  padding: 12px 16px; border-bottom: var(--border); background: #10171b; flex-shrink: 0;
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
 .summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; }
-.action-buttons { display: flex; gap: 4px; align-items: center; }
+.action-buttons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .action-buttons button {
-  padding: 4px 10px; font-size: 11px; background: var(--Highlight1);
+  padding: 7px 10px; font-size: 12px; background: var(--Highlight1);
   border: var(--border); border-radius: 4px; color: var(--mainColor);
   cursor: pointer; font-family: inherit; transition: var(--transition);
 }
 .action-buttons button:hover { background: rgba(255,255,255,0.08); }
 .action-buttons button:disabled { opacity: 0.3; cursor: default; }
-.selection-count { font-size: 11px; opacity: 0.5; }
+.selection-count { font-size: 12px; color: var(--muted); }
+.selection-toolbar { flex-basis: 100%; padding: 8px; border-radius: 6px; background: rgba(255,176,32,.08); }
+.batch-actions { flex-basis: 100%; }
+.batch-actions summary, .issue-location summary { cursor: pointer; color: var(--muted); font-size: 12px; width: fit-content; padding: 4px 0; }
+.batch-actions p { font-size: 12px; color: var(--muted); margin: 4px 0 10px; }
 .status { font-size: 11px; margin-left: auto; }
 .status-ok { color: #50fa7b; }
 .status-error { color: #ff5555; }
 
 .issues-panel { flex: 1; overflow-y: auto; padding: 12px; }
 .issues-file-name { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
-.no-issues { font-size: 13px; color: #50fa7b; opacity: 0.6; padding: 20px; text-align: center; }
+.no-issues { font-size: 13px; color: #50fa7b; padding: 20px; text-align: center; }
 .no-issues-header { font-size: 14px; margin-bottom: 16px; }
-.no-issues-filter { font-size: 13px; opacity: 0.4; padding: 20px; text-align: center; }
+.no-issues-filter { font-size: 13px; color: var(--muted); padding: 20px; text-align: center; }
 .preview-section { text-align: left; }
 .preview-title { font-size: 12px; font-weight: 600; opacity: 0.7; margin-bottom: 8px; color: #8be9fd; }
 .preview-item {
   padding: 8px; margin-bottom: 6px; border-radius: 6px;
   background: rgba(0,0,0,0.2); font-size: 11px;
 }
-.preview-path { font-size: 10px; opacity: 0.3; font-family: monospace; margin-bottom: 4px; }
+.preview-path { font-size: 11px; color: var(--muted); font-family: monospace; margin-bottom: 4px; overflow-wrap: anywhere; }
 .severity-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
 .severity-tabs button {
   padding: 4px 10px; font-size: 11px; background: var(--Highlight1);
   border: var(--border); border-radius: 4px; color: var(--mainColor);
-  cursor: pointer; font-family: inherit; transition: var(--transition); opacity: 0.5;
+  cursor: pointer; font-family: inherit; transition: var(--transition);
 }
 .severity-tabs button:hover { opacity: 0.8; }
 .severity-tabs button.active { opacity: 1; background: rgba(255,176,32,.12); border-color: rgba(255,176,32,.35); }
 .issue-item {
-  margin-bottom: 8px; padding: 10px 12px 10px 44px; border-radius: 6px;
+  margin-bottom: 12px; padding: 16px 16px 16px 48px; border-radius: 8px;
   background: var(--Highlight1); border-left: 3px solid transparent;
   position: relative; transition: var(--transition);
 }
@@ -820,7 +840,7 @@ onUnmounted(() => {
 .issue-checkbox {
   position: absolute; top: 0; left: 0; width: 36px; height: 100%;
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; opacity: 0.4; transition: var(--transition);
+  cursor: pointer; transition: var(--transition);
 }
 .issue-checkbox:hover { opacity: 1; background: rgba(255,176,32,.12); border-radius: 6px 0 0 6px; }
 .issue-checkbox input[type="checkbox"] {
@@ -828,17 +848,21 @@ onUnmounted(() => {
 }
 .issue-item.selected .issue-checkbox { opacity: 1; }
 .issue-content { flex: 1; }
-.issue-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.issue-path { font-size: 11px; opacity: 0.4; font-family: monospace; }
-.issue-type { font-size: 12px; font-weight: 600; white-space: nowrap; }
-.issue-message { font-size: 12px; opacity: 0.7; }
-.issue-values { margin-top: 6px; font-size: 11px; }
+.issue-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.issue-path { font-size: 12px; color: var(--muted); font-family: monospace; overflow-wrap: anywhere; }
+.issue-type { font-size: 14px; font-weight: 600; }
+.issue-severity { font-size: 11px; border: 1px solid currentColor; padding: 1px 6px; border-radius: 4px; }
+.error .issue-severity { color: #ffb1a8; }
+.warning .issue-severity { color: #ffcf8a; }
+.issue-message { font-size: 13px; line-height: 1.6; color: var(--mainColor); }
+.issue-location { margin-top: 4px; }
+.issue-values { margin-top: 12px; font-size: 12px; }
 .value-row { display: flex; gap: 6px; align-items: flex-start; margin-bottom: 2px; }
-.value-label { font-weight: 600; opacity: 0.5; min-width: 36px; }
+.value-label { font-weight: 600; color: var(--muted); min-width: 44px; padding-top: 6px; }
 .value-content {
-  background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;
-  font-family: monospace; font-size: 11px; word-break: break-all;
-  max-height: 60px; overflow-y: auto; display: block;
+  background: rgba(0,0,0,0.3); padding: 6px 10px; border-radius: 4px;
+  font-family: monospace; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap;
+  max-height: 180px; overflow-y: auto; display: block; flex: 1; min-width: 0;
 }
 .value-content.orig { color: #8be9fd; }
 .value-content.trans { color: #f1fa8c; }
@@ -869,4 +893,7 @@ onUnmounted(() => {
 :deep(.summary-ok) { color: #50fa7b; }
 :deep(.summary-total) { opacity: 0.4; }
 :deep(.summary-loading) { color: #8be9fd; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.issue-checkbox:focus-within { background: rgba(255,176,32,.12); }
+@media (max-width: 900px) { .sidebar { width: 190px; } }
 </style>

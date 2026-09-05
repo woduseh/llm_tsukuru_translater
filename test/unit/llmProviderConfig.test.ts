@@ -95,6 +95,7 @@ describe('buildLlmStartWindowState', () => {
     for (const key of ['llmApiKey', 'llmOpenAiApiKey', 'llmCustomApiKey', 'llmClaudeApiKey', 'llmVertexServiceAccountJson']) {
       expect(state).not.toHaveProperty(key);
     }
+    expect(state.llmModel).toBe('gemini-2.5-pro');
     expect(settings.llmModel).toBe('gemini-2.5-pro');
   });
 

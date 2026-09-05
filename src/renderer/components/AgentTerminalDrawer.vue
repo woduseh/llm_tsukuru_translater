@@ -8,8 +8,8 @@
       aria-label="에이전트 터미널 열기"
       @click="openDrawer"
     >
-      Agent
-      <span>{{ activeSession?.label ?? '세션 없음' }}</span>
+      터미널
+      <span>{{ activeSession?.label ?? '열기' }}</span>
     </button>
 
     <div v-else class="drawer" :class="{ large: isLarge }" data-harness-agent-terminal-open @keydown.esc="closeDrawer">
@@ -132,9 +132,9 @@ function closeDrawer() {
   align-items: center;
   gap: 8px;
   padding: 9px 14px;
-  background: var(--Accent);
-  color: #11181b;
-  border: none;
+  background: var(--Highlight1);
+  color: var(--mainColor);
+  border: var(--border);
   border-radius: 999px;
   box-shadow: var(--shadow-md);
   font-family: inherit;
