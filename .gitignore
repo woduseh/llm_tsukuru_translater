@@ -31,3 +31,8 @@ res/mcp-agent-server.cjs
 /artifacts/verify/
 /artifacts/dev/
 /artifacts/doctor/
+
+# one-off local reviews and experiments
+/artifacts/instruction-review/
+/artifacts/mcp-audit-*/
+/artifacts/scratch/

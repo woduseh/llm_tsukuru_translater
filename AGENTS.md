@@ -18,4 +18,4 @@ Read references as needed for the affected area; no full-document reading sequen
 - [Harness](docs/HARNESS.md): choose and run relevant checks.
 - [MCP guide](docs/AGENT_MCP_GUIDE.md): app-facing tool capabilities and guidance source.
 
-`docs/exec-plans/active/` records unresolved work, not automatic assignments. Completed plans are historical evidence, not current instructions.
+`docs/exec-plans/active/` records unresolved work, not automatic assignments. Remove completed plans once current contracts are documented in the references above; Git history preserves past records. Keep one-off review and experiment output in ignored `artifacts/scratch/`; reusable fixtures belong in `test/fixtures/`.
