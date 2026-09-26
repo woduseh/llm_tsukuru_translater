@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import * as path from 'path';
 import * as zlib from 'zlib';
 import type { AlignmentBreak, AlignmentMap, JsonObject } from '../types/agentWorkspace';
-import { AgentSafeFileSystem } from './agentSafeFileSystem';
+import { AgentSafeFileSystem, type SafeTextReadResult } from './agentSafeFileSystem';
 import { ArtifactService } from './artifactService';
 import type { AgentDataRef } from './dataRefService';
 import { DataRefService } from './dataRefService';
@@ -35,48 +35,18 @@ export class AlignmentService {
     assertPath(input.targetPath, 'alignment.inspect requires a non-empty targetPath.');
     const source = this.options.files.readText(input.sourcePath, { maxBytes: positiveInt(input.maxBytes, 256 * 1024) });
     const target = this.options.files.readText(input.targetPath, { maxBytes: positiveInt(input.maxBytes, 256 * 1024) });
-    const sourceLines = classifyLines(source.text);
-    const targetLines = classifyLines(target.text);
+    return this.inspectSnapshot({ source, target }, input);
+  }
+
+  /** Internal request-local snapshots; paths still enter through AgentSafeFileSystem. */
+  inspectSnapshot(pair: { source: SafeTextReadResult; target: SafeTextReadResult }, input: Pick<AlignmentInspectOptions, 'metadataPath' | 'ttlMs'> = {}): AlignmentInspectResult {
+    const { source, target } = pair;
     const metadata = input.metadataPath ? readMetadataSummary(this.options.files, this.options.projectRoot, input.metadataPath) : { status: 'not-provided' };
-    const breaks = findBreaks(sourceLines, targetLines);
-    const score = scoreBreaks(sourceLines.length, targetLines.length, breaks);
-    const partial = source.truncated || target.truncated;
-    const redacted = source.redactions.length > 0 || target.redactions.length > 0;
     const result: AlignmentInspectResult = {
       schemaVersion: 1,
       alignmentId: `alignment-${randomUUID()}`,
       createdAt: new Date().toISOString(),
-      sourcePath: source.relativePath,
-      targetPath: target.relativePath,
-      score,
-      confidence: partial || redacted ? 'low' : score >= 0.92 ? 'high' : score >= 0.75 ? 'medium' : 'low',
-      coverage: partial ? 'partial' : 'full',
-      verified: !partial && !redacted,
-      scoreKind: 'observed-structural',
-      limitations: [
-        ...(partial ? ['Only file prefixes were inspected. Score and line counts describe the observed prefixes; the remaining content is unverified. Increase maxBytes and rerun.'] : []),
-        ...(redacted ? ['Text was redacted during reading; exact structural preservation is unverified.'] : []),
-        'Structural checks do not assess translation meaning or guarantee game-data apply safety.',
-        'Metadata is summarized only; extraction-to-game mappings are not validated.',
-      ],
-      lineCount: {
-        source: sourceLines.length,
-        target: targetLines.length,
-        delta: targetLines.length - sourceLines.length,
-      },
-      refs: sourceLines.map((line, index) => {
-        const targetLine = targetLines[index];
-        const reasons = lineReasons(line, targetLine);
-        return {
-          sourceLine: line.lineNumber,
-          targetLine: targetLine?.lineNumber,
-          confidence: targetLine ? Math.max(0, 1 - reasons.length * 0.25) : 0,
-          kind: line.kind,
-          reasons,
-        };
-      }),
-      breaks,
-      metadata,
+      ...analyzeAlignment(source, target, metadata),
     };
     const artifact = this.options.artifacts.writeJsonArtifact('alignment-map', result.alignmentId, result as unknown as JsonObject);
     result.alignmentRef = this.options.dataRefs.registerArtifactRef(artifact, {
@@ -308,4 +278,47 @@ function assertPath(value: unknown, message: string): asserts value is string {
 
 function positiveInt(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
+/** Pure structural analysis; reading, identity and artifact persistence stay with the caller. */
+export function analyzeAlignment(source: SafeTextReadResult, target: SafeTextReadResult, metadata: JsonObject): Omit<AlignmentInspectResult, 'schemaVersion' | 'alignmentId' | 'createdAt' | 'alignmentRef'> {
+    const sourceLines = classifyLines(source.text);
+    const targetLines = classifyLines(target.text);
+    const breaks = findBreaks(sourceLines, targetLines);
+    const score = scoreBreaks(sourceLines.length, targetLines.length, breaks);
+    const partial = source.truncated || target.truncated;
+    const redacted = source.redactions.length > 0 || target.redactions.length > 0;
+    return {
+      sourcePath: source.relativePath,
+      targetPath: target.relativePath,
+      score,
+      confidence: partial || redacted ? 'low' : score >= 0.92 ? 'high' : score >= 0.75 ? 'medium' : 'low',
+      coverage: partial ? 'partial' : 'full',
+      verified: !partial && !redacted,
+      scoreKind: 'observed-structural',
+      limitations: [
+        ...(partial ? ['Only file prefixes were inspected. Score and line counts describe the observed prefixes; the remaining content is unverified. Increase maxBytes and rerun.'] : []),
+        ...(redacted ? ['Text was redacted during reading; exact structural preservation is unverified.'] : []),
+        'Structural checks do not assess translation meaning or guarantee game-data apply safety.',
+        'Metadata is summarized only; extraction-to-game mappings are not validated.',
+      ],
+      lineCount: {
+        source: sourceLines.length,
+        target: targetLines.length,
+        delta: targetLines.length - sourceLines.length,
+      },
+      refs: sourceLines.map((line, index) => {
+        const targetLine = targetLines[index];
+        const reasons = lineReasons(line, targetLine);
+        return {
+          sourceLine: line.lineNumber,
+          targetLine: targetLine?.lineNumber,
+          confidence: targetLine ? Math.max(0, 1 - reasons.length * 0.25) : 0,
+          kind: line.kind,
+          reasons,
+        };
+      }),
+      breaks,
+      metadata,
+    };
 }

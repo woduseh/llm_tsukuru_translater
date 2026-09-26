@@ -95,17 +95,12 @@ export class MemoryService {
   }
 
   search(options: MemorySearchOptions = {}): AgentMemoryEntry[] {
-    const query = normalize(options.query ?? '');
-    const tags = (options.tags ?? []).map(normalize);
-    const limit = positiveInt(options.limit, 20);
-    return this.readStore().entries
-      .filter((entry) => options.includeForgotten || !entry.forgottenAt)
-      .filter((entry) => !query || searchableMemoryText(entry).includes(query))
-      .filter((entry) => !options.type || entry.type === options.type)
-      .filter((entry) => tags.every((tag) => entry.tags.map(normalize).includes(tag)))
-      .filter((entry) => entry.confidence >= (options.minConfidence ?? 0))
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-      .slice(0, limit);
+    return searchMemoryEntries(this.readSnapshot(), options);
+  }
+
+  /** Fresh entries for one analysis request, never cached across external edits. */
+  readSnapshot(): readonly AgentMemoryEntry[] {
+    return this.readStore().entries;
   }
 
   update(memoryId: string, patch: Partial<Omit<MemoryWriteInput, 'memoryId' | 'provenance'>> & { provenance: AgentProvenance }, now = new Date()): AgentMemoryEntry {
@@ -163,22 +158,7 @@ export class MemoryService {
   }
 
   summarize(options: MemorySearchOptions = {}): JsonObject {
-    const entries = this.search({ ...options, limit: options.limit ?? 50 });
-    const byType: JsonObject = {};
-    for (const entry of entries) {
-      byType[entry.type] = typeof byType[entry.type] === 'number' ? (byType[entry.type] as number) + 1 : 1;
-    }
-    return {
-      total: entries.length,
-      byType,
-      topMemories: entries.slice(0, 10).map((entry) => ({
-        memoryId: entry.memoryId,
-        type: entry.type,
-        summary: entry.summary,
-        confidence: entry.confidence,
-        tags: entry.tags,
-      })),
-    };
+    return summarizeMemoryEntries(this.search({ ...options, limit: options.limit ?? 50 }));
   }
 
   private readStore(): MemoryStore {
@@ -244,3 +224,35 @@ function positiveInt(value: unknown, fallback: number): number {
 function emptyToUndefined(value: string | undefined): string | undefined {
   return value && value.trim() ? value : undefined;
 }
+
+export function searchMemoryEntries(entries: readonly AgentMemoryEntry[], options: MemorySearchOptions = {}): AgentMemoryEntry[] {
+    const query = normalize(options.query ?? '');
+    const tags = (options.tags ?? []).map(normalize);
+    const limit = positiveInt(options.limit, 20);
+    return entries
+      .filter((entry) => options.includeForgotten || !entry.forgottenAt)
+      .filter((entry) => !query || searchableMemoryText(entry).includes(query))
+      .filter((entry) => !options.type || entry.type === options.type)
+      .filter((entry) => tags.every((tag) => entry.tags.map(normalize).includes(tag)))
+      .filter((entry) => entry.confidence >= (options.minConfidence ?? 0))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .slice(0, limit);
+  }
+
+export function summarizeMemoryEntries(entries: readonly AgentMemoryEntry[]): JsonObject {
+    const byType: JsonObject = {};
+    for (const entry of entries) {
+      byType[entry.type] = typeof byType[entry.type] === 'number' ? (byType[entry.type] as number) + 1 : 1;
+    }
+    return {
+      total: entries.length,
+      byType,
+      topMemories: entries.slice(0, 10).map((entry) => ({
+        memoryId: entry.memoryId,
+        type: entry.type,
+        summary: entry.summary,
+        confidence: entry.confidence,
+        tags: entry.tags,
+      })),
+    };
+  }

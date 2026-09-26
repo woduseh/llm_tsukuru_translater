@@ -6,7 +6,7 @@ import type { ArtifactService } from './artifactService';
 import type { AgentDataRef } from './dataRefService';
 import type { DataRefService } from './dataRefService';
 import type { GlossaryEntry, GlossaryService } from './glossaryService';
-import type { MemoryService } from './memoryService';
+import { searchMemoryEntries, summarizeMemoryEntries, type AgentMemoryEntry, type MemoryService } from './memoryService';
 
 export type QaDimension =
   | 'lineAlignment'
@@ -128,14 +128,13 @@ export class QaService {
     const targetLines = splitLines(target.text);
     const sourceLines = source ? splitLines(source.text) : undefined;
     const alignment = source
-      ? this.options.alignment.inspect({
-        sourcePath: source.relativePath,
-        targetPath: target.relativePath,
+      ? this.options.alignment.inspectSnapshot({ source, target }, {
         metadataPath: input.metadataPath,
-        maxBytes: input.maxBytes,
         ttlMs: input.ttlMs,
       })
       : undefined;
+    const glossaryEntries = this.options.glossary.search({ limit: 500 });
+    const memoryEntries = this.options.memory.readSnapshot();
     const findings: QaFinding[] = [];
     const partial = target.truncated || Boolean(source?.truncated);
     const verified = Boolean(source && alignment?.verified) && !partial;
@@ -150,8 +149,8 @@ export class QaService {
     findings.push(...alignmentFindings(alignment));
     findings.push(...compareLineInvariants(sourceLines, targetLines));
     findings.push(...untranslatedFindings(sourceLines, targetLines));
-    findings.push(...glossaryFindings(this.options.glossary.search({ limit: 500 }), sourceLines, targetLines, target.text));
-    findings.push(...styleFindings(this.options.memory, targetLines));
+    findings.push(...glossaryFindings(glossaryEntries, sourceLines, targetLines, target.text));
+    findings.push(...styleFindings(memoryEntries, targetLines));
     findings.push(...fluencyFindings(targetLines));
     findings.push(...lengthFindings(sourceLines, targetLines));
     findings.push(...metadataRiskFindings(alignment, targetLines.length));
@@ -180,10 +179,10 @@ export class QaService {
       findings,
       alignment: alignmentSummary(alignment),
       glossary: {
-        checkedEntries: this.options.glossary.search({ limit: 500 }).length,
+        checkedEntries: glossaryEntries.length,
         findingCount: findings.filter((item) => item.dimension === 'glossaryConsistency').length,
       },
-      memory: this.options.memory.summarize({ limit: 20 }),
+      memory: summarizeMemoryEntries(searchMemoryEntries(memoryEntries, { limit: 20 })),
       nextSuggestedCalls: nextCallsForScore(qualityScore, findings),
     };
     const artifact = this.options.artifacts.writeJsonArtifact('qa-score', result.qaScoreId, result as unknown as JsonObject);
@@ -379,11 +378,10 @@ function glossaryFindings(entries: GlossaryEntry[], sourceLines: string[] | unde
   return findings;
 }
 
-function styleFindings(memory: MemoryService, targetLines: string[]): QaFinding[] {
-  const styleMemories = memory.search({ type: 'style-decision', limit: 20 }).concat(memory.search({ type: 'character-voice', limit: 20 }));
+function styleFindings(memory: readonly AgentMemoryEntry[], targetLines: string[]): QaFinding[] {
+  const styleMemories = searchMemoryEntries(memory, { type: 'style-decision', limit: 20 }).concat(searchMemoryEntries(memory, { type: 'character-voice', limit: 20 }));
   if (!styleMemories.some((entry) => /polite|-요|존댓말/i.test(`${entry.summary}\n${entry.details ?? ''}`))) return [];
-  const dialogueLines = targetLines.filter((line) => line && !isSeparator(line));
-  const informal = dialogueLines.findIndex((line) => /[가-힣](다|해|야|지|군)[.!?…"]?$/.test(line.trim()) && !/(니다|요|세요|죠)[.!?…"]?$/.test(line.trim()));
+  const informal = targetLines.findIndex((line) => line && !isSeparator(line) && /[가-힣](다|해|야|지|군)[.!?…"]?$/.test(line.trim()) && !/(니다|요|세요|죠)[.!?…"]?$/.test(line.trim()));
   return informal >= 0
     ? [finding('info', 'style-memory-politeness-check', 'styleAdherence', 'Project memory mentions polite style; review this line for adherence.', informal + 1)]
     : [];
