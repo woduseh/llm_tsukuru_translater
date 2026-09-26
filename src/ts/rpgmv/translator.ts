@@ -14,7 +14,7 @@ import {
 export { splitFileBlocks } from '../libs/translationCore';
 import type { BlockValidation } from '../libs/translationCore';
 import { extractTranslationControlCodes, isTranslationTextFileName } from '../libs/translationSyntax';
-import { atomicWriteJsonFile, atomicWriteTextFile } from '../libs/atomicFile';
+import { atomicWriteJsonFile, atomicWriteTextFile, cleanupStaleAtomicTempFilesForPaths } from '../libs/atomicFile';
 import { runWithDirectoryLock } from '../libs/concurrency';
 import { LLM_FINGERPRINT_SCHEMA_VERSION } from '../libs/providerRegistry';
 import { normalizeTranslationConcurrency, TranslationRequestScheduler } from '../libs/translationRequestScheduler';
@@ -27,8 +27,10 @@ import {
     type Translator,
 } from '../libs/translatorFactory';
 
+import { TranslationCache, type CacheStore } from '../libs/translationCache';
+
 const PROGRESS_FILE = '.llm_progress.json';
-const CACHE_FILE = '.llm_cache.json';
+
 const BACKUP_SUFFIX = '_backup';
 
 export interface ProgressState {
@@ -36,15 +38,6 @@ export interface ProgressState {
     fingerprint: string;
     completedFiles: string[];
     timestamp: string;
-}
-
-interface CacheStore {
-    [fileHash: string]: { translatedContent: string; model: string; targetLang: string; provider?: string };
-}
-
-interface CacheFileState {
-    version: number;
-    entries: CacheStore;
 }
 
 export async function createTranslationBackup(edir: string): Promise<string> {
@@ -95,46 +88,13 @@ function loadProgress(edir: string): ProgressState | null {
     return null;
 }
 
-function saveProgress(edir: string, state: ProgressState) {
-    atomicWriteJsonFile(path.join(edir, PROGRESS_FILE), state, 2);
+function saveProgress(edir: string, state: ProgressState, cleanupStaleTempFiles = true) {
+    atomicWriteJsonFile(path.join(edir, PROGRESS_FILE), state, 2, { cleanupStaleTempFiles });
 }
 
 function clearProgress(edir: string) {
     const pfile = path.join(edir, PROGRESS_FILE);
     if (fs.existsSync(pfile)) fs.unlinkSync(pfile);
-}
-
-function loadCache(edir: string): CacheStore {
-    const cfile = path.join(edir, CACHE_FILE);
-    if (fs.existsSync(cfile)) {
-        try {
-            const parsed = JSON.parse(fs.readFileSync(cfile, 'utf-8')) as Partial<CacheFileState>;
-            if (parsed?.version !== LLM_FINGERPRINT_SCHEMA_VERSION || !isCacheStore(parsed.entries)) {
-                return {};
-            }
-            return parsed.entries;
-        } catch { return {}; }
-    }
-    return {};
-}
-
-function saveCache(edir: string, cache: CacheStore) {
-    atomicWriteJsonFile(path.join(edir, CACHE_FILE), {
-        version: LLM_FINGERPRINT_SCHEMA_VERSION,
-        entries: cache,
-    } satisfies CacheFileState, 0);
-}
-
-function isCacheStore(value: unknown): value is CacheStore {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-    return Object.values(value).every((entry) => {
-        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
-        const candidate = entry as Record<string, unknown>;
-        return typeof candidate.translatedContent === 'string'
-            && typeof candidate.model === 'string'
-            && typeof candidate.targetLang === 'string'
-            && (candidate.provider === undefined || typeof candidate.provider === 'string');
-    });
 }
 
 function writeTranslationLog(edir: string, log: TranslationLog) {
@@ -174,7 +134,7 @@ export interface TranslationCoordinatorOptions {
     backupDir: string;
     fileList: string[];
     completedFiles: Set<string>;
-    cache: CacheStore;
+    cache?: CacheStore;
     provider: string;
     model: string;
     sourceLang: string;
@@ -273,7 +233,11 @@ export function resolveLlmParallelWorkers(_provider: string, requested: unknown)
 export async function translateFilesWithCoordinator(options: TranslationCoordinatorOptions): Promise<TranslationCoordinatorResult> {
     const entries: TranslationLogEntry[] = [];
     const failedFiles: string[] = [];
-    const pending: PendingTranslationFile[] = [];
+    const cache = new TranslationCache(options.edir, options.cache);
+    cleanupStaleAtomicTempFilesForPaths([
+        ...options.fileList.map(file => path.join(options.edir, file)), path.join(options.edir, PROGRESS_FILE),
+    ]);
+    let sharedTranslator: Translator | undefined;
     let workedFiles = 0;
     let totalErrors = 0;
     let totalBlocks = 0;
@@ -301,7 +265,7 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
         fingerprint: configFingerprint,
         completedFiles: [...options.completedFiles],
         timestamp: new Date().toISOString(),
-    });
+    }, false);
 
     const markWorked = (fileName: string, detail: string) => {
         fileProgress.delete(fileName);
@@ -310,20 +274,18 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
         options.onStatus?.(`${fileName} ${detail}`);
     };
 
-    for (let fileIndex = 0; fileIndex < options.fileList.length; fileIndex++) {
-        const fileName = options.fileList[fileIndex];
-        const fileOrdinal = fileIndex + 1;
+    const prepareFile = (fileName: string, fileOrdinal: number): PendingTranslationFile | undefined => {
         if (options.isAborted()) {
-            break;
+            return;
+        }
+
+        if (options.isResuming && options.completedFiles.has(fileName)) {
+            markWorked(fileName, '(이전 번역 건너뜀)');
+            return;
         }
 
         const filePath = path.join(options.edir, fileName);
         const originalContent = fs.readFileSync(filePath, 'utf-8');
-
-        if (options.isResuming && options.completedFiles.has(fileName)) {
-            markWorked(fileName, '(이전 번역 건너뜀)');
-            continue;
-        }
 
         if (options.translationMode === 'untranslated') {
             const backupPath = path.join(options.backupDir, fileName);
@@ -333,7 +295,7 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
                     options.completedFiles.add(fileName);
                     saveProgressState();
                     markWorked(fileName, '(번역됨, 건너뜀)');
-                    continue;
+                    return;
                 }
             }
         }
@@ -347,7 +309,7 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
             options.targetLang,
             options.settings,
         );
-        const cached = options.cache[cacheKey];
+        const cached = cache.get(cacheKey);
         if (cached) {
             const validation = validateTranslatedFileContent(originalContent, cached.translatedContent);
             if (validation.ok) {
@@ -355,9 +317,9 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
                     failedFiles.push(fileName);
                     entries.push(createFailureLogEntry(fileName, ['번역 중 파일이 변경되어 캐시 결과를 반영하지 않았습니다'], true));
                     markWorked(fileName, '(파일 변경, 건너뜀)');
-                    continue;
+                    return;
                 }
-                atomicWriteTextFile(filePath, cached.translatedContent, { encoding: 'utf-8' });
+                atomicWriteTextFile(filePath, cached.translatedContent, { encoding: 'utf-8', expectedContent: originalContent, cleanupStaleTempFiles: false });
                 options.completedFiles.add(fileName);
                 saveProgressState();
                 entries.push({
@@ -373,25 +335,39 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
                     errors: [],
                 });
                 markWorked(fileName, '(캐시 사용)');
-                continue;
+                return;
             } else {
-                delete options.cache[cacheKey];
-                saveCache(options.edir, options.cache);
+                cache.delete(cacheKey);
                 options.onStatus?.(`${fileName} (캐시 검증 실패, 새 번역 대기)`);
             }
         }
 
-        pending.push({ fileName, fileOrdinal, originalContent, cacheKey });
-    }
+        return { fileName, fileOrdinal, originalContent, cacheKey };
+    };
 
-    await runTranslationQueue(pending, scheduler.concurrency, () => scheduler.isAborted(), async (task) => {
-        options.onStatus?.(`[${task.fileOrdinal}/${options.fileList.length}] ${task.fileName}`);
+    const pending = options.fileList.map((fileName, index) => ({ fileName, fileOrdinal: index + 1 }));
+    await runTranslationQueue(pending, scheduler.concurrency, () => scheduler.isAborted(), async (queued) => {
+        let task: PendingTranslationFile | undefined;
+        try {
+            task = prepareFile(queued.fileName, queued.fileOrdinal);
+            if (!task) return;
+            options.onStatus?.(`[${task.fileOrdinal}/${options.fileList.length}] ${task.fileName}`);
+        } catch (error) {
+            executionFailure ??= { error };
+            scheduler.cancel();
+            throw error;
+        }
+        const translator = options.createTranslatorForFile
+            ? options.createTranslatorForFile(task.fileName)
+            : sharedTranslator ??= createTranslator(options.settings, options.sourceLang, options.targetLang, options.isAborted);
+        const fileName = task.fileName;
         return translateOneFile(task, options, scheduler, (current, total) => {
             const fraction = total > 0 ? Math.min(1, Math.max(0, current / total)) : 0;
-            fileProgress.set(task.fileName, Math.max(fileProgress.get(task.fileName) ?? 0, fraction));
+            fileProgress.set(fileName, Math.max(fileProgress.get(fileName) ?? 0, fraction));
             reportProgress();
-        });
+        }, translator);
     }, (result) => {
+        if (!result) return;
         const filePath = path.join(options.edir, result.fileName);
         if (result.aborted) {
             return;
@@ -418,15 +394,14 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
 
         if (translationSucceeded) {
             if (result.translatedContent !== result.originalContent) {
-                atomicWriteTextFile(filePath, result.translatedContent, { encoding: 'utf-8' });
+                atomicWriteTextFile(filePath, result.translatedContent, { encoding: 'utf-8', expectedContent: result.originalContent, cleanupStaleTempFiles: false });
             }
-            options.cache[result.cacheKey] = {
+            cache.set(result.cacheKey, {
                 translatedContent: result.translatedContent,
                 model: options.model,
                 targetLang: options.targetLang,
                 provider: options.provider,
-            };
-            saveCache(options.edir, options.cache);
+            });
             options.completedFiles.add(result.fileName);
             saveProgressState();
         } else {
@@ -478,10 +453,8 @@ async function translateOneFile(
     options: TranslationCoordinatorOptions,
     scheduler: TranslationRequestScheduler,
     onProgress: (current: number, total: number) => void,
+    translator: Translator,
 ): Promise<TranslationFileResult> {
-    const translator = options.createTranslatorForFile
-        ? options.createTranslatorForFile(task.fileName)
-        : createTranslator(options.settings, options.sourceLang, options.targetLang, options.isAborted);
     const result = await translator.translateFileContent(
         task.originalContent,
         (current, total, detail) => {
@@ -600,10 +573,10 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
             const sortOrder = arg.sortOrder || 'name-asc';
             if (sortOrder === 'name-desc') {
                 fileList.sort((a, b) => b.localeCompare(a));
-            } else if (sortOrder === 'size-asc') {
-                fileList.sort((a, b) => fs.statSync(path.join(edir, a)).size - fs.statSync(path.join(edir, b)).size);
-            } else if (sortOrder === 'size-desc') {
-                fileList.sort((a, b) => fs.statSync(path.join(edir, b)).size - fs.statSync(path.join(edir, a)).size);
+            } else if (sortOrder === 'size-asc' || sortOrder === 'size-desc') {
+                const sizes = new Map(fileList.map(file => [file, fs.statSync(path.join(edir, file)).size]));
+                const direction = sortOrder === 'size-asc' ? 1 : -1;
+                fileList.sort((a, b) => direction * (sizes.get(a)! - sizes.get(b)!));
             } else {
                 fileList.sort((a, b) => a.localeCompare(b));
             }
@@ -612,6 +585,7 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
             Tools.send('loadingTag', '백업 생성 중...');
             const backupDir = edir + BACKUP_SUFFIX;
             const translationMode = arg.translationMode || 'untranslated';
+            const cache = new TranslationCache(edir);
 
             // Reset if requested: restore originals from backup, clear progress/cache
             if (arg.resetProgress) {
@@ -625,16 +599,13 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
                         fs.rmSync(backupDir, { recursive: true, force: true });
                     }
                     clearProgress(edir);
-                    const cfile = path.join(edir, CACHE_FILE);
-                    if (fs.existsSync(cfile)) fs.unlinkSync(cfile);
+                    cache.clear();
                 } else {
                     // Untranslated-only reset: keep translated files, only clear progress
                     // and invalidate cache for untranslated files so they get fresh translations
                     clearProgress(edir);
                     if (fs.existsSync(backupDir)) {
-                        const cache = loadCache(edir);
                         const backupFiles = fs.readdirSync(backupDir).filter(isTranslationTextFileName);
-                        let cacheModified = false;
                         for (const f of backupFiles) {
                             const filePath = path.join(edir, f);
                             const backupPath = path.join(backupDir, f);
@@ -652,14 +623,10 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
                                         targetLang,
                                         ctx.settings,
                                     );
-                                    if (cache[cacheKey]) {
-                                        delete cache[cacheKey];
-                                        cacheModified = true;
-                                    }
+                                    cache.delete(cacheKey);
                                 }
                             }
                         }
-                        if (cacheModified) saveCache(edir, cache);
                     }
                 }
             }
@@ -674,7 +641,6 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
             const isResuming = completedFiles.size > 0;
 
             // Cache
-            const cache = loadCache(edir);
             const workerCount = resolveLlmParallelWorkers(provider, arg.parallelWorkers ?? ctx.settings.llmParallelWorkers);
 
             // Log
@@ -696,7 +662,6 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
                 backupDir,
                 fileList,
                 completedFiles,
-                cache,
                 provider,
                 model,
                 sourceLang,
@@ -805,7 +770,7 @@ async function retranslateFileUnlocked(
     const model = ctx.settings.llmModel;
 
     // Invalidate cache for this file's original content and persist immediately
-    const cache = loadCache(edir);
+    const cache = new TranslationCache(edir);
     const hash = contentHash(originalContent);
     const configFingerprint = buildTranslationConfigFingerprint(
         provider,
@@ -822,8 +787,7 @@ async function retranslateFileUnlocked(
         targetLang,
         ctx.settings,
     );
-    delete cache[cacheKey];
-    saveCache(edir, cache);
+    cache.delete(cacheKey);
 
     onProgress?.('번역 중...');
 
@@ -864,8 +828,7 @@ async function retranslateFileUnlocked(
         atomicWriteTextFile(filePath, translatedContent, { encoding: 'utf-8' });
     }
 
-    cache[cacheKey] = { translatedContent, model, targetLang, provider };
-    saveCache(edir, cache);
+    cache.set(cacheKey, { translatedContent, model, targetLang, provider });
 
     // Remove from progress so it can be re-translated in bulk runs too
     removeFileFromProgress(edir, fileName, configFingerprint);
@@ -1010,7 +973,7 @@ async function retranslateBlocksUnlocked(
         atomicWriteTextFile(filePath, candidateContent, { encoding: 'utf-8' });
 
         // Invalidate cache
-        const cache = loadCache(edir);
+        const cache = new TranslationCache(edir);
         const hash = contentHash(originalContent);
         const model = ctx.settings.llmModel;
         const configFingerprint = buildTranslationConfigFingerprint(
@@ -1028,8 +991,7 @@ async function retranslateBlocksUnlocked(
             targetLang,
             ctx.settings,
         );
-        delete cache[cacheKey];
-        saveCache(edir, cache);
+        cache.delete(cacheKey);
         removeFileFromProgress(edir, fileName, configFingerprint);
 
         return { success: true };

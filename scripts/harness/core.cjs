@@ -520,12 +520,12 @@ async function main() {
 
           const resetRunCalls = await runTranslation('reset run', { ...arg, resetProgress: true }, 1);
 
-          const cachePath = path.join(extractDir, '.llm_cache.json');
+          const cachePath = path.join(extractDir, '.llm_cache');
           const progressPath = path.join(extractDir, '.llm_progress.json');
           const logFiles = fs.readdirSync(extractDir).filter((file) => file.startsWith('translation_log_'));
 
           assert(fs.existsSync(path.join(workspace, 'Extract_backup')), 'backup directory missing');
-          assert(fs.existsSync(cachePath), 'cache file missing');
+          assert(fs.existsSync(cachePath), 'cache directory missing');
           assert(!fs.existsSync(progressPath), 'progress file should be cleared');
           assert(logFiles.length >= 1, 'translation log not written');
           assert(fs.readFileSync(fileOne, 'utf8').includes('안녕하세요'), 'first file was not translated');

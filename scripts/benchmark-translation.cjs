@@ -197,7 +197,17 @@ function verifySample(api, fixture, result, options, provider) {
     return { file: file.name, bytes: output.length, sha256: sha(output), ...checked };
   });
   const progressBytes = fs.readFileSync(path.join(fixture.edir, '.llm_progress.json'));
-  const cacheBytes = fs.readFileSync(path.join(fixture.edir, '.llm_cache.json'));
+  // Baseline snapshots retain the old aggregate cache; current code uses atomic per-key records.
+  const legacyCache = path.join(fixture.edir, '.llm_cache.json');
+  const cacheDirectory = path.join(fixture.edir, '.llm_cache');
+  const cacheBytes = fs.existsSync(legacyCache) ? fs.readFileSync(legacyCache) : Buffer.from(JSON.stringify({
+    version: 2,
+    entries: Object.fromEntries(fs.readdirSync(cacheDirectory).filter(name => name.endsWith('.json')).map(name => {
+      const record = JSON.parse(fs.readFileSync(path.join(cacheDirectory, name), 'utf8'));
+      assert.equal(record.version, 2);
+      return [record.key, record.entry];
+    })),
+  }));
   const progress = JSON.parse(progressBytes.toString('utf8'));
   const cache = JSON.parse(cacheBytes.toString('utf8'));
   assert.deepEqual([...progress.completedFiles].sort(), expectedNames);
@@ -206,7 +216,7 @@ function verifySample(api, fixture, result, options, provider) {
   assert.equal(Object.keys(cache.entries).length, fixture.files.length);
   assert.deepEqual(cache.entries, options.cache);
   assert.deepEqual(Object.values(cache.entries).map(entry => entry.translatedContent).sort(), fixture.files.map(file => file.expected).sort());
-  assert.deepEqual(fs.readdirSync(fixture.edir).sort(), [...expectedNames, '.llm_cache.json', '.llm_progress.json'].sort(),
+  assert.deepEqual(fs.readdirSync(fixture.edir).sort(), [...expectedNames, fs.existsSync(legacyCache) ? '.llm_cache.json' : '.llm_cache', '.llm_progress.json'].sort(),
     'Atomic writes must leave only the final files');
   const state = provider.state();
   assert.equal(state.requestCount, requestTotal);

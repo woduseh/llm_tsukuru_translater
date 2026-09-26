@@ -1,3 +1,4 @@
+import { TranslationCache } from '../../src/ts/libs/translationCache';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -93,7 +94,7 @@ describe('parallel translation coordinator', () => {
     vi.useFakeTimers();
     const project = makeProject(['A.txt', 'B.txt', 'C.txt', 'D.txt']);
     const original = '--- 1 ---\n\\C[1]One\n\n--- 2 ---\nTwo\n--- 3 ---\nThree\n';
-    for (const file of project.files) fs.writeFileSync(path.join(project.edir, file), original);
+    for (const file of project.files) fs.writeFileSync(path.join(project.edir, file), original.replace('One', `One ${file}`));
     let active = 0;
     let maxActive = 0;
     let calls = 0;
@@ -118,9 +119,9 @@ describe('parallel translation coordinator', () => {
     expect(calls).toBe(12);
     expect(progress).toEqual([...progress].sort((a, b) => a - b));
     expect(progress.at(-1)).toBe(100);
-    for (const file of project.files) expect(fs.readFileSync(path.join(project.edir, file), 'utf8')).toBe(translateContent(original));
+    for (const file of project.files) expect(fs.readFileSync(path.join(project.edir, file), 'utf8')).toBe(translateContent(original.replace('One', `One ${file}`)));
     expect(options.completedFiles.size).toBe(4);
-    expect(Object.keys(options.cache)).toHaveLength(1);
+    expect(Object.keys(options.cache)).toHaveLength(4);
   });
 
   it('drops queued chunk requests on cancellation and never commits an unfinished file', async () => {
@@ -384,8 +385,9 @@ describe('parallel translation coordinator', () => {
     expect(readProgress(edir).completedFiles).toEqual(['InFlight.txt']);
     expect([...options.completedFiles]).toEqual(['InFlight.txt']);
     expect(Object.keys(options.cache)).toHaveLength(1);
-    const persistedCache = JSON.parse(fs.readFileSync(path.join(edir, '.llm_cache.json'), 'utf-8'));
-    expect(Object.keys(persistedCache.entries)).toEqual(Object.keys(options.cache));
+    const persistedCache = new TranslationCache(edir);
+    for (const [key, entry] of Object.entries(options.cache)) expect(persistedCache.get(key)).toEqual(entry);
+    expect(fs.readdirSync(path.join(edir, '.llm_cache'))).toHaveLength(1);
   });
 
   it('stops dequeuing queued files after abort while saving completed successes', async () => {

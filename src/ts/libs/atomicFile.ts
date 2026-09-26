@@ -136,41 +136,47 @@ export function cleanupStaleAtomicTempFiles(
   filePath: string,
   options: { maxAgeMs?: number; nowMs?: number } = {},
 ): AtomicCleanupResult {
-  const finalPath = path.resolve(filePath);
-  const dir = path.dirname(finalPath);
-  const prefix = atomicTempPrefix(finalPath);
-  const maxAgeMs = options.maxAgeMs ?? DEFAULT_STALE_TEMP_MAX_AGE_MS;
-  const nowMs = options.nowMs ?? Date.now();
-  const removed: string[] = [];
+  return cleanupStaleAtomicTempFilesForPaths([filePath], options);
+}
 
-  try {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (!entry.isFile() || !entry.name.startsWith(prefix) || !entry.name.endsWith('.tmp')) {
-        continue;
-      }
-
-      const candidatePath = path.join(dir, entry.name);
-      let stat: fs.Stats;
-      try {
-        stat = fs.statSync(candidatePath);
-      } catch (err) {
-        if (isNodeErrorCode(err, 'ENOENT')) {
-          continue;
-        }
-        throw err;
-      }
-
-      if (nowMs - stat.mtimeMs < maxAgeMs) {
-        continue;
-      }
-
-      fs.unlinkSync(candidatePath);
-      removed.push(candidatePath);
-    }
-  } catch (err) {
-    throw new AtomicFileWriteError(`원자적 파일 임시 파일 정리 실패: ${finalPath}`, finalPath, 'cleanup', err);
+/** Clean known output prefixes in one directory scan per directory, not once per output file. */
+export function cleanupStaleAtomicTempFilesForPaths(
+  filePaths: readonly string[],
+  options: { maxAgeMs?: number; nowMs?: number } = {},
+): AtomicCleanupResult {
+  const directories = new Map<string, string[]>();
+  for (const filePath of filePaths) {
+    const finalPath = path.resolve(filePath);
+    const dir = path.dirname(finalPath);
+    const files = directories.get(dir) ?? [];
+    files.push(finalPath);
+    directories.set(dir, files);
   }
-
+  const removed: string[] = [];
+  for (const [dir, files] of directories) {
+    const prefixes = new Set(files.map(atomicTempPrefix));
+    const maxAgeMs = options.maxAgeMs ?? DEFAULT_STALE_TEMP_MAX_AGE_MS;
+    const nowMs = options.nowMs ?? Date.now();
+    try {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const marker = entry.name.lastIndexOf('.atomic-');
+        if (!entry.isFile() || marker < 0 || !entry.name.endsWith('.tmp')
+          || !prefixes.has(entry.name.slice(0, marker + '.atomic-'.length))) continue;
+        const candidatePath = path.join(dir, entry.name);
+        let stat: fs.Stats;
+        try { stat = fs.statSync(candidatePath); }
+        catch (error) {
+          if (isNodeErrorCode(error, 'ENOENT')) continue;
+          throw error;
+        }
+        if (nowMs - stat.mtimeMs < maxAgeMs) continue;
+        fs.unlinkSync(candidatePath);
+        removed.push(candidatePath);
+      }
+    } catch (error) {
+      throw new AtomicFileWriteError(`원자적 파일 임시 파일 정리 실패: ${files[0]}`, files[0], 'cleanup', error);
+    }
+  }
   return { removed };
 }
 

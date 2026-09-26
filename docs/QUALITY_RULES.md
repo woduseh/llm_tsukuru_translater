@@ -13,7 +13,7 @@ Behavioral contracts for the affected code, not a mandatory verification sequenc
 ## Translation Workflow Rules
 
 - `Extract_backup` or `_backup` is the source of truth for untranslated content.
-- `.llm_progress.json` and `.llm_cache.json` must remain resumable and safe to clear.
+- `.llm_progress.json` and the per-key `.llm_cache/` directory must remain resumable and safe to clear. Import valid legacy `.llm_cache.json` entries durably before removing that old file; interrupted imports must retain newer per-key results.
 - `untranslated` mode must skip already translated files and re-run only files that still match backup.
 - Cache/progress identity must include the effective provider configuration; cache keys also include content hash, model, source and target language. `translatorFactory.ts` and `providerRegistry.ts` define the fingerprints.
 - Provider readiness errors must be deterministic and renderer-safe.

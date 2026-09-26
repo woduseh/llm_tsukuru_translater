@@ -58,8 +58,9 @@ describe('selected-block retranslation safeguards', () => {
 
     expect(result).toEqual({ success: true });
     expect(fs.readFileSync(project.filePath, 'utf-8')).toBe(translated);
-    const cacheFile = JSON.parse(fs.readFileSync(path.join(project.edir, '.llm_cache.json'), 'utf-8'));
-    expect(cacheFile).toMatchObject({ version: 2, entries: {} });
+    expect(fs.existsSync(path.join(project.edir, '.llm_cache.json'))).toBe(false);
+    const cacheDirectory = path.join(project.edir, '.llm_cache');
+    expect(fs.existsSync(cacheDirectory) ? fs.readdirSync(cacheDirectory) : []).toEqual([]);
   });
 
   it('does not overwrite an edit made while a selected-block request is in flight', async () => {
@@ -156,8 +157,9 @@ describe('full-file retranslation failure propagation', () => {
 
     expect(result.success).toBe(false);
     expect(fs.readFileSync(project.filePath, 'utf-8')).toBe(project.currentContent);
-    const cacheFile = JSON.parse(fs.readFileSync(path.join(project.edir, '.llm_cache.json'), 'utf-8'));
-    expect(cacheFile).toMatchObject({ version: 2, entries: {} });
+    expect(fs.existsSync(path.join(project.edir, '.llm_cache.json'))).toBe(false);
+    const cacheDirectory = path.join(project.edir, '.llm_cache');
+    expect(fs.existsSync(cacheDirectory) ? fs.readdirSync(cacheDirectory) : []).toEqual([]);
     expect(fs.existsSync(path.join(project.edir, '.llm_progress.json'))).toBe(false);
   });
 
