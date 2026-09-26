@@ -12,7 +12,7 @@ import {
   validateTerminalEvent,
 } from '../../src/agent/contractsValidation';
 import {
-  createMcpLegacyOfflineToolRegistry as createMcpOfflineToolRegistry,
+  createMcpOfflineToolRegistry,
   createMcpReadonlyToolRegistry,
 } from '../../src/mcp';
 import { applyTerminalEvent } from '../../src/renderer/agentWorkspaceModel';
@@ -69,7 +69,7 @@ describe('security harness gates', () => {
     expect(unknown.isError).toBe(true);
     expect(JSON.stringify(unknown)).not.toContain('Hello \\V[1]');
 
-    const invalidArgs = client.callTool('quality.review_file', { path: 42 as never }).result as JsonObject;
+    const invalidArgs = client.callTool('translation.read_window', { targetPath: 42 as never }).result as JsonObject;
     expect(invalidArgs.isError).toBe(true);
     expect(JSON.stringify(invalidArgs)).not.toContain('api_key=secret-value');
   });
@@ -166,20 +166,13 @@ describe('security harness gates', () => {
     `);
   });
 
-  it('keeps repair simulation read-only and rejects offline patch application', () => {
+  it('keeps patch proposals read-only and rejects offline patch application', () => {
     const projectRoot = makeRepairProject('no-unapproved-writes', ['--- 101 ---', 'Hello \\V[1]'], ['--- 101 ---', 'Hello \\V[1]']);
     const service = new AgentService({ projectRoot });
     const registry = createMcpOfflineToolRegistry(service);
     const targetPath = path.join(projectRoot, 'Translated', 'Map001.txt');
     const before = fs.readFileSync(targetPath, 'utf-8');
 
-    const repair = service.repair.loopRun({
-      sourcePath: 'Source\\Map001.txt',
-      targetPath: 'Translated\\Map001.txt',
-      threshold: 1,
-      maxIterations: 2,
-    });
-    expect(repair.dryRunOnly).toBe(true);
     expect(fs.readFileSync(targetPath, 'utf-8')).toBe(before);
 
     const patch = service.patch.propose({

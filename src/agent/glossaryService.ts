@@ -3,7 +3,6 @@ import * as path from 'path';
 import { atomicWriteJsonFile } from '../ts/libs/atomicFile';
 import type { JsonObject } from '../types/agentWorkspace';
 import { redactSecretLikeValues } from './contractsValidation';
-import type { CorpusSampleResult } from './corpusSamplingService';
 
 export interface AgentProvenance {
   source: string;
@@ -147,41 +146,6 @@ export class GlossaryService {
       .slice(0, limit);
   }
 
-  proposeEntriesFromCorpus(sample: CorpusSampleResult, options: { limit?: number; confidence?: number } = {}): GlossaryCreateInput[] {
-    const limit = positiveInt(options.limit, 10);
-    const seen = new Set<string>();
-    const proposals: GlossaryCreateInput[] = [];
-    for (const item of sample.samples) {
-      const text = typeof item.text === 'string' ? item.text : '';
-      for (const candidate of extractTermCandidates(text)) {
-        const key = normalize(candidate);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        proposals.push({
-          sourceText: candidate,
-          preferredTranslation: '',
-          confidence: options.confidence ?? 0.25,
-          sourceRefs: [{
-            kind: 'corpus-sample',
-            path: typeof item.path === 'string' ? item.path : undefined,
-            lineNumber: typeof item.lineNumber === 'number' ? item.lineNumber : undefined,
-          }],
-          provenance: {
-            source: 'corpus.sample',
-            createdBy: 'agent',
-            sourceRefs: [{
-              kind: 'corpus-sample',
-              path: typeof item.path === 'string' ? item.path : undefined,
-              lineNumber: typeof item.lineNumber === 'number' ? item.lineNumber : undefined,
-            }],
-          },
-        });
-        if (proposals.length >= limit) return proposals;
-      }
-    }
-    return proposals;
-  }
-
   validateUsage(text: string, options: { now?: Date } = {}): GlossaryUsageValidationResult {
     const checkedAt = (options.now ?? new Date()).toISOString();
     const redactedText = redactSecretLikeValues({ text });
@@ -264,14 +228,6 @@ function detectGlossaryConflicts(entry: GlossaryEntry, existing: GlossaryEntry[]
     });
   }
   return conflicts;
-}
-
-function extractTermCandidates(text: string): string[] {
-  const normalized = text.replace(/\\[A-Za-z]+\[[^\]]+\]/g, ' ');
-  return uniqueStrings(normalized.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}A-Z][\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}A-Za-z0-9ー・' -]{1,24}/gu) ?? [])
-    .map((term) => term.trim())
-    .filter((term) => term.length >= 2 && !/^---/.test(term))
-    .slice(0, 12);
 }
 
 function requireProvenance(provenance: AgentProvenance | undefined): void {

@@ -22,7 +22,7 @@ afterEach(() => {
   }
 });
 
-describe('MCP read-only adapter scaffold', () => {
+describe('MCP public read-only adapter', () => {
   it('handles initialize, list, and call through the protocol-light mock client', () => {
     const projectRoot = makeProject('protocol');
     const service = new AgentService({ projectRoot, engine: 'rpg-maker-mv' });
@@ -36,16 +36,10 @@ describe('MCP read-only adapter scaffold', () => {
     const list = client.listTools().result as JsonObject;
     expect((list.tools as JsonObject[]).map((tool) => tool.name)).toEqual(expect.arrayContaining([
       'project.context_snapshot',
-      'settings.get_sanitized',
       'provider.list',
-      'provider.readiness',
       'project.get_quality_rules',
       'project.translation_inventory',
-       'project.scan_profile',
-       'quality.review_file',
-       'harness.latest',
        'artifacts.read_ref',
-       'batch.estimate',
        'help.translation_workflow',
        'help.explain_tool',
        'help.safe_recipe',
@@ -63,48 +57,26 @@ describe('MCP read-only adapter scaffold', () => {
     const service = new AgentService({ projectRoot });
     const registry = createMcpReadonlyToolRegistry(service);
 
-    const invalidArgs = registry.callTool('quality.review_file', {});
+    const invalidArgs = registry.callTool('translation.read_window', {});
     expect(invalidArgs.status).toBe('failed');
-    expect(invalidArgs.failure?.message).toContain('missing required property "path"');
+    expect(invalidArgs.failure?.message).toContain('missing required property "targetPath"');
 
-    const traversal = registry.callTool('quality.review_file', { path: path.join('..', path.basename(outside), 'secret.txt') });
+    const traversal = registry.callTool('translation.read_window', { targetPath: path.join('..', path.basename(outside), 'secret.txt') });
     expect(traversal.status).toBe('failed');
     expect(JSON.stringify(traversal)).not.toContain('outside-secret');
   });
-
-  it('redacts provider secrets from settings, provider readiness, file review, and harness artifacts', () => {
-    const projectRoot = makeProject('redact');
-    fs.mkdirSync(path.join(projectRoot, 'artifacts', 'harness'), { recursive: true });
-    fs.writeFileSync(path.join(projectRoot, 'artifacts', 'harness', 'harness-core.json'), JSON.stringify({
-      schemaVersion: 1,
-      suite: 'harness-core',
-      status: 'passed',
-      token: 'super-secret-token',
-    }), 'utf-8');
-    const service = new AgentService({ projectRoot });
-    const registry = createMcpReadonlyToolRegistry(service, {
-      settings: {
-        llmProvider: 'gemini',
-        llmModel: 'gemini-2.5-flash',
-        llmApiKey: 'AIza1234567890123456789012',
-        llmCustomBaseUrl: 'http://127.0.0.1:1234/v1',
-      },
-    });
-
-    const settings = registry.callTool('settings.get_sanitized');
-    expect(JSON.stringify(settings)).not.toContain('AIza1234567890123456789012');
-    expect((settings.payload as JsonObject).llmApiKey).toBe('[REDACTED]');
-
-    const readiness = registry.callTool('provider.readiness');
-    expect(JSON.stringify(readiness)).not.toContain('AIza1234567890123456789012');
-
-    const review = registry.callTool('quality.review_file', { path: 'Extract\\Map001.txt' });
+  it('redacts text and saved analysis through the public read-only surface', () => {
+    const service = new AgentService({ projectRoot: makeProject('redact') });
+    const artifact = service.artifacts.writeJsonArtifact('qa-score', 'secret', { token: 'super-secret-token', findings: [] });
+    const ref = service.dataRefs.registerArtifactRef(artifact, { kind: 'qa-score' });
+    const registry = createMcpReadonlyToolRegistry(service);
+    const review = registry.callTool('translation.read_window', { targetPath: 'Extract/Map001.txt' });
     expect(review.status).toBe('ok');
     expect(JSON.stringify(review)).not.toContain('secret-value');
-    expect((review.payload as JsonObject).redactions).toBeTruthy();
-
-    const latest = registry.callTool('harness.latest');
-    expect(JSON.stringify(latest)).not.toContain('super-secret-token');
+    const page = registry.callTool('artifacts.read_ref', { refId: ref.refId });
+    expect(page.status).toBe('ok');
+    expect(JSON.stringify(page)).not.toContain('super-secret-token');
+    expect(registry.callTool('provider.list').status).toBe('ok');
   });
 
   it('validates app bridge loopback tokens by hash and never exposes token records', () => {
@@ -147,23 +119,12 @@ describe('MCP read-only adapter scaffold', () => {
       expect(toolNames.has(referencedTool), `${referencedTool} should be registered`).toBe(true);
     }
   });
-
-  it('guides provider-not-ready and no-project states without exposing secrets', () => {
-    const projectRoot = makeProject('not-ready');
-    const registry = createMcpReadonlyToolRegistry(new AgentService({ projectRoot }), {
-      settings: { llmProvider: 'gemini', llmApiKey: '' },
-    });
-
-    const readiness = registry.callTool('provider.readiness');
-    expect(readiness.status).toBe('ok');
-    expect(JSON.stringify(readiness)).not.toContain('AIza');
-
-    const providerSetup = registry.callTool('help.safe_recipe', { recipeId: 'provider_setup' });
-    expect(JSON.stringify(providerSetup.payload)).toContain('enter credentials only in the app settings UI');
-
-    const noProject = registry.callTool('project.translation_inventory', { maxFiles: 1 });
-    expect(noProject.status).toBe('ok');
-    expect(noProject.payload).toBeTruthy();
+  it('keeps provider setup guidance in the app and returns bounded inventory', () => {
+    const registry = createMcpReadonlyToolRegistry(new AgentService({ projectRoot: makeProject('setup') }));
+    const setup = registry.callTool('help.safe_recipe', { recipeId: 'provider_setup' });
+    expect(setup.status).toBe('ok');
+    expect(JSON.stringify(setup.payload)).toContain('enter credentials only in the app settings UI');
+    expect(registry.callTool('project.translation_inventory', { maxFiles: 1 }).status).toBe('ok');
   });
 });
 

@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { AgentService } from '../../src/agent/agentService';
 import {
-  createMcpLegacyOfflineToolRegistry as createMcpOfflineToolRegistry,
+  createMcpOfflineToolRegistry,
   createMcpReadonlyToolRegistry,
 } from '../../src/mcp/readonlyTools';
 import { handleMcpRequest } from '../../src/mcp/mcpStdioServer';
@@ -14,30 +14,7 @@ const sandboxRoot = path.resolve('artifacts', 'unit', 'mcpPermissionTiers');
 const cleanupDirs: string[] = [];
 let sequence = 0;
 
-const EXPECTED_WORKSPACE_WRITE_TOOLS = [
-  'alignment.explain',
-  'alignment.find_breaks',
-  'alignment.inspect',
-  'alignment.score',
-  'batch.plan',
-  'corpus.sample',
-  'glossary.propose_entries',
-  'job.graph_create',
-  'patch.preview',
-  'patch.propose',
-  'qa.compare_versions',
-  'qa.explain_score',
-  'qa.score_batch',
-  'qa.score_file',
-  'qa.suggest_next_calls',
-  'qa.threshold_gate',
-  'repair.loop_plan',
-  'repair.loop_run',
-  'repair.loop_stop',
-  'workflow.dry_run',
-  'workflow.explain',
-  'workflow.save_recipe',
-].sort();
+const EXPECTED_WORKSPACE_WRITE_TOOLS = ['alignment.inspect', 'patch.propose', 'qa.score_file'].sort();
 
 afterEach(() => {
   for (const dir of cleanupDirs.splice(0)) {
@@ -61,28 +38,7 @@ describe('MCP permission tiers', () => {
       targetPath: 'Translated\\Map001.txt',
       metadataPath: 'Source\\Map001.extracteddata',
     });
-    const loop = service.repair.loopRun({
-      sourcePath: 'Source\\Map001.txt',
-      targetPath: 'Translated\\Map001.txt',
-      threshold: 1,
-      maxIterations: 1,
-    });
-    const graph = service.jobGraphs.create({
-      graphId: 'readonly-fixture',
-      nodes: [{ nodeId: 'qa', type: 'qa' }],
-    });
-    service.workflows.saveRecipe({
-      recipeId: 'readonly-recipe',
-      graph: { graphId: 'readonly-recipe-graph', nodes: [{ nodeId: 'qa', type: 'qa' }] },
-    });
-
-    const registry = createMcpReadonlyToolRegistry(service, {
-      settings: {
-        llmProvider: 'gemini',
-        llmApiKey: 'configured-fixture-key',
-        llmModel: 'gemini-fixture',
-      },
-    });
+    const registry = createMcpReadonlyToolRegistry(service);
     const patch: TranslationPatch = {
       schemaVersion: 1,
       patchId: 'readonly-patch',
@@ -103,33 +59,15 @@ describe('MCP permission tiers', () => {
       },
     };
     const calls: Record<string, JsonObject> = {
-      'project.context_snapshot': {},
-      'settings.get_sanitized': {},
-      'provider.list': {},
-      'provider.readiness': {},
-      'project.get_quality_rules': {},
+      'project.context_snapshot': {}, 'provider.list': {}, 'project.get_quality_rules': {},
       'project.translation_inventory': { maxFiles: 100 },
-      'project.scan_profile': { maxFiles: 20 },
-      'quality.review_file': { path: 'Translated\\Map001.txt' },
-      'harness.latest': {},
+      'translation.read_window': { targetPath: 'Translated/Map001.txt' },
+      'translation.search': { paths: ['Translated/Map001.txt'], query: '안녕' },
       'artifacts.read_ref': { refId: score.qaRef?.refId ?? '' },
-      'batch.estimate': { maxFiles: 10 },
-      'qa.read_score_ref': { refId: score.qaRef?.refId ?? '' },
       'patch.validate': { patch: patch as unknown as JsonObject },
-      'repair.loop_status': { loopId: loop.loopId },
-      'repair.loop_report': { loopId: loop.loopId },
-      'glossary.search': { limit: 10 },
-      'glossary.validate_usage': { text: '안녕하세요' },
-      'memory.search': { limit: 10 },
-      'memory.summarize': { limit: 10 },
-      'job.graph_validate': { graphId: graph.graphId },
-      'job.graph_status': { graphId: graph.graphId },
-      'job.graph_artifacts': { graphId: graph.graphId },
-      'workflow.compose': { preset: 'translation-review' },
-      'workflow.validate': { preset: 'translation-review' },
-      'workflow.list_recipes': {},
+      'glossary.search': { limit: 10 }, 'memory.search': { limit: 10 },
       'help.translation_workflow': {},
-      'help.explain_tool': { toolName: 'quality.review_file' },
+      'help.explain_tool': { toolName: 'translation.read_window' },
       'help.safe_recipe': { recipeId: 'quality_review' },
     };
     expect(Object.keys(calls).sort()).toEqual(registry.listTools().map((tool) => tool.name).sort());
@@ -177,7 +115,7 @@ describe('MCP permission tiers', () => {
     const registry = createMcpOfflineToolRegistry(new AgentService({ projectRoot }));
     const before = snapshotTree(projectRoot, true);
 
-    const result = registry.callTool('batch.plan', { maxFiles: 10 });
+    const result = registry.callTool('qa.score_file', { sourcePath: 'Source/Map001.txt', targetPath: 'Translated/Map001.txt' });
 
     expect(result.status).toBe('ok');
     expect(result.permissionTier).toBe('workspace-write');

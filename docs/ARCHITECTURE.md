@@ -102,7 +102,7 @@ starts a CLI nor transmits the file. The existing terminal and mutation-approval
 
 ### Public MCP Contracts
 
-`src/mcp/agentTools.ts` curates 16 offline tools with explicit input schemas; `bridgeTools.ts` adds three app-bridge tools. The public surface groups project discovery, exact text access, structural inspection, bounded patch preparation, artifact pagination, terminology lookup and help. See [AGENT_MCP_GUIDE.md](AGENT_MCP_GUIDE.md) for the tool list and migration from the former larger surface. Internal job graphs, workflow recipes and repair-loop simulations are not registered as externally executable work.
+`src/mcp/agentTools.ts` directly defines 16 offline tools with explicit input schemas; `bridgeTools.ts` adds three app-bridge tools. The public surface groups project discovery, exact text access, structural inspection, bounded patch preparation, artifact pagination, terminology lookup and help. See [AGENT_MCP_GUIDE.md](AGENT_MCP_GUIDE.md) for the tool list and migration from the former larger surface. The former legacy registry, job graphs, workflow recipes, batch/corpus planning and repair-loop simulations are removed; tests exercise the same public definitions as the stdio server.
 
 `TranslationReadService` supplies `translation.read_window` and literal `translation.search`. It reads complete UTF-8 files up to 8 MiB, preserves physical empty lines and line endings, includes hashes of original bytes and bounds result sizes. Same-position source/target rows are context, not proof that dialogue is aligned. Response redaction must be checked before using text as a patch precondition.
 

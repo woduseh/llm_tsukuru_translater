@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AgentService } from '../../src/agent/agentService';
 import { handleMcpLine } from '../../src/mcp/mcpStdioServer';
-import { createMcpKernelToolRegistry, createMcpOfflineToolRegistry } from '../../src/mcp/readonlyTools';
+import { createMcpOfflineToolRegistry } from '../../src/mcp/readonlyTools';
 import type { JsonObject } from '../../src/types/agentWorkspace';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'mcpTransportHardening');
@@ -69,32 +69,16 @@ describe('MCP transport hardening', () => {
     expect((inventory.wolfDataFiles as JsonObject[]).map((entry) => entry.path))
       .toContain(path.join('Data', 'MapData', 'Map001.mps'));
   });
-
-  it('publishes and enforces core patch and workflow argument contracts', () => {
-    const projectRoot = makeDir('schema-contracts');
-    const service = new AgentService({ projectRoot });
-    const registry = createMcpOfflineToolRegistry(service);
-    const workflowRegistry = createMcpKernelToolRegistry(service);
-    const patchDefinition = registry.listTools().find((tool) => tool.name === 'patch.validate');
-    const workflowDefinition = workflowRegistry.listTools().find((tool) => tool.name === 'workflow.compose');
-
-    expect(patchDefinition?.inputSchema.required).toEqual(['patch']);
-    expect((workflowDefinition?.inputSchema.properties as JsonObject).preset).toMatchObject({
-      type: 'string',
-      enum: ['translation-review', 'repair-loop', 'memory-glossary'],
-    });
-
-    const missingPatch = registry.callTool('patch.validate', {});
-    expect(missingPatch.status).toBe('failed');
-    expect(missingPatch.failure?.message).toContain('missing required property "patch"');
-
-    const invalidPreset = workflowRegistry.callTool('workflow.compose', { preset: 'typo' });
-    expect(invalidPreset.status).toBe('failed');
-    expect(invalidPreset.failure?.message).toContain('translation-review');
-
-    const validPreset = workflowRegistry.callTool('workflow.compose', { preset: 'repair-loop' });
-    expect(validPreset.status).toBe('ok');
-    expect(validPreset.payload?.title).toBe('Repair loop workflow');
+  it('publishes and enforces the public patch argument contract', () => {
+    const registry = createMcpOfflineToolRegistry(new AgentService({ projectRoot: makeDir('schema-contracts') }));
+    const patch = registry.listTools().find(tool => tool.name === 'patch.validate');
+    expect(patch?.inputSchema.required).toEqual(['patch']);
+    const missing = registry.callTool('patch.validate', {});
+    expect(missing.status).toBe('failed');
+    expect(missing.failure?.message).toContain('missing required property "patch"');
+    const invalid = registry.callTool('patch.propose', { targetPath: 'Map001.txt', operations: [] });
+    expect(invalid.status).toBe('failed');
+    expect(invalid.failure?.message).toContain('too few items');
   });
 });
 

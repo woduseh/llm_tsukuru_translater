@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AgentService } from '../../src/agent/agentService';
-import { createMcpLegacyOfflineToolRegistry as createMcpOfflineToolRegistry } from '../../src/mcp';
+import { createMcpOfflineToolRegistry } from '../../src/mcp';
 import type { AgentResultEnvelope, JsonObject } from '../../src/types/agentWorkspace';
 
-const sandboxRoot = path.resolve('artifacts', 'unit', 'dataRefsBatchCorpus');
+const sandboxRoot = path.resolve('artifacts', 'unit', 'dataRefService');
 let sequence = 0;
 const cleanupDirs: string[] = [];
 
@@ -15,7 +15,7 @@ afterEach(() => {
   }
 });
 
-describe('data refs, batch planning, and corpus sampling kernels', () => {
+describe('analysis data references', () => {
   it('creates bounded redacted refs, rejects expired refs, and rejects wrong project reads', () => {
     const projectRoot = makeProject('refs');
     const service = new AgentService({ projectRoot });
@@ -35,58 +35,19 @@ describe('data refs, batch planning, and corpus sampling kernels', () => {
     const expired = service.dataRefs.registerArtifactRef(artifact, { ttlMs: -1 });
     expect(() => service.dataRefs.readRef(expired.refId, { projectRoot })).toThrow(/expired/);
   });
-
-  it('plans dry-run batches from inventory with limits and exposes the manifest through MCP refs', () => {
-    const projectRoot = makeProject('batch');
-    const service = new AgentService({ projectRoot });
+  it('reads saved analysis through the public paginated artifact tool', () => {
+    const service = new AgentService({ projectRoot: makeProject('pages') });
+    const artifact = service.artifacts.writeJsonArtifact('qa-score', 'page-fixture', { findings: [{ code: 'one' }, { code: 'two' }], token: 'super-secret-value' });
+    const ref = service.dataRefs.registerArtifactRef(artifact, { kind: 'qa-score' });
     const registry = createMcpOfflineToolRegistry(service);
-
-    const plan = registry.callTool('batch.plan', {
-      limits: { maxFiles: 3, maxTotalLines: 8, maxLinesPerBatch: 4, maxBatches: 2 },
-      dryRun: true,
-    });
-
-    expect(plan.status).toBe('ok');
-    const payload = plan.payload as JsonObject;
-    expect(payload.dryRun).toBe(true);
-    expect((payload.inventory as JsonObject).plannedLines as number).toBeLessThanOrEqual(8);
-    expect((payload.batches as JsonObject[]).length).toBeLessThanOrEqual(2);
-
-    const manifestRef = (payload.manifestRef as JsonObject).refId as string;
-    const read = registry.callTool('artifacts.read_ref', { refId: manifestRef, maxBytes: 32 * 1024 });
+    const read = registry.callTool('artifacts.read_ref', { refId: ref.refId, collection: 'findings', limit: 1 });
     expect(read.status).toBe('ok');
     expect(JSON.stringify(read)).not.toContain('super-secret-value');
     expect(validateEnvelope(read)).toBe(true);
+    expect(read.payload?.nextOffset).toBe(1);
   });
-
-  it('returns bounded deterministic corpus samples for each strategy without dumping full files', () => {
-    const projectRoot = makeProject('corpus');
-    const service = new AgentService({ projectRoot });
-
-    const deterministic = service.corpus.sample({ strategy: 'deterministic', maxSamples: 2, maxLineChars: 12 });
-    const deterministicAgain = service.corpus.sample({ strategy: 'deterministic', maxSamples: 2, maxLineChars: 12 });
-    const longest = service.corpus.sample({ strategy: 'longest-lines', maxSamples: 1, maxLineChars: 20 });
-    const controls = service.corpus.sample({ strategy: 'control-code-heavy', maxSamples: 1, maxLineChars: 80 });
-    const untranslated = service.corpus.sample({ strategy: 'untranslated-heavy', maxSamples: 2, maxLineChars: 80 });
-    const random = service.corpus.sample({ strategy: 'random', seed: 42, maxSamples: 3, maxLineChars: 16 });
-
-    expect(projectedSamples(deterministic)).toEqual(projectedSamples(deterministicAgain));
-    expect(deterministic.samples).toHaveLength(2);
-    expect((longest.samples[0].text as string).length).toBeLessThanOrEqual(21);
-    expect(controls.samples[0].controlCodeCount as number).toBeGreaterThan(0);
-    expect(untranslated.samples.some((sample) => (sample.untranslatedScore as number) > 0)).toBe(true);
-    expect(random.samples).toHaveLength(3);
-    expect(JSON.stringify([deterministic, longest, controls, untranslated, random])).not.toContain('super-secret-value');
-  });
+  
 });
-
-function projectedSamples(result: { samples: JsonObject[] }): JsonObject[] {
-  return result.samples.map((sample) => ({
-    path: sample.path,
-    lineNumber: sample.lineNumber,
-    text: sample.text,
-  }));
-}
 
 function validateEnvelope(value: AgentResultEnvelope): boolean {
   return value.schemaVersion === 1 && value.status === 'ok' && value.permissionTier === 'readonly';

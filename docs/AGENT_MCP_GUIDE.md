@@ -15,7 +15,7 @@ Tool registration does not prove the app bridge is still reachable. Use `bridge.
 
 ## Public Tool Surface
 
-The stdio registry exposes 16 offline tools, or 19 with the app bridge. [agentTools.ts](../src/mcp/agentTools.ts) defines the curated surface and explicit argument schemas.
+The stdio registry exposes 16 offline tools, or 19 with the app bridge. [agentTools.ts](../src/mcp/agentTools.ts) directly defines the public surface and explicit argument schemas.
 
 | Task | Tools |
 | --- | --- |
@@ -29,7 +29,7 @@ The stdio registry exposes 16 offline tools, or 19 with the app bridge. [agentTo
 | Get workflow and input guidance | `help.translation_workflow`, `help.safe_recipe`, `help.explain_tool` |
 | Check connection, submit approval and read its result | `bridge.status`, `patch.apply`, `approval.status` (bridge only) |
 
-The former `alignment.find_breaks/score/explain`, QA explanation/gate wrappers, standalone `patch.preview`, and `quality.review_file` are not registered in the public stdio surface. Their useful results are included in inspection or proposal responses. `job.graph_*`, `workflow.*` and `repair.loop_*` planning/simulation services also remain internal; their existence does not imply actual translation or repair execution through MCP. Existing clients must migrate to the public tools above.
+The former `alignment.find_breaks/score/explain`, QA explanation/gate wrappers, standalone `patch.preview`, and `quality.review_file` are not registered in the public stdio surface. Their useful results are included in inspection or proposal responses. `job.graph_*`, `workflow.*`, `repair.loop_*`, batch planning and corpus-sampling simulations have been removed rather than kept as a second internal tool surface. Existing clients must migrate to the public tools above.
 
 ## Working From Evidence
 

@@ -1,18 +1,13 @@
 import { AgentSafeFileSystem } from './agentSafeFileSystem';
 import { AlignmentService } from './alignmentService';
 import { ArtifactService } from './artifactService';
-import { BatchPlanningService } from './batchPlanningService';
-import { CorpusSamplingService } from './corpusSamplingService';
 import { DataRefService } from './dataRefService';
 import { AgentEventBus } from './eventBus';
 import { GlossaryService } from './glossaryService';
-import { JobGraphService } from './jobGraphService';
 import { JobService } from './jobService';
 import { MemoryService } from './memoryService';
 import { PatchService } from './patchService';
 import { QaService } from './qaService';
-import { RepairLoopService } from './repairLoopService';
-import { WorkflowService } from './workflowService';
 import { AgentWorkspaceDescriptor, WorkspaceService, type WorkspaceServiceOptions } from './workspaceService';
 
 export interface AgentServiceOptions extends WorkspaceServiceOptions {
@@ -25,18 +20,13 @@ export class AgentService {
   readonly eventBus: AgentEventBus;
   readonly artifacts: ArtifactService;
   readonly jobs: JobService;
-  readonly jobGraphs: JobGraphService;
-  readonly workflows: WorkflowService;
   readonly files: AgentSafeFileSystem;
   readonly dataRefs: DataRefService;
-  readonly batch: BatchPlanningService;
-  readonly corpus: CorpusSamplingService;
   readonly alignment: AlignmentService;
   readonly patch: PatchService;
   readonly glossary: GlossaryService;
   readonly memory: MemoryService;
   readonly qa: QaService;
-  readonly repair: RepairLoopService;
   private readonly manifestOptions: Omit<AgentServiceOptions, 'projectRoot' | 'eventHistoryLimit'>;
 
   constructor(options: AgentServiceOptions) {
@@ -53,34 +43,9 @@ export class AgentService {
     this.artifacts = new ArtifactService({ workspaceRoot: this.descriptor.workspaceRoot, eventBus: this.eventBus });
     this.dataRefs = new DataRefService({ projectRoot: this.descriptor.projectRoot, workspaceRoot: this.descriptor.workspaceRoot });
     this.jobs = new JobService({ workspaceRoot: this.descriptor.workspaceRoot, eventBus: this.eventBus, artifactService: this.artifacts });
-    this.jobGraphs = new JobGraphService({
-      workspaceRoot: this.descriptor.workspaceRoot,
-      artifacts: this.artifacts,
-      dataRefs: this.dataRefs,
-      eventBus: this.eventBus,
-    });
-    this.workflows = new WorkflowService({
-      workspaceRoot: this.descriptor.workspaceRoot,
-      graphs: this.jobGraphs,
-      artifacts: this.artifacts,
-      dataRefs: this.dataRefs,
-    });
     this.files = new AgentSafeFileSystem({
       projectRoot: this.descriptor.projectRoot,
       allowedRoots: [this.descriptor.projectRoot, this.descriptor.workspaceRoot],
-    });
-    this.batch = new BatchPlanningService({
-      projectRoot: this.descriptor.projectRoot,
-      files: this.files,
-      artifacts: this.artifacts,
-      dataRefs: this.dataRefs,
-    });
-    this.corpus = new CorpusSamplingService({
-      projectRoot: this.descriptor.projectRoot,
-      workspaceRoot: this.descriptor.workspaceRoot,
-      files: this.files,
-      artifacts: this.artifacts,
-      dataRefs: this.dataRefs,
     });
     this.alignment = new AlignmentService({
       projectRoot: this.descriptor.projectRoot,
@@ -102,15 +67,6 @@ export class AgentService {
       alignment: this.alignment,
       glossary: this.glossary,
       memory: this.memory,
-    });
-    this.repair = new RepairLoopService({
-      files: this.files,
-      artifacts: this.artifacts,
-      dataRefs: this.dataRefs,
-      jobs: this.jobs,
-      qa: this.qa,
-      patch: this.patch,
-      glossary: this.glossary,
     });
   }
 

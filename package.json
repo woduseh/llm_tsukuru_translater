@@ -50,12 +50,11 @@
     "esbuild": "^0.27.3",
     "eslint": "^10.0.2",
     "eslint-plugin-vue": "^10.10.0",
-    "npm-run-all": "^4.1.5",
+    "jsdom": "^28.1.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18",
     "vue-eslint-parser": "^10.4.1",
-    "vue-tsc": "^3.3.8",
-    "jsdom": "^28.1.0"
+    "vue-tsc": "^3.3.8"
   },
   "dependencies": {
     "@msgpack/msgpack": "^3.1.3",

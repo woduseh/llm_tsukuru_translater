@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AgentService } from '../../src/agent/agentService';
 import type { AgentProvenance } from '../../src/agent/glossaryService';
-import { createMcpLegacyOfflineToolRegistry as createMcpOfflineToolRegistry } from '../../src/mcp';
+import { createMcpOfflineToolRegistry } from '../../src/mcp';
 import type { JsonObject } from '../../src/types/agentWorkspace';
 
 const sandboxRoot = path.resolve('artifacts', 'unit', 'qaScoringGates');
@@ -101,32 +101,17 @@ describe('deterministic QA scoring gates', () => {
     expect(gate.qualityScore).toBeLessThan(0.9);
     expect(gate.nextSuggestedCalls).toEqual(expect.arrayContaining(['qa.explain_score', 'patch.propose']));
   });
-
-  it('wires QA score and gate tools through the MCP read-only registry', () => {
+  it('returns the QA gate and paginated findings through the public tool', () => {
     const registry = createMcpOfflineToolRegistry(new AgentService({
-      projectRoot: makeProject('mcp', ['--- 101 ---', 'Hello \\V[1]'], ['--- 101 ---', '안녕 \\V[1]']),
+      projectRoot: makeProject('mcp', ['--- 101 ---', 'Hello'], ['--- 101 ---', '안녕']),
     }));
-
-    expect(registry.listTools().map((tool) => tool.name)).toEqual(expect.arrayContaining([
-      'qa.score_file',
-      'qa.score_batch',
-      'qa.explain_score',
-      'qa.read_score_ref',
-      'qa.suggest_next_calls',
-      'qa.threshold_gate',
-      'qa.compare_versions',
-    ]));
-
-    const score = registry.callTool('qa.score_file', { sourcePath: 'Source\\Map001.txt', targetPath: 'Translated\\Map001.txt' });
-    const gate = registry.callTool('qa.threshold_gate', { score: score.payload as JsonObject, threshold: 0.9 });
-
+    const score = registry.callTool('qa.score_file', { sourcePath: 'Source/Map001.txt', targetPath: 'Translated/Map001.txt' });
     expect(score.status).toBe('ok');
-    expect(score.qualityScore).toBeGreaterThanOrEqual(0.9);
-    const qaRef = ((score.payload as JsonObject).qaRef as JsonObject).refId as string;
-    expect(registry.callTool('qa.read_score_ref', { refId: qaRef }).status).toBe('ok');
-    expect(registry.callTool('qa.suggest_next_calls', { scoreRefId: qaRef }).nextSuggestedCalls).toContain('qa.threshold_gate');
-    expect(gate.status).toBe('ok');
-    expect((gate.payload as JsonObject).gate).toBe('passed');
+    expect(score.payload?.structuralScore).toBeGreaterThanOrEqual(0.9);
+    expect(score.payload?.gate).toBe('passed');
+    expect(score.payload?.semanticQuality).toBe('not-evaluated');
+    const qaRef = (score.payload?.qaRef as JsonObject).refId as string;
+    expect(registry.callTool('artifacts.read_ref', { refId: qaRef, collection: 'findings' }).status).toBe('ok');
   });
 });
 
