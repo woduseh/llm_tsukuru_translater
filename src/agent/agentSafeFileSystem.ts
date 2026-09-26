@@ -33,7 +33,7 @@ export class AgentSafeFileSystem {
 
   constructor(private readonly options: AgentSafeFileSystemOptions) {
     this.projectRoot = normalizeRoot(options.projectRoot);
-    this.allowedRoots = (options.allowedRoots?.length ? options.allowedRoots : [this.projectRoot]).map(normalizeRoot);
+    this.allowedRoots = (options.allowedRoots?.length ? options.allowedRoots : [this.projectRoot]).map((root) => normalizePath(normalizeRoot(root)));
     this.maxReadBytes = options.maxReadBytes ?? 64 * 1024;
   }
 
@@ -44,7 +44,7 @@ export class AgentSafeFileSystem {
     if (hasWindowsAlternateDataStream(candidatePath)) {
       throw new SandboxPathError(`ADS paths are not allowed: ${candidatePath}`);
     }
-    const resolved = path.resolve(this.projectRoot, candidatePath);
+    const resolved = path.resolve(this.projectRoot, candidatePath.replaceAll('\\', path.sep));
     const existingProbe = nearestExistingPath(resolved);
     const canonical = fs.existsSync(resolved) ? realpath(resolved) : path.resolve(realpath(existingProbe), path.relative(existingProbe, resolved));
     const normalized = normalizePath(canonical);
@@ -111,11 +111,12 @@ function realpath(candidatePath: string): string {
 }
 
 function normalizeRoot(root: string): string {
-  return normalizePath(fs.existsSync(root) ? realpath(root) : path.resolve(root));
+  return fs.existsSync(root) ? realpath(root) : path.resolve(root);
 }
 
 function normalizePath(candidatePath: string): string {
-  return path.resolve(candidatePath).toLowerCase();
+  const resolved = path.resolve(candidatePath);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 function isPathInsideRoot(candidatePath: string, root: string): boolean {
