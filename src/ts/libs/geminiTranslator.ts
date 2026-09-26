@@ -37,7 +37,7 @@ export class GeminiTranslator extends ProviderTranslationBase {
         this.apiUrl = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent`;
     }
 
-    async translateText(text: string): Promise<string> {
+    async translateText(text: string, signal?: AbortSignal): Promise<string> {
         const systemInstruction = buildTranslationSystemPrompt(this.config, 'google');
         const userMessage = buildTranslationUserMessage(text);
         const targetLangName = getLanguageName(this.config.targetLang);
@@ -60,7 +60,8 @@ export class GeminiTranslator extends ProviderTranslationBase {
                 ]
             }, {
                 headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.config.apiKey },
-                timeout: this.config.timeout
+                signal,
+        timeout: this.config.timeout
             });
         } catch (error) {
             throw normalizeGeminiError(error, this.config.apiKey);

@@ -922,7 +922,9 @@ async function retranslateBlocksUnlocked(
     onProgress?.(`${blockIndices.length}개 블록 번역 중...`);
 
     try {
-        let translated = await translator.translateText(textToTranslate);
+        const scheduler = new TranslationRequestScheduler({ isAborted: () => ctx.llmAbort });
+        let translated = await scheduler.run(() => translator.translateText(textToTranslate, scheduler.signal));
+        if (scheduler.isAborted()) return { success: false, error: '번역이 중단되었습니다' };
         if (textToTranslate.endsWith('\n') && !translated.endsWith('\n')) {
             translated += '\n';
         }

@@ -144,9 +144,11 @@ export class VertexTranslator extends ProviderTranslationBase {
     this.accessTokenProvider = deps.accessTokenProvider || createVertexAccessTokenProvider(config.credentials, deps);
   }
 
-  async translateText(text: string): Promise<string> {
+  async translateText(text: string, signal?: AbortSignal): Promise<string> {
     try {
+      signal?.throwIfAborted();
       const accessToken = await this.accessTokenProvider();
+      signal?.throwIfAborted();
       const response = await this.httpClient.post(this.apiUrl, {
         contents: [
           {
@@ -169,6 +171,7 @@ export class VertexTranslator extends ProviderTranslationBase {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${accessToken}`,
         },
+        signal,
         timeout: this.config.timeout,
       });
 

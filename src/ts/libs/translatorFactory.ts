@@ -15,7 +15,7 @@ import type { BlockValidation, TranslationLogEntry } from './translationCore';
 import type { TranslationExecution } from './providerTranslationBase';
 
 export interface Translator {
-  translateText(text: string): Promise<string>;
+  translateText(text: string, signal?: AbortSignal): Promise<string>;
   translateFileContent(
     content: string,
     onProgress?: (current: number, total: number, detail: string) => void,

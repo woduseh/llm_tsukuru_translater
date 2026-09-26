@@ -45,7 +45,7 @@ export class OpenAiCompatibleTranslator extends ProviderTranslationBase {
     this.apiUrl = buildChatCompletionsUrl(config.baseUrl);
   }
 
-  async translateText(text: string): Promise<string> {
+  async translateText(text: string, signal?: AbortSignal): Promise<string> {
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (this.config.apiKey?.trim()) headers.Authorization = `Bearer ${this.config.apiKey.trim()}`;
@@ -63,6 +63,7 @@ export class OpenAiCompatibleTranslator extends ProviderTranslationBase {
         ],
       }, {
         headers,
+        signal,
         timeout: this.config.timeout,
       });
       const translated = response.data?.choices?.[0]?.message?.content;

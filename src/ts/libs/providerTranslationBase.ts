@@ -128,7 +128,7 @@ export interface TranslationExecution {
 export abstract class ProviderTranslationBase {
   protected constructor(protected readonly baseConfig: ProviderTranslationConfig) {}
 
-  abstract translateText(text: string): Promise<string>;
+  abstract translateText(text: string, signal?: AbortSignal): Promise<string>;
 
   async translateFileContent(
     content: string,
@@ -194,7 +194,7 @@ export abstract class ProviderTranslationBase {
           let translated = await scheduler.run(async () => {
             if (isAborted()) throw new TranslationAbortedError();
             try {
-              return await this.translateText(chunkText);
+              return await this.translateText(chunkText, scheduler.signal);
             } catch (error) {
               // Apply the shared cooldown before releasing this request's permit.
               if (isRateLimitError(error)) scheduler.pauseFor(apiRetryDelay(error, apiRetries));

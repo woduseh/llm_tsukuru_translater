@@ -32,7 +32,7 @@ export class ClaudeTranslator extends ProviderTranslationBase {
     this.httpClient = deps.httpClient || axios;
   }
 
-  async translateText(text: string): Promise<string> {
+  async translateText(text: string, signal?: AbortSignal): Promise<string> {
     try {
       const response = await this.httpClient.post(CLAUDE_MESSAGES_URL, {
         model: this.config.model,
@@ -50,6 +50,7 @@ export class ClaudeTranslator extends ProviderTranslationBase {
           'anthropic-version': ANTHROPIC_VERSION,
           'x-api-key': this.config.apiKey,
         },
+        signal,
         timeout: this.config.timeout,
       });
       const translated = response.data?.content?.find((part: { type?: unknown; text?: unknown }) => part?.type === 'text')?.text;

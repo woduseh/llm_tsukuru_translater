@@ -29,6 +29,8 @@ export class TranslationRequestScheduler {
   private nextStartAt = 0;
   private cooldownUntil = 0;
   private cancelled = false;
+  private readonly controller = new AbortController();
+  readonly signal = this.controller.signal;
   private timer?: ReturnType<typeof setTimeout>;
 
   constructor(options: { concurrency?: unknown; requestsPerMinute?: unknown; isAborted?: () => boolean } = {}) {
@@ -41,11 +43,16 @@ export class TranslationRequestScheduler {
   private readonly isExternallyAborted?: () => boolean;
 
   isAborted(): boolean {
-    return this.cancelled || !!this.isExternallyAborted?.();
+    if (!this.cancelled && this.isExternallyAborted?.()) {
+      this.cancelled = true;
+      this.controller.abort();
+    }
+    return this.cancelled;
   }
 
   cancel(): void {
     this.cancelled = true;
+    this.controller.abort();
     this.pump();
   }
 
@@ -62,7 +69,7 @@ export class TranslationRequestScheduler {
       this.pending.push({
         reject,
         start: () => {
-          // Keep active requests alive until they settle, even after cancellation.
+          // Abort HTTP through the shared signal, but settle every request before releasing its permit.
           void Promise.resolve().then(() => {
             if (this.isAborted()) throw new TranslationAbortedError();
             return request();
@@ -100,8 +107,8 @@ export class TranslationRequestScheduler {
       this.nextStartAt = now + this.intervalMs;
       request.start();
     }
-    if (this.pending.length > 0) {
-      const delay = this.active >= this.concurrency
+    if (this.pending.length > 0 || (this.active > 0 && this.isExternallyAborted)) {
+      const delay = this.pending.length === 0 || this.active >= this.concurrency
         ? 100
         : Math.max(1, Math.min(100, Math.max(this.nextStartAt, this.cooldownUntil) - Date.now()));
       this.timer = setTimeout(() => this.pump(), delay);
