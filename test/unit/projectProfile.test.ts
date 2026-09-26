@@ -6,7 +6,7 @@ import { scanProjectTranslationProfile } from '../../src/ts/libs/projectProfile'
 const tmpRoot = path.join(process.cwd(), 'test', '.tmp-project-profile');
 
 function writeFixture(relativePath: string, content: string): void {
-  const filePath = path.join(tmpRoot, relativePath);
+  const filePath = path.join(tmpRoot, ...relativePath.split(/[\\/]/));
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, 'utf-8');
 }

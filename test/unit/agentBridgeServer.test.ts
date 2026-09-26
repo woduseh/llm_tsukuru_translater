@@ -230,13 +230,17 @@ describe('MCP app bridge proxy', () => {
     expect(commands.codex).not.toContain('--project');
     expect(JSON.stringify(commands)).not.toMatch(/Bearer|token=/i);
 
+    // Command quoting above intentionally covers Windows strings; filesystem resolution uses host paths.
+    const projectRoot = path.resolve('artifacts/unit/bridge-project');
+    const modulePath = path.join(projectRoot, '.llm-tsukuru-agent', 'mcp-agent-server.cjs');
+    const manifestPath = path.resolve('artifacts/unit/bridge-user/agent-bridge.json');
     const resolved = resolveMcpProjectRoot(
-      ['node', 'C:\\project\\.llm-tsukuru-agent\\mcp-agent-server.cjs', '--bridge-manifest', 'C:\\user\\agent-bridge.json'],
-      'C:\\project\\.llm-tsukuru-agent\\mcp-agent-server.cjs',
-      'C:\\fallback',
+      ['node', modulePath, '--bridge-manifest', manifestPath],
+      modulePath,
+      path.resolve('artifacts/unit/fallback'),
     );
-    expect(resolved.projectRoot).toBe(path.resolve('C:\\project'));
-    expect(resolved.bridgeManifestPath).toBe(path.resolve('C:\\user\\agent-bridge.json'));
+    expect(resolved.projectRoot).toBe(projectRoot);
+    expect(resolved.bridgeManifestPath).toBe(manifestPath);
   });
 });
 
