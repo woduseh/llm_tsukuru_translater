@@ -77,7 +77,10 @@ never close `ctx.mainWindow`.
 review. Exact filename stems link the two views; this does not infer JSON-path-to-block mapping.
 First mounts send `compareReady`/`verifyReady` with `fresh: true`, while KeepAlive reactivations
 request readiness without discarding edits. Explicit disk reload/recheck actions refresh external
-changes and confirm discarding outstanding edits or repair previews. Wolf text status reads
+changes and confirm discarding outstanding edits or repair previews. Project-wide review uses bounded asynchronous
+file-pair reads, yields between heavy summaries, and commits only the current scan generation. Revoked/replaced
+preload path grants reject pending reads before content is returned. KeepAlive retains editing state; disposal
+invalidates unfinished scans. Individual selected-file edits and CPU-heavy single-file parsing remain synchronous. Wolf text status reads
 `_Extract/Texts`; JSON review is available for MV/MZ only.
 
 `useWorkspaceDrafts` retains locally edited fields when refreshed persisted settings arrive.

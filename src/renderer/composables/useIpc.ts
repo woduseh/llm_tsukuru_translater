@@ -46,6 +46,8 @@ interface ElectronApi {
 }
 
 interface NodeFs {
+  readTextFile: (filePath: string) => Promise<string>
+  readDirectory: (dirPath: string) => Promise<string[]>
   readFileSync: (filePath: string, encoding?: string) => string
   readdirSync: (dirPath: string) => string[]
   existsSync: (filePath: string) => boolean

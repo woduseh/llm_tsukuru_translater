@@ -4,6 +4,7 @@ import { isReceiveChannel, isSendChannel } from './types/ipc';
 import { isProtectedAgentBridgePath } from './agent/agentBridgeContracts';
 
 let allowedBasePaths: string[] = [];
+let pathGrantRevision = 0;
 
 ipcRenderer.on('set-allowed-paths', (_event: unknown, paths: string[]) => {
   const resolved = paths.map((p: string) => path.resolve(p));
@@ -11,6 +12,7 @@ ipcRenderer.on('set-allowed-paths', (_event: unknown, paths: string[]) => {
 });
 
 ipcRenderer.on('replace-allowed-paths', (_event: unknown, paths: string[]) => {
+  pathGrantRevision++;
   allowedBasePaths = [...new Set(paths.map((p: string) => path.resolve(p)))];
 });
 
@@ -88,7 +90,19 @@ contextBridge.exposeInMainWorld('nodeBuffer', {
   fromBase64: (str: string) => Buffer.from(str, 'base64').toString('utf8')
 });
 
+async function readWithPathGrant<T>(filePath: string, read: () => Promise<T>): Promise<T> {
+  if (!isPathAllowed(filePath)) throw new Error('Access denied: path not in allowed directories');
+  const revision = pathGrantRevision;
+  const value = await read();
+  if (revision !== pathGrantRevision || !isPathAllowed(filePath)) {
+    throw new Error('Access denied: project access changed during read');
+  }
+  return value;
+}
+
 contextBridge.exposeInMainWorld('nodeFs', {
+  readTextFile: (filePath: string) => readWithPathGrant<string>(filePath, () => require('fs').promises.readFile(filePath, 'utf8')),
+  readDirectory: (dirPath: string) => readWithPathGrant<string[]>(dirPath, () => require('fs').promises.readdir(dirPath)),
   readFileSync: (filePath: string, encoding: string) => {
     if (!isPathAllowed(filePath)) throw new Error('Access denied: path not in allowed directories');
     return require('fs').readFileSync(filePath, encoding);

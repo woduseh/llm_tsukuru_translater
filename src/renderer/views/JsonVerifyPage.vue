@@ -160,6 +160,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, onActivated, watchEffect } from 'vue'
+import { createReviewScan, readReviewEntries } from '../reviewFileLoader'
 import { api, useIpcOn } from '../composables/useIpc'
 import { reviewWorkspace, resetReviewWorkspace, findReviewFileIndex, normalizeReviewDirectory } from '../composables/useReviewWorkspace'
 import { getRendererLlmProviderUiText } from '../../types/llmProviderContract'
@@ -364,8 +365,12 @@ function recheckFromDisk() {
   loadFiles(dataDir.value)
 }
 
-function loadFiles(dir: string) {
+const reviewScan = createReviewScan()
+
+async function loadFiles(dir: string) {
+  const isLatest = reviewScan.begin()
   dir = normalizeReviewDirectory(dir)
+  const isCurrent = () => isLatest() && reviewWorkspace.projectDir === dir
   if (reviewWorkspace.projectDir !== dir) resetReviewWorkspace(dir)
   dataDir.value = dir
   searchQuery.value = ''; filterErrors.value = false; filterWarnings.value = false
@@ -391,39 +396,43 @@ function loadFiles(dir: string) {
       origDir = backupDir; transDir = dir
     } else { return }
 
-    const transFiles = window.nodeFs.readdirSync(transDir).filter((f: string) => f.endsWith('.json'))
-    for (const name of transFiles) {
+    const transFiles = (await window.nodeFs.readDirectory(transDir)).filter(f => f.endsWith('.json'))
+    const summaries = await readReviewEntries<FileEntry>(transFiles, async name => {
       const origPath = window.nodePath.join(origDir, name)
       const transPath = window.nodePath.join(transDir, name)
-      if (!window.nodeFs.existsSync(origPath)) continue
+      if (!window.nodeFs.existsSync(origPath)) return
       try {
-        let origData = window.nodeFs.readFileSync(origPath, 'utf-8')
-        let transData = window.nodeFs.readFileSync(transPath, 'utf-8')
+        let [origData, transData] = await Promise.all([window.nodeFs.readTextFile(origPath), window.nodeFs.readTextFile(transPath)])
+        if (!isCurrent()) return
         if (origData.charCodeAt(0) === 0xFEFF) origData = origData.substring(1)
         if (transData.charCodeAt(0) === 0xFEFF) transData = transData.substring(1)
         const orig = JSON.parse(origData), trans = JSON.parse(transData)
         const issues = window.verify.verifyJsonIntegrity(orig, trans) as VerifyIssue[]
-        files.value.push({
+        return {
           name, origPath, transPath, issues,
           errorCount: issues.filter(i => i.severity === 'error').length,
           warningCount: issues.filter(i => i.severity === 'warning').length,
           repaired: false
-        })
+        }
       } catch (e) {
-        files.value.push({
+        if (!isCurrent()) return
+        return {
           name, origPath, transPath,
           issues: [{ path: '$', type: 'parse_error', severity: 'error', message: `JSON 파싱 오류: ${(e as Error).message}` }],
           errorCount: 1, warningCount: 0, repaired: false
-        })
+        }
       }
-    }
+    }, isCurrent)
+    if (!summaries || !isCurrent()) return
+    files.value = summaries
     const focusedIdx = findReviewFileIndex(files.value, reviewWorkspace.focusedFile)
     if (files.value.length > 0) selectFile(Math.max(0, focusedIdx))
   } catch (error) {
+    if (!isCurrent()) return
     statusText.value = `❌ 파일을 불러오지 못했습니다: ${(error as Error).message}`
     statusClass.value = 'status-error'
   } finally {
-    loading.value = false
+    if (isCurrent()) loading.value = false
   }
 }
 
@@ -797,6 +806,7 @@ onMounted(() => {
   api.send('verifyReady', { fresh: true })
 })
 onUnmounted(() => {
+  reviewScan.invalidate()
   for (const pending of pendingVerifyWrites.values()) clearTimeout(pending.timeoutId)
   pendingVerifyWrites.clear()
 })

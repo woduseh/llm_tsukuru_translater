@@ -28,6 +28,8 @@ describe('structure review workspace', () => {
     document.body.append(host)
     window.nodePath = path.posix
     window.nodeFs = {
+      readTextFile: async name => window.nodeFs.readFileSync(name),
+      readDirectory: async dir => window.nodeFs.readdirSync(dir),
       existsSync: () => true,
       readdirSync: () => ['Map001.json', 'Map002.json'],
       readFileSync: () => '{"name":"sample"}',
@@ -51,7 +53,7 @@ describe('structure review workspace', () => {
     reviewWorkspace.focusedFile = 'Map002.txt'
     app = createApp(JsonVerifyPage, { embedded: true })
     app.mount(host)
-    listeners.get('initVerify')!('/game')
+    await listeners.get('initVerify')!('/game')
     await nextTick()
     expect(host.querySelector('.issues-file-name')!.textContent).toBe('Map002.json')
     expect(reviewWorkspace.structure).toEqual({ fileCount: 2, issueCount: 2, busy: false, loaded: true })
@@ -66,7 +68,7 @@ describe('structure review workspace', () => {
     const visible = ref(true)
     app = createApp({ render: () => h(KeepAlive, () => visible.value ? h(JsonVerifyPage, { embedded: true }) : h('div')) })
     app.mount(host)
-    listeners.get('initVerify')!('/game')
+    await listeners.get('initVerify')!('/game')
     await nextTick()
     expect(host.querySelector('.issues-file-name')!.textContent).toBe('Map001.json')
     visible.value = false
@@ -84,7 +86,7 @@ describe('structure review workspace', () => {
     app = createApp(JsonVerifyPage, { embedded: true })
     app.mount(host)
     expect(send).toHaveBeenCalledWith('verifyReady', { fresh: true })
-    listeners.get('initVerify')!('/game')
+    await listeners.get('initVerify')!('/game')
     await nextTick()
     expect(reviewWorkspace.structure.issueCount).toBe(2)
     window.verify.verifyJsonIntegrity = () => []
@@ -92,14 +94,14 @@ describe('structure review workspace', () => {
     button.click()
     await nextTick()
     expect(reviewWorkspace.structure.issueCount).toBe(0)
-    expect(host.querySelector('.no-issues-header')!.textContent).toContain('구조적 문제가 없습니다')
+    await vi.waitFor(() => expect(host.querySelector('.no-issues-header')?.textContent).toContain('구조적 문제가 없습니다'))
   })
 
   it('requires confirmation before a recheck discards unapplied LLM repair previews', async () => {
     window.verify.verifyJsonIntegrity = () => [{ path: '$.name', type: 'text_shift', severity: 'error', message: 'shift', origValue: 'original' }]
     app = createApp(JsonVerifyPage, { embedded: true })
     app.mount(host)
-    listeners.get('initVerify')!('/game')
+    await listeners.get('initVerify')!('/game')
     listeners.get('verifySettings')!({ llmReady: true })
     await nextTick()
     host.querySelector<HTMLButtonElement>('[data-harness-shift-repair]')!.click()
@@ -121,7 +123,7 @@ describe('structure review workspace', () => {
   })
 
   async function startRepair() {
-    listeners.get('initVerify')!('/game')
+    await listeners.get('initVerify')!('/game')
     listeners.get('verifySettings')!({ llmReady: true })
     await nextTick()
     host.querySelector<HTMLInputElement>('.issue-checkbox input')!.click()
@@ -195,4 +197,28 @@ describe('structure review workspace', () => {
     expect(host.querySelector('.llm-preview')).not.toBeNull()
     expect(host.querySelector('[role="status"]')!.textContent).toContain('미리보기를 유지했어요')
   })
+  it('discards obsolete project scans and keeps the latest diagnostics', async () => {
+    let release!: (text: string) => void
+    let oldStarted = false
+    window.nodeFs.readTextFile = async file => {
+      if (file.startsWith('/old/') && file.includes('/Backup/')) {
+        oldStarted = true
+        return new Promise<string>(resolve => { release = resolve })
+      }
+      return '{"name":"new"}'
+    }
+    window.verify.verifyJsonIntegrity = () => []
+    app = createApp(JsonVerifyPage)
+    app.mount(host)
+    const old = listeners.get('initVerify')!('/old')
+    await vi.waitFor(() => expect(oldStarted).toBe(true))
+    await listeners.get('initVerify')!('/new')
+    release('{"name":"old"}')
+    await old
+    await nextTick()
+    expect(reviewWorkspace.projectDir).toBe('/new')
+    expect(reviewWorkspace.structure).toMatchObject({ fileCount: 2, issueCount: 0, busy: false, loaded: true })
+    expect(host.querySelector('.issues-file-name')?.textContent).toBe('Map001.json')
+  })
+
 })

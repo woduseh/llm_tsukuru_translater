@@ -127,6 +127,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, onActivated, onDeactivated, watchEffect, nextTick } from 'vue'
+import { createReviewScan, readReviewEntries } from '../reviewFileLoader'
 import { api, useIpcOn } from '../composables/useIpc'
 import { reviewWorkspace, resetReviewWorkspace, findReviewFileIndex, normalizeReviewDirectory } from '../composables/useReviewWorkspace'
 import { splitBlocks, checkMismatch, autoFixBlock, isBlockUntranslated, removeDuplicateHeaders, blocksToLines, checkMismatchBlocks, hasAnyUntranslatedBlock } from '../compareUtils'
@@ -157,6 +158,7 @@ const busy = ref(false)
 const busyMessage = ref('')
 const dataDir = ref('')
 let active = true
+const reviewScan = createReviewScan()
 
 watchEffect(() => {
   if (!dataDir.value || reviewWorkspace.projectDir !== dataDir.value) return
@@ -312,7 +314,9 @@ async function reloadFromDisk() {
 }
 
 async function loadFiles(dir: string) {
+  const isLatest = reviewScan.begin()
   dir = normalizeReviewDirectory(dir)
+  const isCurrent = () => isLatest() && reviewWorkspace.projectDir === dir
   if (reviewWorkspace.projectDir !== dir) resetReviewWorkspace(dir)
   dataDir.value = dir
   for (const key of Object.keys(dirty)) delete dirty[key]
@@ -325,6 +329,7 @@ async function loadFiles(dir: string) {
   busy.value = true
   busyMessage.value = '파일 비교 중...'
   await yieldToUI()
+  if (!isCurrent()) return
   try {
     const wolfExtDir = window.nodePath.join(dir, '_Extract', 'Texts')
     const wolfBkDir = wolfExtDir + '_backup'
@@ -339,20 +344,22 @@ async function loadFiles(dir: string) {
     files.value = []
     if (!window.nodeFs.existsSync(extractDir) || !window.nodeFs.existsSync(backupDir)) return
 
-    const transFiles: string[] = window.nodeFs.readdirSync(extractDir).filter(isTranslationTextFileName)
-    for (const name of transFiles) {
+    const transFiles = (await window.nodeFs.readDirectory(extractDir)).filter(isTranslationTextFileName)
+    const summaries = await readReviewEntries<FileEntry>(transFiles, async name => {
       const origPath = window.nodePath.join(backupDir, name)
       const transPath = window.nodePath.join(extractDir, name)
-      if (!window.nodeFs.existsSync(origPath)) continue
-      const origContent = window.nodeFs.readFileSync(origPath, 'utf-8')
-      const transContent = window.nodeFs.readFileSync(transPath, 'utf-8')
-      // Split once and reuse for both mismatch and untranslated checks
+      if (!window.nodeFs.existsSync(origPath)) return
+      const [origContent, transContent] = await Promise.all([
+        window.nodeFs.readTextFile(origPath), window.nodeFs.readTextFile(transPath),
+      ])
+      if (!isCurrent()) return
       const ob = splitBlocks(origContent.split('\n'))
       const tb = splitBlocks(transContent.split('\n'))
-      const mismatch = checkMismatchBlocks(ob, tb)
-      const untranslated = origContent === transContent || hasAnyUntranslatedBlock(ob, tb)
-      files.value.push({ name, origPath, transPath, mismatch, untranslated })
-    }
+      return { name, origPath, transPath, mismatch: checkMismatchBlocks(ob, tb),
+        untranslated: origContent === transContent || hasAnyUntranslatedBlock(ob, tb) }
+    }, isCurrent)
+    if (!summaries || !isCurrent()) return
+    files.value = summaries
     const focusedIdx = findReviewFileIndex(files.value, reviewWorkspace.focusedFile)
     currentIdx.value = Math.max(0, focusedIdx)
     selectedBlocks.value = new Set()
@@ -363,11 +370,12 @@ async function loadFiles(dir: string) {
       reviewWorkspace.focusedFile = files.value[currentIdx.value]?.name ?? ''
     }
   } catch (error) {
+    if (!isCurrent()) return
     files.value = []
+    saveStatus.value = `파일을 불러오지 못했습니다: ${(error as Error).message}`
     console.error('Failed to load compare files:', error)
   } finally {
-    loading.value = false
-    busy.value = false
+    if (isCurrent()) { loading.value = false; busy.value = false }
   }
 }
 
@@ -761,6 +769,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  reviewScan.invalidate()
   document.removeEventListener('keydown', onKeydown)
   if (scrollRafId) cancelAnimationFrame(scrollRafId)
   resizeObs?.disconnect()

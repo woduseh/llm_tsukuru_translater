@@ -34,6 +34,8 @@ describe('compare page editing', () => {
     Element.prototype.scrollTo = vi.fn()
     window.nodePath = path.posix
     window.nodeFs = {
+      readTextFile: async name => window.nodeFs.readFileSync(name),
+      readDirectory: async dir => window.nodeFs.readdirSync(dir),
       existsSync: name => disk.has(name) || [...disk.keys()].some(key => key.startsWith(name + '/')),
       readdirSync: dir => [...disk.keys()].filter(key => key.startsWith(dir + '/')).map(key => path.posix.basename(key)),
       readFileSync: name => {
@@ -228,4 +230,31 @@ describe('compare page editing', () => {
     await vi.waitFor(() => expect(host.querySelector<HTMLTextAreaElement>('.block-editor')!.value).toBe('안녕'))
     expect(reviewWorkspace.text.dirty).toBe(false)
   })
+  it('discards obsolete project reads instead of replacing the latest editor', async () => {
+    for (const [project, text] of [['old', '예전 번역'], ['new', '새 번역']]) {
+      disk.set(`/${project}/Extract_backup/Map001.txt`, 'Hello')
+      disk.set(`/${project}/Extract/Map001.txt`, text)
+    }
+    let release!: (text: string) => void
+    let oldStarted = false
+    window.nodeFs.readTextFile = async file => {
+      if (file === '/old/Extract/Map001.txt') {
+        oldStarted = true
+        return new Promise<string>(resolve => { release = resolve })
+      }
+      return window.nodeFs.readFileSync(file)
+    }
+    app = createApp(LlmComparePage)
+    app.mount(host)
+    const old = listeners.get('initCompare')!('/old')
+    await vi.waitFor(() => expect(oldStarted).toBe(true))
+    await listeners.get('initCompare')!('/new')
+    release('예전 번역')
+    await old
+    await nextTick()
+    expect(reviewWorkspace.projectDir).toBe('/new')
+    expect(reviewWorkspace.text).toMatchObject({ fileCount: 1, busy: false, loaded: true })
+    expect(host.querySelector<HTMLTextAreaElement>('.block-editor')?.value).toBe('새 번역')
+  })
+
 })
