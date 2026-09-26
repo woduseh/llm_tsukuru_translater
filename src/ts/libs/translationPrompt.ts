@@ -100,5 +100,7 @@ export function buildTranslationUserMessage(text: string): string {
 }
 
 export function stripMarkdownFences(text: string): string {
-  return text.replace(/^```[^\n]*\n?/, '').replace(/\n?```\s*$/, '').trim();
+  // Remove only a complete wrapper, never whitespace belonging to extracted lines.
+  const fenced = /^```[^\r\n]*\r?\n([\s\S]*?)\r?\n```[ \t]*(?:\r?\n)?$/.exec(text);
+  return fenced ? fenced[1] : text;
 }

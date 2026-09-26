@@ -108,7 +108,7 @@ describe('createVertexTranslator', () => {
       },
     );
 
-    await expect(translator.translateText('hello')).resolves.toBe('translated text');
+    await expect(translator.translateText('hello')).resolves.toBe('  translated text  ');
     expect(post).toHaveBeenCalledWith(
       'https://aiplatform.googleapis.com/v1/projects/vertex-project/locations/global/publishers/google/models/gemini-2.5-pro:generateContent',
       expect.objectContaining({
