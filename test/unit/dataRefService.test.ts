@@ -46,7 +46,7 @@ describe('analysis data references', () => {
     expect(validateEnvelope(read)).toBe(true);
     expect(read.payload?.nextOffset).toBe(1);
   });
-  
+
 });
 
 function validateEnvelope(value: AgentResultEnvelope): boolean {
