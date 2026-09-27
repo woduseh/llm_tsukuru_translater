@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { createHash } from 'crypto';
-import { atomicWriteJsonFile, cleanupStaleAtomicTempFilesForPaths } from './atomicFile';
+import { atomicWriteJsonFile, atomicWriteTextFile, cleanupStaleAtomicTempFilesForPaths } from './atomicFile';
 import { LLM_FINGERPRINT_SCHEMA_VERSION } from './providerRegistry';
 
 export interface TranslationCacheEntry {
@@ -81,15 +81,37 @@ export class TranslationCache {
   private migrateLegacy(): void {
     if (!fs.existsSync(this.legacyPath)) return;
     const bytes = fs.readFileSync(this.legacyPath, 'utf8');
+    const digest = createHash('sha256').update(bytes).digest('hex');
+    const checkpoint = path.join(this.directory, 'legacy-import.sha256');
+    // Retained mixed data must not resurrect an entry invalidated after its first import.
+    if (fs.existsSync(checkpoint) && fs.readFileSync(checkpoint, 'utf8') === digest) return;
     let parsed: { version?: unknown; entries?: unknown };
     try { parsed = JSON.parse(bytes); } catch { parsed = {}; }
-    const entries = parsed?.version === LLM_FINGERPRINT_SCHEMA_VERSION && isStore(parsed.entries) ? parsed.entries : {};
-    for (const [key, entry] of Object.entries(entries)) {
+    if (parsed?.version !== LLM_FINGERPRINT_SCHEMA_VERSION || !parsed.entries
+      || typeof parsed.entries !== 'object' || Array.isArray(parsed.entries)) {
+      console.warn('Unrecognized legacy translation cache retained unchanged; fresh translations will use per-key cache.');
+      return;
+    }
+    let invalidEntries = 0;
+    for (const [key, entry] of Object.entries(parsed.entries)) {
+      if (!isEntry(entry)) { invalidEntries++; continue; }
       // An interrupted migration may already have newer per-key values. Never overwrite them.
       if (!this.readDisk(key)) this.set(key, entry);
     }
-    // No deletion until every valid legacy entry has a durable replacement.
+    if (fs.readFileSync(this.legacyPath, 'utf8') !== bytes) {
+      console.warn('Legacy translation cache changed during migration; original retained.');
+      return;
+    }
+    if (invalidEntries > 0) {
+      fs.mkdirSync(this.directory, { recursive: true });
+      this.directoryReady = true;
+      atomicWriteTextFile(checkpoint, digest);
+      console.warn(`Legacy translation cache contains ${invalidEntries} invalid entries; valid entries imported and original retained unchanged.`);
+      return;
+    }
+    // Delete only an unchanged, fully recognized legacy file after durable import.
     fs.unlinkSync(this.legacyPath);
+    fs.rmSync(checkpoint, { force: true });
   }
 }
 
@@ -100,6 +122,3 @@ function isEntry(value: unknown): value is TranslationCacheEntry {
     && typeof entry.targetLang === 'string' && (entry.provider === undefined || typeof entry.provider === 'string');
 }
 
-function isStore(value: unknown): value is CacheStore {
-  return !!value && typeof value === 'object' && !Array.isArray(value) && Object.values(value).every(isEntry);
-}

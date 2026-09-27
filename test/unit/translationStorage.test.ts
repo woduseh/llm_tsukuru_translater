@@ -137,3 +137,27 @@ it('reuses a completed translation for an identical queued file', async () => {
   expect(result.entries.filter(entry => entry.cached)).toHaveLength(1);
   files.forEach(file => expect(fs.readFileSync(path.join(dir, file), 'utf8')).toBe('--- 101 ---\n안녕'));
 });
+
+it('recovers valid entries from mixed legacy data and preserves the original without resurrecting invalidated values', () => {
+  const dir = fixture();
+  const legacy = path.join(dir, '.llm_cache.json');
+  const bytes = JSON.stringify({ version: 2, entries: { good: entry, bad: { broken: true } } });
+  fs.writeFileSync(legacy, bytes);
+  const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const cache = new TranslationCache(dir);
+  expect(cache.get('good')).toEqual(entry);
+  expect(cache.get('bad')).toBeUndefined();
+  expect(fs.readFileSync(legacy, 'utf8')).toBe(bytes);
+  expect(warning).toHaveBeenCalled();
+  cache.delete('good');
+  expect(new TranslationCache(dir).get('good')).toBeUndefined();
+  expect(fs.readFileSync(legacy, 'utf8')).toBe(bytes);
+});
+
+it.each(['{broken', '{"version":99,"entries":{}}', '{"version":2,"entries":[]}'])('preserves unrecognized legacy bytes: %s', bytes => {
+  const dir = fixture(); const legacy = path.join(dir, '.llm_cache.json');
+  fs.writeFileSync(legacy, bytes);
+  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  expect(new TranslationCache(dir).get('missing')).toBeUndefined();
+  expect(fs.readFileSync(legacy, 'utf8')).toBe(bytes);
+});

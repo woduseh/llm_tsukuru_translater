@@ -157,7 +157,7 @@ describe('full-file retranslation failure propagation', () => {
 
     expect(result.success).toBe(false);
     expect(fs.readFileSync(project.filePath, 'utf-8')).toBe(project.currentContent);
-    expect(fs.existsSync(path.join(project.edir, '.llm_cache.json'))).toBe(false);
+    expect(JSON.parse(fs.readFileSync(path.join(project.edir, '.llm_cache.json'), 'utf8'))).toHaveProperty('legacyKey.translatedContent', 'legacy translation');
     const cacheDirectory = path.join(project.edir, '.llm_cache');
     expect(fs.existsSync(cacheDirectory) ? fs.readdirSync(cacheDirectory) : []).toEqual([]);
     expect(fs.existsSync(path.join(project.edir, '.llm_progress.json'))).toBe(false);
