@@ -91,4 +91,18 @@ describe('MCP exact translation reading', () => {
     expect(() => service.search({ paths, query: 'Alpha\nBeta' })).toThrow('single-line');
     expect(() => service.search({ paths: [], query: 'x' })).toThrow('1 to 20');
   });
+  it('reads and searches late physical lines in a many-line file', () => {
+    const text = 'x\n'.repeat(524288) + 'needle\r\nlast\r';
+    const targetPath = write('many-lines.txt', text);
+    const result = service.readWindow({ targetPath, startLine: 524289, count: 2 });
+    expect(result.rows).toEqual([
+      { lineNumber: 524289, target: { text: 'needle', eol: '\r\n' } },
+      { lineNumber: 524290, target: { text: 'last\r', eol: '' } },
+    ]);
+    expect(result.target).toMatchObject({ totalLines: 524290, contentHash: createHash('sha256').update(text).digest('hex') });
+    expect(service.search({ paths: [targetPath], query: 'needle', startLine: 524289, limit: 1 })).toMatchObject({
+      matches: [{ lineNumber: 524289, text: 'needle', eol: '\r\n' }], next: { startLine: 524290 },
+    });
+  });
+
 });

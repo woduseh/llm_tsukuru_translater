@@ -29,7 +29,8 @@ interface TextFile {
   contentHash: string;
   byteLength: number;
   bom: boolean;
-  lines: { text: string; eol: string }[];
+  text: string;
+  totalLines: number;
 }
 
 /** Exact physical line access, not semantic alignment or translation quality validation. */
@@ -45,11 +46,13 @@ export class TranslationReadService {
     const count = integer(input.count, 40, 200, 'count');
     const target = this.read(input.targetPath);
     const source = input.sourcePath === undefined ? null : this.read(input.sourcePath);
-    const totalLines = Math.max(target.lines.length, source?.lines.length ?? 0);
+    const totalLines = Math.max(target.totalLines, source?.totalLines ?? 0);
     const end = Math.min(totalLines, start + count - 1);
+    const targetRows = windowLines(target, start, end);
+    const sourceRows = source ? windowLines(source, start, end) : null;
     const rows: JsonObject[] = [];
     for (let line = start; line <= end; line += 1) {
-      rows.push({ lineNumber: line, target: lineValue(target, line), ...(source ? { source: lineValue(source, line) } : {}) });
+      rows.push({ lineNumber: line, target: targetRows[line - start] ?? null, ...(sourceRows ? { source: sourceRows[line - start] ?? null } : {}) });
     }
     return bounded({
       schemaVersion: 1,
@@ -77,17 +80,18 @@ export class TranslationReadService {
       if (bytes > 64 * 1024 * 1024) throw new SandboxReadLimitError('Search exceeds 64 MiB total; supply fewer paths');
       const first = fileIndex === 0 ? start : 1;
       let last = first - 1;
-      for (let line = first; line <= file.lines.length; line += 1) {
+      visitLines(file, first, file.totalLines, (line, text, eol) => {
         last = line;
-        if (file.lines[line - 1].text.includes(input.query)) {
-          matches.push({ path: file.relativePath, lineNumber: line, ...file.lines[line - 1], contentHash: file.contentHash });
+        if (text.includes(input.query)) {
+          matches.push({ path: file.relativePath, lineNumber: line, text, eol, contentHash: file.contentHash });
           if (matches.length === limit) {
-            if (line < file.lines.length) next = { paths: input.paths.slice(fileIndex), query: input.query, startLine: line + 1, limit };
+            if (line < file.totalLines) next = { paths: input.paths.slice(fileIndex), query: input.query, startLine: line + 1, limit };
             else if (fileIndex + 1 < input.paths.length) next = { paths: input.paths.slice(fileIndex + 1), query: input.query, startLine: 1, limit };
-            break;
+            return false;
           }
         }
-      }
+        return true;
+      });
       inspected.push({ ...metadata(file), startLine: first, endLine: last >= first ? last : null });
       if (matches.length === limit) break;
     }
@@ -121,14 +125,10 @@ export class TranslationReadService {
     catch { throw new Error(`File is not valid UTF-8: ${candidate}`); }
     const bom = text.startsWith('\uFEFF');
     if (bom) text = text.slice(1);
-    const parts = text.split('\n');
-    const lines = parts.map((part, index) => {
-      const terminated = index < parts.length - 1;
-      const crlf = terminated && part.endsWith('\r');
-      return { text: crlf ? part.slice(0, -1) : part, eol: terminated ? (crlf ? '\r\n' : '\n') : '' };
-    });
+    let totalLines = 1;
+    for (let end = text.indexOf('\n'); end !== -1; end = text.indexOf('\n', end + 1)) totalLines++;
     return { relativePath: path.relative(this.files.projectRoot, absolute), byteLength: buffer.length,
-      contentHash: createHash('sha256').update(buffer).digest('hex'), bom, lines };
+      contentHash: createHash('sha256').update(buffer).digest('hex'), bom, text, totalLines };
   }
 }
 
@@ -139,12 +139,30 @@ function integer(value: number | undefined, fallback: number, maximum: number, n
 }
 
 function metadata(file: TextFile): JsonObject {
-  return { path: file.relativePath, contentHash: file.contentHash, hashAlgorithm: 'sha256-original-bytes', byteLength: file.byteLength, bom: file.bom, totalLines: file.lines.length };
+  return { path: file.relativePath, contentHash: file.contentHash, hashAlgorithm: 'sha256-original-bytes', byteLength: file.byteLength, bom: file.bom, totalLines: file.totalLines };
 }
 
-function lineValue(file: TextFile, line: number): JsonObject | null {
-  const value = file.lines[line - 1];
-  return value ? { text: value.text, eol: value.eol } : null;
+/** Iterate physical lines by offset; only the caller's selected rows are materialized. */
+function visitLines(file: TextFile, start: number, end: number,
+  visit: (line: number, text: string, eol: string) => boolean): void {
+  if (start > file.totalLines || end < start) return;
+  let offset = 0;
+  for (let line = 1; line <= Math.min(end, file.totalLines); line++) {
+    const newline = file.text.indexOf('\n', offset);
+    const terminated = newline !== -1;
+    const until = terminated ? newline : file.text.length;
+    if (line >= start) {
+      const crlf = terminated && until > offset && file.text.charCodeAt(until - 1) === 13;
+      if (!visit(line, file.text.slice(offset, crlf ? until - 1 : until), terminated ? (crlf ? '\r\n' : '\n') : '')) return;
+    }
+    offset = until + 1;
+  }
+}
+
+function windowLines(file: TextFile, start: number, end: number): JsonObject[] {
+  const rows: JsonObject[] = [];
+  visitLines(file, start, end, (_line, text, eol) => { rows.push({ text, eol }); return true; });
+  return rows;
 }
 
 function bounded(result: JsonObject): JsonObject {
