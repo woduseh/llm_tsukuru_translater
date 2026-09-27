@@ -6,6 +6,10 @@ export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
     globals: true,
+    // Worker threads keep file parallelism while avoiding fork startup/module-load overhead.
+    pool: 'threads',
+    // Opt-in concurrent cases share a worker; cap their own async fan-out independently.
+    maxConcurrency: 2,
     coverage: {
       provider: 'v8',
       reportsDirectory: 'artifacts/unit/coverage',
