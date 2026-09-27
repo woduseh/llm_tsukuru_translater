@@ -26,7 +26,7 @@ describe('bounded artifact creation and paging', () => {
     const read = fs.readFileSync;
     const pageReads: string[] = [];
     vi.spyOn(fs, 'readFileSync').mockImplementation(((file: fs.PathOrFileDescriptor, ...args: unknown[]) => {
-      if (typeof file === 'string' && file.includes('.pages/')) pageReads.push(file);
+      if (typeof file === 'string' && /\.pages[\\/]/.test(file)) pageReads.push(file);
       return Reflect.apply(read, fs, [file, ...args]);
     }) as typeof fs.readFileSync);
     syncBuiltinESMExports();
