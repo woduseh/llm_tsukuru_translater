@@ -20,17 +20,25 @@ export function extractTranslationControlCodes(line: string): string[] {
   return line.match(TRANSLATION_CONTROL_CODE_REGEX) || [];
 }
 
+/** Structural checks shared by translation, review, QA and approved patches. */
+export function compareTranslationLineStructure(before: string, after: string) {
+  const beforeCodes = extractTranslationControlCodes(before);
+  const afterCodes = extractTranslationControlCodes(after);
+  return {
+    emptyLineChanged: (before === '') !== (after === ''),
+    separatorChanged: (isSeparatorLine(before) || isSeparatorLine(after)) && before !== after,
+    controlCodesChanged: beforeCodes.length !== afterCodes.length
+      || beforeCodes.some((code, index) => code !== afterCodes[index]),
+  };
+}
+
 export function haveSameTranslationLineStructure(
   originalLines: readonly string[],
   translatedLines: readonly string[],
 ): boolean {
   if (originalLines.length !== translatedLines.length) return false;
-  return originalLines.every((originalLine, index) => {
-    const translatedLine = translatedLines[index];
-    if ((originalLine === '') !== (translatedLine === '')) return false;
-    const originalCodes = extractTranslationControlCodes(originalLine);
-    const translatedCodes = extractTranslationControlCodes(translatedLine);
-    return originalCodes.length === translatedCodes.length
-      && originalCodes.every((code, codeIndex) => code === translatedCodes[codeIndex]);
+  return originalLines.every((line, index) => {
+    const changes = compareTranslationLineStructure(line, translatedLines[index]);
+    return !changes.emptyLineChanged && !changes.separatorChanged && !changes.controlCodesChanged;
   });
 }

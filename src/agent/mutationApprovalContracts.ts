@@ -5,7 +5,7 @@ import { TextDecoder } from 'util';
 import type { ValidationResult } from './contractsValidation';
 import { AgentSafeFileSystem } from './agentSafeFileSystem';
 import { hashArgs } from './approvalService';
-import { extractRpgControlCodes, isRpgSeparatorLine } from './rpgTextInvariants';
+import { compareTranslationLineStructure } from '../ts/libs/translationSyntax';
 import type {
   JsonObject,
   MutationApprovalApproveRequest,
@@ -224,13 +224,14 @@ export function validatePatchApplyProposalRequest(
     const originalText = operation.originalText as string;
     const replacementText = operation.replacementText as string;
     if (originalText !== before) errors.push(`${label}.originalText does not match the current file`);
-    if ((before === '') !== (replacementText === '')) {
+    const changes = compareTranslationLineStructure(before, replacementText);
+    if (changes.emptyLineChanged) {
       errors.push(`${label} must preserve empty-line state`);
     }
-    if (isRpgSeparatorLine(before) && replacementText !== before) {
+    if (changes.separatorChanged) {
       errors.push(`${label} must not change a separator line`);
     }
-    if (!sameStrings(extractRpgControlCodes(before), extractRpgControlCodes(replacementText))) {
+    if (changes.controlCodesChanged) {
       errors.push(`${label} must preserve RPG control code sequence`);
     }
     normalizedOperations.push({
@@ -751,9 +752,6 @@ function samePath(left: string, right: string): boolean {
   return normalize(left) === normalize(right);
 }
 
-function sameStrings(left: string[], right: string[]): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
-}
 
 function safeEqual(left: string, right: string): boolean {
   const leftBuffer = Buffer.from(left, 'utf-8');

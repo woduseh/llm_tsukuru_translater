@@ -1,3 +1,4 @@
+import { compareTranslationLineStructure, isSeparatorLine } from '../ts/libs/translationSyntax';
 import * as fs from 'fs';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
@@ -118,19 +119,17 @@ interface ClassifiedLine {
   text: string;
   kind: 'separator' | 'empty' | 'text';
   separatorId?: string;
-  controlCodes: string[];
   speakerLabel?: string;
 }
 
 function classifyLines(text: string): ClassifiedLine[] {
   return text.split(/\r?\n/).map((line, index) => {
-    const separatorId = parseSeparator(line);
+    const separatorId = isSeparatorLine(line) ? line : undefined;
     return {
       lineNumber: index + 1,
       text: line,
       kind: separatorId ? 'separator' : line === '' ? 'empty' : 'text',
       separatorId,
-      controlCodes: line.match(/\\{1,2}[A-Za-z]+(?:\[[^\]\r\n]{0,24}\])?|\\[{}$|.!<>^]/g) ?? [],
       speakerLabel: parseSpeakerLabel(line),
     };
   });
@@ -150,8 +149,9 @@ function findBreaks(source: ClassifiedLine[], target: ClassifiedLine[]): Alignme
     const left = source[index];
     const right = target[index];
     if (!left || !right) continue;
+    const changes = compareTranslationLineStructure(left.text, right.text);
     if (left.kind === 'separator' || right.kind === 'separator') {
-      if (left.separatorId !== right.separatorId) {
+      if (changes.separatorChanged) {
         breaks.push({
           code: 'separator-drift',
           severity: 'error',
@@ -162,7 +162,7 @@ function findBreaks(source: ClassifiedLine[], target: ClassifiedLine[]): Alignme
       }
       continue;
     }
-    if (left.kind !== right.kind && (left.kind === 'empty' || right.kind === 'empty')) {
+    if (changes.emptyLineChanged) {
       breaks.push({
         code: 'empty-line-drift',
         severity: 'error',
@@ -171,7 +171,7 @@ function findBreaks(source: ClassifiedLine[], target: ClassifiedLine[]): Alignme
         message: `Empty-line alignment changed at line ${left.lineNumber}.`,
       });
     }
-    if (left.controlCodes.join('\u0000') !== right.controlCodes.join('\u0000')) {
+    if (changes.controlCodesChanged) {
       breaks.push({
         code: 'control-code-drift',
         severity: 'error',
@@ -196,9 +196,10 @@ function findBreaks(source: ClassifiedLine[], target: ClassifiedLine[]): Alignme
 function lineReasons(source: ClassifiedLine, target?: ClassifiedLine): string[] {
   if (!target) return ['missing-target-line'];
   const reasons: string[] = [];
+  const changes = compareTranslationLineStructure(source.text, target.text);
   if (source.kind !== target.kind) reasons.push('line-kind-drift');
-  if (source.separatorId !== target.separatorId) reasons.push('separator-drift');
-  if (source.controlCodes.join('\u0000') !== target.controlCodes.join('\u0000')) reasons.push('control-code-drift');
+  if (changes.separatorChanged) reasons.push('separator-drift');
+  if (changes.controlCodesChanged) reasons.push('control-code-drift');
   if (source.speakerLabel && target.speakerLabel && source.speakerLabel !== target.speakerLabel) reasons.push('speaker-label-drift');
   return reasons;
 }
@@ -209,10 +210,6 @@ function scoreBreaks(sourceLines: number, targetLines: number, breaks: Alignment
   return Math.max(0, Math.round((1 - penalty) * 1000) / 1000);
 }
 
-function parseSeparator(line: string): string | undefined {
-  const match = line.match(/^---\s*([^-]+?)\s*---$/);
-  return match?.[1]?.trim();
-}
 
 function parseSpeakerLabel(line: string): string | undefined {
   const match = line.match(/^\s*(?:\[([^\]\r\n]{1,32})\]|([^:：\r\n]{1,32})[:：])/);

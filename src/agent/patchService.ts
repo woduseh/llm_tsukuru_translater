@@ -5,8 +5,7 @@ import { ArtifactService } from './artifactService';
 import type { AgentDataRef } from './dataRefService';
 import { DataRefService } from './dataRefService';
 import { MUTATION_APPROVAL_LIMITS, validatePatchApplyProposalRequest } from './mutationApprovalContracts';
-import { extractRpgControlCodes, isRpgSeparatorLine } from './rpgTextInvariants';
-export { extractRpgControlCodes, isRpgSeparatorLine } from './rpgTextInvariants';
+import { compareTranslationLineStructure } from '../ts/libs/translationSyntax';
 
 export interface PatchProposeOptions {
   targetPath: string;
@@ -107,10 +106,14 @@ export class PatchService {
             message: 'Replacement text contains a newline. Line-count-changing patches require a future alignment proof and are rejected by this dry-run kernel.',
           });
         }
-        if (isRpgSeparatorLine(operation.originalText ?? '') && operation.originalText !== operation.replacementText) {
+        const changes = compareTranslationLineStructure(
+          typeof operation.originalText === 'string' ? operation.originalText : '',
+          typeof operation.replacementText === 'string' ? operation.replacementText : '',
+        );
+        if (changes.separatorChanged) {
           findings.push({ severity: 'error', code: 'separator-replacement', opId: operation.opId, message: 'Separator lines must not be changed by same-line patches.' });
         }
-        if (extractRpgControlCodes(typeof operation.originalText === 'string' ? operation.originalText : '').join('\u0000') !== extractRpgControlCodes(typeof operation.replacementText === 'string' ? operation.replacementText : '').join('\u0000')) {
+        if (changes.controlCodesChanged) {
           findings.push({ severity: 'error', code: 'control-code-drift', opId: operation.opId, message: 'Replacement must preserve RPG control code sequence.' });
         }
       } else if (operation.kind === 'virtual-note') {

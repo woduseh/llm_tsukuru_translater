@@ -13,7 +13,7 @@ import {
 } from '../libs/translationCore';
 export { splitFileBlocks } from '../libs/translationCore';
 import type { BlockValidation } from '../libs/translationCore';
-import { extractTranslationControlCodes, isTranslationTextFileName } from '../libs/translationSyntax';
+import { compareTranslationLineStructure, isTranslationTextFileName } from '../libs/translationSyntax';
 import { atomicWriteJsonFile, atomicWriteTextFile, cleanupStaleAtomicTempFilesForPaths } from '../libs/atomicFile';
 import { runWithDirectoryLock } from '../libs/concurrency';
 import { LLM_FINGERPRINT_SCHEMA_VERSION } from '../libs/providerRegistry';
@@ -196,26 +196,12 @@ export function validateTranslatedFileContent(
         const originalLine = originalLines[i] ?? '';
         const translatedLine = translatedLines[i] ?? '';
         const lineNo = i + 1;
-        const originalIsSeparator = isSeparatorLine(originalLine);
-        const translatedIsSeparator = isSeparatorLine(translatedLine);
-
-        if (originalIsSeparator || translatedIsSeparator) {
-            if (originalLine !== translatedLine) {
-                errors.push(`separator changed at line ${lineNo}`);
-            }
+        const changes = compareTranslationLineStructure(originalLine, translatedLine);
+        if (changes.separatorChanged) errors.push(`separator changed at line ${lineNo}`);
+        if (changes.emptyLineChanged) {
+            errors.push(`${originalLine === '' ? 'empty line filled' : 'non-empty line emptied'} at line ${lineNo}`);
         }
-
-        if (originalLine === '' && translatedLine !== '') {
-            errors.push(`empty line filled at line ${lineNo}`);
-        } else if (originalLine !== '' && translatedLine === '') {
-            errors.push(`non-empty line emptied at line ${lineNo}`);
-        }
-
-        const originalCodes = extractTranslationControlCodes(originalLine);
-        const translatedCodes = extractTranslationControlCodes(translatedLine);
-        if (!sameStringArray(originalCodes, translatedCodes)) {
-            errors.push(`control codes changed at line ${lineNo}`);
-        }
+        if (changes.controlCodesChanged) errors.push(`control codes changed at line ${lineNo}`);
     }
 
     const failedBlocks = blockValidation.filter((b) => !b.lineCountMatch || !b.separatorMatch);
@@ -525,9 +511,6 @@ function createFailureLogEntry(fileName: string, errors: string[], cached: boole
     };
 }
 
-function sameStringArray(a: string[], b: string[]): boolean {
-    return a.length === b.length && a.every((value, index) => value === b[index]);
-}
 
 export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
     Tools.send('llmTranslating', true);

@@ -4,10 +4,7 @@ import * as path from 'path';
 import { TextDecoder } from 'util';
 import { atomicWriteTextFile, type AtomicWriteOptions } from '../ts/libs/atomicFile';
 import type { MutationApprovalResultView } from '../types/agentWorkspace';
-import {
-  extractRpgControlCodes,
-  isRpgSeparatorLine,
-} from './patchService';
+import { compareTranslationLineStructure } from '../ts/libs/translationSyntax';
 import {
   validatePatchApplyProposalRequest,
   type MutationApprovalRecord,
@@ -187,21 +184,22 @@ function assertLineInvariants(before: string[], after: string[]): void {
     );
   }
   for (let index = 0; index < before.length; index += 1) {
-    if ((before[index] === '') !== (after[index] === '')) {
+    const changes = compareTranslationLineStructure(before[index], after[index]);
+    if (changes.emptyLineChanged) {
       throw new MutationPatchExecutionError(
         'approval-stale',
         `The approved patch changed empty-line state at line ${index + 1}.`,
         true,
       );
     }
-    if (isRpgSeparatorLine(before[index]) && before[index] !== after[index]) {
+    if (changes.separatorChanged) {
       throw new MutationPatchExecutionError(
         'approval-stale',
         `The approved patch changed a separator at line ${index + 1}.`,
         true,
       );
     }
-    if (!sameStrings(extractRpgControlCodes(before[index]), extractRpgControlCodes(after[index]))) {
+    if (changes.controlCodesChanged) {
       throw new MutationPatchExecutionError(
         'approval-stale',
         `The approved patch changed control codes at line ${index + 1}.`,

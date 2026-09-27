@@ -1,3 +1,4 @@
+import { compareTranslationLineStructure, isSeparatorLine as isSeparator, extractTranslationControlCodes } from '../ts/libs/translationSyntax';
 import type { JsonObject } from '../types/agentWorkspace';
 import { randomUUID } from 'crypto';
 import type { AgentSafeFileSystem } from './agentSafeFileSystem';
@@ -327,10 +328,11 @@ function compareLineInvariants(sourceLines: string[] | undefined, targetLines: s
     const source = sourceLines[index] ?? '';
     const target = targetLines[index] ?? '';
     const lineNumber = index + 1;
-    if (isSeparator(source) && source !== target) {
+    const changes = compareTranslationLineStructure(source, target);
+    if (changes.separatorChanged) {
       findings.push(finding('error', 'separator-changed', 'separatorPreservation', `Separator must be preserved at line ${lineNumber}.`, lineNumber));
     }
-    if (tokenSignature(controlCodes(source)) !== tokenSignature(controlCodes(target))) {
+    if (changes.controlCodesChanged) {
       findings.push(finding('error', 'control-code-changed', 'controlCodePreservation', `RPG control-code sequence changed at line ${lineNumber}.`, lineNumber));
     }
     if (tokenSignature(placeholders(source)) !== tokenSignature(placeholders(target))) {
@@ -484,13 +486,7 @@ function finding(severity: QaFinding['severity'], code: string, dimension: QaDim
   return { severity, code, dimension, message, lineNumber, details };
 }
 
-function isSeparator(line: string): boolean {
-  return /^---\s*[^-]+?\s*---$/.test(line);
-}
 
-function controlCodes(line: string): string[] {
-  return line.match(/\\{1,2}[A-Za-z]+(?:\[[^\]\r\n]{0,24}\])?|\\[{}$|.!<>^]/g) ?? [];
-}
 
 function placeholders(line: string): string[] {
   return line.match(/{{[^}\r\n]{1,40}}|{[A-Za-z0-9_]{1,40}}|%[sdif]|\$[A-Za-z_][A-Za-z0-9_]*|\[[A-Z_][A-Z0-9_]{1,40}\]/g) ?? [];
@@ -506,7 +502,8 @@ function tokenSignature(tokens: string[]): string {
 }
 
 function stripTokens(line: string): string {
-  return line.replace(/\\{1,2}[A-Za-z]+(?:\[[^\]\r\n]{0,24}\])?|\\[{}$|.!<>^]/g, '');
+  for (const token of extractTranslationControlCodes(line)) line = line.replace(token, '');
+  return line;
 }
 
 function normalizeText(value: string): string {
