@@ -51,7 +51,6 @@ interface NodeFs {
   readFileSync: (filePath: string, encoding?: string) => string
   readdirSync: (dirPath: string) => string[]
   existsSync: (filePath: string) => boolean
-  writeFileSync: (filePath: string, data: string, encoding?: string) => void
 }
 
 interface NodePath {

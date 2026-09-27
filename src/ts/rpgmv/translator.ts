@@ -6,7 +6,6 @@ import {
     TranslationLog,
     TranslationLogEntry,
     contentHash,
-    isSeparatorLine,
     reassembleBlocks,
     splitFileBlocks,
     validateChunk,

@@ -33,7 +33,6 @@ describe('structure review workspace', () => {
       existsSync: () => true,
       readdirSync: () => ['Map001.json', 'Map002.json'],
       readFileSync: () => '{"name":"sample"}',
-      writeFileSync: vi.fn(),
     }
     window.verify = {
       verifyJsonIntegrity: () => [{ path: '$.name', type: 'type_mismatch', severity: 'error', message: 'test issue' }],

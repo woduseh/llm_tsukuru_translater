@@ -33,6 +33,13 @@ describe('compare page editing', () => {
     vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
     Element.prototype.scrollTo = vi.fn()
     window.nodePath = path.posix
+    window.api.invoke = vi.fn(async (channel, request) => {
+      if (channel !== 'compareSaveText') throw new Error('Unexpected channel')
+      const value = request as { targetPath: string; expectedContent: string; nextContent: string }
+      if (disk.get(value.targetPath) !== value.expectedContent) return { success: false, error: '파일이 외부에서 변경되었습니다.' }
+      disk.set(value.targetPath, value.nextContent)
+      return { success: true }
+    })
     window.nodeFs = {
       readTextFile: async name => window.nodeFs.readFileSync(name),
       readDirectory: async dir => window.nodeFs.readdirSync(dir),
@@ -43,7 +50,6 @@ describe('compare page editing', () => {
         if (content === undefined) throw new Error(`Missing fixture: ${name}`)
         return content
       },
-      writeFileSync: (name, content) => { disk.set(name, content) },
     }
   })
 
@@ -255,6 +261,50 @@ describe('compare page editing', () => {
     expect(reviewWorkspace.projectDir).toBe('/new')
     expect(reviewWorkspace.text).toMatchObject({ fileCount: 1, busy: false, loaded: true })
     expect(host.querySelector<HTMLTextAreaElement>('.block-editor')?.value).toBe('새 번역')
+  })
+
+  it('preserves both the external file and dirty editor when saving a stale preimage', async () => {
+    await load('Hello', '안녕')
+    const editor = host.querySelector<HTMLTextAreaElement>('.block-editor')!
+    editor.value = '내 편집'
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+    disk.set('/game/Extract/Map001.txt', '외부 최신 편집')
+    button('변경 저장').click()
+    await vi.waitFor(() => expect(host.querySelector('.save-status')!.textContent).toContain('외부에서 변경'))
+    expect(disk.get('/game/Extract/Map001.txt')).toBe('외부 최신 편집')
+    expect(editor.value).toBe('내 편집')
+    expect(reviewWorkspace.text.dirty).toBe(true)
+    expect(button('변경 저장').disabled).toBe(false)
+  })
+
+  it('does not submit a save for a project replaced while the loading overlay paints', async () => {
+    await load('Hello', '안녕')
+    const editor = host.querySelector<HTMLTextAreaElement>('.block-editor')!
+    editor.value = '내 편집'
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+    button('변경 저장').click()
+    disk.set('/other/Extract_backup/Map002.txt', 'World')
+    disk.set('/other/Extract/Map002.txt', '세계')
+    await listeners.get('initCompare')!('/other')
+    await nextTick()
+    expect(window.api.invoke).not.toHaveBeenCalled()
+    expect(disk.get('/game/Extract/Map001.txt')).toBe('안녕')
+    expect(host.querySelector<HTMLTextAreaElement>('.block-editor')!.value).toBe('세계')
+  })
+
+  it('stops map auto-fix on a write conflict without overwriting external changes', async () => {
+    await load('--- 1 ---\nhello\n', '--- 1 ---\n안녕')
+    const invoke = window.api.invoke
+    window.api.invoke = vi.fn(async (...args) => {
+      disk.set('/game/Extract/Map001.txt', '외부 변경')
+      return invoke(...args)
+    })
+    button('전체 불일치 자동 수정').click()
+    await vi.waitFor(() => expect(host.querySelector('.save-status')!.textContent).toContain('외부에서 변경'))
+    expect(disk.get('/game/Extract/Map001.txt')).toBe('외부 변경')
+    expect(window.api.invoke).toHaveBeenCalledWith('compareSaveText', expect.objectContaining({ expectedContent: '--- 1 ---\n안녕' }))
   })
 
 })

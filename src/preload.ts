@@ -115,10 +115,7 @@ contextBridge.exposeInMainWorld('nodeFs', {
     if (!isPathAllowed(filePath)) throw new Error('Access denied: path not in allowed directories');
     return require('fs').existsSync(filePath);
   },
-  writeFileSync: (filePath: string, data: string, encoding: string) => {
-    if (!isPathAllowed(filePath)) throw new Error('Access denied: path not in allowed directories');
-    return require('fs').writeFileSync(filePath, data, encoding);
-  }
+
 });
 
 contextBridge.exposeInMainWorld('nodePath', {

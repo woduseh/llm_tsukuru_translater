@@ -4,7 +4,7 @@ export const SEND_CHANNELS = [
    'openLLMSettings', 'llmSettingsApply', 'llmSettingsClose', 'abortLLM',
    'scanGuidelineProfile', 'generateGuidelineDraft', 'applyGuidelineDraft', 'cancelGuidelineGeneration',
    'openLLMCompare', 'llmCompareClose', 'openJsonVerify',
-  'retranslateFile', 'retranslateBlocks', 'verifyLlmRepair', 'verifyApplyJson',
+  'retranslateFile', 'retranslateBlocks', 'verifyLlmRepair', 'verifyApplyJson', 'compareSaveText',
   'openFolder', 'projectConvert', 'license', 'app_version',
   'getextention', 'selFont', 'changeFontSize', 'updateVersion',
   'wolf_ext', 'wolf_apply', 'gamePatcher',

@@ -109,7 +109,7 @@
                   <button class="block-delete-btn" @click.stop="deleteBlock(i)" title="이 번역 블록 삭제">✕</button>
                   <div v-if="transBlocks[i]?.sep" class="sep-label">{{ transBlocks[i].sep }}</div>
                   <textarea class="block-editor" :value="transBlocks[i]?.lines.join('\n')" :aria-label="`${i + 1}번 블록 번역 편집`" :aria-describedby="`block-diagnosis-${i}`" spellcheck="false" wrap="off"
-                    :disabled="!transBlocks[i]" :rows="Math.max(origBlocks[i]?.lines.length || transBlocks[i]?.lines.length || 1, 1)"
+                    :disabled="!transBlocks[i] || busy || retranslating" :rows="Math.max(origBlocks[i]?.lines.length || transBlocks[i]?.lines.length || 1, 1)"
                     @input="onBlockEdit(i, $event)"></textarea>
                   <div class="block-badges">
                     <span v-if="untranslatedBlocks.has(i)" class="badge badge-untranslated-block">미번역</span>
@@ -132,6 +132,7 @@ import { api, useIpcOn } from '../composables/useIpc'
 import { reviewWorkspace, resetReviewWorkspace, findReviewFileIndex, normalizeReviewDirectory } from '../composables/useReviewWorkspace'
 import { splitBlocks, checkMismatch, autoFixBlock, isBlockUntranslated, removeDuplicateHeaders, blocksToLines, checkMismatchBlocks, hasAnyUntranslatedBlock } from '../compareUtils'
 import type { Block } from '../compareUtils'
+import type { ReviewedTextWriteResult } from '../../ts/rpgmv/reviewTextWrite'
 import { haveSameTranslationLineStructure, isTranslationTextFileName } from '../../ts/libs/translationSyntax'
 
 defineProps<{ embedded?: boolean }>()
@@ -158,6 +159,8 @@ const busy = ref(false)
 const busyMessage = ref('')
 const dataDir = ref('')
 let active = true
+let editPreimage = ''
+let viewVersion = 0
 const reviewScan = createReviewScan()
 
 watchEffect(() => {
@@ -314,6 +317,8 @@ async function reloadFromDisk() {
 }
 
 async function loadFiles(dir: string) {
+  viewVersion++
+  editPreimage = ''
   const isLatest = reviewScan.begin()
   dir = normalizeReviewDirectory(dir)
   const isCurrent = () => isLatest() && reviewWorkspace.projectDir === dir
@@ -413,7 +418,8 @@ function renderBlocks() {
   if (files.value.length === 0) { origBlocks.value = []; transBlocks.value = []; frozenHeights.value = []; return }
   const f = files.value[currentIdx.value]
   origBlocks.value = splitBlocks(window.nodeFs.readFileSync(f.origPath, 'utf-8').split('\n'))
-  transBlocks.value = splitBlocks(window.nodeFs.readFileSync(f.transPath, 'utf-8').split('\n'))
+  editPreimage = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+  transBlocks.value = splitBlocks(editPreimage.split('\n'))
   selectedBlocks.value = new Set()
   dirty[f.name] = false
   saveStatus.value = ''
@@ -454,6 +460,7 @@ function blockDiagnosis(i: number): string {
 }
 
 function onBlockEdit(i: number, event: Event) {
+  if (busy.value || retranslating.value) return
   const ta = event.target as HTMLTextAreaElement
   const newLines = ta.value.split('\n')
   transBlocks.value[i].lines = newLines
@@ -469,6 +476,7 @@ function toggleSelection(i: number) {
 }
 
 function deleteBlock(i: number) {
+  if (busy.value || retranslating.value) return
   if (i < 0 || i >= transBlocks.value.length) return
   transBlocks.value.splice(i, 1)
   selectedBlocks.value = new Set()
@@ -478,6 +486,7 @@ function deleteBlock(i: number) {
 }
 
 function deleteSelectedBlocks() {
+  if (busy.value || retranslating.value) return
   if (selectedBlocks.value.size === 0) return
   const indices = Array.from(selectedBlocks.value).sort((a, b) => b - a) // descending
   for (const i of indices) {
@@ -490,6 +499,7 @@ function deleteSelectedBlocks() {
 }
 
 function autoFixSelected() {
+  if (busy.value || retranslating.value) return
   const fixes: string[] = []
   for (const i of selectedBlocks.value) {
     const result = autoFixBlock(origBlocks.value[i], transBlocks.value[i])
@@ -505,6 +515,7 @@ function autoFixSelected() {
 }
 
 async function autoFixCurrentFile() {
+  if (busy.value || retranslating.value) return
   busy.value = true
   busyMessage.value = '자동 수정 중...'
   await yieldToUI()
@@ -532,64 +543,88 @@ async function autoFixCurrentFile() {
 
 /** Auto-fix + save all Map***.txt files. Other files are skipped due to higher error risk. */
 async function autoFixAllMapFiles() {
+  if (busy.value || retranslating.value) return
   if (isDirty.value) {
     saveStatus.value = '❌ 현재 편집 내용을 저장한 뒤 전체 수정을 실행해 주세요'
     return
   }
-  const MAP_RE = /^Map\d+\.txt$/i
+  const version = viewVersion
+  const projectDir = dataDir.value
+  const current = () => viewVersion === version && reviewWorkspace.projectDir === projectDir
+  const targets = [...files.value]
   busy.value = true
   busyMessage.value = '전체 Map 파일 자동 수정 중...'
-  await yieldToUI()
   let totalFixed = 0, filesFixed = 0
   try {
-    for (let fi = 0; fi < files.value.length; fi++) {
-      const f = files.value[fi]
-      if (!MAP_RE.test(f.name) || !f.mismatch) continue
+    await yieldToUI()
+    for (const f of targets) {
+      if (!current()) return
+      if (!/^Map\d+\.txt$/i.test(f.name) || !f.mismatch) continue
       const ob = splitBlocks(window.nodeFs.readFileSync(f.origPath, 'utf-8').split('\n'))
-      const tb = splitBlocks(window.nodeFs.readFileSync(f.transPath, 'utf-8').split('\n'))
+      const expectedContent = window.nodeFs.readFileSync(f.transPath, 'utf-8')
+      const tb = splitBlocks(expectedContent.split('\n'))
       let count = removeDuplicateHeaders(tb)
-      for (let i = 0; i < ob.length; i++) {
-        if (autoFixBlock(ob[i], tb[i])) count++
-      }
+      for (let i = 0; i < ob.length; i++) if (autoFixBlock(ob[i], tb[i])) count++
       if (count > 0) {
-        window.nodeFs.writeFileSync(f.transPath, blocksToLines(tb).join('\n'), 'utf-8')
-        // Use in-memory blocks instead of re-reading files
+        const result = await api.invoke('compareSaveText', {
+          projectDir, fileName: f.name, targetPath: f.transPath, expectedContent,
+          nextContent: blocksToLines(tb).join('\n'),
+        }) as ReviewedTextWriteResult
+        if (!current()) return
+        if (!result.success) throw new Error(result.error || '저장에 실패했습니다.')
         f.mismatch = checkMismatchBlocks(ob, tb)
         f.untranslated = hasAnyUntranslatedBlock(ob, tb)
         totalFixed += count
         filesFixed++
       }
     }
-    saveStatus.value = filesFixed > 0
-      ? `${filesFixed}개 Map 파일, ${totalFixed}개 블록 자동 수정 완료`
-      : '수정할 Map 파일이 없습니다'
-    renderBlocks()
+    if (current()) {
+      renderBlocks()
+      saveStatus.value = filesFixed > 0
+        ? `${filesFixed}개 Map 파일, ${totalFixed}개 블록 자동 수정 완료`
+        : '수정할 Map 파일이 없습니다'
+    }
+  } catch (error) {
+    if (current()) {
+      if (filesFixed > 0) renderBlocks()
+      saveStatus.value = `❌ ${filesFixed}개 파일 저장 후 중단: ${(error as Error).message}`
+    }
   } finally {
-    busy.value = false
+    if (current()) busy.value = false
   }
 }
 
 async function saveFile() {
-  if (files.value.length === 0 || retranslating.value) return
+  if (files.value.length === 0 || busy.value || retranslating.value) return
+  const version = viewVersion
+  const projectDir = dataDir.value
+  const current = () => viewVersion === version && reviewWorkspace.projectDir === projectDir
+  const f = files.value[currentIdx.value]
+  const expectedContent = editPreimage
+  const nextContent = blocksToLines(transBlocks.value).join('\n')
   busy.value = true
   busyMessage.value = '저장 중...'
-  await yieldToUI()
   try {
-    const f = files.value[currentIdx.value]
-    window.nodeFs.writeFileSync(f.transPath, blocksToLines(transBlocks.value).join('\n'), 'utf-8')
-    // Use in-memory blocks instead of re-reading files
+    await yieldToUI()
+    if (!current()) return
+    const result = await api.invoke('compareSaveText', {
+      projectDir, fileName: f.name, targetPath: f.transPath, expectedContent, nextContent,
+    }) as ReviewedTextWriteResult
+    if (!current()) return
+    if (!result.success) throw new Error(result.error || '저장에 실패했습니다.')
+    editPreimage = nextContent
     f.mismatch = checkMismatchBlocks(origBlocks.value, transBlocks.value)
     f.untranslated = hasAnyUntranslatedBlock(origBlocks.value, transBlocks.value)
     dirty[f.name] = false
     saveStatus.value = '저장됨 ✓'
     selectedBlocks.value = new Set()
     computeBlockHeights()
-    // Auto-navigate to next problem file if current has no issues
-    if (!f.mismatch && !f.untranslated) {
-      navigateFile(1)
-    }
+    if (!f.mismatch && !f.untranslated) navigateFile(1)
+  } catch (error) {
+    // Keep the local edit and its original preimage so a failed save cannot become a silent overwrite.
+    if (current()) saveStatus.value = `❌ ${(error as Error).message}`
   } finally {
-    busy.value = false
+    if (current()) busy.value = false
   }
 }
 
@@ -769,6 +804,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  viewVersion++
   reviewScan.invalidate()
   document.removeEventListener('keydown', onKeydown)
   if (scrollRafId) cancelAnimationFrame(scrollRafId)

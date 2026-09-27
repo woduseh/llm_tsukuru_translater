@@ -1,3 +1,5 @@
+import { applyReviewedTextWrite, resolveReviewTextTarget, type ReviewedTextWriteRequest, type ReviewedTextWriteResult } from '../ts/rpgmv/reviewTextWrite';
+import { runWithDirectoryLock, normalizeDirectoryLockKey } from '../ts/libs/concurrency';
 import { BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import open from 'open';
@@ -152,6 +154,33 @@ export function registerToolsHandlers(ctx: AppContext) {
       initializeVerify(options?.fresh === true);
     }
   })
+
+  ipcMain.handle('compareSaveText', async (ev, request: ReviewedTextWriteRequest): Promise<ReviewedTextWriteResult> => {
+    const win = llmCompareWindow;
+    const projectDir = activeCompareDir;
+    const current = () => !!win && !win.isDestroyed() && win === llmCompareWindow
+      && ev.sender === win.webContents && projectDir === activeCompareDir;
+    if (!current() || !projectDir || typeof request?.projectDir !== 'string'
+      || normalizeDirectoryLockKey(request.projectDir) !== normalizeDirectoryLockKey(projectDir)
+      || typeof request.targetPath !== 'string' || typeof request.fileName !== 'string'
+      || typeof request.expectedContent !== 'string' || typeof request.nextContent !== 'string') {
+      return { success: false, error: '텍스트 검수 저장 요청 또는 활성 프로젝트가 올바르지 않습니다.' };
+    }
+    try {
+      const target = resolveReviewTextTarget(projectDir, request.targetPath, request.fileName);
+      return await runWithDirectoryLock(path.dirname(target), () => {
+        if (!current()) return { success: false, error: '프로젝트가 변경되어 저장하지 않았습니다.' };
+        // Revalidate the destination after waiting for a translation operation to finish.
+        applyReviewedTextWrite(projectDir, request);
+        return { success: true };
+      });
+    } catch (error) {
+      const conflict = error instanceof AtomicFileWriteError && error.cause instanceof AtomicFilePreimageMismatchError;
+      return { success: false, error: conflict
+        ? '파일이 외부에서 변경되어 저장하지 않았습니다. 편집 내용을 보관한 뒤 디스크에서 다시 읽어 주세요.'
+        : error instanceof Error ? error.message : '텍스트 검수 저장에 실패했습니다.' };
+    }
+  });
 
   ipcMain.on('openFolder', (ev, arg) => {
     open(arg)
