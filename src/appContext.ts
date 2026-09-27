@@ -55,4 +55,3 @@ export class AppContext {
     this.WolfMetadata = { ver: -1 };
   }
 }
-

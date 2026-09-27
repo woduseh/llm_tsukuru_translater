@@ -4,16 +4,16 @@ Behavioral contracts for the affected code, not a mandatory verification sequenc
 
 ## Structural Invariants
 
-- Dialogue separators such as `--- 101 ---` must survive translation unchanged.
+- Dialogue separators such as `--- 101 ---` and Wolf `--- 101-0 ---` must survive translation unchanged; a normal line must not become a separator.
 - Empty lines must stay empty.
 - Per-block line counts must not drift unless a tool explicitly repairs them.
-- RPG Maker control codes such as `\\V[1]`, `\\N[2]`, `\\C[3]`, `\\G`, `\\$`, `\\{`, and `\\}` must be preserved.
+- RPG Maker control codes such as `\\V[1]`, `\\N[2]`, `\\C[3]`, `\\G`, `\\$`, `\\{`, and `\\}` must be preserved, including Wolf `%1`-style parameters and their order.
 - BOM stripping and write behavior must stay consistent across read/write helpers.
 
 ## Translation Workflow Rules
 
 - `Extract_backup` or `_backup` is the source of truth for untranslated content.
-- `.llm_progress.json` and the per-key `.llm_cache/` directory must remain resumable and safe to clear. Import valid legacy `.llm_cache.json` entries durably before removing that old file; interrupted imports must retain newer per-key results.
+- `.llm_progress.json` and the per-key `.llm_cache/` directory must remain resumable and safe to clear. Import valid legacy `.llm_cache.json` entries durably before removing that old file; interrupted imports must retain newer per-key results. Migrate mixed input entry-by-entry, preserve its original bytes, and remember the imported fingerprint so invalidated entries cannot be resurrected. Retain unrecognized cache formats with a warning rather than silently deleting them.
 - `untranslated` mode must skip already translated files and re-run only files that still match backup.
 - Cache/progress identity must include the effective provider configuration; cache keys also include content hash, model, source and target language. `translatorFactory.ts` and `providerRegistry.ts` define the fingerprints.
 - Provider readiness errors must be deterministic and renderer-safe.
@@ -24,6 +24,7 @@ Behavioral contracts for the affected code, not a mandatory verification sequenc
 - Extraction/apply validates input structure and stages outputs before committing; failed multi-file commits roll back instead of reporting partial success.
 - Existing translation backups are reusable only when their complete file set matches the extraction surface. `ext_javascript.js` belongs to the line-aligned translation surface too.
 - Successfully decrypted Wolf archives remain recoverable as `.wolf.tsukuru-backup` files; leaving active `.wolf` archives can hide translated loose `Data/**` at runtime.
+- Text comparison saves and Map auto-fixes must pass a main-owned active-project/sender check and exact loaded preimage before atomic replacement. A stale save must preserve external content and the local dirty editor. Manual repair may change line counts; it is not an agent patch.
 - JSON Verify writes are authorized by main-process validation of the active root, exact target/preimage and valid JSON immediately before atomic replacement. Renderer previews alone do not authorize a write.
 
 ## Verification Rules
@@ -31,6 +32,8 @@ Behavioral contracts for the affected code, not a mandatory verification sequenc
 - `verifyJsonIntegrity` must treat type drift, key drift, array length drift, and control-code drift as regressions.
 - `repairJson` must preserve safe translated fields such as `displayName` while reverting invalid structural changes.
 - Text-shift markers must be detected both when marker text is overwritten and when marker text leaks into dialogue.
+
+Analysis artifact writers and readers must agree on size limits. Every published paged collection must have contiguous coverage and durable pages; page failures and oversized items must be explicit, never silently truncated.
 
 ## UI Rules
 

@@ -82,4 +82,3 @@ export class NativePtyAdapter implements PtyAdapter {
     };
   }
 }
-

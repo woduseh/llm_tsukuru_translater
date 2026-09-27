@@ -184,7 +184,10 @@ export class DataRefService {
       };
       const summary = summarize(content) as JsonObject;
       for (const [name, descriptor] of Object.entries(record.storage?.collections ?? {})) {
-        if (descriptor) collectionParent(summary, name)[name] = { itemCount: descriptor.total };
+        if (descriptor) {
+          const { total } = readArtifactCollection(record, target, name, 0, 0);
+          collectionParent(summary, name)[name] = { itemCount: total };
+        }
       }
       page = { refId, kind: ref.kind, summary };
     } else {

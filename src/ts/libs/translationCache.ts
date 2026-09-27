@@ -121,4 +121,3 @@ function isEntry(value: unknown): value is TranslationCacheEntry {
   return typeof entry.translatedContent === 'string' && typeof entry.model === 'string'
     && typeof entry.targetLang === 'string' && (entry.provider === undefined || typeof entry.provider === 'string');
 }
-

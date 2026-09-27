@@ -11,7 +11,7 @@ This describes the app's game-project tools. Repository development instructions
 
 Tool registration does not prove the app bridge is still reachable. Use `bridge.status` before submitting work to check the current connection. A missing or stale bridge returns a failure; it does not grant a fallback write path. Extraction, provider translation and full game-data apply run through the app UI.
 
-`patch.apply` accepts bounded same-line replacements in one translated UTF-8 `.txt` file: at most 256 KiB per file, 100 operations, and 8 KiB per original/replacement line. It preserves line count, separators, empty lines and control codes; it cannot repair drift by inserting or deleting lines. Proposal validation uses the same current-file and invariant validator as approval submission. A valid proposal still requires app approval and can become stale before submission or execution. `approval.status` reports a decision/result and cannot approve it. Contract limits and validation are implemented in `src/agent/mutationApprovalContracts.ts`.
+`patch.apply` accepts bounded same-line replacements in one translated UTF-8 `.txt` file: at most 256 KiB per file, 100 operations, and 8 KiB per original/replacement line. It preserves line count, separators (including `--- 101-0 ---`), empty lines and ordered control codes (including `%1`); it cannot repair drift by inserting or deleting lines. Proposal validation uses the same current-file and invariant validator as approval submission. A valid proposal still requires app approval and can become stale before submission or execution. `approval.status` reports a decision/result and cannot approve it. Contract limits and validation are implemented in `src/agent/mutationApprovalContracts.ts`.
 
 ## Public Tool Surface
 
@@ -51,7 +51,7 @@ For example, a same-line proposal has this input shape:
 }
 ```
 
-`artifacts.read_ref` accepts `refId`, `collection` (`summary`, `refs`, `breaks`, `findings` or `operations`), zero-based `offset`, and `limit`. Follow `nextOffset`; byte limits can make a page shorter than requested. Responses are valid JSON pages rather than clipped JSON strings. Reuse the saved inspection when reading more findings instead of rerunning it.
+`artifacts.read_ref` accepts `refId`, `collection` (`summary`, `refs`, `breaks`, `findings` or `operations`), zero-based `offset`, and `limit`. Follow `nextOffset`; byte limits can make a page shorter than requested. Responses are valid JSON pages rather than clipped JSON strings. Reuse the saved inspection when reading more findings instead of rerunning it. Large collections are stored in bounded pages so a small read does not parse the whole analysis. Oversized individual findings or total analysis output fail explicitly; reduce the inspected input rather than assuming partial success.
 
 Use the evidence needed for the request; this workflow is guidance, not a mandatory sequence. Meaning and tone still require review of the actual text. Provider credentials/readiness belong in app settings; credentials and bridge tokens must stay out of prompts, logs and results. The tool surface follows the [OpenAI function-calling design guidance](https://developers.openai.com/api/docs/guides/function-calling#best-practices-for-defining-functions): explicit arguments, clear task boundaries and combined operations that are normally used together. Model-specific task success still needs a live agent evaluation.
 

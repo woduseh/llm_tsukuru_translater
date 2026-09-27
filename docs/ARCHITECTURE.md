@@ -26,7 +26,7 @@ The app is an Electron desktop tool for translating RPG Maker MV/MZ and Wolf RPG
 
 ### Wolf
 
-Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-specific binary formats and text caches.
+Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-specific binary formats and text caches. Map parsing validates the tile byte span and advances the binary cursor without materializing unused tile numbers. Event parsing and its original-byte offsets are preserved.
 
 ## Main Process Boundaries
 
@@ -59,7 +59,7 @@ Translation launch summarizes the configured language, provider, model, and opti
 instructions; request tuning and guideline generation are expandable. Compare and JSON review
 keep selected-item actions contextual and file-wide operations expandable. Native checkbox
 labels support keyboard selection; the comparison editor exposes line/structure diagnostics
-without modifying separators or intentional empty lines.
+before explicit manual repairs; manual repair may intentionally restore a broken line layout.
 
 ### Single-window workspace
 
@@ -80,8 +80,10 @@ request readiness without discarding edits. Explicit disk reload/recheck actions
 changes and confirm discarding outstanding edits or repair previews. Project-wide review uses bounded asynchronous
 file-pair reads, yields between heavy summaries, and commits only the current scan generation. Revoked/replaced
 preload path grants reject pending reads before content is returned. KeepAlive retains editing state; disposal
-invalidates unfinished scans. Individual selected-file edits and CPU-heavy single-file parsing remain synchronous. Wolf text status reads
+invalidates unfinished scans. Individual selected-file reads and CPU-heavy single-file parsing remain synchronous. Wolf text status reads
 `_Extract/Texts`; JSON review is available for MV/MZ only.
+
+Text review sends `compareSaveText` with the content originally loaded by the editor and the intended replacement. Main verifies the active project/window, destination and preimage, shares the translation-directory lock, then atomically replaces the file. Project changes while queued cancel the write; conflicts keep local edits dirty. Whole-map auto-fix uses the same per-file contract and reports a stopped/partially completed operation. Unlike agent same-line patches, explicit manual repair may change line counts. Preload no longer exposes a raw writeFileSync capability. This is preimage checking immediately before replacement, not a filesystem-wide compare-and-swap lock against arbitrary external processes.
 
 `useWorkspaceDrafts` retains locally edited fields when refreshed persisted settings arrive.
 Settings save success/failure and translation-submit acknowledgements release their own UI locks.
@@ -101,7 +103,7 @@ starts a CLI nor transmits the file. The existing terminal and mutation-approval
 - The mutation executor revalidates the canonical project, source bytes, argument/preview hashes, original lines, separators, empty lines, and RPG control codes before a same-directory atomic replacement. It preserves BOM, per-line CRLF/LF separators, final-newline state, and file mode, then re-reads the result and atomically restores the exact preimage if verification fails.
 - Renderer terminal sessions come from the main-process `TerminalService`; the renderer does not create placeholder sessions.
 
-`AgentService` assembles offline analysis services. `MutationApprovalRuntime` owns its `ApprovalService` directly and executes through `mutationPatchExecutor.ts`; starting approval handling does not construct the analysis kernel. `PatchService` provides proposal/validation/preview only, reusing `validatePatchApplyProposalRequest` for current-file and application-contract validation. `rpgTextInvariants.ts` holds shared separator/control-code helpers without a dependency on patch services. There is no second direct-write MCP mutation registry.
+`AgentService` assembles offline analysis services. `MutationApprovalRuntime` owns its `ApprovalService` directly and executes through `mutationPatchExecutor.ts`; starting approval handling does not construct the analysis kernel. `PatchService` provides proposal/validation/preview only, reusing `validatePatchApplyProposalRequest` for current-file and application-contract validation. `src/ts/libs/translationSyntax.ts` owns pure before/after structural rules shared by translation, comparison, QA, proposal validation, approval and post-write verification. It classifies both sides, including Wolf numeric-hyphen separators and percent control codes. Producerless job storage, unused QA wrappers and the unconsumed event-history bus have been removed; approval state, durable audit records and the runtime onChanged notification remain. There is no second direct-write MCP mutation registry.
 
 ### Public MCP Contracts
 
@@ -109,9 +111,9 @@ starts a CLI nor transmits the file. The existing terminal and mutation-approval
 
 QA reads source/target once per request and passes those bounded snapshots into alignment. Structural alignment is pure analysis; artifact identity and persistence stay in the service boundary. Glossary and memory snapshots are request-local, never retained across external file edits.
 
-`TranslationReadService` supplies `translation.read_window` and literal `translation.search`. It reads complete UTF-8 files up to 8 MiB, preserves physical empty lines and line endings, includes hashes of original bytes and bounds result sizes. Same-position source/target rows are context, not proof that dialogue is aligned. Response redaction must be checked before using text as a patch precondition.
+`TranslationReadService` supplies `translation.read_window` and literal `translation.search`. It reads complete UTF-8 files up to 8 MiB for hashing and validation, keeps one decoded string plus a line count, and materializes only requested rows or search matches. It preserves physical empty lines and line endings, includes hashes of original bytes and bounds result sizes. Same-position source/target rows are context, not proof that dialogue is aligned. Response redaction must be checked before using text as a patch precondition.
 
-`alignment.inspect` and `qa.score_file` return compact summaries, coverage and artifact references. Partial reads cannot pass the structural gate, and semantic translation quality is explicitly not evaluated. `artifacts.read_ref` pages selected arrays with `collection`, `offset` and `limit`, preserving valid JSON and continuation offsets instead of clipping serialized content. Saved artifacts let agents inspect additional findings without rerunning the same analysis.
+`alignment.inspect` and `qa.score_file` return compact summaries, coverage and artifact references. Partial reads cannot pass the structural gate, and semantic translation quality is explicitly not evaluated. `artifacts.read_ref` pages selected arrays with `collection`, `offset` and `limit`, preserving valid JSON and continuation offsets instead of clipping serialized content. Saved artifacts let agents inspect additional findings without rerunning the same analysis. `artifactPaging.ts` keeps large arrays in immutable generation-scoped pages of at most 4096 items / 512 KiB; a small manifest is published only after every page is durable. Creation and reading share the 16 MiB JSON-record budget and 48 KiB response-item budget; creation also caps total output at 64 MiB. Readers load only intersecting pages, retain existing continuation arguments, and still support legacy inline JSON. Failed generations are removed without replacing an existing manifest. Saved analysis history (including pages from prior overwritten generations) is not automatically pruned.
 
 `patch.propose` accepts exact original/replacement text for each line and includes its preview in the response. `patch.validate` checks an existing proposal against current bytes. Applicable patches retain the approval runtime's 256 KiB file, 100-operation and 8 KiB line bounds; oversized proposals/previews fail rather than inspecting only a file prefix. Virtual notes are analysis-only and inapplicable. A valid proposal does not imply approval or execution, and approval/execution revalidation still protects against later file changes.
 
@@ -120,7 +122,8 @@ QA reads source/target once per request and passes those bounded snapshots into 
 - `providerTranslationBase.ts` owns common provider configuration and translation retry/chunk handling. `translationPrompt.ts` builds prompts, preserving the existing Google/standard wording variants. `translationCore.ts` shares API error parsing; `providerRegistry.ts` owns provider selection and cache/config fingerprints.
 - Compare and verify views derive filters and editing indicators from their source state with Vue computed values. Compare problem navigation includes unmatched blocks on either side.
 - Agent Workspace keeps environment and executable-detection responses per page instance, deriving preset readiness and the timeline from those signals without modifying shared preset definitions.
-- The file translation coordinator queues paths and reads source text only when bounded workers start it. A run reuses its provider client (including Vertex authentication) and the shared request scheduler. `translationCache.ts` lazily reads per-key atomic cache records instead of rewriting or loading an aggregate cache; legacy aggregate files migrate before removal. Known stale output temporaries are cleaned once per directory, while each successful file/cache/progress write keeps its own fsync. Provider failures remain per-file results; completion-handler failures stop new work and propagate after in-flight workers settle, before the directory lock is released. Bulk translation and retranslation share the same line-array block parser. Run cancellation aborts provider HTTP through a shared AbortSignal; active workers still settle before the directory lock is released. External cancellation is observed while an active request remains even if its queue is empty. Client cancellation does not establish provider-side billing cancellation.
+- The file translation coordinator queues paths and reads source text only when bounded workers start it. A run reuses its provider client (including Vertex authentication) and the shared request scheduler. `translationCache.ts` lazily reads per-key atomic cache records instead of rewriting or loading an aggregate cache; fully recognized legacy aggregate files migrate before removal. Mixed-validity input recovers good entries but retains the original plus an import fingerprint so later cache invalidations cannot revive old values; unknown versions or malformed JSON are retained with a warning. Known stale output temporaries are cleaned once per directory, while each successful file/cache/progress write keeps its own fsync. Provider failures remain per-file results; completion-handler failures stop new work and propagate after in-flight workers settle, before the directory lock is released. Bulk translation and retranslation share the same line-array block parser. Run cancellation aborts provider HTTP through a shared AbortSignal; active workers still settle before the directory lock is released. External cancellation is observed while an active request remains even if its queue is empty. Client cancellation does not establish provider-side billing cancellation.
+- JSON Verify LLM repair preserves exact provider whitespace before validation, without caller-level trim.
 - JSON Verify uses the pure `setAtPath` from `src/ts/rpgmv/verify.ts` locally; the actual file write still goes through validated main-process IPC.
 
 ## Build and IPC Details
