@@ -1,3 +1,4 @@
+import { MAX_ARTIFACT_JSON_BYTES, readArtifactCollection, collectionParent } from './artifactPaging';
 import * as fs from 'fs';
 import * as path from 'path';
 import { atomicWriteJsonFile } from '../ts/libs/atomicFile';
@@ -161,7 +162,7 @@ export class DataRefService {
     if (ref.expiresAt && Date.parse(ref.expiresAt) <= Date.now()) throw new AgentDataRefError(`Data ref expired: ${refId}`);
     const target = new AgentSafeFileSystem({ projectRoot: this.workspaceRoot }).resolveAllowed(ref.target.path);
     const stat = fs.statSync(target);
-    if (!stat.isFile() || stat.size > 16 * 1024 * 1024) throw new SandboxReadLimitError('Artifact exceeds the 16 MiB JSON read limit. Inspect a smaller file or lower maxBytes.');
+    if (!stat.isFile() || stat.size > MAX_ARTIFACT_JSON_BYTES) throw new SandboxReadLimitError('Artifact exceeds the 16 MiB JSON read limit. Inspect a smaller file or lower maxBytes.');
     const record = JSON.parse(fs.readFileSync(target, 'utf8')) as AgentArtifactRecord;
     if (record.schemaVersion !== 1 || record.kind !== ref.kind || !record.payload || typeof record.payload !== 'object' || Array.isArray(record.payload)) {
       throw new AgentDataRefError('Artifact is not a supported JSON analysis record.');
@@ -181,19 +182,21 @@ export class DataRefService {
         if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, summarize(item)]));
         return value;
       };
-      page = { refId, kind: ref.kind, summary: summarize(content) };
+      const summary = summarize(content) as JsonObject;
+      for (const [name, descriptor] of Object.entries(record.storage?.collections ?? {})) {
+        if (descriptor) collectionParent(summary, name)[name] = { itemCount: descriptor.total };
+      }
+      page = { refId, kind: ref.kind, summary };
     } else {
-      const parent = collection === 'operations' && content.patch && typeof content.patch === 'object' ? content.patch as JsonObject : content;
-      const rows = parent[collection];
-      if (!Array.isArray(rows)) throw new AgentDataRefError(`Artifact has no ${collection} collection.`);
+      const { total, rows } = readArtifactCollection(record, target, collection, offset, limit);
       const items: JsonValue[] = [];
-      for (const item of rows.slice(offset, offset + limit)) {
+      for (const item of rows) {
         if (Buffer.byteLength(JSON.stringify([...items, item]), 'utf8') > 48 * 1024) break;
         items.push(item);
       }
-      if (!items.length && offset < rows.length) throw new SandboxReadLimitError('One artifact item exceeds the page byte budget. Use translation.read_window for line context.');
-      page = { refId, kind: ref.kind, collection, offset, total: rows.length, items,
-        nextOffset: offset + items.length < rows.length ? offset + items.length : null };
+      if (!items.length && offset < total) throw new SandboxReadLimitError('One artifact item exceeds the page byte budget. Use translation.read_window for line context.');
+      page = { refId, kind: ref.kind, collection, offset, total, items,
+        nextOffset: offset + items.length < total ? offset + items.length : null };
     }
     const redacted = redactSecretLikeValues(page);
     if (Buffer.byteLength(JSON.stringify(redacted.value), 'utf8') > 64 * 1024) throw new SandboxReadLimitError('Artifact summary exceeds the response limit; request a collection page.');

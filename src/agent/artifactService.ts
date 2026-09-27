@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import type { JsonValue } from '../types/agentWorkspace';
-import { atomicWriteJsonFile } from '../ts/libs/atomicFile';
+import { writeArtifactRecord, type ArtifactStorage } from './artifactPaging';
 import { redactSecretLikeValues } from './contractsValidation';
 
 export interface AgentArtifactRecord {
@@ -13,6 +13,7 @@ export interface AgentArtifactRecord {
   path: string;
   redactions: string[];
   payload: JsonValue;
+  storage?: ArtifactStorage;
 }
 
 export interface ArtifactServiceOptions {
@@ -44,7 +45,7 @@ export class ArtifactService {
       payload: redacted.value,
     };
     fs.mkdirSync(this.artifactsRoot, { recursive: true });
-    atomicWriteJsonFile(artifactPath, record, 2);
+    writeArtifactRecord(record);
     return record;
   }
 }
