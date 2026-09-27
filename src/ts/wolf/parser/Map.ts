@@ -15,7 +15,7 @@ export function wolfExtractMap(data:Buffer, ctx: AppContext){
     else{
         ctx.WolfMetadata.ver = 3
     }
-    const len = io.readU4le()
+    io.readU4le() // Reserved field
     const check = io.readU1()
     if(ctx.WolfMetadata.ver === 2){
         if (!(check == 101)) {
@@ -27,15 +27,13 @@ export function wolfExtractMap(data:Buffer, ctx: AppContext){
             throw new Error('Unvalid 2')
         }
     }
-    const unk = io.readLenStr()
-    const tilesetId = io.readU4le();
+    io.readLenStr() // Map metadata
+    io.readU4le(); // Tileset identifier
     const width = io.readU4le();
     const height = io.readU4le();
     const eventSize = io.readU4le();
-    let map:number[] = []
-    for (let i = 0; i < ((width * height) * 3); i++) {
-        map.push(io.readU4le());
-    }
+    if (width < 0 || height < 0 || eventSize < 0) throw new Error('Invalid Wolf map dimensions or event count');
+    io.skipBytes(width * height * 3 * 4);
     let events:WolfMapEvent[] = [];
     for (let i = 0; i < eventSize; i++) {
       events.push(io.readMapEvent())

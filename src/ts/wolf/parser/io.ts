@@ -21,6 +21,12 @@ export class WolfParserIo{
         this.pointer += bytes
         return arr
     }
+    skipBytes(bytes: number): void {
+        if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > this.byteLen - this.pointer) {
+            throw new Error('Invalid or truncated Wolf byte range');
+        }
+        this.pointer += bytes;
+    }
     byteCompare(equals:Uint8Array){
         const byt = this.data.subarray(this.pointer, this.pointer + equals.length)
         return byt.equals(equals)
