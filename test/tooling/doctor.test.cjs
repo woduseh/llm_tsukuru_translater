@@ -46,15 +46,15 @@ function fakeServer(failure) {
 }
 
 test('doctor distinguishes the CI runtime from checks on a different current machine', () => {
-  assert.equal(inspectRuntime('v22.13.0', 'win32').status, 'passed');
-  const old = inspectRuntime('v22.12.0', 'win32');
+  assert.equal(inspectRuntime('v26.0.0', 'win32').status, 'passed');
+  const old = inspectRuntime('v25.9.0', 'win32');
   assert.equal(old.status, 'warning');
   assert.equal(old.supportedNode, false);
-  const newer = inspectRuntime('v24.14.0', 'win32');
+  const newer = inspectRuntime('v27.0.0', 'win32');
   assert.equal(newer.status, 'warning');
   assert.equal(newer.supportedNode, false);
   assert.equal(newer.supportedPlatform, true);
-  const linux = inspectRuntime('v22.20.0', 'linux');
+  const linux = inspectRuntime('v26.10.0', 'linux');
   assert.equal(linux.status, 'warning');
   assert.equal(linux.supportedNode, true);
   assert.equal(linux.supportedPlatform, false);
@@ -184,7 +184,7 @@ test('doctor collects remaining checks after failures and reports only environme
 test('doctor returns a nonzero CLI result and persists the failed checks for diagnosis', async () => {
   const root = fixture();
   const exitCode = await main([], {
-    root, tempDirectory: root, nodeVersion: 'v22.13.0', platform: 'win32', env: {},
+    root, tempDirectory: root, nodeVersion: 'v26.0.0', platform: 'win32', env: {},
     createServer: () => fakeServer(), spawnSync: () => ({ status: 7, stdout: '', stderr: 'private-value' }),
     log: mock.fn(), logError: mock.fn(),
   });
@@ -204,7 +204,7 @@ test('doctor does not report a successful artifact when the report cannot be wri
   const logError = mock.fn();
   const io = { ...fs, mkdirSync: () => { throw Object.assign(new Error('private detail'), { code: 'EACCES' }); } };
   const exitCode = await main([], {
-    root, tempDirectory: root, nodeVersion: 'v22.13.0', platform: 'win32', env: {}, fs: io,
+    root, tempDirectory: root, nodeVersion: 'v26.0.0', platform: 'win32', env: {}, fs: io,
     createServer: () => fakeServer(),
     spawnSync: command => ({ status: 0, stdout: command === 'git' ? 'true' : 'TSUKURU_DOCTOR_PIPE_OK' }),
     log, logError,

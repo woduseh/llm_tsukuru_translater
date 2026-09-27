@@ -103,7 +103,7 @@ function definitions(plan, root) {
     unit: node([cli('vitest/vitest.mjs'), 'run', ...(plan.mode === 'full' ? ['--coverage'] : [])]),
     'clean-main': node(['scripts/clean-main.cjs']),
     'build-main': node([cli('typescript/bin/tsc'), '-p', 'tsconfig.main.json'], ['clean-main']),
-    'build-renderer': node([cli('vite/bin/vite.js'), 'build', '--config', 'vite.renderer.config.ts']),
+    'build-renderer': node([cli('vite/bin/vite.js'), 'build', '--config', 'vite.renderer.config.mts']),
     'build-mcp': node(['scripts/build-mcp-server.mjs']),
     core: harness('core', ['build-main', 'build-mcp']),
     eval: harness('eval', ['build-main']),

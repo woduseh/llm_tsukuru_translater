@@ -19,8 +19,8 @@
     "dist",
     "dist-renderer",
     "src/renderer",
-    "vite.renderer.config.ts",
-    "vitest.config.ts",
+    "vite.renderer.config.mts",
+    "vitest.config.mts",
     "test"
   ]
 }

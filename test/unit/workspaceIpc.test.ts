@@ -8,13 +8,12 @@ import { registerTranslateHandlers } from '../../src/ipc/translateHandler';
 const mocks = vi.hoisted(() => ({
   on: vi.fn(), handle: vi.fn(), createWindow: vi.fn(), write: vi.fn(),
   storageSet: vi.fn(), trans: vi.fn(), validate: vi.fn(),
-  worked: vi.fn(),
+  worked: vi.fn(), shellOpenPath: vi.fn().mockResolvedValue(''),
 }));
 vi.mock('electron', () => ({
   app: { getAppPath: () => process.cwd() },
-  ipcMain: { on: mocks.on, handle: mocks.handle }, BrowserWindow: mocks.createWindow,
+  ipcMain: { on: mocks.on, handle: mocks.handle }, BrowserWindow: mocks.createWindow, shell: { openPath: mocks.shellOpenPath },
 }));
-vi.mock('open', () => ({ default: vi.fn() }));
 vi.mock('../../src/ipc/shared', () => ({
   storage: { set: mocks.storageSet }, worked: mocks.worked, sendError: vi.fn(),
 }));
@@ -194,4 +193,14 @@ describe('inline workspace IPC', () => {
     expect(mocks.trans).not.toHaveBeenCalled();
     expect(sender.send.mock.calls.filter(([channel]) => channel === 'workspaceNavigate')).toHaveLength(0);
   });
+
+  it('opens folders through Electron shell only for the main renderer and valid paths', () => {
+    const { sender } = setup();
+    invoke('openFolder', {}, '/outside');
+    invoke('openFolder', sender, '');
+    expect(mocks.shellOpenPath).not.toHaveBeenCalled();
+    invoke('openFolder', sender, path.resolve('game'));
+    expect(mocks.shellOpenPath).toHaveBeenCalledWith(path.resolve('game'));
+  });
+
 });

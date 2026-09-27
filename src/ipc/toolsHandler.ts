@@ -1,8 +1,7 @@
 import { applyReviewedTextWrite, resolveReviewTextTarget, type ReviewedTextWriteRequest, type ReviewedTextWriteResult } from '../ts/rpgmv/reviewTextWrite';
 import { runWithDirectoryLock, normalizeDirectoryLockKey } from '../ts/libs/concurrency';
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
-import open from 'open';
 import * as prjc from '../ts/rpgmv/projectConvert';
 import { buildVerifyWindowState } from '../ts/libs/llmProviderConfig';
 import { createTranslator, getLlmReadinessError } from '../ts/libs/translatorFactory';
@@ -183,7 +182,8 @@ export function registerToolsHandlers(ctx: AppContext) {
   });
 
   ipcMain.on('openFolder', (ev, arg) => {
-    open(arg)
+    if (ev.sender !== ctx.mainWindow?.webContents || typeof arg !== 'string' || !arg.trim()) return;
+    void shell.openPath(arg);
   })
 
   ipcMain.on('projectConvert', async(ev, arg) => prjc.ConvertProject(arg, ctx))

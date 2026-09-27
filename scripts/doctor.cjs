@@ -28,13 +28,13 @@ function result(status, code, message, details = {}, hint) {
 
 function inspectRuntime(version, platform) {
   const parsed = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(version);
-  const supportedNode = !!parsed && Number(parsed[1]) === 22 && Number(parsed[2]) >= 13;
+  const supportedNode = !!parsed && Number(parsed[1]) === 26;
   const supportedPlatform = platform === 'win32';
   return result(supportedNode && supportedPlatform ? 'passed' : 'warning',
     supportedNode && supportedPlatform ? 'CI_RUNTIME_MATCH' : 'OUTSIDE_CI_RUNTIME',
-    'CI covers Windows and Node 22.x (22.13.0 or newer). Other runtime checks describe this machine only.',
+    'CI covers Windows and Node 26.x. Other runtime checks describe this machine only.',
     { node: version, platform, supportedNode, supportedPlatform },
-    supportedNode && supportedPlatform ? undefined : 'Use the documented Windows / Node 22.x environment when CI parity is required.');
+    supportedNode && supportedPlatform ? undefined : 'Use the documented Windows / Node 26.x environment when CI parity is required.');
 }
 
 function inspectManifests(root, io = fs) {

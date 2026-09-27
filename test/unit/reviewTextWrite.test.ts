@@ -9,9 +9,8 @@ import * as atomic from '../../src/ts/libs/atomicFile';
 
 const mocks = vi.hoisted(() => ({ on: vi.fn(), handle: vi.fn() }));
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() },
-  ipcMain: { on: mocks.on, handle: mocks.handle }, BrowserWindow: vi.fn(),
+  ipcMain: { on: mocks.on, handle: mocks.handle }, BrowserWindow: vi.fn(), shell: { openPath: vi.fn().mockResolvedValue('') },
 }));
-vi.mock('open', () => ({ default: vi.fn() }));
 vi.mock('../../src/ts/rpgmv/projectConvert', () => ({ ConvertProject: vi.fn() }));
 vi.mock('../../src/ipc/viteHelper', () => ({ loadRoute: vi.fn() }));
 const roots: string[] = [];

@@ -20,12 +20,14 @@ RPG Maker MV/MZ 및 Wolf RPG Editor 게임의 텍스트를 추출·번역·적�
 
 ### 요구 사항
 
-- Node.js 22.13 이상인 22.x (CI는 Node 22 사용)
+- Node.js 26.x (CI와 개발 도구 체인은 Node 26 사용)
 - Windows OS (Electron 빌드 대상)
+
+개발·CI Node와 패키지 안의 Electron 런타임은 별개예요. 현재 Electron 44는 자체 Node 24 런타임을 포함하므로 메인/preload 타입은 해당 런타임과 맞는 Node 24 타입 정의를 유지합니다.
 
 ### 개발 환경 설정
 
-Windows x64에서 프로젝트 전용 Node 22.23.2 / npm을 쓰려면 다음 PowerShell 명령을 사용하세요. 첫 실행은 공식 Node ZIP을 내려받아 SHA256을 확인하고 `.tools/`에 설치해요. 이 명령 안에서만 런타임을 선택하며, 관리자 권한이나 전역 Node 변경은 필요하지 않아요.
+Windows x64에서 프로젝트 전용 Node 26.10.0 / npm을 쓰려면 다음 PowerShell 명령을 사용하세요. 첫 실행은 공식 Node ZIP을 내려받아 SHA256을 확인하고 `.tools/`에 설치해요. 이 명령 안에서만 런타임을 선택하며, 관리자 권한이나 전역 Node 변경은 필요하지 않아요.
 
 ```powershell
 .\scripts\dev-env.ps1 ci --prefer-offline --no-audit --fund=false
@@ -34,7 +36,7 @@ Windows x64에서 프로젝트 전용 Node 22.23.2 / npm을 쓰려면 다음 Pow
 .\scripts\dev-env.ps1 run verify:full
 ```
 
-인수 없이 실행하면 `doctor`, `run dev`는 대화식 개발 실행이에요. PowerShell에서 npm 스크립트에 옵션을 넘길 때는 예제처럼 `'--'`를 따옴표로 감싸야 해요. 다운로드와 프로세스 실행은 현재 실행 환경에서 허용돼야 하며, 이 스크립트는 권한 정책을 변경하지 않아요. Node 22 환경이 이미 준비돼 있다면 아래 기본 명령을 바로 사용할 수 있어요.
+인수 없이 실행하면 `doctor`, `run dev`는 대화식 개발 실행이에요. PowerShell에서 npm 스크립트에 옵션을 넘길 때는 예제처럼 `'--'`를 따옴표로 감싸야 해요. 다운로드와 프로세스 실행은 현재 실행 환경에서 허용돼야 하며, 이 스크립트는 권한 정책을 변경하지 않아요. Node 26 환경이 이미 준비돼 있다면 아래 기본 명령을 바로 사용할 수 있어요.
 
 ```bash
 # 체크아웃마다 lockfile 기준 설치 (Electron 다운로드와 설치 스크립트 필요)

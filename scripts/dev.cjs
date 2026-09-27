@@ -20,7 +20,7 @@ function waitForReady(file, completion, timeoutMs) {
 
 function createRendererServer(root, createServer) {
   return createServer({
-    configFile: path.join(root, 'vite.renderer.config.ts'),
+    configFile: path.join(root, 'vite.renderer.config.mts'),
     // Vite treats port 0 as its default. Let it bind the next available port.
     server: { host: '127.0.0.1', port: 5173, strictPort: false },
   });

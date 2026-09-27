@@ -1,6 +1,6 @@
 # Windows x64 project-local Node/npm. Example: .\scripts\dev-env.ps1 run dev
 # Quote npm's separator in PowerShell: .\scripts\dev-env.ps1 run dev '--' --smoke
-# Download and SHA256: https://nodejs.org/en/blog/release/v22.23.2
+# Download and SHA256: https://nodejs.org/en/blog/release/v26.10.0
 $ErrorActionPreference = 'Stop'
 # Preserve native exit codes even when the caller enables PowerShell 7's opt-in.
 $PSNativeCommandUseErrorActionPreference = $false
@@ -8,17 +8,17 @@ $taskNpmArguments = @($args)
 if ($taskNpmArguments.Count -eq 0) { $taskNpmArguments = @('run', 'doctor') }
 
 if ($env:OS -ne 'Windows_NT' -or $env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {
-    throw 'This launcher supports Windows x64. Use the documented Node 22 environment on other systems.'
+    throw 'This launcher supports Windows x64. Use the documented Node 26 environment on other systems.'
 }
 
 $taskRoot = Split-Path -Parent $PSScriptRoot
 $taskTools = Join-Path $taskRoot '.tools'
-$taskNodeVersion = '22.23.2'
+$taskNodeVersion = '26.10.0'
 $taskDistribution = "node-v$taskNodeVersion-win-x64"
 $taskRuntime = Join-Path $taskTools $taskDistribution
 $taskNode = Join-Path $taskRuntime 'node.exe'
 $taskNpm = Join-Path $taskRuntime 'node_modules/npm/bin/npm-cli.js'
-$taskExpectedHash = '1177b4137ba5adaa56354ae40f1080c7450e8ae09cecb47da459d1c52ac99f97'
+$taskExpectedHash = '9fef7eca6743a6b910989cd8e78712376b394fcb9b6e1e9c44a0799a287f90c5'
 
 foreach ($taskDirectory in @($taskTools, $taskRuntime)) {
     if ((Test-Path -LiteralPath $taskDirectory) -and
