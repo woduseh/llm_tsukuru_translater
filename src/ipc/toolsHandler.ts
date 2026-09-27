@@ -296,8 +296,7 @@ export function registerToolsHandlers(ctx: AppContext) {
       for (let i = 0; i < items.length; i++) {
         send('verifyLlmRepairProgress', { requestId, current: i + 1, total: items.length, path: items[i].path });
         try {
-          const translated = await translator.translateText(items[i].origText);
-          const newText = translated.trim();
+          const newText = await translator.translateText(items[i].origText);
           const validation = validateTranslatedFileContent(items[i].origText, newText);
           if (!validation.ok || newText === items[i].origText) {
             failedItems += 1;
