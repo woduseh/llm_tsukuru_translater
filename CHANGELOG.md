@@ -14,7 +14,7 @@
 
 ### 성능 및 정리
 
-- Node 26 개발·CI 도구 체인으로 전환하고 Electron/Vite/Vitest/Vue 및 호환 가능한 의존성을 최신화했습니다. Electron의 내장 Node는 별도 런타임이라 Node 24 타입 정의를 유지합니다.
+- Node 26 개발·CI 도구 체인으로 전환하고 Electron/Vite/Vitest/Vue 및 호환 가능한 의존성을 최신화했습니다. Electron의 내장 Node 24에 맞춰 Node 24 타입 정의를 유지하고, 메인 빌드에는 TypeScript 7 native compiler를 사용하며 compiler API 소비자는 TypeScript 6을 병행합니다.
 - Vitest를 worker thread 기반으로 실행하고, 상태 격리가 필요한 테스트만 별도 프로젝트에 유지해 나머지 테스트가 모듈 그래프를 재사용하도록 했습니다. 독립 TypeScript fixture TC는 같은 worker 안에서 병렬 실행합니다.
 - ESM-only `open` 의존성을 제거하고 Electron `shell.openPath`를 사용합니다.
 - Wolf 맵의 미사용 타일 숫자 배열 생성을 범위 검사 후 바이트 건너뛰기로 대체합니다.

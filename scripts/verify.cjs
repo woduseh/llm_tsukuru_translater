@@ -97,12 +97,12 @@ function definitions(plan, root) {
   const harness = (name, depends) => ({ ...node([`scripts/harness/${name}.cjs`], depends), harness: true });
   return {
     tooling: node(['--test', '--experimental-test-isolation=none', 'test/tooling/*.test.cjs']),
-    'typecheck-main': node([cli('typescript/bin/tsc'), '-p', 'tsconfig.main.json', '--noEmit']),
+    'typecheck-main': node([path.join(root, 'node_modules', '@typescript', 'native', 'bin', 'tsc'), '-p', 'tsconfig.main.json', '--noEmit']),
     'typecheck-renderer': node([cli('vue-tsc/bin/vue-tsc.js'), '-p', 'tsconfig.renderer.json', '--noEmit']),
     lint: node([cli('eslint/bin/eslint.js'), 'src/**/*.ts', 'src/renderer/**/*.vue', 'main.ts']),
     unit: node([cli('vitest/vitest.mjs'), 'run', ...(plan.mode === 'full' ? ['--coverage'] : [])]),
     'clean-main': node(['scripts/clean-main.cjs']),
-    'build-main': node([cli('typescript/bin/tsc'), '-p', 'tsconfig.main.json'], ['clean-main']),
+    'build-main': node([path.join(root, 'node_modules', '@typescript', 'native', 'bin', 'tsc'), '-p', 'tsconfig.main.json'], ['clean-main']),
     'build-renderer': node([cli('vite/bin/vite.js'), 'build', '--config', 'vite.renderer.config.mts']),
     'build-mcp': node(['scripts/build-mcp-server.mjs']),
     core: harness('core', ['build-main', 'build-mcp']),

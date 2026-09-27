@@ -24,6 +24,7 @@ RPG Maker MV/MZ 및 Wolf RPG Editor 게임의 텍스트를 추출·번역·적�
 - Windows OS (Electron 빌드 대상)
 
 개발·CI Node와 패키지 안의 Electron 런타임은 별개예요. 현재 Electron 44는 자체 Node 24 런타임을 포함하므로 메인/preload 타입은 해당 런타임과 맞는 Node 24 타입 정의를 유지합니다.
+메인 프로세스의 빌드·타입 검사는 TypeScript 7 native compiler를 사용하고, `typescript@6`은 typescript-eslint·vue-tsc 및 compiler-API 기반 테스트/도구를 위한 API 호환 계층으로 유지해요.
 
 ### 개발 환경 설정
 

@@ -4,6 +4,10 @@ import vue from '@vitejs/plugin-vue';
 const isolatedTests = [
   // Module mocks and Electron/logger singletons intentionally need a fresh module graph.
   'test/unit/agentWorkspacePage.test.ts',
+  'test/unit/comparePage.test.ts',
+  'test/unit/jsonReviewWorkspace.test.ts',
+  'test/unit/projectSnapshot.test.ts',
+  'test/unit/settingsPageDraft.test.ts',
   'test/unit/ipcHandlers.test.ts',
   'test/unit/jsonRepairBoundary.test.ts',
   'test/unit/llmSettingsPage.test.ts',

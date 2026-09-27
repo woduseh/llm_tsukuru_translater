@@ -3,7 +3,7 @@ import path from 'path';
 import { execFile } from 'child_process';
 
 const repoRoot = process.cwd();
-const tscBin = path.join(repoRoot, 'node_modules', 'typescript', 'bin', 'tsc');
+const tscBin = path.join(repoRoot, 'node_modules', '@typescript', 'native', 'bin', 'tsc');
 
 function runFixtureTsc(fixtureName: string): Promise<{ status: number | null; stdout: string; stderr: string }> {
   const fixtureTsconfig = path.join(
@@ -30,13 +30,13 @@ function runFixtureTsc(fixtureName: string): Promise<{ status: number | null; st
 }
 
 describe('post-release cleanup regressions', () => {
-  it.concurrent('compiles metadata validation without ambient Wolf globals', async () => {
+  it.concurrent('compiles metadata validation without ambient Wolf globals', async ({ expect }) => {
     const result = await runFixtureTsc('metadata-validation-isolated');
 
     expect(result.status, result.stderr || result.stdout).toBe(0);
   });
 
-  it.concurrent('allows legacy extracted metadata entries without a type marker', async () => {
+  it.concurrent('allows legacy extracted metadata entries without a type marker', async ({ expect }) => {
     const result = await runFixtureTsc('legacy-extracted-data-entry');
 
     expect(result.status, result.stderr || result.stdout).toBe(0);
