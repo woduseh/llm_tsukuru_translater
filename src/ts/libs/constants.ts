@@ -8,9 +8,6 @@ export const API_BACKOFF_MAX_MS = 60000;
 export const VALIDATION_RETRY_BASE_MS = 2000;
 export const VALIDATION_RETRY_MAX_MS = 30000;
 
-// Rate limiting between translation chunks
-export const RATE_LIMIT_DELAY_MS = 1000;
-
 // Default API timeout (seconds)
 export const DEFAULT_API_TIMEOUT_SEC = 600;
 

@@ -30,7 +30,7 @@ describe('alignment and patch dry-run kernel', () => {
     ]);
     const service = new AgentService({ projectRoot });
 
-    const result = service.alignment.findBreaks({ sourcePath: 'Source\\Map001.txt', targetPath: 'Translated\\Map001.txt' });
+    const result = service.alignment.inspect({ sourcePath: 'Source\\Map001.txt', targetPath: 'Translated\\Map001.txt' });
     const breaks = result.breaks as JsonObject[];
 
     expect(breaks.some((entry) => entry.code === 'separator-drift')).toBe(true);
@@ -42,7 +42,7 @@ describe('alignment and patch dry-run kernel', () => {
       projectRoot: makeProject('empty', ['--- 101 ---', 'Hello', '', 'World'], ['--- 101 ---', '안녕', '빈 줄 아님', 'World']),
     });
 
-    const result = service.alignment.findBreaks({ sourcePath: 'Source\\Map001.txt', targetPath: 'Translated\\Map001.txt' });
+    const result = service.alignment.inspect({ sourcePath: 'Source\\Map001.txt', targetPath: 'Translated\\Map001.txt' });
     const breaks = result.breaks as JsonObject[];
 
     expect(breaks.some((entry) => entry.code === 'empty-line-drift')).toBe(true);
@@ -53,7 +53,7 @@ describe('alignment and patch dry-run kernel', () => {
       projectRoot: makeProject('control', ['--- 101 ---', 'Hello \\V[1]'], ['--- 101 ---', '안녕']),
     });
 
-    const result = service.alignment.findBreaks({ sourcePath: 'Source\\Map001.txt', targetPath: 'Translated\\Map001.txt' });
+    const result = service.alignment.inspect({ sourcePath: 'Source\\Map001.txt', targetPath: 'Translated\\Map001.txt' });
     const breaks = result.breaks as JsonObject[];
 
     expect(breaks.some((entry) => entry.code === 'control-code-drift')).toBe(true);

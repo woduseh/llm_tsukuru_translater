@@ -248,8 +248,7 @@ export function createAgentToolDefinitions(): RegisteredMcpTool[] {
       handler: (args, { service }) => {
         const result = service.qa.scoreFile(args as unknown as Parameters<typeof service.qa.scoreFile>[0]);
         const gate = service.qa.thresholdGate({ score: result });
-        const { findings, qualityScore, nextSuggestedCalls: _next, ...summary } = result;
-        void _next;
+        const { findings, qualityScore, ...summary } = result;
         return json({
           ...summary,
           structuralScore: qualityScore,

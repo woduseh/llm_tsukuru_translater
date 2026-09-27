@@ -1,6 +1,5 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
-import * as edTool from '../ts/rpgmv/edtool.js';
 import Themes from '../ts/rpgmv/styles'
 import { sanitizeSettingsForRenderer } from '../ts/libs/llmProviderConfig';
 import { applyValidatedSettingsUpdate } from '../ts/libs/settingsRuntimeValidation';
@@ -78,35 +77,4 @@ export function registerSettingsHandlers(ctx: AppContext) {
     if (ev.sender !== ctx.mainWindow?.webContents) worked(ctx)
   })
 
-  ipcMain.on('gamePatcher', (ev, dir) => {
-    if(!edTool.exists(dir)){
-      sendError(ctx, '추출된 파일이 없습니다')
-      worked(ctx)
-      return
-    }
-    ctx.settingsWindow = new BrowserWindow({
-      width: 800,
-      height: 400,
-      resizable: false,
-      show: false,
-      autoHideMenuBar: true,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        sandbox: false,
-        preload: path.join(__dirname, '..', 'preload.js')
-      },
-      icon: path.join(PROJECT_ROOT, 'res', 'icon.png'),
-    })
-    ctx.settingsWindow.setMenu(null)
-    loadRoute(ctx.settingsWindow, '/game-patcher')
-    ctx.settingsWindow.webContents.on('did-finish-load', function () {
-      ctx.settingsWindow!.show();
-      ctx.settingsWindow!.webContents.send('settings', ctx.settings);
-    });
-    ctx.settingsWindow.on('close', function() {
-      worked(ctx)
-    });
-    ctx.settingsWindow!.show()
-  })
 }

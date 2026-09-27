@@ -58,60 +58,6 @@ export class AlignmentService {
     });
     return result;
   }
-
-  findBreaks(input: AlignmentInspectOptions): JsonObject {
-    const inspected = this.inspect(input);
-    return {
-      schemaVersion: 1,
-      sourcePath: inspected.sourcePath,
-      targetPath: inspected.targetPath,
-      score: inspected.score,
-      confidence: inspected.confidence,
-      coverage: inspected.coverage,
-      verified: inspected.verified,
-      scoreKind: inspected.scoreKind,
-      limitations: inspected.limitations,
-      lineCount: inspected.lineCount,
-      breaks: inspected.breaks,
-      alignmentRef: inspected.alignmentRef,
-    } as unknown as JsonObject;
-  }
-
-  score(input: AlignmentInspectOptions): JsonObject {
-    const inspected = this.inspect(input);
-    return {
-      schemaVersion: 1,
-      score: inspected.score,
-      confidence: inspected.confidence,
-      coverage: inspected.coverage,
-      verified: inspected.verified,
-      scoreKind: inspected.scoreKind,
-      limitations: inspected.limitations,
-      breakCount: inspected.breaks.length,
-      lineCount: inspected.lineCount,
-      alignmentRef: inspected.alignmentRef,
-    } as unknown as JsonObject;
-  }
-
-  explain(input: AlignmentInspectOptions): JsonObject {
-    const inspected = this.inspect(input);
-    const topBreaks = inspected.breaks.slice(0, 8);
-    return {
-      schemaVersion: 1,
-      summary: !inspected.verified ? 'Inspection is incomplete. Observed findings cannot establish whole-file alignment.' : topBreaks.length === 0
-        ? 'Source and target keep the first-model alignment invariants.'
-        : `${topBreaks.length} representative alignment break(s) found. Preserve line count, separator order, empty-line positions, and RPG control codes before apply.`,
-      score: inspected.score,
-      confidence: inspected.confidence,
-      coverage: inspected.coverage,
-      verified: inspected.verified,
-      scoreKind: inspected.scoreKind,
-      limitations: inspected.limitations,
-      lineCount: inspected.lineCount,
-      topBreaks,
-      alignmentRef: inspected.alignmentRef,
-    } as unknown as JsonObject;
-  }
 }
 
 interface ClassifiedLine {

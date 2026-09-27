@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { extract, format_extracted, setObj, getVal } from '../../src/ts/rpgmv/extract/index';
 import { settings as defaultSettings } from '../../src/ts/rpgmv/datas';
-import { appCtx } from '../../src/appContext';
+import { AppContext } from '../../src/appContext';
+let appCtx: AppContext;
 import fs from 'fs';
 import path from 'path';
 
@@ -21,6 +22,7 @@ function makeConf(fileName: string, overrides: Record<string, any> = {}) {
 
 describe('extract-apply round-trip', () => {
   beforeEach(() => {
+    appCtx = new AppContext();
     appCtx.gb = {};
     appCtx.settings = { ...defaultSettings, formatNice: false, oneMapFile: false, onefile_src: false, onefile_note: false } as any;
     appCtx.mainWindow = { webContents: { send: () => {} } } as any;

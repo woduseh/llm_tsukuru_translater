@@ -2,7 +2,6 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ApprovalService, hashArgs } from './approvalService';
-import { AgentEventBus } from './eventBus';
 import { AGENT_WORKSPACE_DIRECTORY } from './workspaceService';
 import {
   createMutationPatchExecutor,
@@ -80,7 +79,6 @@ export class MutationApprovalRuntime {
     this.now = options.now ?? (() => new Date());
     const workspaceRoot = path.join(this.projectRoot, AGENT_WORKSPACE_DIRECTORY);
     this.approvals = new ApprovalService({
-      eventBus: new AgentEventBus({ workspaceRoot }),
       auditRoot: workspaceRoot,
       sessionId: this.appSessionId,
       auditMode: 'metadata-only',

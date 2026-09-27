@@ -3,15 +3,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { ApprovalRequest, JsonObject, PermissionTier } from '../types/agentWorkspace';
 import { redactSecretLikeValues } from './contractsValidation';
-import { AgentEventBus } from './eventBus';
 
 export interface ApprovalServiceOptions {
-  eventBus: AgentEventBus;
   idFactory?: () => string;
   tokenFactory?: () => string;
   now?: () => Date;
   sessionId?: string;
-  auditRoot?: string;
+  auditRoot: string;
   auditMode?: 'full-redacted' | 'metadata-only';
 }
 
@@ -50,7 +48,7 @@ export class ApprovalService {
     this.tokenFactory = options.tokenFactory ?? (() => `confirm-${crypto.randomBytes(18).toString('base64url')}`);
     this.now = options.now ?? (() => new Date());
     this.sessionId = options.sessionId ?? 'local-session';
-    this.auditPath = path.join(options.auditRoot ?? options.eventBus.workspaceRoot, 'audit', 'approvals.jsonl');
+    this.auditPath = path.join(options.auditRoot, 'audit', 'approvals.jsonl');
   }
 
   planApproval(input: ApprovalPlanInput): ApprovalRequest {
@@ -104,7 +102,6 @@ export class ApprovalService {
     };
     this.approvals.set(approval.approvalId, approval);
     this.tokenIndex.set(confirmToken, approval.approvalId);
-    this.options.eventBus.emit({ kind: 'approval', approval });
     return approval;
   }
 
@@ -121,7 +118,6 @@ export class ApprovalService {
     if (new Date(approval.expiresAt).getTime() <= this.now().getTime()) {
       approval.status = 'expired';
       this.tokenIndex.delete(input.confirmToken);
-      this.options.eventBus.emit({ kind: 'approval', approval });
       this.writeAudit('approval-expired', approval, input.args, 'failed');
       throw new Error('Approval has expired.');
     }
@@ -132,7 +128,6 @@ export class ApprovalService {
     }
     approval.status = 'granted';
     this.tokenIndex.delete(input.confirmToken);
-    this.options.eventBus.emit({ kind: 'approval', approval });
     this.writeAudit('approval-consumed', approval, input.args, 'ok');
     return approval;
   }
@@ -142,7 +137,6 @@ export class ApprovalService {
     if (!approval) return undefined;
     approval.status = status;
     if (status !== 'pending' && approval.confirmToken) this.tokenIndex.delete(approval.confirmToken);
-    this.options.eventBus.emit({ kind: 'approval', approval });
     this.writeAudit(`approval-${status}`, approval, {}, status === 'denied' || status === 'expired' ? 'failed' : 'ok');
     return approval;
   }

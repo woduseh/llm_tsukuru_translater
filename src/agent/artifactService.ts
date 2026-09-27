@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import type { JsonValue } from '../types/agentWorkspace';
 import { atomicWriteJsonFile } from '../ts/libs/atomicFile';
 import { redactSecretLikeValues } from './contractsValidation';
-import { AgentEventBus } from './eventBus';
 
 export interface AgentArtifactRecord {
   schemaVersion: 1;
@@ -18,14 +17,13 @@ export interface AgentArtifactRecord {
 
 export interface ArtifactServiceOptions {
   workspaceRoot: string;
-  eventBus?: AgentEventBus;
 }
 
 export class ArtifactService {
   readonly workspaceRoot: string;
   readonly artifactsRoot: string;
 
-  constructor(private readonly options: ArtifactServiceOptions) {
+  constructor(options: ArtifactServiceOptions) {
     this.workspaceRoot = options.workspaceRoot;
     this.artifactsRoot = path.join(this.workspaceRoot, 'artifacts');
   }
@@ -47,7 +45,6 @@ export class ArtifactService {
     };
     fs.mkdirSync(this.artifactsRoot, { recursive: true });
     atomicWriteJsonFile(artifactPath, record, 2);
-    this.options.eventBus?.emit({ kind: 'artifact', artifactPath, artifactKind: safeKind, jobId });
     return record;
   }
 }

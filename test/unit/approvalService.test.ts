@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ApprovalService } from '../../src/agent/approvalService';
-import { AgentEventBus } from '../../src/agent/eventBus';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -16,7 +15,7 @@ function setup() {
   roots.push(root);
   let now = new Date('2025-01-01T00:00:00Z');
   const service = new ApprovalService({
-    eventBus: new AgentEventBus({ workspaceRoot: root }),
+    auditRoot: root,
     now: () => now,
     sessionId: 'session-a',
   });

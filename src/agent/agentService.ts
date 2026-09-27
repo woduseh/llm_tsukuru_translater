@@ -2,24 +2,18 @@ import { AgentSafeFileSystem } from './agentSafeFileSystem';
 import { AlignmentService } from './alignmentService';
 import { ArtifactService } from './artifactService';
 import { DataRefService } from './dataRefService';
-import { AgentEventBus } from './eventBus';
 import { GlossaryService } from './glossaryService';
-import { JobService } from './jobService';
 import { MemoryService } from './memoryService';
 import { PatchService } from './patchService';
 import { QaService } from './qaService';
 import { AgentWorkspaceDescriptor, WorkspaceService, type WorkspaceServiceOptions } from './workspaceService';
 
-export interface AgentServiceOptions extends WorkspaceServiceOptions {
-  eventHistoryLimit?: number;
-}
+export type AgentServiceOptions = WorkspaceServiceOptions;
 
 export class AgentService {
   readonly workspace: WorkspaceService;
   readonly descriptor: AgentWorkspaceDescriptor;
-  readonly eventBus: AgentEventBus;
   readonly artifacts: ArtifactService;
-  readonly jobs: JobService;
   readonly files: AgentSafeFileSystem;
   readonly dataRefs: DataRefService;
   readonly alignment: AlignmentService;
@@ -27,7 +21,7 @@ export class AgentService {
   readonly glossary: GlossaryService;
   readonly memory: MemoryService;
   readonly qa: QaService;
-  private readonly manifestOptions: Omit<AgentServiceOptions, 'projectRoot' | 'eventHistoryLimit'>;
+  private readonly manifestOptions: Omit<AgentServiceOptions, 'projectRoot'>;
 
   constructor(options: AgentServiceOptions) {
     this.workspace = new WorkspaceService(options.projectRoot);
@@ -39,10 +33,8 @@ export class AgentService {
       lastFailures: options.lastFailures,
     };
     this.descriptor = this.workspace.describeWorkspace(this.manifestOptions);
-    this.eventBus = new AgentEventBus({ workspaceRoot: this.descriptor.workspaceRoot, maxHistory: options.eventHistoryLimit });
-    this.artifacts = new ArtifactService({ workspaceRoot: this.descriptor.workspaceRoot, eventBus: this.eventBus });
+    this.artifacts = new ArtifactService({ workspaceRoot: this.descriptor.workspaceRoot });
     this.dataRefs = new DataRefService({ projectRoot: this.descriptor.projectRoot, workspaceRoot: this.descriptor.workspaceRoot });
-    this.jobs = new JobService({ workspaceRoot: this.descriptor.workspaceRoot, eventBus: this.eventBus, artifactService: this.artifacts });
     this.files = new AgentSafeFileSystem({
       projectRoot: this.descriptor.projectRoot,
       allowedRoots: [this.descriptor.projectRoot, this.descriptor.workspaceRoot],
@@ -73,14 +65,12 @@ export class AgentService {
   refreshManifest(): AgentWorkspaceDescriptor {
     return this.workspace.describeWorkspace({
       ...this.manifestOptions,
-      currentJobs: this.jobs.listCurrentJobSummaries(),
     });
   }
 
   writeManifest(): AgentWorkspaceDescriptor {
     return this.workspace.writeManifest({
       ...this.manifestOptions,
-      currentJobs: this.jobs.listCurrentJobSummaries(),
     });
   }
 }

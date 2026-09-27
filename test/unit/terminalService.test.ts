@@ -1,8 +1,9 @@
+import { FakePtyAdapter } from '../utils/fakePtyAdapter';
 import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { AppContext } from '../../src/appContext';
-import { FakePtyAdapter, TerminalService, redactTerminalText } from '../../src/agent';
+import { TerminalService, redactTerminalText } from '../../src/agent';
 
 const tmpRoot = path.join(process.cwd(), 'test', '.tmp-terminal-service');
 

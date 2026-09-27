@@ -56,5 +56,3 @@ export class AppContext {
   }
 }
 
-/** Singleton instance for backward compatibility (used by tests) */
-export const appCtx = new AppContext();

@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { rmBom } from '../../src/ts/libs/fileIO';
 import { decodeEncoding } from '../../src/utils';
-import { appCtx } from '../../src/appContext';
+import { AppContext } from '../../src/appContext';
+let appCtx: AppContext;
 
 describe('rmBom', () => {
   it('removes BOM from string that starts with BOM', () => {
@@ -29,6 +30,7 @@ describe('rmBom', () => {
 
 describe('decodeEncoding', () => {
   beforeEach(() => {
+    appCtx = new AppContext();
     appCtx.WolfMetadata = { ver: -1 };
   });
 

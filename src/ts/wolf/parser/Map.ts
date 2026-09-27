@@ -1,4 +1,4 @@
-import { WolfCmd, WolfMapEvent, WolfParserIo } from "./io";
+import { WolfMapEvent, WolfParserIo } from "./io";
 import { AppContext } from '../../../appContext';
 
 export function wolfExtractMap(data:Buffer, ctx: AppContext){
@@ -47,43 +47,4 @@ export function wolfExtractMap(data:Buffer, ctx: AppContext){
     return {
         events: events
     }
-}
-
-export function wolfExtractCommon(data:Buffer, ctx: AppContext){
-    const io = new WolfParserIo(data)
-    const magic = io.readBytes(10)
-    if (!io.byteArrayCompare(magic, [0, 87, 0, 0, 79, 76, 85, 70, 67,  0])){
-        if(io.byteArrayCompare(magic, [0, 87,  0,  0, 79,76,  0, 70, 67,  0])){
-
-        }
-        else{
-        }
-    }
-    const check = io.readU1();
-    if (!(check === 144)) {
-        if(check === 143){
-            ctx.WolfMetadata.ver = 2
-        }
-    }
-    else{
-        ctx.WolfMetadata.ver = 3
-    }
-    const eventsLen = io.readU4le();
-    let events:WolfCmd[] = [];
-    for (let i = 0; i < eventsLen; i++) {
-        try {
-            const ev = io.readCEvent()
-            if(ev){
-                for(const e of ev.events){
-                    events.push(e)
-                }
-            }
-            else{
-                break
-            }   
-        } catch (error) {
-            break
-        }
-    }
-    return events
 }

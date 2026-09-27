@@ -7,7 +7,7 @@ export const SEND_CHANNELS = [
   'retranslateFile', 'retranslateBlocks', 'verifyLlmRepair', 'verifyApplyJson', 'compareSaveText',
   'openFolder', 'projectConvert', 'license', 'app_version',
   'getextention', 'selFont', 'changeFontSize', 'updateVersion',
-  'wolf_ext', 'wolf_apply', 'gamePatcher',
+  'wolf_ext', 'wolf_apply',
    'compareReady', 'verifyReady',
    'llmSettingsReady', 'settingsReady', 'mainReady',
    'terminalCreate', 'terminalInput', 'terminalResize', 'terminalKill', 'terminalList', 'terminalSnapshot',

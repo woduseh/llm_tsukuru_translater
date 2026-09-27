@@ -41,7 +41,6 @@ describe('deterministic QA scoring gates', () => {
     expect(score.qualityScore).toBeGreaterThanOrEqual(0.9);
     expect(score.findings.filter((finding) => finding.severity === 'error')).toEqual([]);
     expect(score.qaRef?.kind).toBe('qa-score');
-    expect(score.nextSuggestedCalls).toContain('qa.threshold_gate');
   });
 
   it('lowers score for separator and control-code drift', () => {
@@ -85,7 +84,7 @@ describe('deterministic QA scoring gates', () => {
     ]));
   });
 
-  it('blocks threshold gate for low QA and includes next calls', () => {
+  it('blocks threshold gate for low QA', () => {
     const service = new AgentService({
       projectRoot: makeProject('gate', ['--- 101 ---', 'Hello \\V[1]'], ['--- 999 ---', 'Hello']),
     });
@@ -99,7 +98,6 @@ describe('deterministic QA scoring gates', () => {
     expect(gate.blocked).toBe(true);
     expect(gate.gate).toBe('blocked');
     expect(gate.qualityScore).toBeLessThan(0.9);
-    expect(gate.nextSuggestedCalls).toEqual(expect.arrayContaining(['qa.explain_score', 'patch.propose']));
   });
   it('returns the QA gate and paginated findings through the public tool', () => {
     const registry = createMcpOfflineToolRegistry(new AgentService({

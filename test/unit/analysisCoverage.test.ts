@@ -37,15 +37,13 @@ describe('analysis evidence coverage', () => {
     const score = service.qa.scoreFile({ ...paths, maxBytes: 30 });
     expect(score).toMatchObject({ coverage: 'partial', verified: false, confidence: 'low', scoreKind: 'structural-and-heuristic' });
     expect(service.qa.thresholdGate({ score, threshold: 0, blockOnErrors: false })).toMatchObject({ blocked: true, gate: 'blocked' });
-    expect(service.qa.scoreBatch({ files: [{ ...paths, maxBytes: 30 }], threshold: 0 }).passed).toBe(false);
   });
 
-  it('does not pass preservation gates without a source or any batch files', () => {
+  it('does not pass preservation gates without a source', () => {
     const { service } = project('Hello', '안녕');
     const score = service.qa.scoreFile({ targetPath: paths.targetPath });
     expect(score).toMatchObject({ coverage: 'full', verified: false, confidence: 'low' });
     expect(service.qa.thresholdGate({ score, threshold: 0 }).blocked).toBe(true);
-    expect(service.qa.scoreBatch({ files: [] }).passed).toBe(false);
     const full = service.qa.scoreFile(paths);
     expect(service.qa.thresholdGate({ score: full, threshold: 0 }).gate).toBe('passed');
   });

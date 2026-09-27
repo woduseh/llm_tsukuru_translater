@@ -31,27 +31,10 @@ export interface QaScoreFileOptions extends Partial<AlignmentInspectOptions> {
   ttlMs?: number;
 }
 
-export interface QaBatchScoreOptions {
-  files: QaScoreFileOptions[];
-  threshold?: number;
-  maxFiles?: number;
-}
-
 export interface QaThresholdGateOptions extends QaScoreFileOptions {
   score?: QaScoreResult;
   threshold?: number;
   blockOnErrors?: boolean;
-}
-
-export interface QaExplainScoreOptions extends QaScoreFileOptions {
-  score?: QaScoreResult;
-  scoreRefId?: string;
-}
-
-export interface QaCompareVersionsOptions {
-  sourcePath: string;
-  versions: Array<{ label: string; targetPath: string; metadataPath?: string }>;
-  threshold?: number;
 }
 
 export interface QaFinding {
@@ -91,7 +74,6 @@ export interface QaScoreResult {
   glossary: JsonObject;
   memory: JsonObject;
   qaRef?: AgentDataRef;
-  nextSuggestedCalls: string[];
 }
 
 const DIMENSIONS: Array<{ key: QaDimension; label: string; weight: number }> = [
@@ -184,7 +166,6 @@ export class QaService {
         findingCount: findings.filter((item) => item.dimension === 'glossaryConsistency').length,
       },
       memory: summarizeMemoryEntries(searchMemoryEntries(memoryEntries, { limit: 20 })),
-      nextSuggestedCalls: nextCallsForScore(qualityScore, findings),
     };
     const artifact = this.options.artifacts.writeJsonArtifact('qa-score', result.qaScoreId, result as unknown as JsonObject);
     result.qaRef = this.options.dataRefs.registerArtifactRef(artifact, {
@@ -194,58 +175,6 @@ export class QaService {
       metadata: { toolName: 'qa.score_file', targetPath: result.targetPath },
     });
     return result;
-  }
-
-  scoreBatch(input: QaBatchScoreOptions): JsonObject {
-    const files = (input.files ?? []).slice(0, positiveInt(input.maxFiles, 50));
-    const scores = files.map((file) => this.scoreFile(file));
-    const averageScore = scores.length ? round3(scores.reduce((sum, score) => sum + score.qualityScore, 0) / scores.length) : 0;
-    const threshold = normalizeThreshold(input.threshold);
-    return {
-      schemaVersion: 1,
-      qualityScore: averageScore,
-      threshold,
-      passed: scores.length > 0 && scores.every((score) => score.verified && score.qualityScore >= threshold && !score.findings.some((finding) => finding.severity === 'error')),
-      fileCount: scores.length,
-      scores: scores.map((score) => scoreSummary(score)) as unknown as JsonObject[],
-      nextSuggestedCalls: averageScore >= threshold ? ['qa.threshold_gate'] : ['qa.explain_score', 'patch.propose', 'qa.score_file'],
-    };
-  }
-
-  explainScore(input: QaExplainScoreOptions): JsonObject {
-    const score = input.score ?? this.readScoreRef(input.scoreRefId) ?? this.scoreFile(input);
-    const topFindings = [...score.findings].sort(severitySort).slice(0, 12);
-    return {
-      schemaVersion: 1,
-      qualityScore: score.qualityScore,
-      confidence: score.confidence,
-      verified: score.verified,
-      coverage: score.coverage,
-      scoreKind: score.scoreKind,
-      limitations: score.limitations,
-      summary: !score.verified ? 'QA is incomplete; no whole-file preservation gate can pass.' : topFindings.length === 0
-        ? 'QA score is high and no deterministic gate findings were detected.'
-        : `${topFindings.length} representative QA finding(s) need review in the app.`,
-      dimensions: score.dimensions as unknown as JsonObject[],
-      topFindings: topFindings as unknown as JsonObject[],
-      nextSuggestedCalls: score.nextSuggestedCalls,
-    };
-  }
-
-  readScoreRefPayload(refId: string): JsonObject {
-    const score = this.readScoreRef(refId);
-    if (!score) throw new Error(`Unknown QA score ref: ${refId}`);
-    return score as unknown as JsonObject;
-  }
-
-  suggestNextCalls(input: QaExplainScoreOptions): JsonObject {
-    const score = input.score ?? this.readScoreRef(input.scoreRefId) ?? this.scoreFile(input);
-    return {
-      schemaVersion: 1,
-      qualityScore: score.qualityScore,
-      nextSuggestedCalls: score.nextSuggestedCalls,
-      topFindingCodes: score.findings.slice(0, 8).map((finding) => finding.code),
-    };
   }
 
   thresholdGate(input: QaThresholdGateOptions): JsonObject {
@@ -265,37 +194,8 @@ export class QaService {
       threshold,
       blockingFindings: blockingFindings.slice(0, 20) as unknown as JsonObject[],
       qaRef: score.qaRef as unknown as JsonObject,
-      nextSuggestedCalls: blocked ? ['qa.explain_score', 'patch.propose', 'qa.score_file'] : ['quality.review_file', 'project.translation_inventory'],
     };
     return result;
-  }
-
-  compareVersions(input: QaCompareVersionsOptions): JsonObject {
-    const versions = input.versions.map((version) => {
-      const score = this.scoreFile({ sourcePath: input.sourcePath, targetPath: version.targetPath, metadataPath: version.metadataPath });
-      const summary: JsonObject = { label: version.label, targetPath: score.targetPath, qualityScore: score.qualityScore, findingCount: score.findings.length };
-      if (score.qaRef) summary.qaRef = score.qaRef as unknown as JsonObject;
-      return summary;
-    }).sort((left, right) => Number(right.qualityScore) - Number(left.qualityScore));
-    return {
-      schemaVersion: 1,
-      best: versions[0] ?? null,
-      versions: versions as unknown as JsonObject[],
-      threshold: normalizeThreshold(input.threshold),
-      nextSuggestedCalls: ['qa.threshold_gate', 'qa.explain_score'],
-    };
-  }
-
-  private readScoreRef(scoreRefId?: string): QaScoreResult | undefined {
-    if (!scoreRefId) return undefined;
-    const read = this.options.dataRefs.readRef(scoreRefId);
-    const payload = typeof read.content === 'object' && read.content && 'payload' in read.content
-      ? (read.content as JsonObject).payload
-      : read.content;
-    if (payload && typeof payload === 'object' && !Array.isArray(payload) && (payload as { schemaVersion?: unknown }).schemaVersion === 1) {
-      return payload as unknown as QaScoreResult;
-    }
-    return undefined;
   }
 }
 
@@ -441,16 +341,6 @@ function scoreDimensions(findings: QaFinding[], alignment?: AlignmentInspectResu
   });
 }
 
-function nextCallsForScore(score: number, findings: QaFinding[]): string[] {
-  if (score >= 0.9 && !findings.some((item) => item.severity === 'error')) return ['qa.threshold_gate', 'patch.preview'];
-  const calls = ['qa.explain_score'];
-  if (findings.some((item) => ['separatorPreservation', 'controlCodePreservation', 'placeholderPreservation', 'lineAlignment'].includes(item.dimension))) {
-    calls.push('patch.propose');
-  }
-  calls.push('qa.score_file');
-  return calls;
-}
-
 function alignmentSummary(alignment?: AlignmentInspectResult): JsonObject | undefined {
   if (!alignment) return undefined;
   return {
@@ -464,21 +354,6 @@ function alignmentSummary(alignment?: AlignmentInspectResult): JsonObject | unde
     breakCount: alignment.breaks.length,
     metadata: alignment.metadata,
     alignmentRef: alignment.alignmentRef as unknown as JsonObject,
-  };
-}
-
-function scoreSummary(score: QaScoreResult): JsonObject {
-  return {
-    targetPath: score.targetPath,
-    qualityScore: score.qualityScore,
-    confidence: score.confidence,
-    verified: score.verified,
-    coverage: score.coverage,
-    scoreKind: score.scoreKind,
-    limitations: score.limitations,
-    findingCount: score.findings.length,
-    qaRef: score.qaRef as unknown as JsonObject,
-    nextSuggestedCalls: score.nextSuggestedCalls,
   };
 }
 
@@ -532,9 +407,4 @@ function normalizeThreshold(value: unknown): number {
 
 function qualityConfidence(score: number): 'high' | 'medium' | 'low' {
   return score >= 0.9 ? 'high' : score >= 0.75 ? 'medium' : 'low';
-}
-
-function severitySort(left: QaFinding, right: QaFinding): number {
-  const rank = { error: 0, warning: 1, info: 2 };
-  return rank[left.severity] - rank[right.severity] || left.dimension.localeCompare(right.dimension, 'en');
 }
