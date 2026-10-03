@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AgentService } from '../../src/agent/agentService';
@@ -33,6 +33,27 @@ describe('MCP transport hardening', () => {
     });
     expect(JSON.stringify(response)).not.toContain('sentinel-secret-2468');
     expect(JSON.stringify(response)).not.toContain('Unexpected token');
+  });
+
+  it.each([
+    { label: 'null', request: null },
+    { label: 'array', request: [] },
+    { label: 'scalar', request: 42 },
+    { label: 'wrong version on a tool call', request: { jsonrpc: '1.0', id: 7, method: 'tools/call', params: { name: 'project.context_snapshot' } } },
+  ])('rejects $label as an invalid request before dispatching tools', async ({ request }) => {
+    const registry = { listTools: vi.fn(() => []), callTool: vi.fn(() => ({
+      schemaVersion: 1 as const, requestId: 'invalid-request-session', toolName: 'project.context_snapshot',
+      status: 'ok' as const, permissionTier: 'readonly' as const, payload: {}, audit: [], redactions: [],
+    })) };
+
+    const response = await handleMcpLine(registry, JSON.stringify(request), 'invalid-request-session');
+
+    expect(response).toEqual({
+      jsonrpc: '2.0',
+      id: request && typeof request === 'object' && 'id' in request ? request.id : null,
+      error: { code: -32600, message: 'Invalid JSON-RPC request.' },
+    });
+    expect(registry.callTool).not.toHaveBeenCalled();
   });
 
   it('detects Wolf projects and keeps both binary and extracted-text inventory visible', () => {

@@ -171,11 +171,12 @@ describe('parallel translation coordinator', () => {
   });
 
   it.each([1, 2, 4])('translates files with at most %i active workers', async (workers) => {
+    vi.useFakeTimers();
     const { edir, backupDir, files } = makeProject(['A.txt', 'B.txt', 'C.txt', 'D.txt']);
     let active = 0;
     let maxActive = 0;
 
-    const result = await translateFilesWithCoordinator({
+    const job = translateFilesWithCoordinator({
       ...baseOptions(edir, backupDir, files, workers),
       createTranslatorForFile: () => fakeTranslator(async (content) => {
         active++;
@@ -185,6 +186,8 @@ describe('parallel translation coordinator', () => {
         return translateContent(content);
       }),
     });
+    await vi.runAllTimersAsync();
+    const result = await job;
 
     expect(result.failedFiles).toEqual([]);
     expect(result.workedFiles).toBe(files.length);
@@ -251,10 +254,11 @@ describe('parallel translation coordinator', () => {
   });
 
   it('reports stable file ordinals for concurrently started workers', async () => {
+    vi.useFakeTimers();
     const { edir, backupDir, files } = makeProject(['One.txt', 'Two.txt', 'Three.txt']);
     const statuses: string[] = [];
 
-    await translateFilesWithCoordinator({
+    const job = translateFilesWithCoordinator({
       ...baseOptions(edir, backupDir, files, 2),
       onStatus: (message) => statuses.push(message),
       createTranslatorForFile: () => fakeTranslator(async (content) => {
@@ -262,6 +266,8 @@ describe('parallel translation coordinator', () => {
         return translateContent(content);
       }),
     });
+    await vi.runAllTimersAsync();
+    await job;
 
     const startedStatuses = statuses.filter((message) => /^\[\d+\/\d+\] [^.]+\.txt$/.test(message));
     expect(startedStatuses).toContain('[1/3] One.txt');
@@ -412,11 +418,12 @@ describe('parallel translation coordinator', () => {
   });
 
   it('waits for in-flight workers on abort and does not save aborted partial results', async () => {
+    vi.useFakeTimers();
     const { edir, backupDir, files } = makeProject(['One.txt', 'Two.txt', 'Three.txt']);
     let aborted = false;
     const started: string[] = [];
 
-    await translateFilesWithCoordinator({
+    const job = translateFilesWithCoordinator({
       ...baseOptions(edir, backupDir, files, 2),
       isAborted: () => aborted,
       createTranslatorForFile: (fileName) => ({
@@ -436,6 +443,8 @@ describe('parallel translation coordinator', () => {
         },
       }),
     });
+    await vi.runAllTimersAsync();
+    await job;
 
     expect(started).toEqual(['One.txt', 'Two.txt']);
     expect(fs.readFileSync(path.join(edir, 'One.txt'), 'utf-8')).toContain('번역');

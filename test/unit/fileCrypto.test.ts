@@ -5,7 +5,6 @@ import path from 'path';
 import fs from 'fs';
 
 describe('rpgencrypt', () => {
-  const HEADER_MV = '5250474D5600000000030100000000000';
   const HEADER_BYTES = Buffer.from(
     ['52', '50', '47', '4D', '56', '00', '00', '00', '00', '03', '01', '00', '00', '00', '00', '00'].join(''),
     'hex'
@@ -100,23 +99,27 @@ describe('rpgencrypt', () => {
     });
   });
 
+  it('uses MZ extensions and refreshes an existing MV asset without creating another', async () => {
+    const srcDir = makeTmpDir('crypto-mz-src-');
+    const outDir = makeTmpDir('crypto-mz-out-');
+    const decDir = makeTmpDir('crypto-mz-dec-');
+    const original = Buffer.from([0x89, 0x50, 0x4E, 0x47, 1, 2, 3, 4]);
+    const source = path.join(srcDir, 'image.png');
+    fs.writeFileSync(source, original);
+
+    await Encrypt(source, outDir, TEST_KEY, false);
+    expect(fs.readdirSync(outDir)).toEqual(['image.png_']);
+    await Decrypt(path.join(outDir, 'image.png_'), decDir, TEST_KEY);
+    expect(fs.readFileSync(path.join(decDir, 'image.png'))).toEqual(original);
+
+    fs.writeFileSync(path.join(outDir, 'image.rpgmvp'), 'old asset');
+    await Encrypt(source, outDir, TEST_KEY, false);
+    expect(fs.readFileSync(path.join(outDir, 'image.rpgmvp'))).toEqual(fs.readFileSync(path.join(outDir, 'image.png_')));
+  });
+
   // ─── Encryption format ───────────────────────────────────────────
 
   describe('encryption format', () => {
-    it('prepends 16-byte RPG Maker MV header', async () => {
-      const srcDir = makeTmpDir('crypto-hdr-src-');
-      const encDir = makeTmpDir('crypto-hdr-enc-');
-
-      const data = Buffer.alloc(20, 0xFF);
-      fs.writeFileSync(path.join(srcDir, 'img.png'), data);
-
-      await Encrypt(path.join(srcDir, 'img.png'), encDir, TEST_KEY);
-      const enc = fs.readFileSync(path.join(encDir, 'img.rpgmvp'));
-
-      expect(enc.subarray(0, 4).toString('hex')).toBe('5250474d'); // "RPGM"
-      expect(enc.length).toBe(20 + 16);
-    });
-
     it('XORs first key-length bytes of the file data', async () => {
       const srcDir = makeTmpDir('crypto-xor-src-');
       const encDir = makeTmpDir('crypto-xor-enc-');
@@ -129,13 +132,9 @@ describe('rpgencrypt', () => {
       const enc = fs.readFileSync(path.join(encDir, 'x.rpgmvp'));
       const body = enc.subarray(16); // skip header
 
-      // First 4 bytes should be XOR of 0x00 with key bytes
-      expect(body[0]).toBe(0xAB);
-      expect(body[1]).toBe(0xCD);
-      expect(body[2]).toBe(0xEF);
-      expect(body[3]).toBe(0x01);
-      // Remaining bytes should be unchanged
-      expect(body[4]).toBe(0x00);
+      expect(body).toEqual(Buffer.from([
+        0xAB, 0xCD, 0xEF, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      ]));
     });
   });
 

@@ -44,7 +44,9 @@ function boot(env, packaged = false) {
 }
 
 test('ordinary and packaged app starts do not adopt a development profile or readiness listener', () => {
-  assert.deepEqual(boot({}).app.paths, {});
+  const ordinary = boot({});
+  assert.deepEqual(ordinary.app.paths, {});
+  assert.equal(ordinary.ipcMain.listenerCount('mainReady'), 0);
   const packaged = boot({ LLM_TSUKURU_DEV_USER_DATA: profile() }, true);
   assert.deepEqual(packaged.app.paths, {});
   assert.equal(packaged.ipcMain.listenerCount('mainReady'), 0);
@@ -73,6 +75,23 @@ test('a runner-owned stop file requests normal application shutdown', async () =
   } finally { clearTimeout(timer); }
 });
 
-test('local runners reject relative profile paths before changing Electron state', () => {
-  assert.throws(() => boot({ LLM_TSUKURU_DEV_USER_DATA: 'relative-profile' }), /absolute isolated/);
+test('UI harness creates separate persistent, session and logging directories', () => {
+  const directory = path.join(profile(), 'harness-profile');
+  const { app, ipcMain } = boot({ LLM_TSUKURU_UI_HARNESS_SCENARIO: 'fixture', LLM_TSUKURU_UI_HARNESS_USER_DATA: directory });
+  assert.deepEqual(app.paths, { userData: directory, sessionData: path.join(directory, 'session'), logs: path.join(directory, 'logs') });
+  for (const name of ['', 'session', 'logs']) assert.equal(fs.statSync(path.join(directory, name)).isDirectory(), true);
+  assert.equal(ipcMain.listenerCount('mainReady'), 0);
 });
+
+for (const env of [
+  { LLM_TSUKURU_DEV_USER_DATA: 'relative-profile' },
+  { LLM_TSUKURU_UI_HARNESS_SCENARIO: 'fixture', LLM_TSUKURU_UI_HARNESS_USER_DATA: '' },
+  { LLM_TSUKURU_UI_HARNESS_SCENARIO: 'fixture', LLM_TSUKURU_UI_HARNESS_USER_DATA: 'relative-profile' },
+]) {
+  test(`local runners reject unsafe profile ${JSON.stringify(env)} before changing Electron state`, () => {
+    assert.throws(() => boot(env), /absolute isolated/);
+    const app = apps.at(-1);
+    assert.deepEqual(app.paths, {});
+    assert.equal(app.listenerCount('will-quit'), 0);
+  });
+}

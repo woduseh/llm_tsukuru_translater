@@ -30,14 +30,10 @@ describe('fileIO', () => {
 
         it('throws FileIOError for non-existent file', () => {
             const file = path.join(tmpDir, 'nonexistent.txt');
-            expect(() => readTextFile(file)).toThrow(FileIOError);
-            try {
-                readTextFile(file);
-            } catch (e) {
-                const err = e as FileIOError;
-                expect(err.operation).toBe('read');
-                expect(err.filePath).toBe(file);
-            }
+            let thrown: unknown;
+            try { readTextFile(file); } catch (error) { thrown = error; }
+            expect(thrown).toBeInstanceOf(FileIOError);
+            expect(thrown).toMatchObject({ operation: 'read', filePath: file });
         });
     });
 

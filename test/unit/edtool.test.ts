@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { read, write, exists } from '../../src/ts/rpgmv/edtool';
 import os from 'os';
 import path from 'path';
@@ -10,6 +10,7 @@ describe('edtool', () => {
   let tmpDir: string;
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (tmpDir) {
       const file = path.join(tmpDir, '.extracteddata');
       if (fs.existsSync(file)) fs.unlinkSync(file);
@@ -39,8 +40,20 @@ describe('edtool', () => {
     const result = read(dir);
 
     // read() unwraps the {dat: ...} wrapper and preserves per-file extraction metadata
-    expect(result.main['Map001.json'].data['1'].val).toBe('events.1.pages.0.list.0.parameters.0');
-    expect(result.main['Map001.json'].data['3'].m).toBe(4);
+    expect(result).toEqual(sampleData);
+  });
+
+  it('preserves previous metadata and removes staging files if replacement fails', () => {
+    const dir = createTmpDir();
+    const previous = { main: { 'Map001.json': { data: {} } } };
+    write(dir, previous);
+    const before = fs.readFileSync(path.join(dir, '.extracteddata'));
+    vi.spyOn(fs, 'renameSync').mockImplementation(() => { throw new Error('replacement failed'); });
+
+    expect(() => write(dir, { main: { 'Map002.json': { data: {} } } })).toThrow('replacement failed');
+    expect(fs.readFileSync(path.join(dir, '.extracteddata'))).toEqual(before);
+    expect(read(dir)).toEqual(previous);
+    expect(fs.readdirSync(dir)).toEqual(['.extracteddata']);
   });
 
   it('exists returns true when .extracteddata file is present', () => {

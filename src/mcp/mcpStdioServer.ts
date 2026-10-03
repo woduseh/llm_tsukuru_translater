@@ -133,7 +133,7 @@ export async function handleMcpRequestAsync(
   request: JsonRpcMessage,
   requestId?: string,
 ): Promise<JsonRpcResponse | null> {
-  if (request?.method !== 'tools/call') {
+  if (!request || request.jsonrpc !== '2.0' || request.method !== 'tools/call') {
     return handleMcpRequest(registry as McpToolRegistryLike, request);
   }
   const id = request.id != null ? request.id : null;
@@ -158,7 +158,7 @@ export async function handleMcpLine(
   return handleMcpRequestAsync(
     registry,
     request,
-    createBridgeMcpRequestId(processSessionId, request.id),
+    createBridgeMcpRequestId(processSessionId, request?.id),
   );
 }
 

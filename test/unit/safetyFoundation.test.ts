@@ -106,7 +106,7 @@ describe('directory operation lock', () => {
       active++;
       maxActive = Math.max(maxActive, active);
       order.push(`start-${item}`);
-      await delay(5);
+      await Promise.resolve();
       order.push(`end-${item}`);
       active--;
       return item;
@@ -121,18 +121,21 @@ describe('directory operation lock', () => {
     const dir = makeSandboxDir();
     const controller = new AbortController();
     let firstRelease!: () => void;
+    let firstStarted!: () => void;
+    const started = new Promise<void>(resolve => { firstStarted = resolve; });
     let active = 0;
     let maxActive = 0;
 
     const first = lock.runExclusive(dir, async () => {
       active++;
       maxActive = Math.max(maxActive, active);
+      firstStarted();
       await new Promise<void>((resolve) => {
         firstRelease = resolve;
       });
       active--;
     });
-    await delay(0);
+    await started;
 
     const aborted = lock.runExclusive(dir, () => {
       throw new Error('aborted waiter should not acquire the lock');
@@ -145,11 +148,12 @@ describe('directory operation lock', () => {
       active--;
     });
 
+    await expect(aborted).rejects.toThrow(AbortError);
+    expect(active).toBe(1);
     firstRelease();
 
     await Promise.all([
       first,
-      expect(aborted).rejects.toThrow(AbortError),
       third,
     ]);
     expect(maxActive).toBe(1);
@@ -165,8 +169,4 @@ function makeSandboxDir(): string {
 
 function listAtomicTemps(dir: string): string[] {
   return fs.readdirSync(dir).filter((name) => name.includes('.atomic-'));
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

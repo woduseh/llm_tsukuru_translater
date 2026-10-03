@@ -118,7 +118,7 @@ describe('isBlockUntranslated', () => {
     expect(isBlockUntranslated({ sep: '', lines: [] }, null as any)).toBe(false)
   })
 
-  it('returns true for empty lines in both', () => {
+  it('returns false for empty lines in both', () => {
     const orig: Block = { sep: '--- 1 ---', lines: [''] }
     const trans: Block = { sep: '--- 1 ---', lines: [''] }
     expect(isBlockUntranslated(orig, trans)).toBe(false) // empty lines have no translatable text
@@ -403,10 +403,13 @@ describe('checkMismatchBlocks', () => {
     expect(checkMismatchBlocks(ob, tb)).toBe(true)
   })
 
-  it('is consistent with checkMismatch', () => {
-    const lines1 = ['--- 1 ---', 'a', '--- 2 ---', 'b']
-    const lines2 = ['--- 1 ---', 'x', '--- 2 ---', 'y']
-    expect(checkMismatchBlocks(splitBlocks(lines1), splitBlocks(lines2))).toBe(checkMismatch(lines1, lines2))
+  it.each([
+    { name: 'valid translated structure', original: ['--- 1 ---', 'a', '', '\\V[1]b'], translated: ['--- 1 ---', 'x', '', '\\V[1]y'], expected: false },
+    { name: 'filled intentional empty line', original: ['--- 1 ---', 'a', '', 'b'], translated: ['--- 1 ---', 'x', 'filled', 'y'], expected: true },
+    { name: 'removed control code', original: ['--- 1 ---', '\\V[1]a'], translated: ['--- 1 ---', 'x'], expected: true },
+  ])('detects $name through both flat and pre-split entry points', ({ original, translated, expected }) => {
+    expect(checkMismatch(original, translated)).toBe(expected)
+    expect(checkMismatchBlocks(splitBlocks(original), splitBlocks(translated))).toBe(expected)
   })
 })
 

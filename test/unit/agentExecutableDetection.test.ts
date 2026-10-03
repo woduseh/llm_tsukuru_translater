@@ -39,9 +39,11 @@ describe('agent executable detection', () => {
 
   it('honors candidate priority order', () => {
     writeExecutable('claude');
+    writeExecutable('claude.exe');
+    writeExecutable('claude.cmd');
     const result = detectExecutableOnPath(['claude.cmd', 'claude.exe', 'claude'], { PATH: tmpRoot });
     expect(result.status).toBe('available');
-    expect(result.resolvedPath).toBe(path.join(tmpRoot, 'claude'));
+    expect(result.resolvedPath).toBe(path.join(tmpRoot, 'claude.cmd'));
   });
 
   it('treats absolute candidate paths directly', () => {

@@ -27,10 +27,13 @@ describe.each(Object.entries(factories))('%s provider output structure', (_provi
     '\nHello', '--- 101 ---\n  Hello \\V[1]  \n\n',
   ])('accepts exact output without retries: %j', async (source) => {
     const text = source.replace('Hello', '안녕');
-    const post = vi.spyOn(axios, 'post').mockResolvedValue({ data: {
-      candidates: [{ content: { parts: [{ text }] } }],
-      choices: [{ message: { content: text } }], content: [{ type: 'text', text }],
-    } });
+    // Return only this provider's wire format so another provider's parser cannot pass.
+    const data = _provider === 'openai'
+      ? { choices: [{ message: { content: text } }] }
+      : _provider === 'claude'
+        ? { content: [{ type: 'text', text }] }
+        : { candidates: [{ content: { parts: [{ text }] } }] };
+    const post = vi.spyOn(axios, 'post').mockResolvedValue({ data });
     const result = await factory().translateFileContent(source);
     expect(result.incomplete).toBe(false);
     expect(result.translatedContent).toBe(text);

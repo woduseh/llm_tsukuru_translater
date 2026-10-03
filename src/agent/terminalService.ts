@@ -603,7 +603,8 @@ function clampDimension(value: unknown, fallback: number, min: number, max: numb
 }
 
 function normalizeComparable(candidatePath: string): string {
-  return path.resolve(candidatePath).toLowerCase();
+  const resolved = path.resolve(candidatePath);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 function sanitizeArgs(args: string[]): string[] {

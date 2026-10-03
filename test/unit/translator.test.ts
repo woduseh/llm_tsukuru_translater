@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import axios from 'axios';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+
+afterEach(() => vi.restoreAllMocks());
 import {
   splitIntoBlocks,
   reassembleBlocks,
@@ -184,11 +187,12 @@ describe('validateChunk', () => {
   it('detects missing translated blocks', () => {
     const original = splitIntoBlocks('a\n--- 101 ---\nb\n--- 101 ---\nc');
     const translated = 'x\n--- 101 ---\ny';
-    const { blockValidations } = validateChunk(original, translated);
+    const { validatedBlocks, blockValidations } = validateChunk(original, translated);
 
     // Third block is missing — should fall back to original
     expect(blockValidations[2].lineCountMatch).toBe(false);
     expect(blockValidations[2].separatorMatch).toBe(false);
+    expect(validatedBlocks[2]).toEqual({ separator: '--- 101 ---', lines: ['c'] });
   });
 
   it('reports extra translated blocks', () => {
@@ -237,7 +241,7 @@ describe('validateChunk', () => {
 describe('contentHash', () => {
   it('returns consistent MD5 hex string', () => {
     const hash = contentHash('hello world');
-    expect(hash).toMatch(/^[0-9a-f]{32}$/);
+    expect(hash).toBe('5eb63bbbe01eeed093cb22bb8f5acdc3');
     expect(contentHash('hello world')).toBe(hash);
   });
 
@@ -246,8 +250,7 @@ describe('contentHash', () => {
   });
 
   it('handles empty string', () => {
-    const hash = contentHash('');
-    expect(hash).toMatch(/^[0-9a-f]{32}$/);
+    expect(contentHash('')).toBe('d41d8cd98f00b204e9800998ecf8427e');
   });
 });
 
@@ -410,15 +413,30 @@ describe('createGeminiTranslator', () => {
     expect(typeof translator.translateFileContent).toBe('function');
   });
 
-  it('uses default chunk size when not provided', () => {
-    const settings = {
-      llmApiKey: 'key',
-      llmModel: 'model',
-      llmCustomPrompt: '',
-      DoNotTransHangul: false,
-    };
-    const translator = createGeminiTranslator(settings, 'ja');
-    expect(translator).toBeDefined();
+  it('uses 30-block chunks when chunk size is omitted', async () => {
+    const post = vi.spyOn(axios, 'post').mockImplementation(async (_url, body) => {
+      const payload = body as { contents: { role: string; parts: { text: string }[] }[] };
+      const userMessage = payload.contents.find((turn) => turn.role === 'user')!.parts[0].text;
+      const source = userMessage.slice('<Source_Text>\n'.length, -'\n</Source_Text>'.length);
+      return { data: { candidates: [{ content: { parts: [{ text: source.replaceAll('Hello', '안녕') }] } }] } };
+    });
+    const source = Array.from({ length: 31 }, (_, i) => `--- ${i + 1} ---\nHello \\V[1]`).join('\n');
+    const translator = createGeminiTranslator({
+      llmApiKey: 'fixture-key', llmModel: 'fixture-model', llmTranslationUnit: 'chunk',
+      llmMaxRetries: 0, llmMaxApiRetries: 0, DoNotTransHangul: false,
+    }, 'en');
+
+    const result = await translator.translateFileContent(source);
+
+    expect(post).toHaveBeenCalledTimes(2);
+    const requestTexts = post.mock.calls.map(([, body]) =>
+      (body as { contents: { parts: { text: string }[] }[] }).contents[0].parts[0].text);
+    expect(requestTexts[0]).toContain('--- 30 ---\nHello \\V[1]');
+    expect(requestTexts[0]).not.toContain('--- 31 ---');
+    expect(requestTexts[1]).toBe('<Source_Text>\n--- 31 ---\nHello \\V[1]\n</Source_Text>');
+    expect(result.translatedContent).toBe(source.replaceAll('Hello', '안녕'));
+    expect(result.logEntry).toMatchObject({ totalBlocks: 31, translatedBlocks: 31, errorBlocks: 0, retries: 0 });
+    expect(result.incomplete).toBe(false);
   });
 });
 

@@ -177,4 +177,40 @@ describe('createVertexTranslator', () => {
     expect(result.logEntry.errors?.[0]).toContain('Vertex AI authentication failed');
     expect(post).toHaveBeenCalledTimes(1);
   });
+
+  it.each([403, 429])('sanitizes Vertex %i errors before exposing them or recording file failures', async (status) => {
+    const token = 'synthetic-private-access-token';
+    const privateKey = validServiceAccount.private_key;
+    const diagnostic = `provider diagnostic: ${token} ${status === 403 ? privateKey : 'temporary overload'}`;
+    const unsafe = Object.assign(new Error(diagnostic), {
+      config: { headers: { Authorization: `Bearer ${token}` } },
+      response: {
+        status,
+        headers: { 'Retry-After': '3' },
+        data: { error: { message: diagnostic } },
+      },
+    });
+    const post = vi.fn().mockRejectedValue(unsafe);
+    const translator = createVertexTranslator({ ...baseSettings, llmMaxRetries: 0, llmMaxApiRetries: 0 },
+      'en', 'ko', undefined, { httpClient: { post }, accessTokenProvider: async () => token });
+
+    const failure = await translator.translateText('Hello').catch((error: Error) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain('provider diagnostic:');
+    expect((failure as Error).message).toContain('[REDACTED]');
+    expect((failure as Error).message).not.toContain(token);
+    expect((failure as Error).message).not.toContain(privateKey.trim());
+    expect(failure).toMatchObject({ status, retryAfterMs: 3000 });
+    expect(failure).not.toHaveProperty('config');
+    expect(failure).not.toHaveProperty('response');
+
+    const source = '--- 101 ---\nHello';
+    const result = await translator.translateFileContent(source);
+    expect(result.translatedContent).toBe(source);
+    expect(result.incomplete).toBe(true);
+    expect(result.logEntry).toMatchObject({ errorBlocks: 1, retries: 0 });
+    expect(JSON.stringify(result)).not.toContain(token);
+    expect(JSON.stringify(result)).not.toContain('BEGIN PRIVATE KEY');
+    expect(post).toHaveBeenCalledTimes(2);
+  });
 });

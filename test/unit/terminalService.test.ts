@@ -1,5 +1,5 @@
 import { FakePtyAdapter } from '../utils/fakePtyAdapter';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { AppContext } from '../../src/appContext';
@@ -7,7 +7,11 @@ import { TerminalService, redactTerminalText } from '../../src/agent';
 
 const tmpRoot = path.join(process.cwd(), 'test', '.tmp-terminal-service');
 
+beforeEach(() => vi.useFakeTimers());
+
 afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
   fs.rmSync(tmpRoot, { recursive: true, force: true });
 });
 
@@ -52,7 +56,7 @@ describe('TerminalService', () => {
       cols: 80,
       rows: 24,
     });
-    await delay(20);
+    await vi.runAllTimersAsync();
 
     expect(created.ok).toBe(true);
     expect(created.session?.state).toBe('running');
@@ -121,6 +125,20 @@ describe('TerminalService', () => {
 
     expect(result.ok).toBe(false);
     expect(result.errorCode).toBe('cwd-denied');
+  });
+
+  it.skipIf(process.platform === 'win32')('rejects a differently cased sibling of a trusted project root', () => {
+    const projectRoot = makeProject('MixedCase');
+    const outside = makeProject('mixedcase');
+    const ctx = new AppContext();
+    ctx.terminalProjectRoots = [projectRoot];
+    const adapter = new FakePtyAdapter();
+    const service = new TerminalService(ctx, { ptyAdapter: adapter });
+
+    const result = service.create({ schemaVersion: 1, requestId: 'req-case-escape', kind: 'shell', cwd: outside });
+
+    expect(result).toMatchObject({ ok: false, errorCode: 'cwd-denied' });
+    expect(adapter.lastSpawnOptions).toBeUndefined();
   });
 
   it('does not count killed sessions against the active session limit', () => {
@@ -236,7 +254,7 @@ describe('TerminalService', () => {
         kind: 'codex',
         cwd: projectRoot,
       });
-      await delay(20);
+      await vi.runAllTimersAsync();
 
       const snapshot = service.snapshot({ schemaVersion: 1, sessionId: created.session!.sessionId });
       expect(snapshot.snapshot?.session.state).toBe('failed');
@@ -270,7 +288,7 @@ describe('TerminalService', () => {
         kind: 'codex',
         cwd: projectRoot,
       });
-      await delay(20);
+      await vi.runAllTimersAsync();
 
       const snapshot = service.snapshot({ schemaVersion: 1, sessionId: created.session!.sessionId });
       const output = snapshot.snapshot?.events.map((event) => event.data).join('\n') ?? '';
@@ -301,7 +319,7 @@ describe('TerminalService', () => {
       cwd: projectRoot,
       persistOutput: true,
     });
-    await delay(20);
+    await vi.runAllTimersAsync();
     service.kill({ schemaVersion: 1, sessionId: created.session!.sessionId });
 
     const transcriptPath = path.join(projectRoot, '.llm-tsukuru-agent', 'terminal-sessions', `${created.session!.sessionId}.json`);
@@ -333,7 +351,7 @@ describe('TerminalService', () => {
       cwd: projectRoot,
       persistOutput: true,
     });
-    await delay(30);
+    await vi.runAllTimersAsync();
 
     const snapshot = service.snapshot({ schemaVersion: 1, sessionId: created.session!.sessionId });
     const renderedOutput = snapshot.snapshot?.events.map((event) => event.data ?? '').join('') ?? '';
@@ -361,7 +379,7 @@ describe('TerminalService', () => {
       cwd: firstRoot,
       persistOutput: true,
     });
-    await delay(20);
+    await vi.runAllTimersAsync();
 
     ctx.terminalProjectRoots = [secondRoot];
     service.kill({ schemaVersion: 1, sessionId: created.session!.sessionId });
@@ -385,7 +403,7 @@ describe('TerminalService', () => {
       kind: 'shell',
       cwd: projectRoot,
     });
-    await delay(20);
+    await vi.runAllTimersAsync();
 
     const killed = service.kill({ schemaVersion: 1, sessionId: created.session!.sessionId });
     expect(killed.ok).toBe(true);
@@ -420,7 +438,7 @@ describe('TerminalService', () => {
       kind: 'shell',
       cwd: projectRoot,
     });
-    await delay(20);
+    await vi.runAllTimersAsync();
 
     const snapshot = service.snapshot({
       schemaVersion: 1,
@@ -448,8 +466,4 @@ function makeExecutableDir(name: string, executableNames: string[]): string {
     fs.writeFileSync(path.join(dir, executableName), '', 'utf8');
   }
   return fs.realpathSync.native(dir);
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

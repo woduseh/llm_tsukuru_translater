@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { GoogleAuth } from 'google-auth-library';
+import { copyRetryMetadata } from './providerRetry';
 import { type AppSettings, DEFAULT_LLM_VERTEX_LOCATION } from '../../types/settings';
 import { buildTranslationSystemPrompt, buildTranslationUserMessage, stripMarkdownFences } from './translationPrompt';
 import {
@@ -79,16 +80,16 @@ function isVertexAuthError(error: unknown): boolean {
     || msg.includes('service account');
 }
 
-function normalizeVertexError(error: unknown): Error {
-  if (error instanceof Error && error.message.startsWith('Vertex AI ')) {
-    return error;
-  }
-
-  if (isVertexAuthError(error)) {
-    return new Error(`Vertex AI authentication failed: ${getApiErrorMessage(error)}`);
-  }
-
-  return error instanceof Error ? error : new Error(getApiErrorMessage(error));
+function normalizeVertexError(error: unknown, secrets: readonly string[]): Error {
+  const rawMessage = getApiErrorMessage(error);
+  const message = secrets.reduce((safe, secret) => secret.trim()
+    ? safe.split(secret.trim()).join('[REDACTED]') : safe, rawMessage);
+  const alreadyNormalized = error instanceof Error && error.message.startsWith('Vertex AI ');
+  const normalized = new Error(!alreadyNormalized && isVertexAuthError(error)
+    ? `Vertex AI authentication failed: ${message}` : message) as Error & { code?: string };
+  const code = (error as { code?: unknown })?.code;
+  if (typeof code === 'string') normalized.code = code;
+  return copyRetryMetadata(error, normalized);
 }
 
 function isPermanentVertexError(error: unknown): boolean {
@@ -145,9 +146,10 @@ export class VertexTranslator extends ProviderTranslationBase {
   }
 
   async translateText(text: string, signal?: AbortSignal): Promise<string> {
+    let accessToken = '';
     try {
       signal?.throwIfAborted();
-      const accessToken = await this.accessTokenProvider();
+      accessToken = await this.accessTokenProvider();
       signal?.throwIfAborted();
       const response = await this.httpClient.post(this.apiUrl, {
         contents: [
@@ -187,7 +189,7 @@ export class VertexTranslator extends ProviderTranslationBase {
       const translated = candidates[0]?.content?.parts?.[0]?.text || '';
       return stripMarkdownFences(translated);
     } catch (error) {
-      throw normalizeVertexError(error);
+      throw normalizeVertexError(error, [accessToken, this.config.credentials.private_key]);
     }
   }
 
