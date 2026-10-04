@@ -169,10 +169,10 @@ describe('createVertexTranslator', () => {
 
     const result = await translator.translateFileContent('hello');
 
-    expect(result.translatedContent).toBe('hello');
+    expect(result).not.toHaveProperty('translatedContent');
     expect(result.logEntry.skippedBlocks).toBe(0);
     expect(result.logEntry.errorBlocks).toBe(1);
-    expect(result.incomplete).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.logEntry.retries).toBe(0);
     expect(result.logEntry.errors?.[0]).toContain('Vertex AI authentication failed');
     expect(post).toHaveBeenCalledTimes(1);
@@ -206,8 +206,8 @@ describe('createVertexTranslator', () => {
 
     const source = '--- 101 ---\nHello';
     const result = await translator.translateFileContent(source);
-    expect(result.translatedContent).toBe(source);
-    expect(result.incomplete).toBe(true);
+    expect(result).not.toHaveProperty('translatedContent');
+    expect(result.status).toBe('failed');
     expect(result.logEntry).toMatchObject({ errorBlocks: 1, retries: 0 });
     expect(JSON.stringify(result)).not.toContain(token);
     expect(JSON.stringify(result)).not.toContain('BEGIN PRIVATE KEY');

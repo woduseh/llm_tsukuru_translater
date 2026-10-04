@@ -122,7 +122,7 @@ function openLLMCompare() {
 onMounted(() => {
   api.send('setheight', 700)
 
-  useIpcOn('set_path', (tt: Record<string, string>) => {
+  useIpcOn('set_path', (tt) => {
     if (tt && tt.type === 'wolf_folder_input') {
       folderPath.value = tt.dir
       if (mode.value === -1) mode.value = 0

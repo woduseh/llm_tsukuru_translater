@@ -473,6 +473,7 @@ async function main() {
             const blocks = translationCore.splitIntoBlocks(content);
             onProgress?.(blocks.length, blocks.length, 'stub');
             return {
+              status: 'translated',
               translatedContent: translateText(content),
               validation: buildSuccessValidation(blocks),
               logEntry: {
@@ -484,7 +485,6 @@ async function main() {
                 durationMs: 1,
                 errors: [],
               },
-              aborted: false,
             };
           },
         });

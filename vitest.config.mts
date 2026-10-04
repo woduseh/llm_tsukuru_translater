@@ -17,6 +17,8 @@ const isolatedTests = [
   'test/unit/uiCapture.test.ts',
   'test/unit/workspaceIpc.test.ts',
   'test/unit/workspaceNavigation.test.ts',
+  'test/unit/translationReset.test.ts',
+  'test/unit/agentApprovalQueue.test.ts',
 ];
 
 export default defineConfig({

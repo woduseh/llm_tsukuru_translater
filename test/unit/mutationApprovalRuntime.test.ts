@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { MutationApprovalRuntime, MutationApprovalRuntimeError } from '../../src/agent/mutationApprovalRuntime';
@@ -14,12 +14,65 @@ const cleanupDirs: string[] = [];
 let sequence = 0;
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const dir of cleanupDirs.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
 describe('MutationApprovalRuntime', () => {
+  it('returns and publishes the applied result when its audit append fails', async () => {
+    const projectRoot = makeProject('applied-audit-failure', ['Hello']);
+    const snapshots: MutationApprovalQueueSnapshot[] = [];
+    const runtime = new MutationApprovalRuntime({ projectRoot, onChanged: (snapshot) => snapshots.push(snapshot) });
+    const submitted = runtime.submit(makeRequest('Translated/Map001.txt', [
+      replaceLine('op-001', 'Translated/Map001.txt', 1, 'Hello', '안녕'),
+    ]), 'renderer');
+    vi.spyOn(runtime.approvals, 'writeToolAudit').mockImplementation(() => { throw new Error('audit disk full'); });
+
+    const result = await runtime.approve({ schemaVersion: 1, approvalId: submitted.approvalId });
+    expect(result).toMatchObject({ status: 'applied', result: { applied: true }, auditWarning: { code: 'audit-write-failed' } });
+    expect(fs.readFileSync(path.join(projectRoot, 'Translated', 'Map001.txt'), 'utf-8')).toBe('안녕');
+    expect(snapshots.at(-1)?.approvals[0]).toEqual(result);
+    expect(runtime.getBridge({ schemaVersion: 1, approvalId: submitted.approvalId })).toMatchObject({ status: 'applied', auditWarning: result.auditWarning });
+    await expect(runtime.approve({ schemaVersion: 1, approvalId: submitted.approvalId })).rejects.toMatchObject({ code: 'invalid-state' });
+  });
+
+  it('preserves the execution failure and notification when failure auditing also fails', async () => {
+    const projectRoot = makeProject('failed-audit-failure', ['Hello']);
+    const snapshots: MutationApprovalQueueSnapshot[] = [];
+    const runtime = new MutationApprovalRuntime({
+      projectRoot, onChanged: (snapshot) => snapshots.push(snapshot),
+      executor: () => { throw new Error('write rejected'); },
+    });
+    const submitted = runtime.submit(makeRequest('Translated/Map001.txt', [
+      replaceLine('op-001', 'Translated/Map001.txt', 1, 'Hello', '안녕'),
+    ]), 'renderer');
+    vi.spyOn(runtime.approvals, 'writeToolAudit').mockImplementation(() => { throw new Error('audit disk full'); });
+    const result = await runtime.approve({ schemaVersion: 1, approvalId: submitted.approvalId });
+    expect(result).toMatchObject({ status: 'failed', failure: { code: 'write-failed' }, auditWarning: { code: 'audit-write-failed' } });
+    expect(snapshots.at(-1)?.approvals[0]).toEqual(result);
+    expect(fs.readFileSync(path.join(projectRoot, 'Translated', 'Map001.txt'), 'utf-8')).toBe('Hello');
+  });
+
+  it('revokes pending confirmations and publishes cancellation when the audit directory becomes unwritable', () => {
+    const projectRoot = makeProject('cancel-audit-failure', ['Hello']);
+    const snapshots: MutationApprovalQueueSnapshot[] = [];
+    const runtime = new MutationApprovalRuntime({ projectRoot, onChanged: (snapshot) => snapshots.push(snapshot) });
+    const submitted = runtime.submit(makeRequest('Translated/Map001.txt', [
+      replaceLine('op-001', 'Translated/Map001.txt', 1, 'Hello', '안녕'),
+    ]), 'renderer');
+    const token = runtime.approvals.getApproval(submitted.approvalId)?.confirmToken;
+    const auditDirectory = path.join(projectRoot, '.llm-tsukuru-agent', 'audit');
+    fs.unlinkSync(path.join(auditDirectory, 'approvals.jsonl'));
+    fs.rmdirSync(auditDirectory);
+    fs.writeFileSync(auditDirectory, 'blocked');
+
+    expect(() => runtime.dispose('project-change')).not.toThrow();
+    expect(snapshots.at(-1)?.approvals[0]).toMatchObject({ status: 'cancelled', auditWarning: { code: 'audit-write-failed' } });
+    expect(() => runtime.approvals.consumeConfirmation({ toolName: 'patch.apply', args: {}, confirmToken: token })).toThrow(/invalid or already used/);
+    expect(fs.readFileSync(path.join(projectRoot, 'Translated', 'Map001.txt'), 'utf-8')).toBe('Hello');
+  });
   it('submits, lists, gets, and denies one request without exposing or writing patch data', () => {
     const projectRoot = makeProject('lifecycle', ['--- 101 ---', 'Hello \\V[1]']);
     const targetPath = path.join(projectRoot, 'Translated', 'Map001.txt');

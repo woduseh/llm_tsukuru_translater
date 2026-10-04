@@ -1,6 +1,5 @@
 import * as fs from 'fs';
-import * as path from 'path';
-import { atomicWriteJsonFile } from '../ts/libs/atomicFile';
+import { AgentWorkspaceStorage } from './agentWorkspaceStorage';
 import type { JsonObject } from '../types/agentWorkspace';
 import { redactSecretLikeValues } from './contractsValidation';
 import type { AgentProvenance } from './glossaryService';
@@ -57,11 +56,11 @@ interface MemoryStore {
 }
 
 export class MemoryService {
-  private readonly storePath: string;
+  private readonly storage: AgentWorkspaceStorage;
   private readonly idFactory: (summary: string) => string;
 
-  constructor(options: { workspaceRoot: string; idFactory?: (summary: string) => string }) {
-    this.storePath = path.join(path.resolve(options.workspaceRoot), 'memory', 'entries.json');
+  constructor(options: { projectRoot: string; workspaceRoot: string; idFactory?: (summary: string) => string }) {
+    this.storage = new AgentWorkspaceStorage(options.projectRoot, options.workspaceRoot);
     this.idFactory = options.idFactory ?? ((summary) => `mem-${slug(summary)}-${Date.now()}`);
   }
 
@@ -162,13 +161,13 @@ export class MemoryService {
   }
 
   private readStore(): MemoryStore {
-    if (!fs.existsSync(this.storePath)) return { schemaVersion: 1, entries: [] };
-    return JSON.parse(fs.readFileSync(this.storePath, 'utf-8')) as MemoryStore;
+    const storePath = this.storage.resolve('memory/entries.json');
+    if (!fs.existsSync(storePath)) return { schemaVersion: 1, entries: [] };
+    return JSON.parse(fs.readFileSync(storePath, 'utf-8')) as MemoryStore;
   }
 
   private writeStore(store: MemoryStore): void {
-    fs.mkdirSync(path.dirname(this.storePath), { recursive: true });
-    atomicWriteJsonFile(this.storePath, store, 2);
+    this.storage.writeJson('memory/entries.json', store);
   }
 }
 

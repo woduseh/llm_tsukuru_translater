@@ -5,7 +5,7 @@ import path from 'path';
 import { spawn } from 'child_process';
 import log from '../logger';
 import type { AppContext } from '../appContext';
-import { atomicWriteJsonFile } from '../ts/libs/atomicFile';
+import { AgentWorkspaceStorage } from './agentWorkspaceStorage';
 import {
   TerminalCapability,
   TerminalEvent,
@@ -448,7 +448,6 @@ export class TerminalService {
     if (!session.persistOutput) return;
     const root = session.ownerRoot;
     if (!root) return;
-    const transcriptPath = path.join(root, '.llm-tsukuru-agent', 'terminal-sessions', `${session.sessionId}.json`);
     const payload = {
       schemaVersion: 1,
       session: this.toSummary(session),
@@ -465,8 +464,7 @@ export class TerminalService {
       },
     };
     try {
-      fs.mkdirSync(path.dirname(transcriptPath), { recursive: true });
-      atomicWriteJsonFile(transcriptPath, payload, 2);
+      new AgentWorkspaceStorage(root).writeJson(`terminal-sessions/${session.sessionId}.json`, payload);
     } catch (error) {
       log.warn('Failed to persist terminal transcript.', error);
     }

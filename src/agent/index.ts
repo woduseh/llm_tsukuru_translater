@@ -5,7 +5,6 @@ export * from './agentBridgeToken';
 export * from './agentService';
 export * from './mutationApprovalContracts';
 export * from './mutationApprovalRuntime';
-export * from './mutationPatchExecutor';
 export * from './ptyAdapter';
 export * from './agentFileErrors';
 export * from './terminalService';

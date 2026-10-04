@@ -59,7 +59,10 @@ const tabs = computed(() => [
 function isActive(path: string) { return path === '/llm-compare' ? isReview.value : route.path === path }
 function navigate(path: string) {
   if (path === route.path) return
-  if (path === '/llm-settings') api.send('openLLMSettings', { dir: activeProject.path, game: activeProject.engine })
+  if (path === '/llm-settings') {
+    if (!activeProject.engine) return
+    api.send('openLLMSettings', { dir: activeProject.path, game: activeProject.engine })
+  }
   else if (path === '/llm-compare') api.send('openLLMCompare', activeProject.path)
   else if (path === '/json-verify') api.send('openJsonVerify', activeProject.path)
   else if (path === '/settings') api.send('settings')

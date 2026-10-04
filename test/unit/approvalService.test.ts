@@ -16,6 +16,7 @@ function setup() {
   let now = new Date('2025-01-01T00:00:00Z');
   const service = new ApprovalService({
     auditRoot: root,
+    projectRoot: root,
     now: () => now,
     sessionId: 'session-a',
   });

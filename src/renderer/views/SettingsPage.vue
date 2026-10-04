@@ -253,8 +253,7 @@ function closeSettings() {
 }
 
 onMounted(() => {
-  useIpcOn('settings', (arg: unknown) => {
-    const s = arg as Record<string, any>
+  useIpcOn('settings', (s) => {
     const incoming = { ...baseline }
     for (const key of Object.keys(settings)) if (s[key] !== undefined) incoming[key] = s[key]
     incoming.extractSomeScript2Text = (s.extractSomeScript2 || []).join('\n')

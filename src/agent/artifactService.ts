@@ -1,5 +1,5 @@
 import * as path from 'path';
-import * as fs from 'fs';
+import { AgentWorkspaceStorage } from './agentWorkspaceStorage';
 import type { JsonValue } from '../types/agentWorkspace';
 import { writeArtifactRecord, type ArtifactStorage } from './artifactPaging';
 import { redactSecretLikeValues } from './contractsValidation';
@@ -18,14 +18,17 @@ export interface AgentArtifactRecord {
 
 export interface ArtifactServiceOptions {
   workspaceRoot: string;
+  projectRoot: string;
 }
 
 export class ArtifactService {
   readonly workspaceRoot: string;
   readonly artifactsRoot: string;
+  private readonly storage: AgentWorkspaceStorage;
 
   constructor(options: ArtifactServiceOptions) {
     this.workspaceRoot = options.workspaceRoot;
+    this.storage = new AgentWorkspaceStorage(options.projectRoot, options.workspaceRoot);
     this.artifactsRoot = path.join(this.workspaceRoot, 'artifacts');
   }
 
@@ -44,8 +47,9 @@ export class ArtifactService {
       redactions: redacted.redactions,
       payload: redacted.value,
     };
-    fs.mkdirSync(this.artifactsRoot, { recursive: true });
-    writeArtifactRecord(record);
+    this.storage.ensureDirectory('artifacts');
+    this.storage.resolve(artifactPath);
+    writeArtifactRecord(record, this.storage);
     return record;
   }
 }

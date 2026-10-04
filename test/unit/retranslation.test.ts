@@ -190,6 +190,26 @@ describe('full-file retranslation failure propagation', () => {
   });
 });
 
+describe.each(['file', 'blocks'] as const)('%s retranslation project binding', (kind) => {
+  it('does not save a late provider response after the selected project changes', async () => {
+    const project = makeProject();
+    let current = true;
+    let resolveResponse!: (value: unknown) => void;
+    vi.spyOn(axios, 'post').mockReturnValue(new Promise(resolve => { resolveResponse = resolve; }) as ReturnType<typeof axios.post>);
+    const pending = kind === 'file'
+      ? retranslateFile(project.edir, project.fileName, 'ja', 'ko', createContext(), undefined, project.currentContent, () => current)
+      : retranslateBlocks(project.edir, project.fileName, [0, 1], 'ja', 'ko', createContext(), undefined, project.currentContent, () => current);
+    await vi.waitFor(() => expect(axios.post).toHaveBeenCalledOnce());
+    current = false;
+    resolveResponse({ data: { candidates: [{ content: { parts: [{ text: '--- 101-0 ---\n\\C[1]새 번역\n\n--- 101-1 ---\n새 세계' }] } }] } });
+
+    const result = await pending;
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('프로젝트가 변경') });
+    expect(fs.readFileSync(project.filePath, 'utf8')).toBe(project.currentContent);
+    expect(fs.existsSync(path.join(project.edir, '.llm_progress.json'))).toBe(false);
+  });
+});
+
 function createContext(): AppContext {
   return {
     llmAbort: false,

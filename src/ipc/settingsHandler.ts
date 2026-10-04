@@ -1,9 +1,8 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
-import Themes from '../ts/rpgmv/styles'
 import { sanitizeSettingsForRenderer } from '../ts/libs/llmProviderConfig';
-import { applyValidatedSettingsUpdate } from '../ts/libs/settingsRuntimeValidation';
-import { sendError, worked, storage } from './shared';
+import { sendError, worked } from './shared';
+import { commitSettings } from './settingsCommit';
 import { loadRoute } from './viteHelper';
 import { AppContext } from '../appContext';
 import { PROJECT_ROOT } from '../projectRoot';
@@ -56,15 +55,13 @@ export function registerSettingsHandlers(ctx: AppContext) {
   ipcMain.on('applysettings', (ev, arg) => {
     if (ctx.settingsWindow && ev.sender !== ctx.settingsWindow.webContents) return;
     try {
-      ctx.settings = applyValidatedSettingsUpdate(ctx.settings, arg)
+      commitSettings(ctx, arg)
     } catch (error) {
       ev.sender.send('settingsSaveFailed');
       sendError(ctx, (error as Error).message)
       if (ev.sender !== ctx.mainWindow?.webContents) worked(ctx)
       return
     }
-    storage.set('settings', JSON.stringify(ctx.settings))
-    ctx.settings.themeData = (Themes as Record<string, Record<string, string>>)[ctx.settings.theme] ?? {}
     ev.sender.send('settingsSaved', ctx.settings);
     ctx.mainWindow!.webContents.send('getGlobalSettings', sanitizeSettingsForRenderer(ctx.settings));
     closeSettings()

@@ -237,8 +237,7 @@ onUnmounted(() => {
 })
 
 onMounted(() => {
-  useIpcOn('llmSettings', (arg: unknown) => {
-    const s = arg as Record<string, any>
+  useIpcOn('llmSettings', (s) => {
     const incoming = { ...executionBaseline,
       sortOrder: s.llmSortOrder || 'name-asc',
       parallelWorkers: s.llmParallelWorkers === undefined ? 1 : s.llmParallelWorkers,
@@ -285,7 +284,7 @@ async function scanProfile() {
   scanBusy.value = true
   feedbackMessage.value = '프로젝트 프로필을 스캔하는 중입니다...'
   try {
-    profile.value = await api.invoke('scanGuidelineProfile') as ProjectTranslationProfile
+    profile.value = await api.invoke('scanGuidelineProfile')
     feedbackMessage.value = '프로필 스캔이 완료되었습니다. 지침 생성을 눌러 초안을 만들 수 있습니다.'
   } catch (error) {
     feedbackMessage.value = getErrorMessage(error)
@@ -305,10 +304,7 @@ async function generateGuideline() {
   generateBusy.value = true
   feedbackMessage.value = '현재 LLM 제공자로 번역 지침을 생성하는 중입니다...'
   try {
-    const result = await api.invoke('generateGuidelineDraft', { profile: profile.value }) as {
-      guideline?: string
-      promptChars?: number
-    }
+    const result = await api.invoke('generateGuidelineDraft', { profile: profile.value })
     guidelineDraft.value = result.guideline || ''
     feedbackMessage.value = `지침 초안이 생성되었습니다. 전송 프롬프트 약 ${result.promptChars || 0}자.`
   } catch (error) {
@@ -332,7 +328,7 @@ async function applyGuideline() {
     const result = await api.invoke('applyGuidelineDraft', {
       guideline: guidelineDraft.value,
       mode: guidelineMergeMode.value,
-    }) as { llmCustomPrompt?: string }
+    })
     currentCustomPrompt.value = result.llmCustomPrompt || currentCustomPrompt.value
     appliedDraft = guidelineDraft.value
     workspaceDrafts.translationDirty = JSON.stringify(executionSnapshot()) !== JSON.stringify(executionBaseline)
@@ -373,8 +369,8 @@ function start() {
   api.send('llmSettingsApply', {
     llmResetProgress: resetProgress.value,
     llmSortOrder: sortOrder.value,
-    llmParallelWorkers: parallelWorkers.value,
-    llmRequestsPerMinute: requestsPerMinute.value,
+    llmParallelWorkers: Number(parallelWorkers.value),
+    llmRequestsPerMinute: Number(requestsPerMinute.value),
     llmTranslationMode: translationMode.value,
   })
 }

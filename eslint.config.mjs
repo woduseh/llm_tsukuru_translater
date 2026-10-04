@@ -48,4 +48,16 @@ export default [
       'no-console': 'off',
     },
   },
+  {
+    files: ['src/**/*.{ts,vue}', 'main.ts'],
+    ignores: ['src/agent/mutationApprovalRuntime.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['**/mutationPatchExecutor', '**/mutationPatchExecutor.*'],
+          message: 'Execute patches through MutationApprovalRuntime so approval and token consumption cannot be bypassed.',
+        }],
+      }],
+    },
+  },
 ];

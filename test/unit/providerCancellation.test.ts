@@ -37,8 +37,8 @@ describe.each(Object.entries(factories))('%s request cancellation', (_name, fact
     await started;
     scheduler.cancel();
     const result = await job;
-    expect(result.aborted).toBe(true);
-    expect(result.translatedContent).toBe(source);
+    expect(result.status).toBe('aborted');
+    expect(result).not.toHaveProperty('translatedContent');
     expect(result.logEntry.retries).toBe(0);
     expect(post).toHaveBeenCalledTimes(1);
   });
@@ -72,7 +72,7 @@ it('cancels a real local HTTP connection without waiting for a provider timeout'
     const result = translator.translateFileContent('--- 101 ---\nHello', undefined, { scheduler });
     await request;
     scheduler.cancel();
-    expect((await result).aborted).toBe(true);
+    expect((await result).status).toBe('aborted');
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));

@@ -132,7 +132,7 @@ import { api, useIpcOn } from '../composables/useIpc'
 import { reviewWorkspace, resetReviewWorkspace, findReviewFileIndex, normalizeReviewDirectory } from '../composables/useReviewWorkspace'
 import { splitBlocks, checkMismatch, autoFixBlock, isBlockUntranslated, removeDuplicateHeaders, blocksToLines, checkMismatchBlocks, hasAnyUntranslatedBlock } from '../compareUtils'
 import type { Block } from '../compareUtils'
-import type { ReviewedTextWriteResult } from '../../ts/rpgmv/reviewTextWrite'
+import type { RetranslateIpcResult as RetranslateResult, RetranslateIpcProgress as RetranslateProgress } from '../../types/ipc'
 import { haveSameTranslationLineStructure, isTranslationTextFileName } from '../../ts/libs/translationSyntax'
 
 defineProps<{ embedded?: boolean }>()
@@ -180,19 +180,6 @@ interface RetranslateRequest {
   fileName: string
   transPath: string
   expectedContent: string
-}
-
-interface RetranslateResult {
-  success: boolean
-  error?: string
-  requestId?: string
-  fileName?: string
-}
-
-interface RetranslateProgress {
-  requestId?: string
-  fileName?: string
-  message: string
 }
 
 let activeRetranslate: RetranslateRequest | null = null
@@ -569,7 +556,7 @@ async function autoFixAllMapFiles() {
         const result = await api.invoke('compareSaveText', {
           projectDir, fileName: f.name, targetPath: f.transPath, expectedContent,
           nextContent: blocksToLines(tb).join('\n'),
-        }) as ReviewedTextWriteResult
+        })
         if (!current()) return
         if (!result.success) throw new Error(result.error || '저장에 실패했습니다.')
         f.mismatch = checkMismatchBlocks(ob, tb)
@@ -609,7 +596,7 @@ async function saveFile() {
     if (!current()) return
     const result = await api.invoke('compareSaveText', {
       projectDir, fileName: f.name, targetPath: f.transPath, expectedContent, nextContent,
-    }) as ReviewedTextWriteResult
+    })
     if (!current()) return
     if (!result.success) throw new Error(result.error || '저장에 실패했습니다.')
     editPreimage = nextContent

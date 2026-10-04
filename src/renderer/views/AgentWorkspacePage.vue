@@ -228,6 +228,7 @@ import { useMutationApprovals } from '../composables/useMutationApprovals'
 import type { AgentExecutableDetectionResult } from '../../agent/agentExecutableDetection'
 import type { AgentWorkspaceStatus } from '../../agent/agentWorkspaceStatus'
 import type { TerminalSessionKind } from '../../types/agentWorkspace'
+import type { McpConnectionResult } from '../../types/ipc'
 
 const workspaceTemplate = createAgentWorkspaceViewModel()
 const route = useRoute()
@@ -273,13 +274,6 @@ const focusApprovalId = computed(() => {
   return typeof value === 'string' ? value : ''
 })
 
-interface McpConnectionResult {
-  ok: boolean
-  reason?: string
-  serverPath?: string
-  projectRoot?: string
-  commands?: { codex: string; claude: string }
-}
 const mcpConnection = ref<McpConnectionResult | null>(null)
 const mcpConnectBusy = ref(false)
 
@@ -380,7 +374,7 @@ async function refreshAll() {
 
 async function refreshStatus() {
   try {
-    const status = (await api.invoke('getAgentWorkspaceStatus')) as AgentWorkspaceStatus | undefined
+    const status = await api.invoke('getAgentWorkspaceStatus')
     if (!status) return
     liveStatus.value = status
   } catch {
@@ -394,7 +388,7 @@ async function detectExecutables() {
       id: preset.id,
       executableNames: preset.executable.executableNames,
     }))
-    const result = (await api.invoke('detectAgentExecutables', payload)) as AgentExecutableDetectionResult | undefined
+    const result = await api.invoke('detectAgentExecutables', payload)
     if (!result || !Array.isArray(result.results)) return
     executableDetections.value = result
   } catch {
@@ -409,7 +403,7 @@ function openSettings() {
 async function prepareMcpConnection() {
   mcpConnectBusy.value = true
   try {
-    mcpConnection.value = (await api.invoke('prepareAgentMcpConnection')) as McpConnectionResult
+    mcpConnection.value = await api.invoke('prepareAgentMcpConnection')
   } catch {
     mcpConnection.value = { ok: false, reason: '연결 명령을 생성하지 못했습니다.' }
   } finally {

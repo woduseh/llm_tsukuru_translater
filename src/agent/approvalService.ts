@@ -1,6 +1,5 @@
 import * as crypto from 'crypto';
-import * as fs from 'fs';
-import * as path from 'path';
+import { AgentWorkspaceStorage } from './agentWorkspaceStorage';
 import type { ApprovalRequest, JsonObject, PermissionTier } from '../types/agentWorkspace';
 import { redactSecretLikeValues } from './contractsValidation';
 
@@ -10,6 +9,7 @@ export interface ApprovalServiceOptions {
   now?: () => Date;
   sessionId?: string;
   auditRoot: string;
+  projectRoot: string;
   auditMode?: 'full-redacted' | 'metadata-only';
 }
 
@@ -41,14 +41,14 @@ export class ApprovalService {
   private readonly tokenFactory: () => string;
   private readonly now: () => Date;
   private readonly sessionId: string;
-  private readonly auditPath: string;
+  private readonly storage: AgentWorkspaceStorage;
 
   constructor(private readonly options: ApprovalServiceOptions) {
     this.idFactory = options.idFactory ?? (() => `approval-${Date.now()}-${Math.random().toString(16).slice(2)}`);
     this.tokenFactory = options.tokenFactory ?? (() => `confirm-${crypto.randomBytes(18).toString('base64url')}`);
     this.now = options.now ?? (() => new Date());
     this.sessionId = options.sessionId ?? 'local-session';
-    this.auditPath = path.join(options.auditRoot, 'audit', 'approvals.jsonl');
+    this.storage = new AgentWorkspaceStorage(options.projectRoot, options.auditRoot);
   }
 
   planApproval(input: ApprovalPlanInput): ApprovalRequest {
@@ -195,8 +195,7 @@ export class ApprovalService {
   }
 
   private appendAudit(entry: JsonObject): void {
-    fs.mkdirSync(path.dirname(this.auditPath), { recursive: true });
-    fs.appendFileSync(this.auditPath, `${JSON.stringify(entry)}\n`, 'utf-8');
+    this.storage.appendText('audit/approvals.jsonl', `${JSON.stringify(entry)}\n`);
   }
 }
 

@@ -307,7 +307,7 @@ function convertProject() {
 onMounted(() => {
   api.send('setheight', 700)
 
-  useIpcOn('set_path', (tt: Record<string, string>) => {
+  useIpcOn('set_path', (tt) => {
     if (tt && tt.type) {
       if (tt.type === 'folder_input') {
         folderPath.value = tt.dir

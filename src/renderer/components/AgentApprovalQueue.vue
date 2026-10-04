@@ -34,6 +34,7 @@
               <span class="status-badge">{{ statusLabel(approval.status) }}</span>
               <strong>{{ approval.preview.targetPath }}</strong>
               <span>{{ approval.preview.operations.length }}개 줄 변경</span>
+              <span v-if="approval.auditWarning" class="audit-warning-label">감사 기록 경고</span>
             </div>
             <span class="request-source">{{ sourceLabel(approval.requestSource) }}</span>
           </summary>
@@ -65,7 +66,7 @@
               <div><dt>요청 경로</dt><dd>{{ approval.affectedPaths.join(', ') }}</dd></div>
               <div><dt>생성</dt><dd>{{ formatDate(approval.createdAt) }}</dd></div>
               <div><dt>만료</dt><dd>{{ formatDate(approval.expiresAt) }}</dd></div>
-              <div><dt>감사 상태</dt><dd>세션 메타데이터 기록</dd></div>
+              <div><dt>감사 상태</dt><dd>{{ approval.auditWarning ? '기록 실패' : '세션 메타데이터 기록' }}</dd></div>
             </dl>
 
             <div class="invariant-list" aria-label="보존 규칙">
@@ -113,6 +114,11 @@
             <div v-else-if="approval.denialNote" class="request-result denied" role="status">
               <strong>거절 메모</strong>
               <p>{{ approval.denialNote }}</p>
+            </div>
+
+            <div v-if="approval.auditWarning" class="request-result audit-warning" role="status">
+              <strong>감사 기록 경고</strong>
+              <p>{{ approval.auditWarning.message }}</p>
             </div>
 
             <div v-if="approval.status === 'pending'" class="approval-actions">
@@ -314,6 +320,8 @@ summary::marker { color: #ffc36a; }
 .request-result.failure { background: rgba(255, 156, 156, 0.1); color: #ffb3b3; }
 .request-result.success { background: rgba(95, 208, 138, 0.1); color: #9aebba; }
 .request-result.denied { background: rgba(255,255,255,0.06); }
+.request-result.audit-warning { background: rgba(255, 190, 92, 0.1); color: #ffce8a; }
+.audit-warning-label { color: #ffce8a; }
 .approval-actions { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
 .approval-actions label { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 9px; opacity: 0.8; }
 .approval-actions textarea { resize: vertical; min-height: 48px; max-height: 120px; padding: 7px; background: #0f1018; color: var(--mainColor); border: var(--border); border-radius: var(--radius-sm); font: 10px inherit; }

@@ -11,20 +11,48 @@ import { AppContext } from '../appContext';
 import { PROJECT_ROOT } from '../projectRoot';
 import { AtomicFilePreimageMismatchError, AtomicFileWriteError } from '../ts/libs/atomicFile';
 import { applyVerifiedJsonWrite } from '../ts/rpgmv/verifyWrite';
+import { resolveGrantedReviewProject } from './reviewProjectAccess';
+import type { LlmRepairRequest, VerifyApplyJsonRequest } from '../types/ipc';
 
 let llmCompareWindow: Electron.BrowserWindow | null = null;
+interface CompareBinding {
+  readonly window: Electron.BrowserWindow;
+  readonly projectDir: string;
+  readonly isCurrent: () => boolean;
+}
+let compareBinding: CompareBinding | null = null;
 
-export function getLLMCompareWindow(): Electron.BrowserWindow | null {
-  return llmCompareWindow;
+export function getLLMCompareBinding(): CompareBinding | null {
+  return compareBinding;
 }
 
 export function registerToolsHandlers(ctx: AppContext) {
   llmCompareWindow = null;
+  compareBinding = null;
   let jsonVerifyWindow: Electron.BrowserWindow | null = null;
   let pendingCompareDir: string | null = null;
   let activeCompareDir: string | null = null;
   let pendingVerifyDir: string | null = null;
   let activeVerifyDir: string | null = null;
+  let verifySelectionRevision = ctx.projectSelectionRevision;
+
+  const bindCompare = (win: Electron.BrowserWindow, projectDir: string) => {
+    if (compareBinding?.window === win && compareBinding.projectDir === projectDir && compareBinding.isCurrent()) return;
+    const selectionRevision = ctx.projectSelectionRevision;
+    const binding: CompareBinding = {
+      window: win, projectDir,
+      isCurrent: () => compareBinding === binding && !win.isDestroyed()
+        && ctx.projectSelectionRevision === selectionRevision,
+    };
+    compareBinding = binding;
+  };
+  const grantedDirectory = (sender: Electron.WebContents, dir: unknown): string | undefined => {
+    try { return resolveGrantedReviewProject(ctx, dir); }
+    catch (error) {
+      sender.send('alert', { icon: 'error', message: error instanceof Error ? error.message : '검수 프로젝트를 열지 못했습니다.' });
+      return;
+    }
+  };
 
   const isMainRoute = (route: string) => ctx.mainWindow?.webContents.getURL().split('#')[1]?.split('?')[0] === route;
   const initializeCompare = (fresh = false) => {
@@ -45,18 +73,23 @@ export function registerToolsHandlers(ctx: AppContext) {
   };
 
   ipcMain.on('openLLMCompare', (ev, dir: string) => {
+    const granted = grantedDirectory(ev.sender, dir);
+    if (!granted) return;
+    dir = granted;
     if (ctx.mainWindow && ev.sender === ctx.mainWindow.webContents) {
-      if (llmCompareWindow !== ctx.mainWindow || activeCompareDir !== path.resolve(dir)) {
+      if (llmCompareWindow !== ctx.mainWindow || activeCompareDir !== dir || !compareBinding?.isCurrent()) {
         pendingCompareDir = dir;
         activeCompareDir = path.resolve(dir);
       }
       llmCompareWindow = ctx.mainWindow;
+      bindCompare(llmCompareWindow, dir);
       if (isMainRoute('/llm-compare')) initializeCompare();
       ctx.mainWindow.webContents.send('workspaceNavigate', { route: '/llm-compare' });
       return;
     }
     activeCompareDir = path.resolve(dir);
     if (llmCompareWindow && !llmCompareWindow.isDestroyed()) {
+      bindCompare(llmCompareWindow, dir);
       llmCompareWindow.webContents.send('replace-allowed-paths', [dir]);
       llmCompareWindow.webContents.send('initCompare', dir);
       llmCompareWindow.focus();
@@ -78,12 +111,14 @@ export function registerToolsHandlers(ctx: AppContext) {
       icon: path.join(PROJECT_ROOT, 'res', 'icon.png'),
     });
     llmCompareWindow.setMenu(null);
+    bindCompare(llmCompareWindow, dir);
     loadRoute(llmCompareWindow, '/llm-compare');
     llmCompareWindow.webContents.on('did-finish-load', () => {
       llmCompareWindow!.show();
     });
     llmCompareWindow.on('closed', () => {
       llmCompareWindow = null;
+      compareBinding = null;
     });
   })
 
@@ -97,13 +132,18 @@ export function registerToolsHandlers(ctx: AppContext) {
   })
 
   ipcMain.on('compareReady', (ev, options?: { fresh?: boolean }) => {
-    if (ev.sender !== llmCompareWindow?.webContents) return;
+    if (ev.sender !== llmCompareWindow?.webContents || !compareBinding?.isCurrent()) return;
     initializeCompare(options?.fresh === true);
   })
 
   ipcMain.on('openJsonVerify', (ev, dir: string) => {
+    const granted = grantedDirectory(ev.sender, dir);
+    if (!granted) return;
+    dir = granted;
+    const selectionChanged = verifySelectionRevision !== ctx.projectSelectionRevision;
+    verifySelectionRevision = ctx.projectSelectionRevision;
     if (ctx.mainWindow && ev.sender === ctx.mainWindow.webContents) {
-      if (jsonVerifyWindow !== ctx.mainWindow || activeVerifyDir !== path.resolve(dir)) {
+      if (jsonVerifyWindow !== ctx.mainWindow || activeVerifyDir !== dir || selectionChanged) {
         pendingVerifyDir = dir;
       }
       activeVerifyDir = path.resolve(dir);
@@ -147,7 +187,7 @@ export function registerToolsHandlers(ctx: AppContext) {
   })
 
   ipcMain.on('verifyReady', (ev, options?: { fresh?: boolean }) => {
-    if (ev.sender !== jsonVerifyWindow?.webContents) return;
+    if (ev.sender !== jsonVerifyWindow?.webContents || verifySelectionRevision !== ctx.projectSelectionRevision) return;
     if (jsonVerifyWindow && !jsonVerifyWindow.isDestroyed()) {
       jsonVerifyWindow.webContents.send('verifySettings', buildVerifyWindowState(ctx.settings));
       initializeVerify(options?.fresh === true);
@@ -155,10 +195,9 @@ export function registerToolsHandlers(ctx: AppContext) {
   })
 
   ipcMain.handle('compareSaveText', async (ev, request: ReviewedTextWriteRequest): Promise<ReviewedTextWriteResult> => {
-    const win = llmCompareWindow;
-    const projectDir = activeCompareDir;
-    const current = () => !!win && !win.isDestroyed() && win === llmCompareWindow
-      && ev.sender === win.webContents && projectDir === activeCompareDir;
+    const binding = compareBinding;
+    const projectDir = binding?.projectDir;
+    const current = () => !!binding && binding.isCurrent() && ev.sender === binding.window.webContents;
     if (!current() || !projectDir || typeof request?.projectDir !== 'string'
       || normalizeDirectoryLockKey(request.projectDir) !== normalizeDirectoryLockKey(projectDir)
       || typeof request.targetPath !== 'string' || typeof request.fileName !== 'string'
@@ -166,6 +205,7 @@ export function registerToolsHandlers(ctx: AppContext) {
       return { success: false, error: '텍스트 검수 저장 요청 또는 활성 프로젝트가 올바르지 않습니다.' };
     }
     try {
+      resolveGrantedReviewProject(ctx, projectDir);
       const target = resolveReviewTextTarget(projectDir, request.targetPath, request.fileName);
       return await runWithDirectoryLock(path.dirname(target), () => {
         if (!current()) return { success: false, error: '프로젝트가 변경되어 저장하지 않았습니다.' };
@@ -187,14 +227,6 @@ export function registerToolsHandlers(ctx: AppContext) {
   })
 
   ipcMain.on('projectConvert', async(ev, arg) => prjc.ConvertProject(arg, ctx))
-
-  interface VerifyApplyJsonRequest {
-    requestId: string;
-    fileName: string;
-    targetPath: string;
-    expectedContent: string;
-    nextContent: string;
-  }
 
   ipcMain.on('verifyApplyJson', (ev, request: VerifyApplyJsonRequest) => {
     const win = jsonVerifyWindow;
@@ -224,12 +256,13 @@ export function registerToolsHandlers(ctx: AppContext) {
       || !targetPath
       || expectedContent === null
       || nextContent === null
-      || !activeVerifyDir) {
+      || !activeVerifyDir || verifySelectionRevision !== ctx.projectSelectionRevision) {
       sendResult(false, 'JSON Verify 저장 요청이 올바르지 않습니다.');
       return;
     }
 
     try {
+      resolveGrantedReviewProject(ctx, activeVerifyDir);
       applyVerifiedJsonWrite(activeVerifyDir, {
         fileName,
         targetPath,
@@ -249,16 +282,6 @@ export function registerToolsHandlers(ctx: AppContext) {
   })
 
   // ── 줄밀림 LLM 재번역 ──
-  interface LlmRepairItem {
-    path: string;
-    origText: string;
-  }
-
-  interface LlmRepairRequest {
-    requestId: string;
-    items: LlmRepairItem[];
-  }
-
   ipcMain.on('verifyLlmRepair', async (ev, request: LlmRepairRequest) => {
     const win = jsonVerifyWindow;
     if (!win || win.isDestroyed() || ev.sender !== win.webContents) return;
@@ -270,7 +293,7 @@ export function registerToolsHandlers(ctx: AppContext) {
       ? request.requestId
       : '';
     const items = Array.isArray(request?.items)
-      ? request.items.filter((item): item is LlmRepairItem => (
+      ? request.items.filter((item): item is LlmRepairRequest['items'][number] => (
         !!item && typeof item.path === 'string' && typeof item.origText === 'string'
       ))
       : [];

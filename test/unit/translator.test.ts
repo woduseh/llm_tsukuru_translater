@@ -436,7 +436,7 @@ describe('createGeminiTranslator', () => {
     expect(requestTexts[1]).toBe('<Source_Text>\n--- 31 ---\nHello \\V[1]\n</Source_Text>');
     expect(result.translatedContent).toBe(source.replaceAll('Hello', '안녕'));
     expect(result.logEntry).toMatchObject({ totalBlocks: 31, translatedBlocks: 31, errorBlocks: 0, retries: 0 });
-    expect(result.incomplete).toBe(false);
+    expect(result.status).toBe('translated');
   });
 });
 

@@ -27,26 +27,27 @@ function fixture(surface = 'Extract') {
   const request = { projectDir: root, fileName: 'Map001.txt', targetPath, expectedContent, nextContent: '--- 101-0 ---\n안녕\n\n' };
   return { root, dir, targetPath, request };
 }
-function setup() {
+function setup(grantedRoots: string[] = []) {
   const ctx = new AppContext();
+  ctx.allowedProjectRoots = grantedRoots;
   const sender = { send: vi.fn(), getURL: () => 'file:///fixture/index.html#/mvmz' };
   ctx.mainWindow = { webContents: sender, isDestroyed: () => false } as unknown as Electron.BrowserWindow;
   registerToolsHandlers(ctx);
   const open = (dir: string) => mocks.on.mock.calls.find(([name]) => name === 'openLLMCompare')![1]({ sender }, dir);
   const save = (request: unknown, caller: unknown = sender) => mocks.handle.mock.calls.find(([name]) => name === 'compareSaveText')![1]({ sender: caller }, request);
-  return { open, save };
+  return { open, save, ctx, sender };
 }
 
 describe('manual review storage boundary', () => {
   it.each(['Extract', path.join('_Extract', 'Texts')])('allows explicit structural repair inside %s', async surface => {
-    const f = fixture(surface); const ipc = setup(); ipc.open(f.root);
+    const f = fixture(surface); const ipc = setup([f.root]); ipc.open(f.root);
     expect(await ipc.save(f.request)).toEqual({ success: true });
     expect(fs.readFileSync(f.targetPath, 'utf8')).toBe(f.request.nextContent);
     expect(fs.readdirSync(f.dir)).toEqual(['Map001.txt']);
   });
 
   it('rejects stale preimages without losing the external edit', async () => {
-    const f = fixture(); const ipc = setup(); ipc.open(f.root);
+    const f = fixture(); const ipc = setup([f.root]); ipc.open(f.root);
     fs.writeFileSync(f.targetPath, 'newer external edit');
     expect(await ipc.save(f.request)).toMatchObject({ success: false, error: expect.stringContaining('외부에서 변경') });
     expect(fs.readFileSync(f.targetPath, 'utf8')).toBe('newer external edit');
@@ -54,7 +55,7 @@ describe('manual review storage boundary', () => {
   });
 
   it('validates the selected project, sender, filename and destination', async () => {
-    const f = fixture(); const other = fixture(); const ipc = setup(); ipc.open(f.root);
+    const f = fixture(); const other = fixture(); const ipc = setup([f.root, other.root]); ipc.open(f.root);
     expect((await ipc.save(f.request, {})).success).toBe(false);
     expect((await ipc.save(other.request)).success).toBe(false);
     expect((await ipc.save({ ...f.request, targetPath: other.targetPath })).success).toBe(false);
@@ -65,12 +66,25 @@ describe('manual review storage boundary', () => {
   });
 
   it('rechecks project ownership after waiting for the translation directory lock', async () => {
-    const f = fixture(); const other = fixture(); const ipc = setup(); ipc.open(f.root);
+    const f = fixture(); const other = fixture(); const ipc = setup([f.root, other.root]); ipc.open(f.root);
     let release!: () => void;
     const active = runWithDirectoryLock(f.dir, () => new Promise<void>(resolve => { release = resolve; }));
     await vi.waitFor(() => expect(release).toBeTypeOf('function'));
     const pending = ipc.save(f.request);
     ipc.open(other.root);
+    release(); await active;
+    expect(await pending).toMatchObject({ success: false, error: expect.stringContaining('프로젝트') });
+    expect(fs.readFileSync(f.targetPath, 'utf8')).toBe(f.request.expectedContent);
+  });
+
+  it('does not save an old request after selecting another project and returning to the same directory', async () => {
+    const f = fixture(); const ipc = setup([f.root]); ipc.open(f.root);
+    let release!: () => void;
+    const active = runWithDirectoryLock(f.dir, () => new Promise<void>(resolve => { release = resolve; }));
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    const pending = ipc.save(f.request);
+    ipc.ctx.projectSelectionRevision += 2;
+    ipc.open(f.root);
     release(); await active;
     expect(await pending).toMatchObject({ success: false, error: expect.stringContaining('프로젝트') });
     expect(fs.readFileSync(f.targetPath, 'utf8')).toBe(f.request.expectedContent);

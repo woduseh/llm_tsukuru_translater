@@ -63,7 +63,7 @@ describe('parallel translation chunks', () => {
     expect(calls.some((text) => text.includes('이미 번역됨'))).toBe(false);
     expect(result.translatedContent).toBe(translated(content));
     expect(result.logEntry).toMatchObject({ translatedBlocks: 2, skippedBlocks: 1, retries: 1 });
-    expect(result.incomplete).toBe(false);
+    expect(result.status).toBe('translated');
   });
 
   it('cancels pending chunks and drains active requests before reporting abortion', async () => {
@@ -85,7 +85,7 @@ describe('parallel translation chunks', () => {
     await vi.advanceTimersByTimeAsync(50);
     expect(settled).toBe(false);
     await vi.runAllTimersAsync();
-    expect((await job).aborted).toBe(true);
+    expect((await job).status).toBe('aborted');
     expect(calls).toHaveLength(2);
     expect(active).toBe(0);
   });
@@ -124,7 +124,7 @@ describe('parallel translation chunks', () => {
     await vi.runAllTimersAsync();
     const result = await job;
     expect(attempts).toEqual([0, 10000]);
-    expect(result.incomplete).toBe(true);
+    expect(result.status).toBe('failed');
     expect(result.logEntry.errorBlocks).toBe(1);
     expect(JSON.stringify(result)).not.toContain(secret);
   });

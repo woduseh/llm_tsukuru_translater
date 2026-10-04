@@ -12,6 +12,7 @@ import {
 import { buildTranslationCacheKey, type Translator } from '../../src/ts/libs/translatorFactory';
 import { LLM_FINGERPRINT_SCHEMA_VERSION } from '../../src/ts/libs/providerRegistry';
 import { contentHash, type BlockValidation } from '../../src/ts/libs/translationCore';
+import { finishFileTranslation } from '../../src/ts/libs/translationResult';
 import * as atomicFile from '../../src/ts/libs/atomicFile';
 import { ProviderTranslationBase, type ProviderTranslationConfig } from '../../src/ts/libs/providerTranslationBase';
 
@@ -302,7 +303,8 @@ describe('parallel translation coordinator', () => {
       createTranslatorForFile: () => ({
         translateText: async (text) => text,
         translateFileContent: async () => ({
-          translatedContent: translated,
+          status: 'failed',
+          error: 'terminal failure',
           validation: validBlockValidation(original, translated),
           logEntry: { ...logEntry(), translatedBlocks: 0, errorBlocks: 1, errors: ['terminal failure'] },
         }),
@@ -434,12 +436,10 @@ describe('parallel translation coordinator', () => {
             aborted = true;
           }
           await delay(fileName === 'One.txt' ? 2 : 5);
-          return {
-            translatedContent: translateContent(content),
+          return finishFileTranslation(content, translateContent(content), {
             validation: validBlockValidation(content, translateContent(content)),
             logEntry: logEntry(),
-            aborted: fileName === 'Two.txt',
-          };
+          }, { aborted: fileName === 'Two.txt' });
         },
       }),
     });
@@ -557,11 +557,10 @@ function fakeTranslator(translate: (content: string) => Promise<string>): Transl
     translateText: translate,
     translateFileContent: async (content) => {
       const translatedContent = await translate(content);
-      return {
-        translatedContent,
+      return finishFileTranslation(content, translatedContent, {
         validation: validBlockValidation(content, translatedContent),
         logEntry: logEntry(),
-      };
+      });
     },
   };
 }

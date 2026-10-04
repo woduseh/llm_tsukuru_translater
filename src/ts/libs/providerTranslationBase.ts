@@ -13,12 +13,11 @@ import {
   validateChunk,
   isPermanentApiError,
   isRetryableApiError,
-  type BlockValidation,
   type TranslationBlock,
-  type TranslationLogEntry,
 } from './translationCore';
 import { getProviderErrorStatus, getRetryAfterMs } from './providerRetry';
 import { TranslationAbortedError, TranslationRequestScheduler } from './translationRequestScheduler';
+import { finishFileTranslation, type TranslationOutcome } from './translationResult';
 
 export interface ProviderTranslationConfig {
   chunkSize: number;
@@ -134,13 +133,7 @@ export abstract class ProviderTranslationBase {
     content: string,
     onProgress?: (current: number, total: number, detail: string) => void,
     execution?: TranslationExecution,
-  ): Promise<{
-    translatedContent: string;
-    validation: BlockValidation[];
-    logEntry: Partial<TranslationLogEntry>;
-    aborted?: boolean;
-    incomplete?: boolean;
-  }> {
+  ): Promise<TranslationOutcome> {
     const startTime = Date.now();
     const allBlocks = splitIntoBlocks(content);
     const isFileMode = this.baseConfig.translationUnit === 'file';
@@ -274,12 +267,9 @@ export abstract class ProviderTranslationBase {
     if (failure) throw failure.error;
 
     logData.durationMs = Date.now() - startTime;
-    return {
-      translatedContent: isAborted() ? content : reassembleBlocks(results.flatMap((result) => result.validation.validatedBlocks)),
+    return finishFileTranslation(content, reassembleBlocks(results.flatMap((result) => result.validation.validatedBlocks)), {
       validation: results.flatMap((result) => result.validation.blockValidations),
       logEntry: logData,
-      aborted: isAborted(),
-      incomplete,
-    };
+    }, { aborted: isAborted(), incomplete });
   }
 }

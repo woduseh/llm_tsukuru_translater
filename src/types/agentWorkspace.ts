@@ -104,12 +104,22 @@ export interface MutationApprovalFailureView {
   retryable: boolean;
 }
 
-interface MutationApprovalViewBase {
+export interface MutationApprovalAuditWarning {
+  code: 'audit-write-failed';
+  message: string;
+}
+
+export type MutationApprovalState =
+  | { status: 'pending' | 'applying' | 'denied' | 'expired'; result?: never; failure?: never }
+  | { status: 'applied'; result: MutationApprovalResultView; failure?: never }
+  | { status: 'stale' | 'failed'; result?: never; failure: MutationApprovalFailureView }
+  | { status: 'cancelled'; result?: never; failure?: MutationApprovalFailureView };
+
+interface MutationApprovalViewFields {
   schemaVersion: 1;
   approvalId: string;
   requestId: string;
   toolName: 'patch.apply';
-  status: MutationApprovalStatus;
   requestSource: 'mcp' | 'renderer';
   projectLabel: string;
   affectedPaths: string[];
@@ -117,13 +127,14 @@ interface MutationApprovalViewBase {
   invariants: MutationApprovalInvariantSummary;
   createdAt: string;
   expiresAt: string;
-  result?: MutationApprovalResultView;
-  failure?: MutationApprovalFailureView;
+  auditWarning?: MutationApprovalAuditWarning;
 }
 
-export interface MutationApprovalRendererView extends MutationApprovalViewBase {
+type MutationApprovalViewBase = MutationApprovalViewFields & MutationApprovalState;
+
+export type MutationApprovalRendererView = MutationApprovalViewBase & {
   denialNote?: string;
-}
+};
 
 export type MutationApprovalBridgeView = MutationApprovalViewBase;
 

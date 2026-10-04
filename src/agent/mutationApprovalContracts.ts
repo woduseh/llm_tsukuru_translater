@@ -19,6 +19,8 @@ import type {
   MutationApprovalRendererView,
   MutationApprovalResultView,
   MutationApprovalStatus,
+  MutationApprovalState,
+  MutationApprovalAuditWarning,
   PatchApplyProposalRequest,
   TranslationPatch,
   TranslationPatchOperation,
@@ -80,13 +82,12 @@ export interface ValidatedPatchApplyProposal {
   invariants: MutationApprovalInvariantSummary;
 }
 
-export interface MutationApprovalRecord {
+interface MutationApprovalRecordFields {
   schemaVersion: 1;
   approvalId: string;
   requestId: string;
   idempotencyKey: string;
   toolName: 'patch.apply';
-  status: MutationApprovalStatus;
   requestSource: 'mcp' | 'renderer';
   projectRoot: string;
   projectBindingId: string;
@@ -105,9 +106,11 @@ export interface MutationApprovalRecord {
   createdAt: string;
   expiresAt: string;
   denialNote?: string;
-  result?: MutationApprovalResultView;
-  failure?: MutationApprovalFailureView;
+  auditWarning?: MutationApprovalAuditWarning;
 }
+
+export type MutationApprovalRecord = MutationApprovalRecordFields & MutationApprovalState;
+export type ApplyingMutationApprovalRecord = MutationApprovalRecordFields & { status: 'applying'; result?: never; failure?: never };
 
 export interface MutationApprovalBinding {
   appSessionId: string;
@@ -363,6 +366,14 @@ export function validateMutationApprovalBinding(
 
 export function transitionMutationApproval(
   record: MutationApprovalRecord,
+  transition: { type: 'claim' },
+): ApplyingMutationApprovalRecord;
+export function transitionMutationApproval(
+  record: MutationApprovalRecord,
+  transition: MutationApprovalTransition,
+): MutationApprovalRecord;
+export function transitionMutationApproval(
+  record: MutationApprovalRecord,
   transition: MutationApprovalTransition,
 ): MutationApprovalRecord {
   if (TERMINAL_MUTATION_APPROVAL_STATUSES.has(record.status)) {
@@ -407,12 +418,11 @@ export function toMutationApprovalBridgeView(record: MutationApprovalRecord): Mu
 }
 
 function toMutationApprovalViewBase(record: MutationApprovalRecord): MutationApprovalBridgeView {
-  return {
-    schemaVersion: 1,
+  const fields = {
+    schemaVersion: 1 as const,
     approvalId: record.approvalId,
     requestId: record.requestId,
     toolName: record.toolName,
-    status: record.status,
     requestSource: record.requestSource,
     projectLabel: record.projectLabel,
     affectedPaths: [...record.affectedPaths],
@@ -423,9 +433,15 @@ function toMutationApprovalViewBase(record: MutationApprovalRecord): MutationApp
     invariants: { ...record.invariants },
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
-    ...(record.result ? { result: { ...record.result } } : {}),
-    ...(record.failure ? { failure: sanitizeMutationApprovalFailure(record.failure) } : {}),
+    ...(record.auditWarning ? { auditWarning: { ...record.auditWarning } } : {}),
   };
+  switch (record.status) {
+    case 'applied': return { ...fields, status: 'applied', result: { ...record.result } };
+    case 'failed':
+    case 'stale': return { ...fields, status: record.status, failure: sanitizeMutationApprovalFailure(record.failure) };
+    case 'cancelled': return { ...fields, status: 'cancelled', ...(record.failure ? { failure: sanitizeMutationApprovalFailure(record.failure) } : {}) };
+    default: return { ...fields, status: record.status };
+  }
 }
 
 export function sanitizeMutationApprovalFailure(
@@ -557,6 +573,7 @@ function validateMutationApprovalPublicView<T extends MutationApprovalRendererVi
     'expiresAt',
     'result',
     'failure',
+    'auditWarning',
     ...(allowDenialNote ? ['denialNote'] : []),
   ];
   rejectUnknownKeys(value, allowedKeys, 'approvalView', errors);
@@ -578,6 +595,18 @@ function validateMutationApprovalPublicView<T extends MutationApprovalRendererVi
   validateIsoDate(value.expiresAt, 'expiresAt', errors);
   if ('result' in value) validateResultViewShape(value.result, errors);
   if ('failure' in value) validateFailureViewShape(value.failure, errors);
+  if (value.status === 'applied' && !('result' in value)) errors.push('applied approval requires result');
+  if ((value.status === 'failed' || value.status === 'stale') && !('failure' in value)) errors.push('failed or stale approval requires failure');
+  if (value.status !== 'applied' && 'result' in value) errors.push('result is only allowed for applied approval');
+  if (!['failed', 'stale', 'cancelled'].includes(String(value.status)) && 'failure' in value) errors.push('failure is not allowed for this approval status');
+  if ('auditWarning' in value) {
+    if (!isPlainObject(value.auditWarning)) errors.push('auditWarning must be an object');
+    else {
+      rejectUnknownKeys(value.auditWarning, ['code', 'message'], 'auditWarning', errors);
+      if (value.auditWarning.code !== 'audit-write-failed') errors.push('auditWarning.code is invalid');
+      validateBoundedString(value.auditWarning.message, 'auditWarning.message', 1024, errors);
+    }
+  }
   if ('denialNote' in value) {
     if (!allowDenialNote) {
       errors.push('approvalView.denialNote is not allowed');
@@ -772,11 +801,11 @@ function jsonByteLength(value: unknown): number | undefined {
   }
 }
 
-function requireStatus(
+function requireStatus<TStatus extends MutationApprovalStatus>(
   record: MutationApprovalRecord,
-  expected: MutationApprovalStatus,
+  expected: TStatus,
   transition: MutationApprovalTransition['type'],
-): void {
+): asserts record is MutationApprovalRecord & { status: TStatus } {
   if (record.status !== expected) {
     throw new MutationApprovalStateError(`Transition ${transition} requires ${expected}, received ${record.status}.`);
   }

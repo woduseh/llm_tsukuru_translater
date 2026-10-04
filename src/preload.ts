@@ -1,6 +1,7 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer }: typeof import('electron') = require('electron');
 const path = require('path');
-import { isReceiveChannel, isSendChannel } from './types/ipc';
+import { isInvokeChannel, isReceiveChannel, isSendChannel } from './types/ipc';
+import type { ElectronApi, IpcCallback, ReceiveArgs, ReceiveChannel } from './types/ipc';
 import { isProtectedAgentBridgePath } from './agent/agentBridgeContracts';
 
 let allowedBasePaths: string[] = [];
@@ -23,67 +24,68 @@ function isPathAllowed(filePath: string): boolean {
   return allowedBasePaths.some((base: string) => resolved === base || resolved.startsWith(base + path.sep));
 }
 
-contextBridge.exposeInMainWorld('api', {
-  send: (channel: string, ...args: unknown[]) => {
+const api: ElectronApi = {
+  send: (channel, ...args) => {
     if (isSendChannel(channel)) {
       ipcRenderer.send(channel, ...args);
     }
   },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  on: (channel: string, callback: (...args: any[]) => void) => {
+  on: <C extends ReceiveChannel>(channel: C, callback: IpcCallback<C>) => {
     if (isReceiveChannel(channel)) {
-      const subscription = (_event: unknown, ...args: unknown[]) => callback(...args);
-      ipcRenderer.on(channel, subscription as (...args: unknown[]) => void);
+      const subscription = (_event: unknown, ...args: unknown[]) => callback(...args as ReceiveArgs[C]);
+      ipcRenderer.on(channel, subscription);
       return () => ipcRenderer.removeListener(channel, subscription);
     }
   },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  once: (channel: string, callback: (...args: any[]) => void) => {
+  once: <C extends ReceiveChannel>(channel: C, callback: IpcCallback<C>) => {
     if (isReceiveChannel(channel)) {
-      ipcRenderer.once(channel, (_event: unknown, ...args: unknown[]) => callback(...args));
+      ipcRenderer.once(channel, (_event: unknown, ...args: unknown[]) => callback(...args as ReceiveArgs[C]));
     }
   },
-  removeAllListeners: (channel: string) => {
+  removeAllListeners: (channel) => {
     if (isReceiveChannel(channel)) {
       ipcRenderer.removeAllListeners(channel);
     }
   },
-  invoke: (channel: string, ...args: unknown[]) => {
-    if (isSendChannel(channel)) {
+  invoke: async (channel, ...args) => {
+    if (isInvokeChannel(channel)) {
       return ipcRenderer.invoke(channel, ...args);
     }
+    throw new Error('Access denied: IPC invoke channel not allowed');
   },
   terminal: {
-    create: (request: unknown) => ipcRenderer.invoke('terminalCreate', request),
-    input: (request: unknown) => ipcRenderer.invoke('terminalInput', request),
-    resize: (request: unknown) => ipcRenderer.invoke('terminalResize', request),
-    kill: (request: unknown) => ipcRenderer.invoke('terminalKill', request),
+    create: (request) => ipcRenderer.invoke('terminalCreate', request),
+    input: (request) => ipcRenderer.invoke('terminalInput', request),
+    resize: (request) => ipcRenderer.invoke('terminalResize', request),
+    kill: (request) => ipcRenderer.invoke('terminalKill', request),
     list: () => ipcRenderer.invoke('terminalList'),
-    snapshot: (request: unknown) => ipcRenderer.invoke('terminalSnapshot', request),
-    onEvent: (callback: (event: unknown) => void) => {
-      const listener = (_event: unknown, payload: unknown) => callback(payload);
+    snapshot: (request) => ipcRenderer.invoke('terminalSnapshot', request),
+    onEvent: (callback) => {
+      const listener = (_event: unknown, payload: ReceiveArgs['terminalEvent'][0]) => callback(payload);
       ipcRenderer.on('terminalEvent', listener);
       return () => ipcRenderer.removeListener('terminalEvent', listener);
     },
-    onSessions: (callback: (payload: unknown) => void) => {
-      const listener = (_event: unknown, payload: unknown) => callback(payload);
+    onSessions: (callback) => {
+      const listener = (_event: unknown, payload: ReceiveArgs['terminalSessions'][0]) => callback(payload);
       ipcRenderer.on('terminalSessions', listener);
       return () => ipcRenderer.removeListener('terminalSessions', listener);
     },
   },
   approvals: {
-    submit: (request: unknown) => ipcRenderer.invoke('mutationApprovalSubmit', request),
-    list: (request: unknown) => ipcRenderer.invoke('mutationApprovalList', request),
-    get: (request: unknown) => ipcRenderer.invoke('mutationApprovalGet', request),
-    approve: (request: unknown) => ipcRenderer.invoke('mutationApprovalApprove', request),
-    deny: (request: unknown) => ipcRenderer.invoke('mutationApprovalDeny', request),
-    onChanged: (callback: (payload: unknown) => void) => {
-      const listener = (_event: unknown, payload: unknown) => callback(payload);
+    submit: (request) => ipcRenderer.invoke('mutationApprovalSubmit', request),
+    list: (request) => ipcRenderer.invoke('mutationApprovalList', request),
+    get: (request) => ipcRenderer.invoke('mutationApprovalGet', request),
+    approve: (request) => ipcRenderer.invoke('mutationApprovalApprove', request),
+    deny: (request) => ipcRenderer.invoke('mutationApprovalDeny', request),
+    onChanged: (callback) => {
+      const listener = (_event: unknown, payload: ReceiveArgs['approvalQueueChanged'][0]) => callback(payload);
       ipcRenderer.on('approvalQueueChanged', listener);
       return () => ipcRenderer.removeListener('approvalQueueChanged', listener);
     },
   }
-});
+};
+
+contextBridge.exposeInMainWorld('api', api);
 
 contextBridge.exposeInMainWorld('nodeBuffer', {
   toBase64: (str: string) => Buffer.from(str, 'utf8').toString('base64'),

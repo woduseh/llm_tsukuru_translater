@@ -7,9 +7,11 @@ import { translateFilesWithCoordinator } from '../../src/ts/rpgmv/translator';
 import { settings } from '../../src/ts/rpgmv/datas';
 import * as atomic from '../../src/ts/libs/atomicFile';
 import type { Translator } from '../../src/ts/libs/translatorFactory';
+import { finishFileTranslation, type TranslationRunLog } from '../../src/ts/libs/translationResult';
 
 const roots: string[] = [];
 const entry = { translatedContent: '안녕', model: 'fixture', targetLang: 'ko' };
+const runLog: TranslationRunLog = { totalBlocks: 1, translatedBlocks: 1, skippedBlocks: 0, errorBlocks: 0, retries: 0, durationMs: 0, errors: [] };
 function fixture() {
   const parent = path.resolve('artifacts/unit/translationStorage');
   fs.mkdirSync(parent, { recursive: true });
@@ -86,7 +88,7 @@ it('loads only active source files before the first request and writes cache byt
     translateText: async text => text.replace('Hello', '안녕'),
     translateFileContent: async text => {
       if (requests++ === 0) readsAtFirstRequest = reads;
-      return { translatedContent: text.replace('Hello', '안녕'), validation: [], logEntry: {} };
+      return finishFileTranslation(text, text.replace('Hello', '안녕'), { validation: [], logEntry: runLog });
     },
   };
   const result = await translateFilesWithCoordinator({
@@ -124,7 +126,7 @@ it('reuses a completed translation for an identical queued file', async () => {
   const dir = fixture();
   const files = ['A.txt', 'B.txt'];
   files.forEach(file => fs.writeFileSync(path.join(dir, file), '--- 101 ---\nHello'));
-  const translateFileContent = vi.fn(async () => ({ translatedContent: '--- 101 ---\n안녕', validation: [], logEntry: {} }));
+  const translateFileContent = vi.fn(async (text: string) => finishFileTranslation(text, '--- 101 ---\n안녕', { validation: [], logEntry: runLog }));
   const result = await translateFilesWithCoordinator({
     edir: dir, backupDir: dir + '_backup', fileList: files, completedFiles: new Set(),
     provider: 'gemini', model: 'fixture', sourceLang: 'en', targetLang: 'ko', settings,

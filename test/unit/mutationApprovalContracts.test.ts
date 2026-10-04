@@ -129,6 +129,24 @@ describe('mutation approval Phase 0 contracts', () => {
     expect(oversizedRequest.errors.some((error) => error.includes('request exceeds'))).toBe(true);
   });
 
+  it('requires state-specific results in public approval views', () => {
+    const projectRoot = makeProject('state-view', ['Hello']);
+    const validated = requireValidated(makeRequest('Translated/Map001.txt', [
+      replaceLine('op-001', 'Translated/Map001.txt', 1, 'Hello', '안녕'),
+    ]), projectRoot);
+    const pending = toMutationApprovalBridgeView(makeRecord(validated));
+    const result = { schemaVersion: 1, applied: true, targetPath: 'Translated/Map001.txt', operationsApplied: 1 };
+    const failure = { schemaVersion: 1, code: 'write-failed', message: 'Write failed.', retryable: false };
+    expect(validateMutationApprovalBridgeView({ ...pending, status: 'applied' }).ok).toBe(false);
+    expect(validateMutationApprovalBridgeView({ ...pending, status: 'failed' }).ok).toBe(false);
+    expect(validateMutationApprovalBridgeView({ ...pending, status: 'stale' }).ok).toBe(false);
+    expect(validateMutationApprovalBridgeView({ ...pending, result }).ok).toBe(false);
+    expect(validateMutationApprovalBridgeView({ ...pending, failure }).ok).toBe(false);
+    expect(validateMutationApprovalBridgeView({ ...pending, status: 'applied', result,
+      auditWarning: { code: 'audit-write-failed', message: 'Execution confirmed; audit could not be saved.' } }).ok).toBe(true);
+    expect(validateMutationApprovalBridgeView({ ...pending, status: 'failed', failure }).ok).toBe(true);
+  });
+
   it('rejects a complete preview above the display bound instead of truncating it', () => {
     const beforeLines = Array.from({ length: 70 }, (_, index) => `${index}: ${'a'.repeat(1000)}`);
     const projectRoot = makeProject('preview-bound', ['Hello'], { 'Translated/Large.txt': beforeLines });
@@ -402,7 +420,7 @@ function requireValidated(
   return result.value;
 }
 
-function makeRecord(validated: ValidatedPatchApplyProposal): MutationApprovalRecord {
+function makeRecord(validated: ValidatedPatchApplyProposal): MutationApprovalRecord & { status: 'pending' } {
   return {
     schemaVersion: 1,
     approvalId: 'approval-1',

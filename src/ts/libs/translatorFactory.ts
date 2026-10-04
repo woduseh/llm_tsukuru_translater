@@ -11,7 +11,7 @@ import {
   validateProviderReadiness,
   VertexTranslator,
 } from './providerRegistry';
-import type { BlockValidation, TranslationLogEntry } from './translationCore';
+import type { TranslationOutcome } from './translationResult';
 import type { TranslationExecution } from './providerTranslationBase';
 
 export interface Translator {
@@ -20,13 +20,7 @@ export interface Translator {
     content: string,
     onProgress?: (current: number, total: number, detail: string) => void,
     execution?: TranslationExecution,
-  ): Promise<{
-    translatedContent: string;
-    validation: BlockValidation[];
-    logEntry: Partial<TranslationLogEntry>;
-    aborted?: boolean;
-    incomplete?: boolean;
-  }>;
+  ): Promise<TranslationOutcome>;
 }
 
 type LlmSettingsLike = Partial<AppSettings> & Record<string, unknown>;

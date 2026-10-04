@@ -21,6 +21,7 @@ export class AppContext {
   allowedProjectRoots: string[] = [];
   terminalProjectRoots: string[] = [];
   currentTerminalProjectRoot = '';
+  projectSelectionRevision = 0;
   terminalService: TerminalService | null = null;
   agentAppSessionId = `app-${crypto.randomUUID()}`;
   mutationApprovalRuntime: MutationApprovalRuntime | null = null;
@@ -47,6 +48,7 @@ export class AppContext {
     this.allowedProjectRoots = [];
     this.terminalProjectRoots = [];
     this.currentTerminalProjectRoot = '';
+    this.projectSelectionRevision++;
     this.terminalService = null;
     this.agentAppSessionId = `app-${crypto.randomUUID()}`;
     this.mutationApprovalRuntime = null;

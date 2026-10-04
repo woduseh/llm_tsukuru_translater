@@ -1,6 +1,5 @@
 import * as fs from 'fs';
-import * as path from 'path';
-import { atomicWriteJsonFile } from '../ts/libs/atomicFile';
+import { AgentWorkspaceStorage } from './agentWorkspaceStorage';
 import type { JsonObject } from '../types/agentWorkspace';
 import { redactSecretLikeValues } from './contractsValidation';
 
@@ -90,11 +89,11 @@ interface GlossaryStore {
 }
 
 export class GlossaryService {
-  private readonly storePath: string;
+  private readonly storage: AgentWorkspaceStorage;
   private readonly idFactory: (sourceText: string) => string;
 
-  constructor(options: { workspaceRoot: string; idFactory?: (sourceText: string) => string }) {
-    this.storePath = path.join(path.resolve(options.workspaceRoot), 'glossary', 'entries.json');
+  constructor(options: { projectRoot: string; workspaceRoot: string; idFactory?: (sourceText: string) => string }) {
+    this.storage = new AgentWorkspaceStorage(options.projectRoot, options.workspaceRoot);
     this.idFactory = options.idFactory ?? ((sourceText) => `term-${slug(sourceText)}-${Date.now()}`);
   }
 
@@ -170,13 +169,13 @@ export class GlossaryService {
   }
 
   private readStore(): GlossaryStore {
-    if (!fs.existsSync(this.storePath)) return { schemaVersion: 1, entries: [] };
-    return JSON.parse(fs.readFileSync(this.storePath, 'utf-8')) as GlossaryStore;
+    const storePath = this.storage.resolve('glossary/entries.json');
+    if (!fs.existsSync(storePath)) return { schemaVersion: 1, entries: [] };
+    return JSON.parse(fs.readFileSync(storePath, 'utf-8')) as GlossaryStore;
   }
 
   private writeStore(store: GlossaryStore): void {
-    fs.mkdirSync(path.dirname(this.storePath), { recursive: true });
-    atomicWriteJsonFile(this.storePath, store, 2);
+    this.storage.writeJson('glossary/entries.json', store);
   }
 }
 

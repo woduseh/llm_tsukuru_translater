@@ -1,13 +1,12 @@
 import { MAX_ARTIFACT_JSON_BYTES, readArtifactCollection, collectionParent } from './artifactPaging';
 import * as fs from 'fs';
 import * as path from 'path';
-import { atomicWriteJsonFile } from '../ts/libs/atomicFile';
+import { AgentWorkspaceStorage } from './agentWorkspaceStorage';
 import type { JsonObject, JsonValue } from '../types/agentWorkspace';
 import type { AgentArtifactRecord } from './artifactService';
 import { sanitizePathSegment } from './artifactService';
 import { redactSecretLikeValues } from './contractsValidation';
-import { SandboxPathError, SandboxReadLimitError } from './agentFileErrors';
-import { AgentSafeFileSystem } from './agentSafeFileSystem';
+import { SandboxReadLimitError } from './agentFileErrors';
 
 export type AgentDataRefScope = 'session' | 'project';
 export type AgentDataRefKind =
@@ -69,13 +68,13 @@ export class AgentDataRefError extends Error {
 export class DataRefService {
   private readonly projectRoot: string;
   private readonly workspaceRoot: string;
-  private readonly indexPath: string;
+  private readonly storage: AgentWorkspaceStorage;
   private readonly idFactory: () => string;
 
   constructor(options: DataRefServiceOptions) {
     this.projectRoot = path.resolve(options.projectRoot);
     this.workspaceRoot = path.resolve(options.workspaceRoot);
-    this.indexPath = path.join(this.workspaceRoot, 'mcp', 'data-refs.json');
+    this.storage = new AgentWorkspaceStorage(this.projectRoot, this.workspaceRoot);
     this.idFactory = options.idFactory ?? (() => `ref-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   }
 
@@ -90,6 +89,7 @@ export class DataRefService {
     } = {},
   ): AgentDataRef {
     const now = options.now ?? new Date();
+    this.storage.resolve(artifact.path);
     const ref: AgentDataRef = {
       schemaVersion: 1,
       refId: sanitizePathSegment(this.idFactory()),
@@ -121,10 +121,7 @@ export class DataRefService {
     if (ref.expiresAt && Date.parse(ref.expiresAt) <= (options.now ?? new Date()).getTime()) {
       throw new AgentDataRefError(`Data ref expired: ${ref.refId}`);
     }
-    const targetPath = path.resolve(ref.target.path);
-    if (!isPathInsideRoot(targetPath, this.workspaceRoot)) {
-      throw new SandboxPathError(`Data ref target escapes workspace: ${ref.refId}`);
-    }
+    const targetPath = this.storage.resolve(ref.target.path);
     const stat = fs.statSync(targetPath);
     const maxBytes = Math.max(1, Math.min(options.maxBytes ?? 64 * 1024, 256 * 1024));
     const bytesToRead = Math.min(stat.size, maxBytes);
@@ -160,7 +157,7 @@ export class DataRefService {
     const ref = this.readIndex()[sanitizePathSegment(refId)];
     if (!ref || ref.refId !== refId || ref.projectRoot !== this.projectRoot) throw new AgentDataRefError(`Unknown data ref: ${refId}`);
     if (ref.expiresAt && Date.parse(ref.expiresAt) <= Date.now()) throw new AgentDataRefError(`Data ref expired: ${refId}`);
-    const target = new AgentSafeFileSystem({ projectRoot: this.workspaceRoot }).resolveAllowed(ref.target.path);
+    const target = this.storage.resolve(ref.target.path);
     const stat = fs.statSync(target);
     if (!stat.isFile() || stat.size > MAX_ARTIFACT_JSON_BYTES) throw new SandboxReadLimitError('Artifact exceeds the 16 MiB JSON read limit. Inspect a smaller file or lower maxBytes.');
     const record = JSON.parse(fs.readFileSync(target, 'utf8')) as AgentArtifactRecord;
@@ -207,13 +204,13 @@ export class DataRefService {
   }
 
   private readIndex(): Record<string, AgentDataRef> {
-    if (!fs.existsSync(this.indexPath)) return {};
-    return JSON.parse(fs.readFileSync(this.indexPath, 'utf-8')) as Record<string, AgentDataRef>;
+    const indexPath = this.storage.resolve('mcp/data-refs.json');
+    if (!fs.existsSync(indexPath)) return {};
+    return JSON.parse(fs.readFileSync(indexPath, 'utf-8')) as Record<string, AgentDataRef>;
   }
 
   private writeIndex(index: Record<string, AgentDataRef>): void {
-    fs.mkdirSync(path.dirname(this.indexPath), { recursive: true });
-    atomicWriteJsonFile(this.indexPath, index, 2);
+    this.storage.writeJson('mcp/data-refs.json', index);
   }
 }
 
@@ -223,10 +220,4 @@ function parseJsonOrText(text: string): JsonValue | string {
   } catch {
     return text;
   }
-}
-
-function isPathInsideRoot(candidatePath: string, root: string): boolean {
-  const normalizedCandidate = path.resolve(candidatePath).toLowerCase();
-  const normalizedRoot = path.resolve(root).toLowerCase();
-  return normalizedCandidate === normalizedRoot || normalizedCandidate.startsWith(`${normalizedRoot}${path.sep}`);
 }

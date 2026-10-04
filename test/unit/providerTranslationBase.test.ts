@@ -35,6 +35,7 @@ describe('ProviderTranslationBase terminal failures', () => {
     const result = await translator.translateFileContent(content);
 
     expect(result.translatedContent).toBe(content);
+    expect(result.status).toBe('skipped');
     expect(result.logEntry.skippedBlocks).toBe(1);
     expect(translate).not.toHaveBeenCalled();
   });
@@ -59,10 +60,17 @@ describe('ProviderTranslationBase terminal failures', () => {
 
     const result = await translator.translateFileContent('--- 1 ---\nHello');
 
-    expect(result.translatedContent).toBe('--- 1 ---\nHello');
-    expect(result.incomplete).toBe(true);
+    expect(result).not.toHaveProperty('translatedContent');
+    expect(result.status).toBe('failed');
     expect(result.logEntry.errorBlocks).toBe(1);
     expect(result.logEntry.skippedBlocks).toBe(0);
+  });
+
+  it('returns a failure without savable content when a provider changes control codes', async () => {
+    const translator = new StubTranslator(async () => '--- 1 ---\n안녕 \\V[2]');
+    const result = await translator.translateFileContent('--- 1 ---\nHello \\V[1]');
+    expect(result).toMatchObject({ status: 'failed', error: expect.stringContaining('control codes changed') });
+    expect(result).not.toHaveProperty('translatedContent');
   });
 
   it('skips only Hangul-containing blocks in a mixed source chunk', async () => {
@@ -78,7 +86,7 @@ describe('ProviderTranslationBase terminal failures', () => {
 
     expect(calls).toEqual(['--- 2 ---\nHello']);
     expect(result.translatedContent).toBe('--- 1 ---\n이미 번역됨\n--- 2 ---\n안녕');
-    expect(result.incomplete).toBe(false);
+    expect(result.status).toBe('translated');
     expect(result.logEntry.skippedBlocks).toBe(1);
     expect(result.logEntry.translatedBlocks).toBe(1);
     expect(result.logEntry.errorBlocks).toBe(0);
@@ -107,7 +115,7 @@ describe('Gemini error sanitization', () => {
     const logged = consoleError.mock.calls.flat().map(String).join(' ');
     const recordedErrors = (result.logEntry.errors || []).join(' ');
 
-    expect(result.incomplete).toBe(true);
+    expect(result.status).toBe('failed');
     expect(logged).not.toContain(secret);
     expect(recordedErrors).not.toContain(secret);
     expect(recordedErrors).toContain('[REDACTED]');

@@ -162,6 +162,7 @@
 import { ref, computed, onMounted, onUnmounted, onActivated, watchEffect } from 'vue'
 import { createReviewScan, readReviewEntries } from '../reviewFileLoader'
 import { api, useIpcOn } from '../composables/useIpc'
+import type { VerifyApplyJsonResult } from '../../types/ipc'
 import { reviewWorkspace, resetReviewWorkspace, findReviewFileIndex, normalizeReviewDirectory } from '../composables/useReviewWorkspace'
 import { getRendererLlmProviderUiText } from '../../types/llmProviderContract'
 import { setAtPath } from '../../ts/rpgmv/verify'
@@ -216,14 +217,6 @@ watchEffect(() => {
 function openTranslation() {
   reviewWorkspace.focusedFile = files.value[currentIdx.value]?.name ?? ''
   api.send('openLLMCompare', reviewWorkspace.projectDir)
-}
-
-interface VerifyApplyJsonResult {
-  requestId: string
-  fileName: string
-  targetPath: string
-  success: boolean
-  error?: string
 }
 
 interface PendingVerifyWrite {
@@ -762,8 +755,7 @@ function cancelLlmRepair() {
 onMounted(() => {
   useIpcOn('initVerify', (dir: string) => loadFiles(dir))
   useIpcOn('verifyApplyJsonDone', onVerifyApplyJsonDone)
-  useIpcOn('verifySettings', (s: unknown) => {
-    const settings = s as Record<string, any>
+  useIpcOn('verifySettings', (settings) => {
     jsonChangeLine.value = !!settings.JsonChangeLine
     llmReady.value = !!settings.llmReady
     currentProvider.value = typeof settings.llmProvider === 'string' ? settings.llmProvider : 'gemini'

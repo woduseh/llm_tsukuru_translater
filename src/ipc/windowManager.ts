@@ -169,6 +169,8 @@ async function rememberTrustedProjectPaths(
     && path.resolve(previousCurrentRoot).toLowerCase() !== path.resolve(terminalRoot).toLowerCase(),
   );
   if (projectChanged) {
+    // Invalidate queued/in-flight writes before awaiting bridge shutdown.
+    ctx.projectSelectionRevision++;
     ctx.terminalService?.disposeAll('project-change');
     await ctx.agentBridgeServer?.stop();
     ctx.agentBridgeServer = null;

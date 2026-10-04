@@ -23,8 +23,10 @@ Behavioral contracts for the affected code, not a mandatory verification sequenc
 
 - Extraction/apply validates input structure and stages outputs before committing; failed multi-file commits roll back instead of reporting partial success.
 - Existing translation backups are reusable only when their complete file set matches the extraction surface. `ext_javascript.js` belongs to the line-aligned translation surface too.
+- Full translation reset must validate that file set before its first mutation, retain the original backup and roll back earlier replacements if a later restore fails. Progress/cache reset follows successful restoration.
 - Successfully decrypted Wolf archives remain recoverable as `.wolf.tsukuru-backup` files; leaving active `.wolf` archives can hide translated loose `Data/**` at runtime.
 - Text comparison saves and Map auto-fixes must pass a main-owned active-project/sender check and exact loaded preimage before atomic replacement. A stale save must preserve external content and the local dirty editor. Manual repair may change line counts; it is not an agent patch.
+- Review navigation consumes an existing native-picker project grant; it cannot grant a renderer-supplied path. Queued review saves and retranslation responses must retain the current project-selection binding, including after switching away and back.
 - JSON Verify writes are authorized by main-process validation of the active root, exact target/preimage and valid JSON immediately before atomic replacement. Renderer previews alone do not authorize a write.
 
 ## Verification Rules

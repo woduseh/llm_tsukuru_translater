@@ -94,11 +94,11 @@ const terminalDrawerRoutes = new Set(['/', '/mvmz', '/wolf'])
 const showGlobalTerminalDrawer = computed(() => terminalDrawerRoutes.has(route.path) || (showWorkspace.value && route.path !== AGENT_WORKSPACE_ROUTE))
 const showApprovalBanner = computed(() => route.path !== AGENT_WORKSPACE_ROUTE && pendingCount.value > 0)
 
-for (const channel of ['getGlobalSettings', 'settings', 'llmSettings', 'verifySettings']) {
-  useIpcOn(channel, (settings: Record<string, unknown>) => {
+for (const channel of ['getGlobalSettings', 'settings', 'llmSettings', 'verifySettings'] as const) {
+  useIpcOn(channel, (settings) => {
     if (channel === 'getGlobalSettings') mainRenderer.value = true
     if (settings && settings.themeData) {
-      for (const [key, value] of Object.entries(settings.themeData as Record<string, string>)) {
+      for (const [key, value] of Object.entries(settings.themeData)) {
         document.documentElement.style.setProperty(key, value)
       }
     }

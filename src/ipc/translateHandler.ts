@@ -1,18 +1,19 @@
 import { BrowserWindow, ipcMain } from 'electron';
-import fs from 'fs';
 import path from 'path';
 import * as eztrans from '../ts/rpgmv/translator.js';
 import { buildLlmStartWindowState } from '../ts/libs/llmProviderConfig';
 import { normalizeTranslationConcurrency, normalizeTranslationRpm } from '../ts/libs/translationRequestScheduler';
 import { generateGuidelineDraft } from '../ts/libs/guidelineGenerator';
 import { scanProjectTranslationProfile, type ProjectTranslationProfile } from '../ts/libs/projectProfile';
-import { storage } from './shared';
-import { getLLMCompareWindow } from './toolsHandler';
+import { commitSettings } from './settingsCommit';
+import { getLLMCompareBinding } from './toolsHandler';
+import { resolveReviewRetranslationTarget } from './reviewProjectAccess';
 import { loadRoute } from './viteHelper';
 import log from '../logger';
 import { AppContext } from '../appContext';
 import { PROJECT_ROOT } from '../projectRoot';
 import { coerceLlmProjectArg, validateLlmProjectPath, type LlmProjectArg } from './llmProjectPathValidation';
+import type { LlmSettingsApplyRequest, RetranslateIpcRequest } from '../types/ipc';
 
 export function registerTranslateHandlers(ctx: AppContext) {
   let llmSettingsWindow: Electron.BrowserWindow | null = null;
@@ -73,23 +74,25 @@ export function registerTranslateHandlers(ctx: AppContext) {
     }
   })
 
-  ipcMain.on('llmSettingsApply', (ev, data) => {
+  ipcMain.on('llmSettingsApply', (ev, data: LlmSettingsApplyRequest) => {
     if (llmSettingsWindow && ev.sender !== llmSettingsWindow.webContents) return;
     const llmParallelWorkers = normalizeTranslationConcurrency(data?.llmParallelWorkers);
     const llmRequestsPerMinute = normalizeTranslationRpm(data?.llmRequestsPerMinute);
-    ctx.settings = { ...ctx.settings, llmSortOrder: data?.llmSortOrder, llmParallelWorkers, llmRequestsPerMinute };
-    storage.set('settings', JSON.stringify(ctx.settings));
+    let validatedProject: ReturnType<typeof validateLlmProjectPath> | undefined;
+    try {
+      if (llmPendingArg) validatedProject = validateLlmProjectPath(llmPendingArg, { allowedRoots: ctx.allowedProjectRoots });
+      commitSettings(ctx, {
+        llmSortOrder: data?.llmSortOrder ?? ctx.settings.llmSortOrder ?? 'name-asc',
+        llmParallelWorkers, llmRequestsPerMinute,
+      });
+    } catch (err: unknown) {
+      log.warn('Blocked LLM translation settings update:', err);
+      ctx.mainWindow?.webContents.send('alert', { icon: 'error', message: (err as Error).message || String(err) });
+      ev.sender?.send('llmSettingsApplyResult', { success: false });
+      return;
+    }
 
-    if (llmPendingArg) {
-      let validatedProject;
-      try {
-        validatedProject = validateLlmProjectPath(llmPendingArg, { allowedRoots: ctx.allowedProjectRoots });
-      } catch (err: unknown) {
-        log.warn('Blocked LLM translation for invalid project path:', err);
-        ctx.mainWindow?.webContents.send('alert', { icon: 'error', message: (err as Error).message || String(err) });
-        ev.sender.send('llmSettingsApplyResult', { success: false });
-        return;
-      }
+    if (validatedProject) {
       ev.sender.send('llmSettingsApplyResult', { success: true });
       closeSettings(`/${validatedProject.game}`);
       ctx.llmAbort = false;
@@ -98,7 +101,7 @@ export function registerTranslateHandlers(ctx: AppContext) {
         langu: ctx.settings.llmSourceLang || 'ja',
         game: validatedProject.game,
         resetProgress: data.llmResetProgress || false,
-        sortOrder: data.llmSortOrder || 'name-asc',
+        sortOrder: ctx.settings.llmSortOrder || 'name-asc',
         parallelWorkers: llmParallelWorkers,
         translationMode: data.llmTranslationMode || 'untranslated'
       };
@@ -150,8 +153,7 @@ export function registerTranslateHandlers(ctx: AppContext) {
     const nextPrompt = mode === 'replace'
       ? guideline
       : [currentPrompt.trim(), guideline].filter(Boolean).join('\n\n');
-    ctx.settings = { ...ctx.settings, llmCustomPrompt: nextPrompt };
-    storage.set('settings', JSON.stringify(ctx.settings));
+    commitSettings(ctx, { llmCustomPrompt: nextPrompt });
     return {
       success: true,
       llmCustomPrompt: nextPrompt,
@@ -171,34 +173,34 @@ export function registerTranslateHandlers(ctx: AppContext) {
     closeSettings();
   })
 
-  interface RetranslateRequest {
-    dir: string;
-    fileName: string;
-    requestId?: string;
-    expectedContent?: string;
-  }
-
   async function retranslate(
     sender: Electron.WebContents,
-    data: RetranslateRequest,
+    data: RetranslateIpcRequest,
     doneChannel: 'retranslateFileDone' | 'retranslateBlocksDone',
-    translate: (extractDir: string, onProgress: (message: string) => void) => Promise<{ success: boolean; error?: string }>,
+    translate: (extractDir: string, onProgress: (message: string) => void, isCurrent: () => boolean) => Promise<{ success: boolean; error?: string }>,
   ): Promise<void> {
     // Capture the request's target before awaiting the provider. A newly opened
     // compare surface must never receive another window's in-flight result.
-    const win = getLLMCompareWindow();
-    if (!win || win.isDestroyed() || sender !== win.webContents) return;
+    const binding = getLLMCompareBinding();
+    if (!binding || !binding.isCurrent() || sender !== binding.window.webContents) return;
+    const win = binding.window;
     const send = (channel: 'retranslateProgress' | typeof doneChannel, payload: object) => {
-      if (win && !win.isDestroyed()) {
-        win.webContents.send(channel, { ...payload, requestId: data.requestId, fileName: data.fileName });
+      if (binding.isCurrent()) {
+        win.webContents.send(channel, { ...payload, requestId: data?.requestId, fileName: data?.fileName });
       }
     };
     try {
-      const wolfDir = path.join(data.dir, '_Extract', 'Texts');
-      const extractDir = fs.existsSync(wolfDir) && fs.existsSync(wolfDir + '_backup')
-        ? wolfDir
-        : path.join(data.dir, 'Extract');
-      const result = await translate(extractDir, (message) => send('retranslateProgress', { message }));
+      if (typeof data?.fileName !== 'string' || typeof data.expectedContent !== 'string'
+        || typeof data.requestId !== 'string' || !data.requestId || data.requestId.length > 128) {
+        throw new Error('재번역 요청이 올바르지 않습니다.');
+      }
+      const extractDir = resolveReviewRetranslationTarget(ctx, data.dir, data.fileName, binding.projectDir);
+      const isCurrent = () => {
+        if (!binding.isCurrent()) return false;
+        try { return resolveReviewRetranslationTarget(ctx, data.dir, data.fileName, binding.projectDir) === extractDir; }
+        catch { return false; }
+      };
+      const result = await translate(extractDir, (message) => send('retranslateProgress', { message }), isCurrent);
       send(doneChannel, result);
     } catch (err: unknown) {
       log.error('Retranslation failed:', err);
@@ -206,8 +208,8 @@ export function registerTranslateHandlers(ctx: AppContext) {
     }
   }
 
-  ipcMain.on('retranslateFile', (ev, data: RetranslateRequest) => {
-    return retranslate(ev.sender, data, 'retranslateFileDone', (extractDir, onProgress) => eztrans.retranslateFile(
+  ipcMain.on('retranslateFile', (ev, data: RetranslateIpcRequest) => {
+    return retranslate(ev.sender, data, 'retranslateFileDone', (extractDir, onProgress, isCurrent) => eztrans.retranslateFile(
       extractDir,
       data.fileName,
       ctx.settings.llmSourceLang || 'ja',
@@ -215,11 +217,12 @@ export function registerTranslateHandlers(ctx: AppContext) {
       ctx,
       onProgress,
       data.expectedContent,
+      isCurrent,
     ));
   });
 
-  ipcMain.on('retranslateBlocks', (ev, data: RetranslateRequest & { blockIndices: number[] }) => {
-    return retranslate(ev.sender, data, 'retranslateBlocksDone', (extractDir, onProgress) => eztrans.retranslateBlocks(
+  ipcMain.on('retranslateBlocks', (ev, data: RetranslateIpcRequest & { blockIndices: number[] }) => {
+    return retranslate(ev.sender, data, 'retranslateBlocksDone', (extractDir, onProgress, isCurrent) => eztrans.retranslateBlocks(
       extractDir,
       data.fileName,
       data.blockIndices,
@@ -228,6 +231,7 @@ export function registerTranslateHandlers(ctx: AppContext) {
       ctx,
       onProgress,
       data.expectedContent,
+      isCurrent,
     ));
   });
 }

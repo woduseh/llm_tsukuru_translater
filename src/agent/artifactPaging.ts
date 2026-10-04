@@ -5,6 +5,7 @@ import type { JsonObject, JsonValue } from '../types/agentWorkspace';
 import type { AgentArtifactRecord } from './artifactService';
 import { atomicWriteTextFile } from '../ts/libs/atomicFile';
 import { AgentSafeFileSystem } from './agentSafeFileSystem';
+import type { AgentWorkspaceStorage } from './agentWorkspaceStorage';
 import { SandboxReadLimitError } from './agentFileErrors';
 
 export const MAX_ARTIFACT_JSON_BYTES = 16 * 1024 * 1024;
@@ -25,7 +26,7 @@ export function collectionParent(content: JsonObject, name: string): JsonObject 
 }
 
 /** Publish a small manifest only after its immutable collection pages are durable. */
-export function writeArtifactRecord(record: AgentArtifactRecord): void {
+export function writeArtifactRecord(record: AgentArtifactRecord, workspace: AgentWorkspaceStorage): void {
   const storage: ArtifactStorage = { generation: randomUUID(), collections: {} };
   const directory = `${record.path}.${storage.generation}.pages`;
   const object = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
@@ -43,11 +44,15 @@ export function writeArtifactRecord(record: AgentArtifactRecord): void {
       const chunks: { start: number; count: number }[] = [];
       let batch: string[] = [], batchBytes = 2, start = 0;
       const flush = () => {
-        if (!directoryCreated) { fs.mkdirSync(directory); directoryCreated = true; }
+        if (!directoryCreated) {
+          workspace.ensureDirectory(path.relative(workspace.workspaceRoot, directory));
+          directoryCreated = true;
+        }
         const json = `[${batch.join(',')}]`;
         bytesWritten += Buffer.byteLength(json);
         if (bytesWritten > MAX_ARTIFACT_BYTES) throw new SandboxReadLimitError('Analysis artifact exceeds 64 MiB; inspect a smaller input.');
-        atomicWriteTextFile(path.join(directory, `${name}-${chunks.length}.json`), json, { cleanupStaleTempFiles: false });
+        const pagePath = path.join(directory, `${name}-${chunks.length}.json`);
+        atomicWriteTextFile(workspace.resolve(pagePath), json, { cleanupStaleTempFiles: false });
         chunks.push({ start, count: batch.length }); start += batch.length;
         batch = []; batchBytes = 2;
       };
@@ -70,9 +75,9 @@ export function writeArtifactRecord(record: AgentArtifactRecord): void {
     if (bytes > MAX_ARTIFACT_JSON_BYTES || bytesWritten + bytes > MAX_ARTIFACT_BYTES) {
       throw new SandboxReadLimitError('Artifact metadata exceeds its JSON read budget; inspect a smaller input.');
     }
-    atomicWriteTextFile(record.path, json);
+    atomicWriteTextFile(workspace.resolve(record.path), json);
   } catch (error) {
-    if (directoryCreated) fs.rmSync(directory, { recursive: true, force: true });
+    if (directoryCreated) fs.rmSync(workspace.resolve(directory), { recursive: true, force: true });
     throw error;
   }
 }

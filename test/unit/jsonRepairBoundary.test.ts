@@ -14,6 +14,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); });
 describe('JSON repair through its real IPC and provider boundaries', () => {
   it.each(['Hello', 'Hello\n', '\nHello', '\nHello\n\n', '  Hello  ', 'Hello %1 \\V[2]'])('preserves exact structure for %j', async original => {
     const ctx = new AppContext();
+    ctx.allowedProjectRoots = [process.cwd()];
     ctx.settings = { ...settings, llmProvider: 'gemini', llmApiKey: 'fixture-key', llmModel: 'fixture' };
     const sender = { send: vi.fn(), getURL: () => 'file:///fixture/#/mvmz' };
     ctx.mainWindow = { webContents: sender, isDestroyed: () => false } as unknown as Electron.BrowserWindow;

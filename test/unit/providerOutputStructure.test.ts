@@ -35,7 +35,7 @@ describe.each(Object.entries(factories))('%s provider output structure', (_provi
         : { candidates: [{ content: { parts: [{ text }] } }] };
     const post = vi.spyOn(axios, 'post').mockResolvedValue({ data });
     const result = await factory().translateFileContent(source);
-    expect(result.incomplete).toBe(false);
+    expect(result.status).toBe('translated');
     expect(result.translatedContent).toBe(text);
     expect(post).toHaveBeenCalledTimes(1);
   });

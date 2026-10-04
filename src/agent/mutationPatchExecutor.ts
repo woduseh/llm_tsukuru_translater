@@ -2,12 +2,12 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { TextDecoder } from 'util';
-import { atomicWriteTextFile, type AtomicWriteOptions } from '../ts/libs/atomicFile';
+import { atomicWriteTextFile, AtomicFileWriteError, AtomicFilePreimageMismatchError, type AtomicWriteOptions } from '../ts/libs/atomicFile';
 import type { MutationApprovalResultView } from '../types/agentWorkspace';
 import { compareTranslationLineStructure } from '../ts/libs/translationSyntax';
 import {
   validatePatchApplyProposalRequest,
-  type MutationApprovalRecord,
+  type ApplyingMutationApprovalRecord,
 } from './mutationApprovalContracts';
 
 type AtomicTextWriter = (
@@ -36,7 +36,10 @@ export function createMutationPatchExecutor(options: MutationPatchExecutorOption
   const projectRoot = canonicalRoot(options.projectRoot);
   const atomicWrite = options.atomicWrite ?? atomicWriteTextFile;
 
-  return (record: Readonly<MutationApprovalRecord>): MutationApprovalResultView => {
+  return (record: Readonly<ApplyingMutationApprovalRecord>): MutationApprovalResultView => {
+    if (record.status !== 'applying') {
+      throw new MutationPatchExecutionError('approval-stale', 'The patch has not been claimed for execution.', true);
+    }
     if (!samePath(record.projectRoot, projectRoot)) {
       throw new MutationPatchExecutionError(
         'approval-stale',
@@ -98,8 +101,16 @@ export function createMutationPatchExecutor(options: MutationPatchExecutorOption
     const expectedBytes = Buffer.from(expectedText, 'utf-8');
 
     try {
-      atomicWrite(targetPath, expectedText, { encoding: 'utf-8', mode: originalMode });
-    } catch {
+      atomicWrite(targetPath, expectedText, {
+        encoding: 'utf-8',
+        mode: originalMode,
+        expectedContent: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(current.originalBytes),
+      });
+    } catch (error) {
+      if (error instanceof AtomicFilePreimageMismatchError
+          || (error instanceof AtomicFileWriteError && error.cause instanceof AtomicFilePreimageMismatchError)) {
+        throw new MutationPatchExecutionError('approval-stale', 'The target changed immediately before replacement. Submit a fresh proposal.', true);
+      }
       throw new MutationPatchExecutionError(
         'write-failed',
         'The approved patch could not be written atomically.',

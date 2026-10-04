@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { PROJECT_ROOT } from '../projectRoot';
 import { buildMcpConnectionCommands } from '../agent/mcpConnection';
+import { AgentWorkspaceStorage } from '../agent/agentWorkspaceStorage';
 import {
   MutationApprovalRuntimeError,
   type MutationApprovalRuntime,
@@ -53,9 +54,11 @@ export function registerAgentHandlers(ctx: AppContext): void {
     if (!fs.existsSync(bundleSource)) {
       return { ok: false, reason: 'MCP 서버 번들을 찾을 수 없습니다. 앱을 다시 빌드하세요 (npm run build:mcp).' };
     }
-    const destFile = path.join(projectRoot, '.llm-tsukuru-agent', 'mcp-agent-server.cjs');
+    let destFile: string;
     try {
-      fs.mkdirSync(path.dirname(destFile), { recursive: true });
+      const workspace = new AgentWorkspaceStorage(projectRoot);
+      workspace.ensureDirectory('');
+      destFile = workspace.resolve('mcp-agent-server.cjs');
       fs.copyFileSync(bundleSource, destFile);
     } catch (error) {
       return { ok: false, reason: `서버 파일 복사 실패: ${(error as Error).message}` };

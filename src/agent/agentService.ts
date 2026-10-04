@@ -33,11 +33,10 @@ export class AgentService {
       lastFailures: options.lastFailures,
     };
     this.descriptor = this.workspace.describeWorkspace(this.manifestOptions);
-    this.artifacts = new ArtifactService({ workspaceRoot: this.descriptor.workspaceRoot });
+    this.artifacts = new ArtifactService({ projectRoot: this.descriptor.projectRoot, workspaceRoot: this.descriptor.workspaceRoot });
     this.dataRefs = new DataRefService({ projectRoot: this.descriptor.projectRoot, workspaceRoot: this.descriptor.workspaceRoot });
     this.files = new AgentSafeFileSystem({
       projectRoot: this.descriptor.projectRoot,
-      allowedRoots: [this.descriptor.projectRoot, this.descriptor.workspaceRoot],
     });
     this.alignment = new AlignmentService({
       projectRoot: this.descriptor.projectRoot,
@@ -50,8 +49,8 @@ export class AgentService {
       artifacts: this.artifacts,
       dataRefs: this.dataRefs,
     });
-    this.glossary = new GlossaryService({ workspaceRoot: this.descriptor.workspaceRoot });
-    this.memory = new MemoryService({ workspaceRoot: this.descriptor.workspaceRoot });
+    this.glossary = new GlossaryService({ projectRoot: this.descriptor.projectRoot, workspaceRoot: this.descriptor.workspaceRoot });
+    this.memory = new MemoryService({ projectRoot: this.descriptor.projectRoot, workspaceRoot: this.descriptor.workspaceRoot });
     this.qa = new QaService({
       files: this.files,
       artifacts: this.artifacts,

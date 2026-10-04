@@ -1,5 +1,6 @@
 import path from 'path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppContext } from '../../src/appContext';
 import { registerToolsHandlers } from '../../src/ipc/toolsHandler';
 import { registerSettingsHandlers } from '../../src/ipc/settingsHandler';
@@ -36,8 +37,12 @@ const invoke = (channel: string, sender: unknown, arg?: unknown) => {
   return entry[1]({ sender }, arg);
 };
 
+let fixtureRoot: string;
+let gameDir: string;
+let otherGameDir: string;
 function setup() {
   const ctx = new AppContext();
+  ctx.allowedProjectRoots = [gameDir, otherGameDir];
   const win = { webContents: { send: vi.fn(), getURL: vi.fn(() => 'file:///app/index.html#/mvmz') }, isDestroyed: () => false, close: vi.fn(), focus: vi.fn() };
   ctx.mainWindow = win as unknown as Electron.BrowserWindow;
   registerToolsHandlers(ctx);
@@ -46,15 +51,34 @@ function setup() {
   return { ctx, win, sender: win.webContents };
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.validate.mockReset();
+  const parent = path.resolve('artifacts/unit/workspaceIpc');
+  fs.mkdirSync(parent, { recursive: true });
+  fixtureRoot = fs.mkdtempSync(path.join(parent, 'case-'));
+  gameDir = path.join(fixtureRoot, 'game');
+  otherGameDir = path.join(fixtureRoot, 'other-game');
+  fs.mkdirSync(gameDir); fs.mkdirSync(otherGameDir);
+});
+afterEach(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }));
 
 describe('inline workspace IPC', () => {
+  it.each(['openLLMCompare', 'openJsonVerify'])('does not grant an unselected project through %s', open => {
+    const { ctx, sender } = setup();
+    ctx.allowedProjectRoots = [gameDir];
+    invoke(open, sender, otherGameDir);
+    expect(sender.send).toHaveBeenCalledWith('alert', expect.objectContaining({ icon: 'error' }));
+    expect(sender.send.mock.calls.some(([channel]) => ['set-allowed-paths', 'replace-allowed-paths', 'workspaceNavigate'].includes(channel))).toBe(false);
+    expect(mocks.createWindow).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['openLLMCompare', 'compareReady', 'initCompare', '/llm-compare'],
     ['openJsonVerify', 'verifyReady', 'initVerify', '/json-verify'],
   ])('routes %s into main and only initializes changed projects', (open, ready, init, route) => {
     const { win, sender } = setup();
-    const dir = path.resolve('game');
+    const dir = gameDir;
     invoke(open, sender, dir);
     expect(sender.send).toHaveBeenCalledWith('workspaceNavigate', { route });
     expect(mocks.createWindow).not.toHaveBeenCalled();
@@ -67,7 +91,7 @@ describe('inline workspace IPC', () => {
     invoke(open, sender, dir);
     invoke(ready, sender);
     expect(sender.send.mock.calls.filter(([channel]) => channel === init)).toHaveLength(0);
-    const nextDir = path.resolve('other-game');
+    const nextDir = otherGameDir;
     invoke(open, sender, nextDir);
     invoke(ready, sender);
     expect(sender.send).toHaveBeenCalledWith(init, nextDir);
@@ -79,7 +103,7 @@ describe('inline workspace IPC', () => {
     ['openJsonVerify', 'verifyReady', 'initVerify', '/json-verify'],
   ])('reinitializes fresh %s mounts and handles new directories on an already active route', (open, ready, init, route) => {
     const { sender } = setup();
-    const dir = path.resolve('game');
+    const dir = gameDir;
     invoke(open, sender, dir);
     invoke(ready, sender, { fresh: true });
     sender.send.mockClear();
@@ -92,7 +116,7 @@ describe('inline workspace IPC', () => {
     invoke(ready, sender);
     expect(sender.send.mock.calls.filter(([channel]) => channel === init)).toHaveLength(0);
     sender.getURL.mockReturnValue(`file:///app/index.html#${route}`);
-    const nextDir = path.resolve('other-game');
+    const nextDir = otherGameDir;
     invoke(open, sender, nextDir);
     expect(sender.send).toHaveBeenCalledWith(init, nextDir);
     sender.send.mockClear();
@@ -102,7 +126,7 @@ describe('inline workspace IPC', () => {
 
   it('keeps JSON writes scoped to the selected inline project and sender', () => {
     const { sender } = setup();
-    const dir = path.resolve('game');
+    const dir = gameDir;
     invoke('openJsonVerify', sender, dir);
     invoke('verifyReady', sender);
     const request = { requestId: 'save-1', fileName: 'Map001.json', targetPath: path.join(dir, 'Map001.json'), expectedContent: '{}', nextContent: '{"x":1}' };
@@ -133,7 +157,7 @@ describe('inline workspace IPC', () => {
 
   it('starts translation and navigates back to its engine without closing main', () => {
     const { win, sender } = setup();
-    const dir = path.resolve('game');
+    const dir = gameDir;
     mocks.validate.mockReturnValue({ dir, game: 'wolf' });
     invoke('openLLMSettings', sender, { dir, game: 'wolf' });
     invoke('llmSettingsApply', sender, { llmParallelWorkers: 2 });
@@ -181,6 +205,47 @@ describe('inline workspace IPC', () => {
     expect(sender.send).toHaveBeenCalledWith('settingsSaveFailed');
     expect(sender.send.mock.calls.filter(([channel]) => channel === 'workspaceNavigate')).toHaveLength(0);
     expect(mocks.storageSet).not.toHaveBeenCalled();
+  });
+
+  it('preserves runtime settings and releases submission when persistence fails', () => {
+    const { ctx, sender } = setup();
+    invoke('settings', sender);
+    ctx.settings.llmModel = 'saved-model';
+    const before = ctx.settings;
+    sender.send.mockClear();
+    mocks.storageSet.mockImplementationOnce(() => { throw new Error('disk full'); });
+    invoke('applysettings', sender, { llmModel: 'draft-model' });
+    expect(ctx.settings).toBe(before);
+    expect(ctx.settings.llmModel).toBe('saved-model');
+    expect(sender.send).toHaveBeenCalledWith('settingsSaveFailed');
+    expect(sender.send.mock.calls.some(([channel]) => ['settingsSaved', 'workspaceNavigate'].includes(channel))).toBe(false);
+  });
+
+  it('does not start translation or replace runtime options when settings persistence fails', () => {
+    const { ctx, sender } = setup();
+    ctx.settings.llmParallelWorkers = 1;
+    const before = ctx.settings;
+    mocks.validate.mockReturnValue({ dir: gameDir, game: 'wolf' });
+    invoke('openLLMSettings', sender, { dir: gameDir, game: 'wolf' });
+    sender.send.mockClear();
+    mocks.storageSet.mockImplementationOnce(() => { throw new Error('disk full'); });
+    invoke('llmSettingsApply', sender, { llmParallelWorkers: 4 });
+    expect(ctx.settings).toBe(before);
+    expect(ctx.settings.llmParallelWorkers).toBe(1);
+    expect(sender.send).toHaveBeenCalledWith('llmSettingsApplyResult', { success: false });
+    expect(mocks.trans).not.toHaveBeenCalled();
+    expect(sender.send.mock.calls.some(([channel]) => channel === 'workspaceNavigate')).toBe(false);
+  });
+
+  it('keeps the original custom prompt when guideline persistence fails', async () => {
+    const { ctx } = setup();
+    ctx.settings.llmCustomPrompt = 'original prompt';
+    const before = ctx.settings;
+    mocks.storageSet.mockImplementationOnce(() => { throw new Error('disk full'); });
+    const apply = mocks.handle.mock.calls.find(([channel]) => channel === 'applyGuidelineDraft')![1];
+    await expect(apply({}, { guideline: 'new guideline', mode: 'append' })).rejects.toThrow('disk full');
+    expect(ctx.settings).toBe(before);
+    expect(ctx.settings.llmCustomPrompt).toBe('original prompt');
   });
 
   it('releases translation submission after invalid project without starting work', () => {

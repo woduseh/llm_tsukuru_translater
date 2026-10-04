@@ -113,6 +113,22 @@ describe('mutation patch executor', () => {
     expect(fs.readFileSync(targetPath)).toEqual(original);
   });
 
+  it('preserves an external edit made after execution validation and before atomic replacement', async () => {
+    const { projectRoot, targetPath } = makeProject('preimage-conflict', Buffer.from('Hello', 'utf-8'));
+    const executor = createMutationPatchExecutor({
+      projectRoot,
+      atomicWrite(filePath, content, options) {
+        fs.writeFileSync(filePath, 'External edit', 'utf-8');
+        atomicWriteTextFile(filePath, content, options);
+      },
+    });
+    const runtime = new MutationApprovalRuntime({ projectRoot, executor });
+    const submitted = runtime.submit(makeRequest([replaceLine('op-001', 1, 'Hello', '안녕')]), 'renderer');
+    const result = await runtime.approve({ schemaVersion: 1, approvalId: submitted.approvalId });
+    expect(result).toMatchObject({ status: 'failed', failure: { code: 'approval-stale', retryable: true } });
+    expect(fs.readFileSync(targetPath, 'utf-8')).toBe('External edit');
+  });
+
   it('records applied metadata and hashes without patch text, tokens, sessions, or absolute paths', async () => {
     const { projectRoot } = makeProject(
       'audit',

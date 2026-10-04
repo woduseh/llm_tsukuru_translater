@@ -1,49 +1,5 @@
 import { onUnmounted } from 'vue'
-import type {
-  MutationApprovalApproveRequest,
-  MutationApprovalDenyRequest,
-  MutationApprovalGetRequest,
-  MutationApprovalListRequest,
-  MutationApprovalOperationResult,
-  MutationApprovalQueueSnapshot,
-  PatchApplyProposalRequest,
-  TerminalEvent,
-  TerminalInputRequest,
-  TerminalKillRequest,
-  TerminalOperationResult,
-  TerminalResizeRequest,
-  TerminalSessionCreateRequest,
-  TerminalSnapshotRequest,
-} from '../../types/agentWorkspace'
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type IpcCallback = (...args: any[]) => void
-
-interface ElectronApi {
-  send: (channel: string, ...args: unknown[]) => void
-  on: (channel: string, callback: IpcCallback) => (() => void) | undefined
-  once: (channel: string, callback: IpcCallback) => void
-  removeAllListeners: (channel: string) => void
-  invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
-  terminal: {
-    create: (request: TerminalSessionCreateRequest) => Promise<TerminalOperationResult>
-    input: (request: TerminalInputRequest) => Promise<TerminalOperationResult>
-    resize: (request: TerminalResizeRequest) => Promise<TerminalOperationResult>
-    kill: (request: TerminalKillRequest) => Promise<TerminalOperationResult>
-    list: () => Promise<TerminalOperationResult>
-    snapshot: (request: TerminalSnapshotRequest) => Promise<TerminalOperationResult>
-    onEvent: (callback: (event: TerminalEvent) => void) => () => void
-    onSessions: (callback: (result: TerminalOperationResult) => void) => () => void
-  }
-  approvals: {
-    submit: (request: PatchApplyProposalRequest) => Promise<MutationApprovalOperationResult>
-    list: (request: MutationApprovalListRequest) => Promise<MutationApprovalOperationResult>
-    get: (request: MutationApprovalGetRequest) => Promise<MutationApprovalOperationResult>
-    approve: (request: MutationApprovalApproveRequest) => Promise<MutationApprovalOperationResult>
-    deny: (request: MutationApprovalDenyRequest) => Promise<MutationApprovalOperationResult>
-    onChanged: (callback: (snapshot: MutationApprovalQueueSnapshot) => void) => () => void
-  }
-}
+import type { ElectronApi, IpcCallback, ReceiveChannel } from '../../types/ipc'
 
 interface NodeFs {
   readTextFile: (filePath: string) => Promise<string>
@@ -82,18 +38,10 @@ declare global {
   }
 }
 
-export const api = {
-  send: (channel: string, ...args: unknown[]) => window.api.send(channel, ...args),
-  on: (channel: string, callback: IpcCallback) => window.api.on(channel, callback),
-  once: (channel: string, callback: IpcCallback) => window.api.once(channel, callback),
-  removeAllListeners: (channel: string) => window.api.removeAllListeners(channel),
-  invoke: (channel: string, ...args: unknown[]) => window.api.invoke(channel, ...args),
-  terminal: window.api.terminal,
-  approvals: window.api.approvals,
-}
+export const api: ElectronApi = window.api
 
 /** Register an IPC listener that auto-cleans on component unmount */
-export function useIpcOn(channel: string, callback: IpcCallback) {
+export function useIpcOn<C extends ReceiveChannel>(channel: C, callback: IpcCallback<C>) {
   const unsubscribe = api.on(channel, callback)
   onUnmounted(() => {
     unsubscribe?.()

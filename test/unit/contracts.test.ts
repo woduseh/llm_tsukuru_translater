@@ -8,6 +8,8 @@ import {
 import {
   RECEIVE_CHANNELS,
   SEND_CHANNELS,
+  INVOKE_CHANNELS,
+  isInvokeChannel,
   isReceiveChannel,
   isSendChannel,
 } from '../../src/types/ipc';
@@ -23,9 +25,9 @@ describe('IPC channel contract', () => {
   it('keeps channel allowlists stable and type-guarded for preload and renderer agents', () => {
     expect(SEND_CHANNELS).toContain('llmSettingsApply');
     expect(SEND_CHANNELS).toContain('verifyReady');
-    expect(SEND_CHANNELS).toContain('prepareAgentMcpConnection');
-    expect(SEND_CHANNELS).toContain('mutationApprovalApprove');
-    expect(SEND_CHANNELS).toContain('mutationApprovalDeny');
+    expect(INVOKE_CHANNELS).toContain('prepareAgentMcpConnection');
+    expect(INVOKE_CHANNELS).toContain('mutationApprovalApprove');
+    expect(INVOKE_CHANNELS).toContain('mutationApprovalDeny');
     expect(RECEIVE_CHANNELS).toContain('llmSettings');
     expect(RECEIVE_CHANNELS).toContain('verifyLlmRepairDone');
     expect(RECEIVE_CHANNELS).toContain('replace-allowed-paths');
@@ -33,6 +35,9 @@ describe('IPC channel contract', () => {
 
     expect(isSendChannel('openLLMCompare')).toBe(true);
     expect(isSendChannel('unknown-channel')).toBe(false);
+    expect(isSendChannel('compareSaveText')).toBe(false);
+    expect(isInvokeChannel('compareSaveText')).toBe(true);
+    expect(isInvokeChannel('openLLMCompare')).toBe(false);
     expect(isReceiveChannel('initCompare')).toBe(true);
     expect(isReceiveChannel('unknown-channel')).toBe(false);
   });

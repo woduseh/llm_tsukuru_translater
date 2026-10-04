@@ -20,6 +20,7 @@ import {
   validatePatchApplyProposalRequest,
   validatePatchApplyProposalShape,
   type MutationApprovalRecord,
+  type ApplyingMutationApprovalRecord,
 } from './mutationApprovalContracts';
 import type {
   JsonObject,
@@ -31,7 +32,7 @@ import type {
 } from '../types/agentWorkspace';
 
 export type MutationApprovalExecutor = (
-  record: Readonly<MutationApprovalRecord>,
+  record: Readonly<ApplyingMutationApprovalRecord>,
 ) => MutationApprovalResultView | Promise<MutationApprovalResultView>;
 
 export interface MutationApprovalRuntimeOptions {
@@ -80,6 +81,7 @@ export class MutationApprovalRuntime {
     const workspaceRoot = path.join(this.projectRoot, AGENT_WORKSPACE_DIRECTORY);
     this.approvals = new ApprovalService({
       auditRoot: workspaceRoot,
+      projectRoot: this.projectRoot,
       sessionId: this.appSessionId,
       auditMode: 'metadata-only',
       now: this.now,
@@ -218,10 +220,9 @@ export class MutationApprovalRuntime {
       throw new MutationApprovalRuntimeError('invalid-state', `Approval is not pending: ${record.status}.`);
     }
     const denied = transitionMutationApproval(record, { type: 'deny', note: request.value.note });
-    this.records.set(denied.approvalId, denied);
-    this.approvals.updateApprovalStatus(denied.approvalId, 'denied');
+    const completed = this.saveDecision(denied, () => this.approvals.updateApprovalStatus(denied.approvalId, 'denied'));
     this.emitChanged();
-    return toMutationApprovalRendererView(denied);
+    return toMutationApprovalRendererView(completed);
   }
 
   async approve(value: unknown): Promise<MutationApprovalRendererView> {
@@ -271,17 +272,7 @@ export class MutationApprovalRuntime {
         );
       }
       const applied = transitionMutationApproval(latest, { type: 'applied', result });
-      this.records.set(applied.approvalId, applied);
-      this.approvals.writeToolAudit({
-        requestId: applied.requestId,
-        toolName: 'patch.apply',
-        action: 'applied approved patch',
-        args: approvalArgs(current.value.request),
-        status: 'ok',
-        paths: applied.affectedPaths,
-      });
-      this.emitChanged();
-      return toMutationApprovalRendererView(applied);
+      return this.finishExecution(applied, approvalArgs(current.value.request));
     } catch (error) {
       const latest = this.records.get(applying.approvalId);
       if (latest?.status !== 'applying') {
@@ -296,17 +287,7 @@ export class MutationApprovalRuntime {
           retryable: error instanceof MutationPatchExecutionError ? error.retryable : false,
         },
       });
-      this.records.set(failed.approvalId, failed);
-      this.approvals.writeToolAudit({
-        requestId: failed.requestId,
-        toolName: 'patch.apply',
-        action: 'approved patch execution failed',
-        args: approvalArgs(current.value.request),
-        status: 'failed',
-        paths: failed.affectedPaths,
-      });
-      this.emitChanged();
-      return toMutationApprovalRendererView(failed);
+      return this.finishExecution(failed, approvalArgs(current.value.request));
     }
   }
 
@@ -318,6 +299,39 @@ export class MutationApprovalRuntime {
       approvals,
       pendingCount: approvals.filter((approval) => approval.status === 'pending').length,
     };
+  }
+
+  private finishExecution(record: MutationApprovalRecord, args: JsonObject): MutationApprovalRendererView {
+    const completed = this.saveDecision(record, () => {
+      this.approvals.writeToolAudit({
+        requestId: record.requestId,
+        toolName: 'patch.apply',
+        action: record.status === 'applied' ? 'applied approved patch' : 'approved patch execution failed',
+        args,
+        status: record.status === 'applied' ? 'ok' : 'failed',
+        paths: record.affectedPaths,
+      });
+    });
+    this.emitChanged();
+    return toMutationApprovalRendererView(completed);
+  }
+
+  private saveDecision(record: MutationApprovalRecord, audit: () => unknown): MutationApprovalRecord {
+    let completed = record;
+    this.records.set(record.approvalId, record);
+    try {
+      audit();
+    } catch {
+      completed = {
+        ...record,
+        auditWarning: {
+          code: 'audit-write-failed',
+          message: 'The approval result is confirmed, but its audit record could not be saved. Inspect the approval status before submitting another patch.',
+        },
+      };
+      this.records.set(completed.approvalId, completed);
+    }
+    return completed;
   }
 
   dispose(reason = 'runtime-disposed'): void {
@@ -333,8 +347,7 @@ export class MutationApprovalRuntime {
           retryable: true,
         },
       });
-      this.records.set(cancelled.approvalId, cancelled);
-      this.approvals.updateApprovalStatus(cancelled.approvalId, 'cancelled');
+      this.saveDecision(cancelled, () => this.approvals.updateApprovalStatus(cancelled.approvalId, 'cancelled'));
     }
     this.disposed = true;
     this.emitChanged();
@@ -353,10 +366,9 @@ export class MutationApprovalRuntime {
         retryable: true,
       },
     });
-    this.records.set(stale.approvalId, stale);
-    this.approvals.updateApprovalStatus(stale.approvalId, 'stale');
+    const completed = this.saveDecision(stale, () => this.approvals.updateApprovalStatus(stale.approvalId, 'stale'));
     this.emitChanged();
-    return toMutationApprovalRendererView(stale);
+    return toMutationApprovalRendererView(completed);
   }
 
   private expirePending(): void {
@@ -365,8 +377,7 @@ export class MutationApprovalRuntime {
     for (const record of this.records.values()) {
       if (record.status !== 'pending' || Date.parse(record.expiresAt) > nowMs) continue;
       const expired = transitionMutationApproval(record, { type: 'expire' });
-      this.records.set(expired.approvalId, expired);
-      this.approvals.updateApprovalStatus(expired.approvalId, 'expired');
+      this.saveDecision(expired, () => this.approvals.updateApprovalStatus(expired.approvalId, 'expired'));
       changed = true;
     }
     if (changed) this.emitChanged();
