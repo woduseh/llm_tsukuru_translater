@@ -7,12 +7,14 @@ class StubTranslator extends ProviderTranslationBase {
   constructor(
     private readonly translate: (text: string) => Promise<string>,
     doNotTransHangul = false,
+    controlCodePolicy: 'warn' | 'strict' = 'warn',
   ) {
     super({
       chunkSize: 2,
       translationUnit: 'chunk',
       doNotTransHangul,
       maxRetries: 0,
+      controlCodePolicy,
       maxApiRetries: 0,
     });
   }
@@ -67,9 +69,31 @@ describe('ProviderTranslationBase terminal failures', () => {
   });
 
   it('returns a failure without savable content when a provider changes control codes', async () => {
-    const translator = new StubTranslator(async () => '--- 1 ---\n안녕 \\V[2]');
+    const translator = new StubTranslator(async () => '--- 1 ---\n안녕 \\V[2]', false, 'strict');
     const result = await translator.translateFileContent('--- 1 ---\nHello \\V[1]');
     expect(result).toMatchObject({ status: 'failed', error: expect.stringContaining('control codes changed') });
+    expect(result).not.toHaveProperty('translatedContent');
+  });
+
+  it('preserves translations and logs every changed icon line by default', async () => {
+    const translator = new StubTranslator(async () => '--- 1 ---\n물약\n--- 2 ---\n검 \\I[65]');
+    const result = await translator.translateFileContent('--- 1 ---\nPotion \\i[64]\n--- 2 ---\nSword \\i[65]');
+    expect(result.status).toBe('translated');
+    expect(result.translatedContent).toBe('--- 1 ---\n물약\n--- 2 ---\n검 \\I[65]');
+    expect(result.logEntry.errors).toEqual([]);
+    expect(result.logEntry.warnings).toEqual([
+      'control codes changed at line 2: original=["\\\\i[64]"], translated=[]',
+      'control codes changed at line 4: original=["\\\\i[65]"], translated=["\\\\I[65]"]',
+    ]);
+  });
+
+  it.each([
+    '--- 2 ---\n안녕\n\n끝',
+    '--- 1 ---\n안녕\n채워짐\n끝',
+    '--- 1 ---\n안녕\n\n끝\n추가',
+  ])('still rejects structural drift in warning mode: %s', async (translated) => {
+    const result = await new StubTranslator(async () => translated).translateFileContent('--- 1 ---\nHello \\i[64]\n\nEnd');
+    expect(result.status).toBe('failed');
     expect(result).not.toHaveProperty('translatedContent');
   });
 

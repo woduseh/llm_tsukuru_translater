@@ -38,6 +38,7 @@ export const settings: AppSettings = {
     llmCustomPrompt: '',
     llmChunkSize: 30,
     llmMaxRetries: 2,
+    llmControlCodePolicy: 'warn',
     llmMaxApiRetries: 5,
     llmTimeout: 600,
     llmParallelWorkers: 1,

@@ -97,6 +97,14 @@
         <input type="number" id="llmChunkSize" class="text-input short" v-model.number="settings.llmChunkSize" min="1" max="200">
       </div>
       <div class="setting-item">
+        <label for="llmControlCodePolicy">제어문자 불일치 처리</label>
+        <select id="llmControlCodePolicy" class="text-input" v-model="settings.llmControlCodePolicy">
+          <option value="warn">경고 후 저장 (기본)</option>
+          <option value="strict">저장 차단</option>
+        </select>
+      </div>
+      <div class="provider-hint">번역문을 보존하고 문제 줄과 제어문자를 로그에 남겨요. 적용 전 검수해 주세요. 줄 수·구분자·빈 줄 오류는 항상 저장을 차단해요.</div>
+      <div class="setting-item">
         <label for="llmMaxRetries">검증 재시도 <span class="hint">번역 검증 실패 시</span></label>
         <input type="number" id="llmMaxRetries" class="text-input short" v-model.number="settings.llmMaxRetries" min="0" max="10">
       </div>
@@ -167,6 +175,7 @@ const settings = reactive<Record<string, any>>({
   llmClaudeApiKey: '', llmMaxTokens: 4096,
   llmVertexServiceAccountJson: '', llmVertexLocation: DEFAULT_LLM_VERTEX_LOCATION,
   llmSourceLang: 'ja', llmTargetLang: 'ko', llmTranslationUnit: 'file',
+  llmControlCodePolicy: 'warn',
   llmChunkSize: 30, llmMaxRetries: 2, llmMaxApiRetries: 5, llmTimeout: 600,
   llmCustomPrompt: '', extractPlus: [], extractSomeScript2: [], theme: 'Dracula',
 })

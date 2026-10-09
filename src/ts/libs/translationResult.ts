@@ -1,5 +1,6 @@
 import type { BlockValidation, TranslationLogEntry } from './translationCore';
-import { compareTranslationLineStructure } from './translationSyntax';
+import type { ControlCodePolicy } from '../../types/settings';
+import { extractTranslationControlCodes, compareTranslationLineStructure } from './translationSyntax';
 
 export type TranslationRunLog = Omit<TranslationLogEntry, 'timestamp' | 'fileName' | 'cached'>;
 
@@ -18,14 +19,17 @@ export type TranslationOutcome = TranslationDiagnostics & (
 export interface FileValidationResult {
   ok: boolean;
   errors: string[];
+  warnings: string[];
 }
 
 export function validateTranslatedFileContent(
   originalContent: string,
   translatedContent: string,
   blockValidation: BlockValidation[] = [],
+  controlCodePolicy: ControlCodePolicy = 'strict',
 ): FileValidationResult {
   const errors: string[] = [];
+  const warnings: string[] = [];
   const originalLines = originalContent.split('\n');
   const translatedLines = translatedContent.split('\n');
   if (originalLines.length !== translatedLines.length) {
@@ -38,11 +42,14 @@ export function validateTranslatedFileContent(
     if (changes.emptyLineChanged) {
       errors.push(`${originalLine === '' ? 'empty line filled' : 'non-empty line emptied'} at line ${i + 1}`);
     }
-    if (changes.controlCodesChanged) errors.push(`control codes changed at line ${i + 1}`);
+    if (changes.controlCodesChanged) {
+      const message = `control codes changed at line ${i + 1}: original=${JSON.stringify(extractTranslationControlCodes(originalLine))}, translated=${JSON.stringify(extractTranslationControlCodes(translatedLines[i] ?? ''))}`;
+      (controlCodePolicy === 'warn' ? warnings : errors).push(message);
+    }
   }
   const failedBlocks = blockValidation.filter(block => !block.lineCountMatch || !block.separatorMatch);
   if (failedBlocks.length) errors.push(`block validation failed (${failedBlocks.length} blocks)`);
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors, warnings };
 }
 
 /** Producer-side completion: provider failure, cancellation and structural rules are resolved here. */
@@ -50,7 +57,7 @@ export function finishFileTranslation(
   originalContent: string,
   translatedContent: string,
   diagnostics: TranslationDiagnostics,
-  execution: { aborted?: boolean; incomplete?: boolean } = {},
+  execution: { aborted?: boolean; incomplete?: boolean; controlCodePolicy?: ControlCodePolicy } = {},
 ): TranslationOutcome {
   if (execution.aborted) return { ...diagnostics, status: 'aborted' };
   if (execution.incomplete || diagnostics.logEntry.errorBlocks > 0) {
@@ -59,7 +66,15 @@ export function finishFileTranslation(
       error: diagnostics.logEntry.errors[0] || '제공자 오류로 일부 청크가 번역되지 않았습니다',
     };
   }
-  const validation = validateTranslatedFileContent(originalContent, translatedContent, diagnostics.validation);
+  const validation = validateTranslatedFileContent(originalContent, translatedContent, diagnostics.validation, execution.controlCodePolicy ?? 'warn');
+  diagnostics = {
+    ...diagnostics,
+    logEntry: {
+      ...diagnostics.logEntry,
+      ...(validation.warnings.length ? { warnings: validation.warnings } : {}),
+      errors: [...diagnostics.logEntry.errors, ...validation.errors],
+    },
+  };
   if (!validation.ok) return { ...diagnostics, status: 'failed', error: validation.errors[0] };
   const intentionallySkippedAll = diagnostics.logEntry.totalBlocks > 0
     && diagnostics.logEntry.skippedBlocks === diagnostics.logEntry.totalBlocks;

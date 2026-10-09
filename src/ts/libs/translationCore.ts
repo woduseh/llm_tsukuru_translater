@@ -29,6 +29,7 @@ export interface TranslationLogEntry {
   cached: boolean;
   durationMs: number;
   errors: string[];
+  warnings?: string[];
 }
 
 export interface TranslationLog {

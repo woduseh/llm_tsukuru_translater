@@ -7,6 +7,7 @@ Behavioral contracts for the affected code, not a mandatory verification sequenc
 - Dialogue separators such as `--- 101 ---` and Wolf `--- 101-0 ---` must survive translation unchanged; a normal line must not become a separator.
 - Empty lines must stay empty.
 - Per-block line counts must not drift unless a tool explicitly repairs them.
+- LLM bulk/file/block translation defaults to warning-and-save for control-code drift; logs include every physical line and original/translated code sequences. The strict setting blocks saving. Both modes reject line-count, separator and empty-line drift. Review and approved MCP patches retain strict validation.
 - RPG Maker control codes such as `\\V[1]`, `\\N[2]`, `\\C[3]`, `\\G`, `\\$`, `\\{`, and `\\}` must be preserved, including Wolf `%1`-style parameters and their order.
 - BOM stripping and write behavior must stay consistent across read/write helpers.
 

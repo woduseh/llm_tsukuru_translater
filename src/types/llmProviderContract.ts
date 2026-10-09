@@ -67,7 +67,7 @@ export const LLM_PROVIDER_METADATA = {
     secretSettingKeys: ['llmApiKey'],
     cacheKeyParts: [
       'llmProvider', 'llmModel', 'llmTargetLang', 'llmSourceLang', 'llmCustomPrompt',
-      'DoNotTransHangul', 'llmTranslationUnit', 'llmChunkSize',
+      'DoNotTransHangul', 'llmTranslationUnit', 'llmChunkSize', 'llmControlCodePolicy',
     ],
     maxRecommendedConcurrency: 1,
     capabilities: ['bulkTranslate', 'retranslate', 'jsonRepair', 'liveHarness'],
@@ -107,7 +107,7 @@ export const LLM_PROVIDER_METADATA = {
     secretSettingKeys: ['llmVertexServiceAccountJson'],
     cacheKeyParts: [
       'llmProvider', 'llmModel', 'llmTargetLang', 'llmSourceLang', 'llmCustomPrompt', 'llmVertexLocation',
-      'DoNotTransHangul', 'llmTranslationUnit', 'llmChunkSize',
+      'DoNotTransHangul', 'llmTranslationUnit', 'llmChunkSize', 'llmControlCodePolicy',
     ],
     maxRecommendedConcurrency: 1,
     capabilities: ['bulkTranslate', 'retranslate', 'jsonRepair', 'liveHarness'],
@@ -139,7 +139,7 @@ export const LLM_PROVIDER_METADATA = {
     secretSettingKeys: ['llmOpenAiApiKey'],
     cacheKeyParts: [
       'llmProvider', 'llmModel', 'llmTargetLang', 'llmSourceLang', 'llmCustomPrompt',
-      'DoNotTransHangul', 'llmTranslationUnit', 'llmChunkSize',
+      'DoNotTransHangul', 'llmTranslationUnit', 'llmChunkSize', 'llmControlCodePolicy',
     ],
     maxRecommendedConcurrency: 2,
     capabilities: ['bulkTranslate', 'retranslate', 'jsonRepair', 'liveHarness'],
@@ -179,7 +179,7 @@ export const LLM_PROVIDER_METADATA = {
     secretSettingKeys: ['llmCustomApiKey'],
     cacheKeyParts: [
       'llmProvider', 'llmCustomBaseUrl', 'llmModel', 'llmTargetLang', 'llmSourceLang', 'llmCustomPrompt',
-      'DoNotTransHangul', 'llmTranslationUnit', 'llmChunkSize',
+      'DoNotTransHangul', 'llmTranslationUnit', 'llmChunkSize', 'llmControlCodePolicy',
     ],
     maxRecommendedConcurrency: 2,
     capabilities: ['bulkTranslate', 'retranslate', 'jsonRepair', 'liveHarness'],
@@ -219,7 +219,7 @@ export const LLM_PROVIDER_METADATA = {
     secretSettingKeys: ['llmClaudeApiKey'],
     cacheKeyParts: [
       'llmProvider', 'llmModel', 'llmTargetLang', 'llmSourceLang', 'llmCustomPrompt', 'llmMaxTokens',
-      'DoNotTransHangul', 'llmTranslationUnit', 'llmChunkSize',
+      'DoNotTransHangul', 'llmTranslationUnit', 'llmChunkSize', 'llmControlCodePolicy',
     ],
     maxRecommendedConcurrency: 2,
     capabilities: ['bulkTranslate', 'retranslate', 'jsonRepair', 'liveHarness'],

@@ -1,5 +1,5 @@
 import { hanguls } from '../rpgmv/datas';
-import type { AppSettings } from '../../types/settings';
+import type { AppSettings, ControlCodePolicy } from '../../types/settings';
 import {
   API_BACKOFF_BASE_MS,
   API_BACKOFF_MAX_MS,
@@ -24,6 +24,7 @@ export interface ProviderTranslationConfig {
   translationUnit: string;
   doNotTransHangul: boolean;
   maxRetries: number;
+  controlCodePolicy?: ControlCodePolicy;
   maxApiRetries: number;
   requestConcurrency?: number;
   requestsPerMinute?: number;
@@ -55,6 +56,7 @@ export function createProviderTranslatorConfig(
     targetLang,
     doNotTransHangul: !!settings.DoNotTransHangul,
     maxRetries: settings.llmMaxRetries ?? 2,
+    controlCodePolicy: settings.llmControlCodePolicy === 'strict' ? 'strict' : 'warn',
     maxApiRetries: settings.llmMaxApiRetries ?? 5,
     requestConcurrency: settings.llmParallelWorkers,
     requestsPerMinute: settings.llmRequestsPerMinute,
@@ -270,6 +272,6 @@ export abstract class ProviderTranslationBase {
     return finishFileTranslation(content, reassembleBlocks(results.flatMap((result) => result.validation.validatedBlocks)), {
       validation: results.flatMap((result) => result.validation.blockValidations),
       logEntry: logData,
-    }, { aborted: isAborted(), incomplete });
+    }, { aborted: isAborted(), incomplete, controlCodePolicy: this.baseConfig.controlCodePolicy });
   }
 }

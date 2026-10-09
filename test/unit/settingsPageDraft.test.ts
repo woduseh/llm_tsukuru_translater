@@ -72,6 +72,20 @@ describe('settings workspace drafts', () => {
     await nextTick()
     expect(workspaceDrafts.settingsDirty).toBe(false)
   })
+  it('shows warning mode by default and submits the selected strict policy', async () => {
+    const select = host.querySelector<HTMLSelectElement>('#llmControlCodePolicy')!
+    expect(select.value).toBe('warn')
+    select.value = 'strict'
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+    await nextTick()
+    host.querySelector<HTMLButtonElement>('.btn-primary')!.click()
+    await nextTick()
+    expect(send).toHaveBeenCalledWith('applysettings', expect.objectContaining({ llmControlCodePolicy: 'strict' }))
+    listeners.get('settingsSaved')!({})
+    await refresh({ llmControlCodePolicy: 'strict' })
+    expect(select.value).toBe('strict')
+  })
+
   it('restores the latest persisted values when cancelling edits', async () => {
     await edit('#llmModel', 'draft-model')
     await refresh({ llmModel: 'external-model' })

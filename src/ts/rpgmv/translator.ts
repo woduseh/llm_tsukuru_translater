@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import Tools from '../libs/projectTools';
 import { AppContext } from '../../appContext';
 import {
@@ -143,6 +144,13 @@ function writeTranslationLog(edir: string, log: TranslationLog) {
     const logFile = path.join(edir, `translation_log_${ts}.json`);
     atomicWriteJsonFile(logFile, log, 2);
     return logFile;
+}
+
+function writeRetranslationWarnings(edir: string, fileName: string, warnings: string[], onProgress?: (message: string) => void): void {
+    if (!warnings.length) return;
+    const logFile = path.join(edir, `retranslation_log_${Date.now()}_${crypto.randomUUID()}.json`);
+    atomicWriteJsonFile(logFile, { timestamp: new Date().toISOString(), fileName, warnings }, 2);
+    onProgress?.(`제어문자 경고 ${warnings.length}줄: 로그 ${path.basename(logFile)}`);
 }
 
 interface TransArg {
@@ -295,7 +303,7 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
         );
         const cached = cache.get(cacheKey);
         if (cached) {
-            const validation = validateTranslatedFileContent(originalContent, cached.translatedContent);
+            const validation = validateTranslatedFileContent(originalContent, cached.translatedContent, [], options.settings.llmControlCodePolicy ?? 'warn');
             if (validation.ok) {
                 if (!fileStillMatches(filePath, originalContent)) {
                     failedFiles.push(fileName);
@@ -317,6 +325,7 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
                     cached: true,
                     durationMs: 0,
                     errors: [],
+                    warnings: validation.warnings,
                 });
                 markWorked(fileName, '(캐시 사용)');
                 return;
@@ -386,10 +395,10 @@ export async function translateFilesWithCoordinator(options: TranslationCoordina
             errors: [
                 ...outcome.logEntry.errors,
                 ...(stalePreimage ? ['번역 중 파일이 변경되어 결과를 반영하지 않았습니다']
-                    : outcome.status === 'failed' ? [outcome.error] : []),
+                    : outcome.status === 'failed' && !outcome.logEntry.errors.includes(outcome.error) ? [outcome.error] : []),
             ],
         });
-        markWorked(result.fileName, translationSucceeded ? '' : stalePreimage ? '(파일 변경, 건너뜀)' : '(검증 실패)');
+        markWorked(result.fileName, translationSucceeded ? (outcome.logEntry.warnings?.length ? '(제어문자 경고, 저장됨)' : '') : stalePreimage ? '(파일 변경, 건너뜀)' : '(검증 실패)');
     }, (task, err) => {
         if (scheduler.isAborted()) {
             if (!options.isAborted()) executionFailure ??= { error: err };
@@ -638,6 +647,8 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
             const failMsg = result.failedFiles.length > 0
                 ? `\n번역 실패: ${result.failedFiles.length}개 파일 (${result.failedFiles.slice(0, 5).join(', ')}${result.failedFiles.length > 5 ? ' ...' : ''})`
                 : '';
+            const warningFiles = translationLog.entries.filter(entry => entry.warnings?.length && !result.failedFiles.includes(entry.fileName)).length;
+            const warningMsg = warningFiles ? `\n제어문자 경고: ${warningFiles}개 파일 (저장됨, 로그 확인 필요)` : '';
             const workerMsg = workerCount > 1 ? `\n동시 API 요청 수: ${workerCount}` : '';
             if (aborted) {
                 Tools.sendAlert(
@@ -646,7 +657,7 @@ export const trans = async (ev: unknown, arg: TransArg, ctx: AppContext) => {
             } else {
                 const resumeNote = isResuming ? `\n(이전 진행 상태에서 재개됨)` : '';
                 Tools.sendAlert(
-                    `번역 완료! (${durationSec}초 소요)\n백업: ${backupDir}\n로그: ${path.basename(logFile)}${resumeNote}${cacheMsg}${failMsg}${workerMsg}`
+                    `번역 완료! (${durationSec}초 소요)\n백업: ${backupDir}\n로그: ${path.basename(logFile)}${resumeNote}${cacheMsg}${failMsg}${warningMsg}${workerMsg}`
                 );
             }
         });
@@ -760,6 +771,7 @@ async function retranslateFileUnlocked(
         return { success: false, error: '재번역 중 파일이 변경되어 결과를 반영하지 않았습니다' };
     }
 
+    writeRetranslationWarnings(edir, fileName, outcome.logEntry.warnings ?? [], onProgress);
     if (translatedContent !== originalContent) {
         atomicWriteTextFile(filePath, translatedContent, { encoding: 'utf-8', expectedContent: translationPreimage });
     }
@@ -884,6 +896,7 @@ async function retranslateBlocksUnlocked(
             textToTranslate,
             translated,
             selectedValidation.blockValidations,
+            ctx.settings.llmControlCodePolicy,
         );
         if (!selectedFileValidation.ok) {
             return { success: false, error: selectedFileValidation.errors[0] || '선택 블록 검증에 실패했습니다' };
@@ -903,7 +916,7 @@ async function retranslateBlocksUnlocked(
         }
 
         const candidateContent = reassembleBlocks(candidateBlocks);
-        const candidateValidation = validateTranslatedFileContent(originalContent, candidateContent);
+        const candidateValidation = validateTranslatedFileContent(originalContent, candidateContent, [], ctx.settings.llmControlCodePolicy);
         if (!candidateValidation.ok) {
             return { success: false, error: candidateValidation.errors[0] || '최종 파일 검증에 실패했습니다' };
         }
@@ -914,6 +927,7 @@ async function retranslateBlocksUnlocked(
             return { success: false, error: '재번역 중 파일이 변경되어 결과를 반영하지 않았습니다' };
         }
 
+        writeRetranslationWarnings(edir, fileName, candidateValidation.warnings, onProgress);
         atomicWriteTextFile(filePath, candidateContent, { encoding: 'utf-8', expectedContent: transContent });
 
         // Invalidate cache

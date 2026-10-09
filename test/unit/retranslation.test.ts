@@ -35,7 +35,7 @@ describe('selected-block retranslation safeguards', () => {
     ['separator', '--- 999 ---\n\\C[1]새 번역\n'],
     ['empty line', '--- 101-0 ---\n\\C[1]새 번역\n채워짐'],
     ['control code', '--- 101-0 ---\n\\C[2]새 번역\n'],
-  ])('rejects %s drift before writing', async (_caseName, providerText) => {
+  ])('rejects %s drift before writing in strict mode', async (_caseName, providerText) => {
     const project = makeProject();
     mockGeminiResponse(providerText);
 
@@ -45,6 +45,22 @@ describe('selected-block retranslation safeguards', () => {
 
     expect(result.success).toBe(false);
     expect(fs.readFileSync(project.filePath, 'utf-8')).toBe(project.currentContent);
+  });
+
+  it.each(['file', 'blocks'])('saves %s retranslation with durable physical-line warnings in warning mode', async (kind) => {
+    const project = makeProject();
+    const context = createContext();
+    context.settings.llmControlCodePolicy = 'warn';
+    mockGeminiResponse('--- 101-0 ---\n새 번역\n\n--- 101-1 ---\n새 세계');
+    const result = kind === 'file'
+      ? await retranslateFile(project.edir, project.fileName, 'ja', 'ko', context)
+      : await retranslateBlocks(project.edir, project.fileName, [0, 1], 'ja', 'ko', context);
+    expect(result.success).toBe(true);
+    expect(fs.readFileSync(project.filePath, 'utf-8')).toBe('--- 101-0 ---\n새 번역\n\n--- 101-1 ---\n새 세계');
+    const logName = fs.readdirSync(project.edir).find(name => name.startsWith('retranslation_log_'))!;
+    const log = JSON.parse(fs.readFileSync(path.join(project.edir, logName), 'utf-8'));
+    expect(log.fileName).toBe(project.fileName);
+    expect(log.warnings).toEqual([expect.stringContaining('line 2: original=')]);
   });
 
   it('writes atomically only after selected and final file validation pass', async () => {
@@ -221,6 +237,7 @@ function createContext(): AppContext {
       llmTranslationUnit: 'chunk',
       llmChunkSize: 30,
       llmMaxRetries: 0,
+      llmControlCodePolicy: 'strict',
       llmMaxApiRetries: 0,
       DoNotTransHangul: false,
     },

@@ -112,6 +112,7 @@ function normalizeFingerprintValue(
   provider: LlmProvider,
   args: ProviderConfigFingerprintArgs,
 ): unknown {
+  if (key === 'llmControlCodePolicy') return args.settings.llmControlCodePolicy === 'strict' ? 'strict' : 'warn';
   if (key === 'llmProvider') return provider;
   if (key === 'llmModel') return args.model.trim();
   if (key === 'llmSourceLang') return args.sourceLang.trim();

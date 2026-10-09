@@ -482,6 +482,37 @@ describe('parallel translation safeguards', () => {
     }
   });
 
+  it('saves warning results, logs cached warnings, and blocks them after switching to strict', async () => {
+    const { edir, backupDir, files } = makeProject(['Icons.txt']);
+    const filePath = path.join(edir, files[0]);
+    const original = '--- 1 ---\nPotion \\i[64]\n--- 2 ---\nSword \\i[65]';
+    const translated = '--- 1 ---\n물약\n--- 2 ---\n검';
+    fs.writeFileSync(filePath, original);
+    const options = baseOptions(edir, backupDir, files, 1);
+    const request = vi.fn(async () => translated);
+    const first = await translateFilesWithCoordinator({ ...options,
+      createTranslatorForFile: () => chunkTranslator(request, { translationUnit: 'file' }),
+    });
+    expect(first.failedFiles).toEqual([]);
+    expect(fs.readFileSync(filePath, 'utf-8')).toBe(translated);
+    expect(first.entries[0].warnings).toHaveLength(2);
+    fs.writeFileSync(filePath, original);
+    const cached = await translateFilesWithCoordinator({ ...options, completedFiles: new Set() });
+    expect(cached.entries[0].cached).toBe(true);
+    expect(cached.entries[0].warnings).toEqual(first.entries[0].warnings);
+    expect(fs.readFileSync(filePath, 'utf-8')).toBe(translated);
+    fs.writeFileSync(filePath, original);
+    const strict = await translateFilesWithCoordinator({ ...options, completedFiles: new Set(),
+      settings: { ...options.settings, llmControlCodePolicy: 'strict' },
+      createTranslatorForFile: () => chunkTranslator(request, { translationUnit: 'file', controlCodePolicy: 'strict' }),
+    });
+    expect(strict.failedFiles).toEqual(files);
+    expect(strict.entries[0].cached).toBe(false);
+    expect(strict.entries[0].errors).toHaveLength(2);
+    expect(fs.readFileSync(filePath, 'utf-8')).toBe(original);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
   it('detects separator, empty-line, line-count, and control-code regressions', () => {
     const original = '--- 1 ---\n\\C[1]Hello\n\nWorld';
     expect(validateTranslatedFileContent(original, '--- 2 ---\n\\C[1]Hello\n\nWorld').ok).toBe(false);

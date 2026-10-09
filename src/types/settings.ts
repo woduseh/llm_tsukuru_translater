@@ -1,3 +1,5 @@
+export type ControlCodePolicy = 'warn' | 'strict';
+
 export type LlmProvider = 'gemini' | 'vertex' | 'openai' | 'custom-openai' | 'claude';
 
 export const DEFAULT_LLM_PROVIDER: LlmProvider = 'gemini';
@@ -35,6 +37,7 @@ export interface AppSettings {
   llmCustomPrompt: string;
   llmChunkSize: number;
   llmMaxRetries: number;
+  llmControlCodePolicy: ControlCodePolicy;
   llmMaxApiRetries: number;
   llmTimeout: number;
   llmParallelWorkers: number;

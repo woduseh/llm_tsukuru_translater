@@ -140,3 +140,10 @@ describe('applyValidatedSettingsUpdate', () => {
       .toThrow(/llmRequestsPerMinute/);
   });
 });
+
+ it('defaults old settings to warning mode and validates the strict option', () => {
+    const defaults = sanitizeStoredSettings({});
+    expect(defaults.llmControlCodePolicy).toBe('warn');
+    expect(applyValidatedSettingsUpdate(defaults, { llmControlCodePolicy: 'strict' }).llmControlCodePolicy).toBe('strict');
+    expect(() => applyValidatedSettingsUpdate(defaults, { llmControlCodePolicy: 'ignore' })).toThrow('llmControlCodePolicy');
+  });

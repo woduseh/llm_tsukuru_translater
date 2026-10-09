@@ -148,6 +148,11 @@ function validateSettingValue(
       : invalid('알 수 없는 테마입니다');
   }
 
+  if (key === 'llmControlCodePolicy') {
+    return value === 'warn' || value === 'strict'
+      ? value : invalid('warn 또는 strict만 허용됩니다');
+  }
+
   if (key === 'llmTranslationUnit') {
     return isString(value) && TRANSLATION_UNITS.includes(value as (typeof TRANSLATION_UNITS)[number])
       ? value
