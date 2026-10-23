@@ -1,6 +1,6 @@
 # Windows x64 project-local Node/npm. Example: .\scripts\dev-env.ps1 run dev
 # Quote npm's separator in PowerShell: .\scripts\dev-env.ps1 run dev '--' --smoke
-# Download and SHA256: https://nodejs.org/en/blog/release/v26.10.0
+# Download and SHA256: https://nodejs.org/en/blog/release/v26.12.1
 $ErrorActionPreference = 'Stop'
 # Preserve native exit codes even when the caller enables PowerShell 7's opt-in.
 $PSNativeCommandUseErrorActionPreference = $false
@@ -13,12 +13,12 @@ if ($env:OS -ne 'Windows_NT' -or $env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {
 
 $taskRoot = Split-Path -Parent $PSScriptRoot
 $taskTools = Join-Path $taskRoot '.tools'
-$taskNodeVersion = '26.10.0'
+$taskNodeVersion = '26.12.1'
 $taskDistribution = "node-v$taskNodeVersion-win-x64"
 $taskRuntime = Join-Path $taskTools $taskDistribution
 $taskNode = Join-Path $taskRuntime 'node.exe'
 $taskNpm = Join-Path $taskRuntime 'node_modules/npm/bin/npm-cli.js'
-$taskExpectedHash = '9fef7eca6743a6b910989cd8e78712376b394fcb9b6e1e9c44a0799a287f90c5'
+$taskExpectedHash = 'b3efd5c70cba3308ed46e7e699a9b8aac075bbc6b027fcb39c84c31acc25e2b4'
 
 foreach ($taskDirectory in @($taskTools, $taskRuntime)) {
     if ((Test-Path -LiteralPath $taskDirectory) -and

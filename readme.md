@@ -28,7 +28,7 @@ RPG Maker MV/MZ 및 Wolf RPG Editor 게임의 텍스트를 추출·번역·적�
 
 ### 개발 환경 설정
 
-Windows x64에서 프로젝트 전용 Node 26.10.0 / npm을 쓰려면 다음 PowerShell 명령을 사용하세요. 첫 실행은 공식 Node ZIP을 내려받아 SHA256을 확인하고 `.tools/`에 설치해요. 이 명령 안에서만 런타임을 선택하며, 관리자 권한이나 전역 Node 변경은 필요하지 않아요.
+Windows x64에서 프로젝트 전용 Node 26.12.1 / npm을 쓰려면 다음 PowerShell 명령을 사용하세요. 첫 실행은 공식 Node ZIP을 내려받아 SHA256을 확인하고 `.tools/`에 설치해요. 이 명령 안에서만 런타임을 선택하며, 관리자 권한이나 전역 Node 변경은 필요하지 않아요.
 
 ```powershell
 .\scripts\dev-env.ps1 ci --prefer-offline --no-audit --fund=false
