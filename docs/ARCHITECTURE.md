@@ -26,11 +26,13 @@ The app is an Electron desktop tool for translating RPG Maker MV/MZ and Wolf RPG
 
 ### Wolf
 
-Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-specific binary formats and text caches. Map parsing validates the tile byte span and advances the binary cursor without materializing unused tile numbers. Event parsing and its original-byte offsets are preserved.
+Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-specific binary formats and text caches. Map parsing validates the tile byte span and advances the binary cursor without materializing unused tile numbers. Event parsing and its original-byte offsets are preserved. Pattern-based extraction scans candidate offsets without per-offset exceptions and yields to the event loop through `src/ts/libs/eventLoopSlice.ts` every 8 ms, so the window and progress events stay responsive on large maps.
 
 ## Main Process Boundaries
 
 - `src/ipc/windowManager.ts`: main window, route loading, global settings bootstrap
+- `src/ipc/extractHandler.ts`: MV/MZ extraction and project version upgrade
+- `main.ts` registers MV/MZ `apply` directly; `src/ts/wolf/main.ts` registers Wolf extract/apply and `src/ts/rpgmv/fonts.ts` the font actions
 - `src/ipc/translateHandler.ts`: LLM settings, bulk translation, retranslate actions
 - `src/ipc/toolsHandler.ts`: compare window, JSON verify window, verify-side LLM repair
 - `src/ipc/settingsHandler.ts`: settings persistence and renderer-safe settings payloads
@@ -42,6 +44,7 @@ Wolf follows a parallel flow, but the extract/apply stages operate on Wolf-speci
 
 - `HomePage.vue`: entry landing page
 - `MvMzPage.vue` and `WolfPage.vue`: main operator screens
+- `SettingsPage.vue`: app and provider settings, opened inline from the main window
 - `LlmSettingsPage.vue`: translation-launch tab (also supports a standalone window)
 - `LlmComparePage.vue`: block mismatch and untranslated review
 - `JsonVerifyPage.vue`: structural verification, repair, and LLM shift repair
@@ -51,8 +54,8 @@ The main workspace is resizable. `useProjectSession` retains only the active, al
 project and extraction/application tab for the current renderer session; the home page offers
 a return action. It does not persist paths or grant filesystem access. Selecting a different
 engine's project replaces this session context. `ProjectSnapshot` reports the current top-level
-extracted text file count through the existing restricted preload bridge, refreshing on focus,
-operation completion, or explicit refresh. This is file presence evidence, not translation or
+extracted text file count through the existing restricted preload bridge, refreshing on folder
+change, operation completion and window focus; a retry button appears only after a failed read. This is file presence evidence, not translation or
 verification completion. The pipeline buttons are tool navigation, not completion indicators.
 
 Translation launch summarizes the configured language, provider, model, and optional user
@@ -127,9 +130,10 @@ QA reads source/target once per request and passes those bounded snapshots into 
 - `providerTranslationBase.ts` owns common provider configuration and translation retry/chunk handling. `translationPrompt.ts` builds prompts, preserving the existing Google/standard wording variants. `translationCore.ts` shares API error parsing; `providerRegistry.ts` owns provider selection and cache/config fingerprints.
 - `translationResult.ts` owns the final translation outcome: `translated`, `skipped`, `failed` or `aborted`. Only successful outcomes carry savable content. Control-code-only drift defaults to success with warnings; `llmControlCodePolicy: strict` blocks saving. Cache/progress fingerprints include the policy; cache reuse revalidates and records warnings. File/block retranslation writes warning logs with physical file line numbers. Provider completion applies structural and intentional-skip rules once; bulk and file retranslation consume the same result. Cached disk content and selected-block candidates still require validation at their own input seams.
 - Translation reset checks the complete backup file set before changing translations or progress/cache. It retains the original backup, restores through preimage-checked atomic writes, and restores already changed translations if a later reset write fails. If rollback also fails, the error names the affected files and the original backup remains available.
-- Compare and verify views derive filters and editing indicators from their source state with Vue computed values. Compare problem navigation includes unmatched blocks on either side.
+- Compare and verify views derive filters and editing indicators from their source state with Vue computed values. Compare problem navigation includes unmatched blocks on either side. `LlmComparePage.vue` keeps its block arrays in `shallowRef` so a keystroke does not make every block deeply reactive; code that changes blocks in place must call `triggerRef` on that array.
+- The Agent terminal pane and xterm load with `defineAsyncComponent` on first use, keeping them out of the renderer entry bundle.
 - Agent Workspace keeps environment and executable-detection responses per page instance, deriving preset readiness and the timeline from those signals without modifying shared preset definitions.
-- The file translation coordinator queues paths and reads source text only when bounded workers start it. A run reuses its provider client (including Vertex authentication) and the shared request scheduler. `translationCache.ts` lazily reads per-key atomic cache records instead of rewriting or loading an aggregate cache; fully recognized legacy aggregate files migrate before removal. Mixed-validity input recovers good entries but retains the original plus an import fingerprint so later cache invalidations cannot revive old values; unknown versions or malformed JSON are retained with a warning. Known stale output temporaries are cleaned once per directory, while each successful file/cache/progress write keeps its own fsync. Provider failures remain per-file results; completion-handler failures stop new work and propagate after in-flight workers settle, before the directory lock is released. Bulk translation and retranslation share the same line-array block parser. Run cancellation aborts provider HTTP through a shared AbortSignal; active workers still settle before the directory lock is released. External cancellation is observed while an active request remains even if its queue is empty. Client cancellation does not establish provider-side billing cancellation.
+- The file translation coordinator queues paths and reads source text only when bounded workers start it. A run reuses its provider client (including Vertex authentication) and the shared request scheduler. `translationCache.ts` lazily reads per-key atomic cache records instead of rewriting or loading an aggregate cache; fully recognized legacy aggregate files migrate before removal. Mixed-validity input recovers good entries but retains the original plus an import fingerprint so later cache invalidations cannot revive old values; unknown versions or malformed JSON are retained with a warning. Known stale output temporaries are cleaned once per directory, while each successful file/cache/progress write keeps its own fsync. Provider failures remain per-file results; completion-handler failures stop new work and propagate after in-flight workers settle, before the directory lock is released. Bulk translation and retranslation share the same line-array block parser. While it works through cached files the coordinator yields to the event loop every 8 ms so cancellation and window events are not starved. Run cancellation aborts provider HTTP through a shared AbortSignal; active workers still settle before the directory lock is released. External cancellation is observed while an active request remains even if its queue is empty. Client cancellation does not establish provider-side billing cancellation.
 - JSON Verify LLM repair preserves exact provider whitespace before validation, without caller-level trim.
 - JSON Verify uses the pure `setAtPath` from `src/ts/rpgmv/verify.ts` locally; the actual file write still goes through validated main-process IPC.
 

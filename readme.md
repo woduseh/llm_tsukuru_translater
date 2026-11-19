@@ -14,13 +14,13 @@ RPG Maker MV/MZ 및 Wolf RPG Editor 게임의 텍스트를 추출·번역·적�
 - 버전 업그레이드 도구
 - Wolf RPG Editor 지원
 
-사용법은 깃허브 내 위키를 참조해주세요.
+사용법은 [GitHub 위키](https://github.com/woduseh/llm_tsukuru_translater/wiki)를 참조해주세요.
 
 ## 설치 및 실행
 
 ### 요구 사항
 
-- Node.js 26.x (CI와 개발 도구 체인은 Node 26 사용)
+- Node.js 26.12.1 이상 26.x (`.nvmrc`와 `package.json`의 `engines` 기준, CI도 `.nvmrc`를 사용)
 - Windows OS (Electron 빌드 대상)
 
 개발·CI Node와 패키지 안의 Electron 런타임은 별개예요. 현재 Electron 44는 자체 Node 24 런타임을 포함하므로 메인/preload 타입은 해당 런타임과 맞는 Node 24 타입 정의를 유지합니다.
@@ -117,8 +117,9 @@ src/
 ├── ipc/             # 추출·번역·도구·에이전트·터미널 IPC 핸들러
 ├── mcp/             # 프로젝트 보호 MCP stdio 서버와 도구 레지스트리
 ├── renderer/        # Vue 3 SPA (Vite로 빌드 → dist-renderer/)
-│   ├── views/       # 운영 화면과 Agent Workspace 페이지
-│   ├── composables/ # Vue composables (useIpc)
+│   ├── views/       # 운영 화면, 설정, 검수, Agent Workspace 페이지
+│   ├── components/  # 제목 표시줄, 프로젝트 헤더, 승인 큐, 터미널 등 공용 컴포넌트
+│   ├── composables/ # IPC, 프로젝트 세션, 검수 작업공간, 설정 초안, 승인, 터미널 상태
 │   └── router.ts    # Hash 기반 라우터
 ├── ts/
 │   ├── rpgmv/       # RPG Maker MV/MZ 파이프라인 (extract, apply, translate, verify)
@@ -131,8 +132,11 @@ src/
 └── utils.ts         # 인코딩/파일 유틸리티
 test/
 ├── unit/            # Vitest 단위 테스트
+├── tooling/         # doctor, dev 실행, verify 증거용 Node 내장 테스트
+├── utils/           # 테스트용 MCP 클라이언트, 가짜 PTY, Wolf 맵 픽스처 생성기
 └── fixtures/        # 단위·하네스 픽스처
-scripts/harness/     # core, eval, UI, live, package smoke 실행기
+scripts/             # dev, doctor, verify, 벤치마크, MCP 번들 빌드 스크립트
+└── harness/         # core, eval, UI, live, package smoke 실행기
 ```
 
 ## 핵심 워크플로우
@@ -145,7 +149,7 @@ Agent Workspace와 외부 MCP 서버는 프로젝트 상태와 번역 품질 분
 
 ## 개발 문서
 
-저장소의 에이전트 개발 지침은 [Codex용 AGENTS.md](AGENTS.md)로 통합합니다. 구조·품질 계약·검증 명령은 해당 파일의 주제별 링크에서 확인할 수 있습니다.
+저장소의 코딩 에이전트 개발 지침은 [AGENTS.md](AGENTS.md) 하나로 통합합니다. 구조·품질 계약·검증 명령은 해당 파일의 주제별 링크에서 확인할 수 있습니다.
 
 ## 라이선스
 

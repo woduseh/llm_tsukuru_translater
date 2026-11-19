@@ -44,6 +44,7 @@ Analysis artifact writers and readers must agree on size limits. Every published
 - Compare and verify views must expose enough stable state for automation to assert health.
 - Settings and verify screens must never leak secrets into renderer-safe payloads.
 - Approval previews must show every bounded material line change before an explicit per-request decision.
+- Renderer text must be at least 12px; show hierarchy with weight or color instead of smaller text. `test/unit/rendererTypography.test.ts` enforces this for `.vue` and `.css` files.
 
 ## Agent Bridge Rules
 
