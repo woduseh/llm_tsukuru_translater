@@ -97,6 +97,7 @@ describe('MCP public read-only adapter', () => {
     const workflow = registry.callTool('help.translation_workflow');
     expect(workflow.status).toBe('ok');
     expect(JSON.stringify(workflow.payload)).toContain('Run translation and apply through the app UI');
+    expect(JSON.stringify(workflow.payload)).toContain('wait for the user instead of calling approval.status repeatedly');
     expect(JSON.stringify(workflow.payload)).not.toContain('api_key=');
     expect(workflow.payload?.capabilities).toMatchObject({ mode: 'offline' });
     expect(workflow.payload).not.toHaveProperty('guideText');

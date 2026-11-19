@@ -94,7 +94,7 @@ export function createTranslationWorkflowPayload(definitions: McpToolDefinition[
       'Inspect with alignment.inspect or qa.score_file; coverage/verified describe inspection coverage, not semantic correctness. Reuse returned refs for detail pages.',
       'Propose operations with targetPath and [{lineNumber, originalText, replacementText}]. patch.propose returns validation, patch and preview together.',
       'When app bridge tools exist, call bridge.status, then patch.apply with the returned patch and idempotencyKey=patch.patchId. Submission is not application.',
-      'For uncertain submissions reuse the same idempotencyKey. Poll approval.status with the returned approvalId; pending requires a user decision in the app. Never approve through MCP.',
+      'For uncertain submissions reuse the same idempotencyKey. Read approval.status with the returned approvalId. Pending means the user must decide in the app: report the approvalId and wait for the user instead of calling approval.status repeatedly. MCP cannot approve or deny.',
       'After applied, read the file and rerun QA. After stale, reread and prepare a new proposal. Denied is not authorization to resubmit.',
     ],
     recipes: AGENT_SKILL_RECIPES.map((recipe) => recipePayload(recipe, definitions)),
