@@ -341,7 +341,7 @@ function stateLabel(state: string): string {
 }
 
 .terminal-toolbar > div:first-child { display: flex; flex-direction: column; gap: 2px; }
-.terminal-toolbar span, .terminal-details, .terminal-helper { font-size: 11px; opacity: 0.78; }
+.terminal-toolbar span, .terminal-details, .terminal-helper { font-size: 12px; opacity: 0.78; }
 .terminal-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .terminal-actions button {
   background: var(--Highlight1);

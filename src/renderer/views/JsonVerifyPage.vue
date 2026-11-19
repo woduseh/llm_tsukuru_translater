@@ -839,7 +839,7 @@ onActivated(() => {
 }
 .file-item:hover { background: #151f24; }
 .file-item.active { background: #20231d; border-left: 3px solid var(--Accent); }
-.badge { font-size: 9px; padding: 1px 5px; border-radius: 4px; font-weight: 600; }
+.badge { font-size: 12px; padding: 1px 5px; border-radius: 4px; font-weight: 600; }
 .badge-error { background: rgba(255,85,85,0.2); color: #ff5555; }
 .badge-warn { background: rgba(255,184,108,0.2); color: #ffb86c; }
 .badge-ok { background: rgba(80,250,123,0.2); color: #50fa7b; }
@@ -864,7 +864,7 @@ onActivated(() => {
 .batch-actions { flex-basis: 100%; }
 .batch-actions summary, .issue-location summary { cursor: pointer; color: var(--muted); font-size: 12px; width: fit-content; padding: 4px 0; }
 .batch-actions p { font-size: 12px; color: var(--muted); margin: 4px 0 10px; }
-.status { font-size: 11px; margin-left: auto; }
+.status { font-size: 12px; margin-left: auto; }
 .status-ok { color: #50fa7b; }
 .status-error { color: #ff5555; }
 
@@ -877,12 +877,12 @@ onActivated(() => {
 .preview-title { font-size: 12px; font-weight: 600; opacity: 0.7; margin-bottom: 8px; color: #8be9fd; }
 .preview-item {
   padding: 8px; margin-bottom: 6px; border-radius: 6px;
-  background: rgba(0,0,0,0.2); font-size: 11px;
+  background: rgba(0,0,0,0.2); font-size: 12px;
 }
-.preview-path { font-size: 11px; color: var(--muted); font-family: monospace; margin-bottom: 4px; overflow-wrap: anywhere; }
+.preview-path { font-size: 12px; color: var(--muted); font-family: monospace; margin-bottom: 4px; overflow-wrap: anywhere; }
 .severity-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
 .severity-tabs button {
-  padding: 4px 10px; font-size: 11px; background: var(--Highlight1);
+  padding: 4px 10px; font-size: 12px; background: var(--Highlight1);
   border: var(--border); border-radius: 4px; color: var(--mainColor);
   cursor: pointer; font-family: inherit; transition: var(--transition);
 }
@@ -910,7 +910,7 @@ onActivated(() => {
 .issue-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
 .issue-path { font-size: 12px; color: var(--muted); font-family: monospace; overflow-wrap: anywhere; }
 .issue-type { font-size: 14px; font-weight: 600; }
-.issue-severity { font-size: 11px; border: 1px solid currentColor; padding: 1px 6px; border-radius: 4px; }
+.issue-severity { font-size: 12px; border: 1px solid currentColor; padding: 1px 6px; border-radius: 4px; }
 .error .issue-severity { color: #ffb1a8; }
 .warning .issue-severity { color: #ffcf8a; }
 .issue-message { font-size: 13px; line-height: 1.6; color: var(--mainColor); }
@@ -937,14 +937,14 @@ onActivated(() => {
 .llm-preview-title { font-size: 13px; font-weight: 700; color: #50fa7b; }
 .llm-preview-actions { display: flex; gap: 4px; }
 .llm-preview-actions button {
-  padding: 3px 10px; font-size: 11px; background: var(--Highlight1);
+  padding: 3px 10px; font-size: 12px; background: var(--Highlight1);
   border: var(--border); border-radius: 4px; color: var(--mainColor);
   cursor: pointer; font-family: inherit; transition: var(--transition);
 }
 .llm-preview-actions button:hover { background: rgba(255,255,255,0.08); }
 .llm-preview-item {
   padding: 8px; margin-bottom: 6px; border-radius: 6px;
-  background: rgba(0,0,0,0.2); font-size: 11px;
+  background: rgba(0,0,0,0.2); font-size: 12px;
 }
 
 :deep(.summary-error) { color: #ff5555; }

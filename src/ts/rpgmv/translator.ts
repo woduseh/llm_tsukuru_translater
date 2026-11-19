@@ -29,6 +29,7 @@ import {
 } from '../libs/translatorFactory';
 
 import { TranslationCache, type CacheStore } from '../libs/translationCache';
+import { createEventLoopSlicer } from '../libs/eventLoopSlice';
 
 const PROGRESS_FILE = '.llm_progress.json';
 
@@ -452,6 +453,7 @@ async function runTranslationQueue<T, R>(
 ): Promise<void> {
     let nextIndex = 0;
     let failure: { error: unknown } | undefined;
+    const yieldIfDue = createEventLoopSlicer();
     const runWorker = async () => {
         try {
             while (nextIndex < tasks.length && !isAborted() && !failure) {
@@ -461,9 +463,11 @@ async function runTranslationQueue<T, R>(
                     result = await worker(task);
                 } catch (error) {
                     onFailure(task, error);
+                    await yieldIfDue();
                     continue;
                 }
                 onSuccess(result);
+                await yieldIfDue();
             }
         } catch (error) {
             failure ??= { error };

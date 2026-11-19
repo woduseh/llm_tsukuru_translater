@@ -1,9 +1,11 @@
 <template>
   <div class="titlebar">
     <div class="app-identity">Tsukuru Console</div>
-    <div class="progress-bar" :style="{ width: progressWidth }"></div>
+    <div class="progress-bar" :style="{ transform: progressScale }"></div>
     <div class="loading-text" v-show="progress > 0">
-      {{ loadingTag }}{{ loadingTag ? ' · ' : '' }}{{ progress.toFixed(1) }}% {{ estimatedTime }}
+      <span v-if="loadingTag">{{ loadingTag }}</span>
+      <span>{{ progress.toFixed(1) }}%</span>
+      <span v-if="estimatedTime">{{ estimatedTime }}</span>
     </div>
     <button
       v-if="showAbortBtn && llmTranslating"
@@ -44,7 +46,7 @@ const lastPercent = ref(-1.0)
 const speedSamples = ref<number[]>([])
 const ETA_WINDOW = 10
 
-const progressWidth = computed(() => `${progress.value}vw`)
+const progressScale = computed(() => `scaleX(${Math.min(100, Math.max(0, progress.value)) / 100})`)
 
 function toHHMMSS(num: number): string {
   const sec = Math.max(0, Math.round(num))
@@ -120,13 +122,14 @@ onMounted(() => {
 }
 .app-identity { margin-left: 14px; font-size: 12px; font-weight: 800; letter-spacing: .2px; }
 .progress-bar {
-  position: absolute; left: 0; top: 0; height: 38px; width: 0;
+  position: absolute; left: 0; top: 0; height: 38px; width: 100%;
+  transform: scaleX(0); transform-origin: left;
   background: rgba(255,176,32,.22);
-  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .loading-text {
-  position: absolute; left: 140px;
-  font-size: 11px; opacity: 0.6; font-weight: 500; z-index: 1;
+  position: absolute; left: 140px; display: flex; gap: 12px;
+  font-size: 12px; opacity: 0.6; font-weight: 500; z-index: 1;
 }
 .icon {
   border: 0; background: transparent;
@@ -155,7 +158,7 @@ onMounted(() => {
   padding: 0 14px;
   background: #9f3341;
   border: none; border-radius: 6px; color: #fff;
-  font-family: inherit; font-size: 11px; font-weight: 600;
+  font-family: inherit; font-size: 12px; font-weight: 600;
   cursor: pointer; z-index: 2; transition: var(--transition);
   box-shadow: 0 2px 8px rgba(229,57,53,0.3);
 }

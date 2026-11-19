@@ -8,14 +8,13 @@
     </aside>
     <section class="home-main">
       <header>
-        <p class="eyebrow">LOCALIZATION WORKSPACE</p>
         <h1>{{ activeProject.path ? '프로젝트 작업을 이어가세요' : '번역 프로젝트를 시작하세요' }}</h1>
         <p class="subtitle">{{ activeProject.path ? '열려 있는 프로젝트로 돌아가거나 다른 게임 프로젝트를 선택하세요.' : '게임 엔진을 선택하면 추출부터 검수와 적용까지 한 흐름으로 이어집니다.' }}</p>
       </header>
 
       <section v-if="activeProject.path" class="resume-project" aria-label="열려 있는 프로젝트">
         <div>
-          <span class="eyebrow">열려 있는 프로젝트 · {{ activeProject.engine === 'wolf' ? 'Wolf RPG' : 'MV / MZ' }}</span>
+          <span class="resume-meta"><span class="eyebrow">열려 있는 프로젝트</span><span>{{ activeProject.engine === 'wolf' ? 'Wolf RPG' : 'MV / MZ' }}</span></span>
           <h2>{{ projectName }}</h2>
           <p :title="activeProject.path">{{ activeProject.path }}</p>
         </div>
@@ -27,7 +26,7 @@
           <span class="engine-code">MV / MZ</span>
           <span>
             <strong>RPG Maker 프로젝트</strong>
-            <small>JSON 데이터 · 번역 비교 · 구조 검증</small>
+            <small>JSON 데이터의 추출, 번역, 검수, 적용</small>
           </span>
           <b>시작</b>
         </button>
@@ -35,15 +34,11 @@
           <span class="engine-code">WOLF</span>
           <span>
             <strong>Wolf RPG 프로젝트</strong>
-            <small>맵 이벤트 대사 · DB / 커먼 이벤트 미지원</small>
+            <small>맵 이벤트 대사만 지원해요. DB와 커먼 이벤트는 제외돼요.</small>
           </span>
           <b>시작</b>
         </button>
       </div>
-
-      <footer>
-        <span><i></i> 로컬 파일은 선택한 작업에서만 처리됩니다</span>
-      </footer>
     </section>
   </main>
 </template>
@@ -70,7 +65,7 @@ onMounted(() => {
 
 <style scoped>
 .resume-project { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 20px 0 0; padding: 20px; border: var(--border); border-left: 3px solid var(--Accent); border-radius: 8px; background: var(--Highlight1); }
-.resume-project > div { min-width: 0; }
+.resume-project > div { min-width: 0; max-width: 100%; }
 .resume-project h2 { margin-top: 5px; font-size: 20px; }
 .resume-project p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
 .resume-project button { flex-shrink: 0; }
@@ -82,8 +77,9 @@ onMounted(() => {
 .home-rail button { margin-top: auto; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
 .home-rail button:hover { color: var(--mainColor); background: #172027; }
 .home-main { padding: 24px 30px 64px; display: flex; flex-direction: column; min-width: 0; overflow-y: auto; }
-.eyebrow { color: var(--Healthy); font-size: 11px; font-weight: 800; letter-spacing: 1.1px; }
-.home-main h1 { margin-top: 6px; font-size: 28px; letter-spacing: -.6px; }
+.resume-meta { display: flex; gap: 12px; color: var(--muted); font-size: 12px; }
+.eyebrow { color: var(--Healthy); font-size: 12px; font-weight: 800; }
+.home-main h1 { font-size: 28px; letter-spacing: -.6px; }
 .home-main header > p:last-child { margin-top: 7px; color: var(--muted); }
 .engine-list { margin-top: 28px; border-top: var(--border); }
 .engine-list button { width: 100%; min-height: 82px; display: grid; grid-template-columns: 86px 1fr auto; align-items: center; gap: 18px; padding: 14px 10px; background: transparent; border: 0; border-bottom: var(--border); text-align: left; cursor: pointer; }
@@ -94,8 +90,6 @@ onMounted(() => {
 .engine-list small { margin-top: 4px; color: var(--muted); }
 .engine-list b { padding: 7px 12px; border: var(--border); border-radius: 6px; font-size: 12px; }
 .engine-list button:hover b { border-color: #9d6d18; color: #ffc04a; }
-.home-main footer { margin-top: auto; padding-top: 16px; border-top: var(--border); display: flex; align-items: center; color: var(--muted); font-size: 12px; }
-.home-main footer i { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--Success); }
 @media (max-width: 850px) {
   .resume-project { align-items: flex-start; flex-direction: column; }
 }

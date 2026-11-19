@@ -38,7 +38,7 @@
         >
           <strong>{{ preset.title }}</strong>
           <span>{{ preset.description }}</span>
-          <small>{{ riskLevelLabel(preset.risk) }} · {{ preset.estimated }}</small>
+          <small><span>{{ riskLevelLabel(preset.risk) }}</span><span>{{ preset.estimated }}</span></small>
         </button>
 
         <div v-if="activeCommandPreset" class="preset-detail" :data-risk="activeCommandPreset.risk">
@@ -98,7 +98,7 @@
             type="button"
             @click="useStarterPrompt(prompt)"
           >
-            {{ prompt.action === 'copy' ? '복사' : '제안' }} · {{ prompt.title }}
+            {{ prompt.action === 'copy' ? '복사' : '제안' }}: {{ prompt.title }}
           </button>
         </div>
         <pre v-if="selectedPrompt" class="prompt-preview">{{ selectedPrompt }}</pre>
@@ -167,7 +167,7 @@
               {{ mcpConnectBusy ? '준비 중…' : '연결 명령 생성' }}
             </button>
           </div>
-          <p v-if="!mcpConnection" class="mcp-connect-hint">프로젝트 폴더를 선택한 뒤 누르면 Codex·Claude CLI에 분석 도구와 변경 제안 도구를 연결합니다. 제안은 앱 승인 큐에서 직접 승인해야 하며 CLI가 파일을 바로 수정할 수는 없습니다.</p>
+          <p v-if="!mcpConnection" class="mcp-connect-hint">프로젝트 폴더를 선택한 뒤 누르면 Codex 또는 Claude CLI에 분석 도구와 변경 제안 도구를 연결합니다. 제안은 앱 승인 큐에서 직접 승인해야 하며 CLI가 파일을 바로 수정할 수는 없습니다.</p>
           <p v-else-if="!mcpConnection.ok" class="mcp-connect-error">{{ mcpConnection.reason }}</p>
           <template v-else>
             <label>Codex
@@ -470,7 +470,7 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   border-radius: var(--radius-lg);
 }
 
-.eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 1.4px; opacity: 0.5; }
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 1.4px; opacity: 0.5; }
 .workspace-hero h1 { margin: 2px 0; font-size: 20px; }
 .workspace-hero p:last-child { opacity: 0.68; font-size: 12px; }
 
@@ -503,7 +503,7 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
 
 .panel h2 { font-size: 14px; margin-bottom: 10px; }
 .panel-heading { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; min-width: 0; }
-.panel-heading span { font-size: 11px; opacity: 0.78; overflow-wrap: anywhere; }
+.panel-heading span { font-size: 12px; opacity: 0.78; overflow-wrap: anywhere; }
 .terminal-heading { margin-top: 14px; }
 
 .navigator { grid-area: navigator; }
@@ -541,10 +541,10 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   min-width: 0;
 }
 .preset-detail strong { font-size: 13px; }
-.preset-detail p { font-size: 11px; opacity: 0.85; line-height: 1.4; overflow-wrap: anywhere; }
+.preset-detail p { font-size: 12px; opacity: 0.85; line-height: 1.4; overflow-wrap: anywhere; }
 .preset-badges { display: flex; flex-wrap: wrap; gap: 5px; }
 .preset-badges span {
-  font-size: 10px;
+  font-size: 12px;
   padding: 2px 7px;
   border-radius: 999px;
   background: rgba(255,255,255,0.08);
@@ -557,12 +557,12 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   border: var(--border);
   border-radius: var(--radius-sm);
   padding: 6px 9px;
-  font-size: 11px;
+  font-size: 12px;
   font-family: inherit;
   cursor: pointer;
 }
-.preset span { font-size: 11px; opacity: 0.82; line-height: 1.35; }
-.preset small { font-size: 10px; opacity: 0.72; }
+.preset span { font-size: 12px; opacity: 0.82; line-height: 1.35; }
+.preset small { display: flex; flex-wrap: wrap; gap: 0 8px; font-size: 12px; opacity: 0.72; }
 
 .agent-preset-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .agent-preset-tabs button {
@@ -577,7 +577,7 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   text-align: left;
 }
 .agent-preset-tabs button.active { border-color: rgba(255,176,32,.65); background: rgba(255,176,32,.08); }
-.agent-preset-tabs span { display: block; margin-top: 2px; font-size: 10px; opacity: 0.76; overflow-wrap: anywhere; }
+.agent-preset-tabs span { display: block; margin-top: 2px; font-size: 12px; opacity: 0.76; overflow-wrap: anywhere; }
 
 .command-preview, .prompt-preview {
   background: #0f1018;
@@ -620,7 +620,7 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   border: var(--border);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .workspace-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -635,7 +635,7 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   font-family: inherit;
 }
 .workspace-tabs button.active { border-color: rgba(255,176,32,.65); background: rgba(255,176,32,.08); }
-.workspace-tabs span { margin-left: 8px; font-size: 10px; opacity: 0.76; }
+.workspace-tabs span { margin-left: 8px; font-size: 12px; opacity: 0.76; }
 .terminal-empty {
   display: flex;
   flex-wrap: wrap;
@@ -673,7 +673,7 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
   position: relative;
   background: var(--Highlight1);
   border-radius: var(--radius-sm);
-  font-size: 11px;
+  font-size: 12px;
   min-width: 0;
 }
 .env-status li::before {
@@ -689,15 +689,15 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
 .env-status li[data-ok="true"]::before { background: #5fd08a; }
 .env-key { flex: 0 0 auto; font-weight: 700; opacity: 0.85; }
 .env-val { flex: 1 1 auto; opacity: 0.82; overflow-wrap: anywhere; }
-.env-status-loading { font-size: 11px; opacity: 0.7; }
+.env-status-loading { font-size: 12px; opacity: 0.7; }
 .timeline-heading { margin-top: 14px; }
 
 .timeline { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .timeline li { padding: 9px; background: var(--Highlight1); border-radius: var(--radius-sm); font-size: 12px; }
-.timeline span { margin-right: 8px; opacity: 0.78; font-size: 10px; }
+.timeline span { margin-right: 8px; opacity: 0.78; font-size: 12px; }
 .mcp-states { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .mcp-states div { padding: 9px; border-radius: var(--radius-sm); background: var(--Highlight1); }
-.mcp-states p, .safety-list { margin-top: 4px; font-size: 11px; line-height: 1.45; opacity: 0.82; }
+.mcp-states p, .safety-list { margin-top: 4px; font-size: 12px; line-height: 1.45; opacity: 0.82; }
 .safety-list { padding-left: 18px; }
 .safety-list li + li { margin-top: 4px; }
 
@@ -742,21 +742,21 @@ function timelineStatusLabel(status: 'ready' | 'waiting' | 'mocked'): string {
 .mcp-connect-head strong { font-size: 13px; }
 .mcp-connect-head button {
   background: var(--Highlight1); color: var(--mainColor); border: var(--border);
-  border-radius: var(--radius-sm); padding: 6px 10px; font-size: 11px; font-family: inherit; cursor: pointer;
+  border-radius: var(--radius-sm); padding: 6px 10px; font-size: 12px; font-family: inherit; cursor: pointer;
 }
 .mcp-connect-head button:disabled { opacity: 0.5; cursor: default; }
-.mcp-connect-hint { font-size: 11px; opacity: 0.8; line-height: 1.4; overflow-wrap: anywhere; }
-.mcp-connect-error { font-size: 11px; color: #ff9c9c; }
-.mcp-connect label { font-size: 10px; opacity: 0.7; display: flex; flex-direction: column; gap: 4px; }
+.mcp-connect-hint { font-size: 12px; opacity: 0.8; line-height: 1.4; overflow-wrap: anywhere; }
+.mcp-connect-error { font-size: 12px; color: #ff9c9c; }
+.mcp-connect label { font-size: 12px; opacity: 0.7; display: flex; flex-direction: column; gap: 4px; }
 .mcp-cmd { display: flex; gap: 6px; align-items: stretch; min-width: 0; }
 .mcp-cmd code {
   flex: 1; min-width: 0; background: #0f1018; color: #d7ddff; border-radius: var(--radius-sm);
-  padding: 7px 9px; font-family: Consolas, 'Courier New', monospace; font-size: 11px;
+  padding: 7px 9px; font-family: Consolas, 'Courier New', monospace; font-size: 12px;
   overflow-wrap: anywhere; white-space: pre-wrap;
 }
 .mcp-cmd button {
   background: var(--Highlight1); color: var(--mainColor); border: var(--border);
-  border-radius: var(--radius-sm); padding: 0 10px; font-size: 11px; font-family: inherit; cursor: pointer; white-space: nowrap;
+  border-radius: var(--radius-sm); padding: 0 10px; font-size: 12px; font-family: inherit; cursor: pointer; white-space: nowrap;
 }
 
 </style>

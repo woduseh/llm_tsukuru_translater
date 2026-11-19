@@ -24,7 +24,7 @@ export async function chooseWorkspaceProject(engine: ProjectEngine): Promise<voi
   if (activeProject.path && workspaceHasPendingChanges()) {
     const { isConfirmed } = await Swal.fire({
       icon: 'warning', title: '다른 프로젝트를 열까요?',
-      text: '다른 폴더를 선택하면 저장하지 않은 번역 편집·설정·지침 초안이 사라져요. 같은 프로젝트의 탭을 이동하면 내용은 유지돼요.',
+      text: '다른 폴더를 선택하면 저장하지 않은 번역 편집, 설정, 지침 초안이 사라져요. 같은 프로젝트의 탭을 이동하면 내용은 유지돼요.',
       showCancelButton: true, confirmButtonText: '폴더 선택', cancelButtonText: '현재 작업 유지',
     })
     if (!isConfirmed) return

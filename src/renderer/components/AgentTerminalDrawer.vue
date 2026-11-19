@@ -16,7 +16,7 @@
       <header class="drawer-header">
         <div>
           <strong>에이전트 터미널</strong>
-          <span>내장 PTY · 출력은 기본적으로 저장되지 않음</span>
+          <span>내장 PTY, 출력은 기본적으로 저장하지 않아요</span>
         </div>
         <div class="header-actions">
           <button type="button" :aria-pressed="isLarge" @click="isLarge = !isLarge">
@@ -68,11 +68,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import AgentTerminalPane from './AgentTerminalPane.vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { chooseActiveTerminalSessionId, sessionStateLabel } from '../agentWorkspaceModel'
 import { useTerminalSessions } from '../composables/useTerminalSessions'
 import type { TerminalSessionKind } from '../../types/agentWorkspace'
+
+const AgentTerminalPane = defineAsyncComponent(() => import('./AgentTerminalPane.vue'))
 
 defineProps<{ docked?: boolean }>()
 
@@ -156,7 +157,7 @@ function closeDrawer() {
   outline-offset: 2px;
 }
 
-.agent-chip span { font-size: 11px; opacity: 0.78; }
+.agent-chip span { font-size: 12px; opacity: 0.78; }
 
 .drawer {
   height: 48vh;
@@ -186,7 +187,7 @@ function closeDrawer() {
 }
 
 .drawer-header div:first-child { display: flex; flex-direction: column; gap: 2px; }
-.drawer-header span { font-size: 11px; opacity: 0.78; }
+.drawer-header span { font-size: 12px; opacity: 0.78; }
 .header-actions { display: flex; gap: 6px; align-items: center; }
 .header-actions button {
   background: var(--Highlight1);
@@ -219,7 +220,7 @@ function closeDrawer() {
 }
 
 .session-tabs button.active { opacity: 1; border-color: rgba(255,176,32,.65); background: #252117; }
-.session-tabs span { margin-left: 8px; font-size: 10px; opacity: 0.78; }
+.session-tabs span { margin-left: 8px; font-size: 12px; opacity: 0.78; }
 
 .empty-sessions {
   display: grid;

@@ -96,7 +96,7 @@ describe('compare page editing', () => {
 
   it('explains line mismatches and grows the virtual row when editing adds a line', async () => {
     await load('--- 1 ---\nhello\nworld', '--- 1 ---\n안녕')
-    expect(host.querySelector('#block-diagnosis-0')!.textContent).toBe('번역 1줄 · 1줄 부족')
+    expect(host.querySelector('#block-diagnosis-0')!.textContent).toBe('번역 1줄, 1줄 부족')
     const editor = host.querySelector<HTMLTextAreaElement>('.block-editor')!
     expect(editor.getAttribute('aria-describedby')).toBe('block-diagnosis-0')
     const row = host.querySelector<HTMLElement>('.block-row')!
@@ -104,7 +104,7 @@ describe('compare page editing', () => {
     editor.value = '안녕\n세계\n추가'
     editor.dispatchEvent(new Event('input', { bubbles: true }))
     await nextTick()
-    expect(host.querySelector('#block-diagnosis-0')!.textContent).toBe('번역 3줄 · 1줄 초과')
+    expect(host.querySelector('#block-diagnosis-0')!.textContent).toBe('번역 3줄, 1줄 초과')
     expect(parseInt(row.style.height)).toBeGreaterThan(previousHeight)
   })
 
@@ -123,7 +123,7 @@ describe('compare page editing', () => {
 
   it('distinguishes control-code mismatches from line-count mismatches', async () => {
     await load('--- 1 ---\nhello \\V[1]', '--- 1 ---\n안녕')
-    expect(host.querySelector('#block-diagnosis-0')!.textContent).toBe('번역 1줄 · 제어 코드 불일치')
+    expect(host.querySelector('#block-diagnosis-0')!.textContent).toBe('번역 1줄, 제어 코드 불일치')
   })
 
   it('navigates to translation-only blocks and keeps edited text aligned when deleting one', async () => {

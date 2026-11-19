@@ -359,7 +359,6 @@ export async function maybeRunUiHarness(ctx: AppContext): Promise<void> {
 
     checkpoint('project-selection-and-approval');
     await selectProject(ctx, scenario.compareDir, stepTimeoutMs);
-    await click(mainWindow, '[data-harness-project-snapshot] button');
     const projectFiles = await snapshot(mainWindow, `document.querySelector('[data-harness-project-snapshot] [role="status"]')?.textContent`);
     if (!String(projectFiles).includes('2개 파일')) throw new Error('Project snapshot must report the real extracted fixture count.');
     screenshots.project = await captureScreen(mainWindow, diagnosticDir, 'project');

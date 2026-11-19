@@ -28,7 +28,7 @@ export async function extractWolfFolder(
         const sourceFile = toWolfProjectRelativePath(projectRoot, map)
         ctx.WolfCache[sourceFile] = buf
         if(patternMode){
-            const pa = wolfExtractMapPattern(buf, ctx)
+            const pa = await wolfExtractMapPattern(buf, ctx)
             extractEvent(pa, sourceFile, conf, ctx)
 
         }

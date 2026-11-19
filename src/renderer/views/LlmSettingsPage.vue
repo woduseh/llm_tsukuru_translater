@@ -1,14 +1,13 @@
 <template>
   <section class="translation-page" :class="{ embedded }">
   <div id="container" data-harness-view="llm-settings" :data-llm-ready="llmReady ? 'true' : 'false'" :data-provider="currentProvider">
-    <p class="window-eyebrow">TRANSLATION JOB</p>
-    <h2>번역</h2>
-    <p class="intro">사용할 번역 설정과 실행 범위를 확인하세요.</p>
+    <h2 v-if="!embedded">번역</h2>
 
     <section class="job-summary" aria-label="번역 설정 요약" data-harness-job-summary>
       <div class="summary-heading">
         <h3>이번 번역에 사용할 설정</h3>
         <span class="ready-state" :class="{ ready: llmReady }">{{ llmReady ? '설정 준비됨' : '설정 확인 필요' }}</span>
+        <button type="button" class="btn small" :class="{ primary: !llmReady }" data-harness-open-app-settings @click="openAppSettings">앱 설정에서 변경</button>
       </div>
       <dl class="summary-grid">
         <div><dt>언어</dt><dd>{{ languageLabel(sourceLang) }} → {{ languageLabel(targetLang) }}</dd></div>
@@ -20,7 +19,6 @@
         <pre v-if="currentCustomPrompt" class="current-prompt">{{ currentCustomPrompt }}</pre>
         <p v-else class="field-hint">별도 사용자 지침 없이 기본 번역 프롬프트를 사용해요.</p>
       </details>
-      <p class="field-hint">언어·모델·사용자 지침은 앱 설정에서 변경할 수 있어요.</p>
     </section>
 
     <section class="execution-scope" aria-label="번역 실행 범위">
@@ -41,7 +39,7 @@
 
     </section>
     <details class="disclosure-panel" :open="advancedOpen" @toggle="advancedOpen = ($event.target as HTMLDetailsElement).open">
-      <summary>고급 실행 설정 <span>{{ parallelWorkers }}개 동시 요청 · {{ requestsPerMinute === 0 ? 'RPM 제한 없음' : `${requestsPerMinute} RPM` }}</span></summary>
+      <summary>고급 실행 설정 <span>동시 요청 {{ parallelWorkers }}개</span><span>{{ requestsPerMinute === 0 ? 'RPM 제한 없음' : `${requestsPerMinute} RPM` }}</span></summary>
       <div class="disclosure-content">
     <div class="form-group">
       <label for="sortOrder">번역 순서</label>
@@ -218,7 +216,7 @@ const profileSummary = computed(() => {
     `제어 코드 패턴 ${p.controlCodePatterns.length}개`,
     `구분자 패턴 ${p.separatorPatterns.length}개`,
     `언어 ${sourceLang.value} → ${targetLang.value}`,
-  ].join(' · ')
+  ].join(', ')
 })
 const currentPromptCharCount = computed(() => currentCustomPrompt.value.length)
 
@@ -375,6 +373,11 @@ function start() {
   })
 }
 
+function openAppSettings() {
+  if (workspaceOperationRunning()) return
+  api.send('settings')
+}
+
 function cancel() {
   if (generateBusy.value) api.send('cancelGuidelineGeneration')
   api.send('llmSettingsClose')
@@ -403,14 +406,12 @@ onActivated(() => { if (embedded) api.send('llmSettingsReady') })
 #container {
   padding: 22px 26px; flex: 1; overflow-y: auto;
 }
-.window-eyebrow { color: var(--Healthy); font-size: 11px; font-weight: 900; letter-spacing: 1.1px; }
-h2 { font-size: 24px; font-weight: 800; margin: 2px 0 6px; }
+h2 { font-size: 24px; font-weight: 800; margin: 2px 0 16px; }
 h3 { font-size: 15px; margin: 0 0 6px; }
-.intro { margin: 0 0 20px; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .job-summary { padding: 16px; border: var(--border); border-radius: 10px; background: var(--Highlight1); }
 .summary-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-.summary-heading h3 { margin: 0; }
-.ready-state { padding: 4px 8px; border: var(--border); border-radius: 5px; font-size: 11px; color: var(--muted); }
+.summary-heading h3 { margin: 0 auto 0 0; }
+.ready-state { padding: 4px 8px; border: var(--border); border-radius: 5px; font-size: 12px; color: var(--muted); }
 .ready-state.ready { color: var(--Healthy); }
 .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
 .summary-grid > div { min-width: 0; }

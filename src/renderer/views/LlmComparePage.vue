@@ -55,7 +55,7 @@
             <button :disabled="!hasProblems" @click="navigateBlock(-1)" title="이전 불일치 블록">◀ 블록</button>
             <button :disabled="!hasProblems" @click="navigateBlock(1)" title="다음 불일치 블록">블록 ▶</button>
           </div>
-          <span class="save-status" role="status">{{ saveStatus || (isDirty ? '저장하지 않은 변경이 있어요' : '블록을 선택하면 수정·재번역할 수 있어요') }}</span>
+          <span class="save-status" role="status">{{ saveStatus || (isDirty ? '저장하지 않은 변경이 있어요' : '블록을 선택하면 수정하거나 재번역할 수 있어요') }}</span>
         </div>
         <div v-if="selectedBlocks.size > 0" class="toolbar-row selection-toolbar">
           <span class="selection-count">{{ selectedBlocks.size }}개 선택</span>
@@ -67,7 +67,7 @@
           <button @click="selectedBlocks.clear()">선택 해제</button>
         </div>
         <details class="batch-actions">
-          <summary>파일 단위 수정·재번역</summary>
+          <summary>파일 단위 수정과 재번역</summary>
           <div class="toolbar-row">
             <button :disabled="files.length === 0" @click="autoFixCurrentFile"
               title="현재 파일의 모든 불일치 블록 자동 수정: 빈줄 추가/제거, 구분자 수정">파일 불일치 자동 수정</button>
@@ -126,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, onActivated, onDeactivated, watchEffect, nextTick } from 'vue'
+import { ref, shallowRef, triggerRef, reactive, computed, onMounted, onUnmounted, onActivated, onDeactivated, watchEffect, nextTick } from 'vue'
 import { createReviewScan, readReviewEntries } from '../reviewFileLoader'
 import { api, useIpcOn } from '../composables/useIpc'
 import { reviewWorkspace, resetReviewWorkspace, findReviewFileIndex, normalizeReviewDirectory } from '../composables/useReviewWorkspace'
@@ -149,8 +149,8 @@ const selectedBlocks = ref<Set<number>>(new Set())
 const searchQuery = ref('')
 const filterMismatch = ref(false)
 const filterUntranslated = ref(false)
-const origBlocks = ref<Block[]>([])
-const transBlocks = ref<Block[]>([])
+const origBlocks = shallowRef<Block[]>([])
+const transBlocks = shallowRef<Block[]>([])
 const saveStatus = ref('')
 const retranslating = ref(false)
 const isDirty = computed(() => !!dirty[files.value[currentIdx.value]?.name])
@@ -208,6 +208,11 @@ function computeBlockHeights() {
     h.push(blockHeight(i))
   }
   frozenHeights.value = h
+}
+
+function refreshTranslatedBlocks() {
+  triggerRef(transBlocks)
+  computeBlockHeights()
 }
 
 function blockHeight(i: number): number {
@@ -439,11 +444,11 @@ function blockDiagnosis(i: number): string {
   if (!ob) return '대응하는 원문 블록 없음'
   const count = `번역 ${tb.lines.length}줄`
   const difference = tb.lines.length - ob.lines.length
-  if (ob.sep !== tb.sep) return `${count} · 구분자 불일치`
-  if (difference !== 0) return `${count} · ${Math.abs(difference)}줄 ${difference < 0 ? '부족' : '초과'}`
-  if (ob.lines.some((line, index) => (line === '') !== (tb.lines[index] === ''))) return `${count} · 빈 줄 위치 불일치`
-  if (!haveSameTranslationLineStructure(ob.lines, tb.lines)) return `${count} · 제어 코드 불일치`
-  return `${count} · 구조 일치`
+  if (ob.sep !== tb.sep) return `${count}, 구분자 불일치`
+  if (difference !== 0) return `${count}, ${Math.abs(difference)}줄 ${difference < 0 ? '부족' : '초과'}`
+  if (ob.lines.some((line, index) => (line === '') !== (tb.lines[index] === ''))) return `${count}, 빈 줄 위치 불일치`
+  if (!haveSameTranslationLineStructure(ob.lines, tb.lines)) return `${count}, 제어 코드 불일치`
+  return `${count}, 구조 일치`
 }
 
 function onBlockEdit(i: number, event: Event) {
@@ -451,6 +456,7 @@ function onBlockEdit(i: number, event: Event) {
   const ta = event.target as HTMLTextAreaElement
   const newLines = ta.value.split('\n')
   transBlocks.value[i].lines = newLines
+  triggerRef(transBlocks)
   frozenHeights.value[i] = blockHeight(i)
   dirty[files.value[currentIdx.value].name] = true
   saveStatus.value = ''
@@ -469,7 +475,7 @@ function deleteBlock(i: number) {
   selectedBlocks.value = new Set()
   dirty[files.value[currentIdx.value].name] = true
   saveStatus.value = '블록 삭제됨'
-  computeBlockHeights()
+  refreshTranslatedBlocks()
 }
 
 function deleteSelectedBlocks() {
@@ -482,7 +488,7 @@ function deleteSelectedBlocks() {
   selectedBlocks.value = new Set()
   dirty[files.value[currentIdx.value].name] = true
   saveStatus.value = `${indices.length}개 블록 삭제됨`
-  computeBlockHeights()
+  refreshTranslatedBlocks()
 }
 
 function autoFixSelected() {
@@ -494,10 +500,10 @@ function autoFixSelected() {
       fixes.push(result)
     }
   }
+  refreshTranslatedBlocks()
   if (fixes.length > 0) {
     dirty[files.value[currentIdx.value].name] = true
     saveStatus.value = `${fixes.length}개 블록 수정됨`
-    computeBlockHeights()
   }
 }
 
@@ -516,12 +522,12 @@ async function autoFixCurrentFile() {
         count++
       }
     }
+    refreshTranslatedBlocks()
     if (count > 0) {
       dirty[files.value[currentIdx.value].name] = true
       saveStatus.value = dupRemoved > 0
         ? `${count}개 블록 수정됨 (중복 헤더 ${dupRemoved}개 제거 포함)`
         : `${count}개 블록 자동 수정됨`
-      computeBlockHeights()
     }
   } finally {
     busy.value = false
@@ -857,7 +863,7 @@ function onKeydown(e: KeyboardEvent) {
 }
 .file-item:hover { background: #151f24; }
 .file-item.active { background: #20231d; border-left: 3px solid var(--Accent); }
-.badge { font-size: 9px; padding: 1px 5px; border-radius: 4px; font-weight: 600; }
+.badge { font-size: 12px; padding: 1px 5px; border-radius: 4px; font-weight: 600; }
 .badge-error { background: rgba(255,85,85,0.2); color: #ff5555; }
 .badge-dirty { background: rgba(241,250,140,0.2); color: #f1fa8c; }
 .badge-untranslated { background: rgba(139,233,253,0.15); color: #8be9fd; }
@@ -874,7 +880,7 @@ function onKeydown(e: KeyboardEvent) {
 .toolbar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; white-space: nowrap; }
 .nav-buttons { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.group-label { font-size: 10px; color: var(--subtle); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; min-width: 48px; }
+.group-label { font-size: 12px; color: var(--subtle); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; min-width: 48px; }
 .nav-buttons button, .toolbar-row button {
   padding: 7px 10px; font-size: 12px; background: var(--Highlight1);
   border: var(--border); border-radius: 4px; color: var(--mainColor);
@@ -882,8 +888,8 @@ function onKeydown(e: KeyboardEvent) {
 }
 .nav-buttons button:hover, .toolbar-row button:hover { background: rgba(255,255,255,0.08); }
 .nav-buttons button:disabled, .toolbar-row button:disabled { opacity: 0.3; cursor: default; }
-.selection-count { font-size: 11px; color: var(--muted); white-space: nowrap; }
-.save-status { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.selection-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.save-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .toolbar-row .primary-action { margin-left: auto; background: var(--accent); color: #111820; font-weight: 700; }
 .batch-actions summary { cursor: pointer; color: var(--muted); font-size: 12px; width: fit-content; padding: 4px 0; }
 .batch-actions[open] summary { margin-bottom: 8px; }
@@ -924,7 +930,7 @@ function onKeydown(e: KeyboardEvent) {
 .select-indicator input[type="checkbox"] {
   width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent);
 }
-.sep-label { font-size: 11px; line-height: 16px; height: 16px; flex-shrink: 0; color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow-x: auto; }
+.sep-label { font-size: 12px; line-height: 16px; height: 16px; flex-shrink: 0; color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow-x: auto; overflow-y: hidden; }
 .block-delete-btn {
   position: absolute; top: 4px; right: 4px; z-index: 1;
   width: 20px; height: 20px; padding: 0; border: none; border-radius: 4px;
@@ -933,9 +939,9 @@ function onKeydown(e: KeyboardEvent) {
 }
 .block:hover .block-delete-btn, .block:focus-within .block-delete-btn { opacity: 1; }
 .block-delete-btn:hover { opacity: 1 !important; background: rgba(255,85,85,0.3); }
-.block-badges { display: flex; gap: 6px; align-items: center; justify-content: flex-end; height: 22px; flex-shrink: 0; overflow-x: auto; white-space: nowrap; }
-.badge-untranslated-block { font-size: 8px; padding: 1px 4px; border-radius: 3px; background: rgba(139,233,253,0.15); color: #8be9fd; }
-.line-count { font-size: 11px; color: var(--muted); }
+.block-badges { display: flex; gap: 6px; align-items: center; justify-content: flex-end; height: 22px; flex-shrink: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; }
+.badge-untranslated-block { font-size: 12px; padding: 1px 4px; border-radius: 3px; background: rgba(139,233,253,0.15); color: #8be9fd; }
+.line-count { font-size: 12px; color: var(--muted); }
 .diagnosis-error { color: #ffb1a8; }
 pre { margin: 0; white-space: pre; font-size: 13px; line-height: 18px; font-family: inherit; flex: 1; min-height: 0; overflow: auto; }
 .block-editor {

@@ -24,14 +24,19 @@ describe('project file status', () => {
   it('counts extracted text without treating metadata as translated or verified output', async () => {
     const status = await mount(() => true, ['Map001.txt', 'Map002.TXT', 'Map001.extracteddata'])
     expect(status.textContent).toContain('2개 파일')
-    expect(host.textContent).toContain('적용 가능 여부는 검수에서 확인')
+    expect(host.querySelector('button')).toBeNull()
   })
   it('distinguishes absent extraction from an unreadable project', async () => {
     const status = await mount(() => false)
-    expect(status.textContent).toContain('추출 폴더 없음')
+    expect(status.textContent).toContain('추출 폴더가 없어요')
     window.nodeFs.existsSync = () => { throw new Error('Access denied') }
-    host.querySelector('button')!.click()
+    window.dispatchEvent(new Event('focus'))
     await nextTick()
     expect(status.textContent).toContain('읽지 못했어요')
+    window.nodeFs.existsSync = () => false
+    host.querySelector('button')!.click()
+    await nextTick()
+    expect(status.textContent).toContain('추출 폴더가 없어요')
+    expect(host.querySelector('button')).toBeNull()
   })
 })

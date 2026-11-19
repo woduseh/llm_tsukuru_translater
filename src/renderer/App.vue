@@ -12,8 +12,11 @@
     </div>
     <footer v-if="showWorkspace" class="workspace-status" role="status" aria-live="polite">
       <span>{{ activityText }}</span>
-      <progress v-if="workspaceActivity.translating || projectBusy" :value="workspaceActivity.progress" max="100" aria-label="현재 작업 진행률" />
-      <span>{{ reviewWorkspace.text.dirty ? '번역 편집 미저장 · 탭을 이동해도 유지돼요' : '현재 프로젝트 안에서 작업 중' }}</span>
+      <template v-if="workspaceActivity.translating || projectBusy">
+        <progress :value="workspaceActivity.progress" max="100" aria-label="현재 작업 진행률" />
+        <span>{{ Math.round(workspaceActivity.progress) }}%</span>
+      </template>
+      <span v-if="reviewWorkspace.text.dirty" class="unsaved-note">저장하지 않은 번역 편집이 있어요. 탭을 옮겨도 유지돼요.</span>
     </footer>
     <button
       v-if="showApprovalBanner"
@@ -61,7 +64,7 @@ const showWorkspace = computed(() => mainRenderer.value && !!activeProject.path 
 const toolProps = computed(() => toolRoutes.has(route.path) ? { embedded: mainRenderer.value } : {})
 const returnRoutes = new Map<string, string>()
 const activityText = computed(() => {
-  if (workspaceActivity.translating || projectBusy.value) return `${workspaceActivity.label || '작업 진행 중'} · ${Math.round(workspaceActivity.progress)}%`
+  if (workspaceActivity.translating || projectBusy.value) return workspaceActivity.label || '작업 진행 중'
   if (reviewWorkspace.text.busy || reviewWorkspace.structure.busy) return '검수 작업 진행 중'
   return '대기 중'
 })
@@ -148,8 +151,8 @@ useIpcOn('alert_free', (tt: unknown) => {
 .workspace-content.embedded :deep(.wolf-header) { display: none; }
 .workspace-content.embedded :deep(.project-console), .workspace-content.embedded :deep(.wolf-console) { grid-template-columns: 1fr; }
 .workspace-content.embedded :deep(.agent-workspace) { height: 100%; min-height: 0; overflow-y: auto; }
-.workspace-status { display: flex; align-items: center; gap: 12px; flex-shrink: 0; min-height: 32px; padding: 6px 18px; background: var(--Highlight2); border-top: var(--border); color: var(--muted); font-size: 11px; }
-.workspace-status span:last-child { margin-left: auto; margin-right: 150px; }
+.workspace-status { display: flex; align-items: center; gap: 12px; flex-shrink: 0; min-height: 32px; padding: 6px 18px; background: var(--Highlight2); border-top: var(--border); color: var(--muted); font-size: 12px; }
+.workspace-status .unsaved-note { margin-left: auto; margin-right: 150px; color: var(--Accent); }
 .workspace-status progress { width: 120px; height: 6px; accent-color: var(--Accent); }
 .workspace-active .approval-banner { top: auto; bottom: 42px; }
 .approval-banner {
@@ -175,8 +178,8 @@ useIpcOn('alert_free', (tt: unknown) => {
 .approval-banner:focus-visible { outline: 2px solid #ffc36a; outline-offset: 2px; }
 .approval-banner > span:nth-child(2) { min-width: 0; flex: 1; }
 .approval-banner strong, .approval-banner small { display: block; overflow-wrap: anywhere; }
-.approval-banner strong { font-size: 11px; }
-.approval-banner small { margin-top: 2px; font-size: 9px; opacity: 0.72; }
+.approval-banner strong { font-size: 12px; }
+.approval-banner small { margin-top: 2px; font-size: 12px; opacity: 0.72; }
 .approval-count {
   display: grid;
   place-items: center;

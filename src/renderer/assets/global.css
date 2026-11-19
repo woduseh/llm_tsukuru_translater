@@ -159,6 +159,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .option-btn:hover { border-color: #4b5b63; color: var(--mainColor); }
 .option-btn.active { background: #17303a; border-color: #347e95; color: #8eddf2; }
+.option-btn::before { content: ''; display: inline-block; width: 14px; margin-right: 6px; text-align: center; }
+.option-btn[aria-pressed="true"]::before { content: '✓'; font-weight: 900; }
 .option-btn:disabled {
   background: #11181c;
   border-color: #253037;

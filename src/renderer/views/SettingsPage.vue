@@ -103,7 +103,7 @@
           <option value="strict">저장 차단</option>
         </select>
       </div>
-      <div class="provider-hint">번역문을 보존하고 문제 줄과 제어문자를 로그에 남겨요. 적용 전 검수해 주세요. 줄 수·구분자·빈 줄 오류는 항상 저장을 차단해요.</div>
+      <div class="provider-hint">번역문을 보존하고 문제 줄과 제어문자를 로그에 남겨요. 적용 전 검수해 주세요. 줄 수, 구분자, 빈 줄 오류는 항상 저장을 차단해요.</div>
       <div class="setting-item">
         <label for="llmMaxRetries">검증 재시도 <span class="hint">번역 검증 실패 시</span></label>
         <input type="number" id="llmMaxRetries" class="text-input short" v-model.number="settings.llmMaxRetries" min="0" max="10">
@@ -315,9 +315,9 @@ onActivated(() => { if (embedded) api.send('settingsReady') })
   width: 220px;
 }
 .text-input.short { width: 100px; }
-.hint { font-size: 11px; opacity: 0.4; }
+.hint { font-size: 12px; opacity: 0.4; }
 .tag {
-  font-size: 10px; padding: 1px 5px; border-radius: 4px;
+  font-size: 12px; padding: 1px 5px; border-radius: 4px;
   background: rgba(84,200,232,0.14); color: var(--Healthy);
 }
 textarea {
@@ -333,7 +333,7 @@ textarea {
 }
 details { margin-top: 12px; }
 summary { font-size: 13px; cursor: pointer; opacity: 0.7; }
-.warn-text { font-size: 11px; color: #f1fa8c; margin: 6px 0 8px; }
+.warn-text { font-size: 12px; color: #f1fa8c; margin: 6px 0 8px; }
 .btn2 {
   background: transparent; border: var(--border); border-radius: 6px;
   color: var(--mainColor); padding: 6px 14px; cursor: pointer; font-size: 12px;

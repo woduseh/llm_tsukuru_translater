@@ -9,7 +9,7 @@
     </nav>
     <section class="wolf-body">
       <header class="wolf-header">
-        <div><span>WOLF RPG EDITOR</span><h1>{{ hasFolder ? '프로젝트 작업공간' : '프로젝트를 선택하세요' }}</h1></div>
+        <div><span>WOLF RPG Editor</span><h1>{{ hasFolder ? '프로젝트 작업공간' : '프로젝트를 선택하세요' }}</h1></div>
         <button type="button" class="btn-secondary" @click="selectFolder">{{ hasFolder ? '프로젝트 변경' : '폴더 선택' }}</button>
         <p>{{ folderPath || 'Wolf RPG 게임 폴더를 선택하면 작업을 시작할 수 있습니다.' }}</p>
       </header>
@@ -35,9 +35,9 @@
             <div><span>WOLF 지원 상태</span><strong>현재 지원 범위</strong></div>
           </div>
           <div class="wolf-capability-note">
-            <p><strong>지원:</strong> 맵 이벤트 대사 추출·번역·적용</p>
+            <p><strong>지원:</strong> 맵 이벤트 대사의 추출, 번역, 적용</p>
             <p><strong>미지원:</strong> DB 데이터, 커먼 이벤트, 자동 줄바꿈</p>
-            <p>적용 전 구분자·빈 줄·제어 코드·원본 binary 변경 여부를 검사합니다.</p>
+            <p>적용 전에 구분자, 빈 줄, 제어 코드, 원본 바이너리 변경 여부를 검사해요.</p>
           </div>
         </aside>
       </div>
@@ -170,7 +170,7 @@ onMounted(() => {
 .wolf-rail button:last-child { margin-top: auto; }
 .wolf-body { min-width: 0; display: flex; flex-direction: column; }
 .wolf-header { position: relative; min-height: 94px; padding: 14px 18px 12px; border-bottom: var(--border); }
-.wolf-header span { color: var(--Healthy); font-size: 10px; font-weight: 900; letter-spacing: .9px; }
+.wolf-header span { color: var(--Healthy); font-size: 12px; font-weight: 900; letter-spacing: .9px; }
 .wolf-header h1 { margin-top: 3px; font-size: 20px; }
 .wolf-header > button { position: absolute; top: 15px; right: 18px; }
 .wolf-header p { margin-top: 11px; max-width: calc(100% - 150px); overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
@@ -183,11 +183,11 @@ onMounted(() => {
 .wolf-pipeline .current b { border-color: var(--Accent); color: var(--Accent); }
 .wolf-pipeline span, .wolf-pipeline small { display: block; text-align: left; }
 .wolf-pipeline span { font-weight: 800; }
-.wolf-pipeline small { color: var(--subtle); font-size: 11px; font-weight: 600; }
+.wolf-pipeline small { color: var(--subtle); font-size: 12px; font-weight: 600; }
 .wolf-work { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.05fr .95fr; }
 .wolf-current, .wolf-options { padding: 17px 18px; }
 .wolf-current { border-right: var(--border); }
-.wolf-current > p { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .9px; }
+.wolf-current > p { color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .9px; }
 .wolf-current h2 { margin-top: 8px; font-size: 24px; }
 .wolf-current > span { display: block; min-height: 44px; margin-top: 7px; color: var(--muted); font-size: 12px; }
 .wolf-current .btn-run { width: 100%; margin: 18px 0 0; padding: 12px; }
@@ -195,7 +195,7 @@ onMounted(() => {
 .wolf-review:disabled { opacity: .35; cursor: default; }
 .wolf-options-head { display: flex; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: var(--border); }
 .wolf-options-head span, .wolf-options-head strong { display: block; }
-.wolf-options-head span { color: var(--muted); font-size: 10px; }
+.wolf-options-head span { color: var(--muted); font-size: 12px; }
 .wolf-capability-note { margin-top: 14px; padding: 14px; border: var(--border); border-radius: 7px; background: rgba(255,255,255,.02); }
 .wolf-capability-note p { margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .wolf-capability-note p:last-child { margin-bottom: 0; color: var(--subtle); }

@@ -17,10 +17,10 @@
     <div v-if="isReview" class="review-navigation">
       <nav aria-label="검수 유형">
         <button type="button" :aria-current="route.path === '/llm-compare' ? 'page' : undefined" :class="{ active: route.path === '/llm-compare' }" data-workspace-review="text" @click="navigate('/llm-compare')">
-          번역 대조 <span>{{ reviewWorkspace.text.loaded ? `${reviewWorkspace.text.mismatchCount} 불일치 · ${reviewWorkspace.text.untranslatedCount} 미번역` : '미확인' }}</span>
+          번역 대조 <template v-if="reviewWorkspace.text.loaded"><span>불일치 {{ reviewWorkspace.text.mismatchCount }}</span><span>미번역 {{ reviewWorkspace.text.untranslatedCount }}</span></template><span v-else>미확인</span>
         </button>
         <button v-if="activeProject.engine !== 'wolf'" type="button" :aria-current="route.path === '/json-verify' ? 'page' : undefined" :class="{ active: route.path === '/json-verify' }" data-workspace-review="structure" @click="navigate('/json-verify')">
-          JSON 구조 <span>{{ reviewWorkspace.structure.loaded ? `${reviewWorkspace.structure.issueCount}개 문제` : '미확인' }}</span>
+          JSON 구조 <span>{{ reviewWorkspace.structure.loaded ? `문제 ${reviewWorkspace.structure.issueCount}` : '미확인' }}</span>
         </button>
       </nav>
       <span class="focused-file">{{ reviewWorkspace.focusedFile || '검수할 파일을 선택하세요' }}</span>
@@ -50,7 +50,7 @@ const projectName = computed(() => {
   return parts.at(-1) || activeProject.path
 })
 const tabs = computed(() => [
-  { id: 'overview', path: '/' + activeProject.engine, label: '추출 · 적용', badge: '' },
+  { id: 'overview', path: '/' + activeProject.engine, label: '추출과 적용', badge: '' },
   { id: 'translation', path: '/llm-settings', label: '번역', badge: workspaceDrafts.translationDirty ? '초안' : '' },
   { id: 'review', path: '/llm-compare', label: '검수', badge: reviewWorkspace.text.dirty ? '미저장' : '' },
   { id: 'agent', path: '/agent-workspace', label: 'AI 도구', badge: '' },
@@ -84,11 +84,11 @@ button:disabled { opacity: .5; cursor: default; }
 .workspace-tabs { display: flex; gap: 5px; padding: 0 18px; overflow-x: auto; }
 .workspace-tabs button { border: 0; border-radius: 0; padding: 10px 16px; border-bottom: 3px solid transparent; white-space: nowrap; color: var(--muted); }
 .workspace-tabs button.active { border-color: var(--Accent); color: var(--mainColor); background: var(--Highlight1); font-weight: 700; }
-.workspace-tabs span { margin-left: 7px; font-size: 11px; color: var(--Accent); }
+.workspace-tabs span { margin-left: 7px; font-size: 12px; color: var(--Accent); }
 .review-navigation { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 18px; background: var(--Background); border-top: var(--border); }
 .review-navigation nav { display: flex; gap: 6px; }
 .review-navigation button.active { border-color: var(--Healthy); background: var(--Highlight1); }
-.review-navigation button span { color: var(--muted); font-size: 11px; margin-left: 6px; }
+.review-navigation button span { color: var(--muted); font-size: 12px; margin-left: 6px; }
 .focused-file { flex: 1; font-size: 12px; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .context-action { font-size: 12px; }
 </style>

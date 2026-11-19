@@ -10,7 +10,7 @@
     <section class="console-body">
       <header class="project-header">
         <div>
-          <span>RPG MAKER MV / MZ</span>
+          <span>RPG Maker MV / MZ</span>
           <h1>{{ hasFolder ? '프로젝트 작업공간' : '프로젝트를 선택하세요' }}</h1>
         </div>
         <button type="button" class="btn-secondary" @click="selectFolder">{{ hasFolder ? '프로젝트 변경' : '폴더 선택' }}</button>
@@ -376,12 +376,12 @@ onMounted(() => {
 .console-rail button:last-child { margin-top: auto; }
 .console-body { min-width: 0; display: flex; flex-direction: column; }
 .project-header { position: relative; min-height: 94px; padding: 14px 18px 12px; border-bottom: var(--border); }
-.project-header > div:first-child span { color: var(--Healthy); font-size: 10px; font-weight: 900; letter-spacing: .9px; }
+.project-header > div:first-child span { color: var(--Healthy); font-size: 12px; font-weight: 900; letter-spacing: .9px; }
 .project-header h1 { margin-top: 3px; font-size: 20px; }
 .project-header > .btn-secondary { position: absolute; top: 15px; right: 18px; }
 .project-path { margin-top: 11px; display: flex; gap: 9px; align-items: center; min-width: 0; color: var(--muted); font-size: 12px; }
 .project-path span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.project-path button { padding: 3px 7px; border: var(--border); border-radius: 4px; background: transparent; color: var(--Healthy); cursor: pointer; font-size: 11px; }
+.project-path button { padding: 3px 7px; border: var(--border); border-radius: 4px; background: transparent; color: var(--Healthy); cursor: pointer; font-size: 12px; }
 .pipeline { height: 66px; display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: var(--border); }
 .pipeline button { display: flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-right: var(--border); background: transparent; color: var(--muted); cursor: pointer; }
 .pipeline button:last-child { border-right: 0; }
@@ -392,11 +392,11 @@ onMounted(() => {
 .pipeline .current b { border-color: var(--Accent); color: var(--Accent); }
 .pipeline span, .pipeline small { display: block; text-align: left; }
 .pipeline span { font-weight: 800; }
-.pipeline small { margin-top: 1px; color: var(--subtle); font-size: 11px; font-weight: 600; }
+.pipeline small { margin-top: 1px; color: var(--subtle); font-size: 12px; font-weight: 600; }
 .work-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.05fr .95fr; }
 .current-task, .task-options { min-width: 0; padding: 17px 18px; }
 .current-task { border-right: var(--border); }
-.eyebrow { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .9px; }
+.eyebrow { color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .9px; }
 .current-task h2 { margin-top: 8px; font-size: 24px; }
 .current-task > p:nth-of-type(2) { min-height: 44px; margin-top: 7px; color: var(--muted); font-size: 12px; }
 .current-task .btn-run { width: 100%; margin: 18px 0 0; padding: 12px; }
@@ -405,10 +405,10 @@ onMounted(() => {
 .review-link:disabled { opacity: .35; cursor: default; }
 .options-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: var(--border); }
 .options-heading span, .options-heading strong { display: block; }
-.options-heading span { color: var(--muted); font-size: 10px; }
+.options-heading span { color: var(--muted); font-size: 12px; }
 .options-heading strong { margin-top: 2px; }
 .task-options .options-grid { margin-top: 12px; grid-template-columns: repeat(2, 1fr); }
-.task-options .option-btn { min-height: 34px; font-size: 11px; }
+.task-options .option-btn { min-height: 34px; font-size: 12px; }
 .apply-options { grid-template-columns: 1fr !important; }
 .secondary-tools { margin-top: 12px; padding-top: 10px; border-top: var(--border); display: flex; flex-wrap: wrap; gap: 6px; }
 .secondary-tools button { padding: 5px 8px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; }

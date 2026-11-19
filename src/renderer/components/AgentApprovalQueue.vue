@@ -103,13 +103,13 @@
             </div>
 
             <div v-if="approval.failure" class="request-result failure" role="status">
-              <strong>처리 실패 · {{ approval.failure.code }}</strong>
+              <strong>처리 실패: {{ approval.failure.code }}</strong>
               <p>{{ approval.failure.message }}</p>
               <span>{{ approval.failure.retryable ? '새 제안으로 다시 시도할 수 있어요.' : '로그 확인이 필요해요.' }}</span>
             </div>
             <div v-else-if="approval.result" class="request-result success" role="status">
               <strong>변경 적용 완료</strong>
-              <p>{{ approval.result.targetPath }} · {{ approval.result.operationsApplied }}개 작업</p>
+              <p class="result-meta"><span>{{ approval.result.targetPath }}</span><span>{{ approval.result.operationsApplied }}개 작업</span></p>
             </div>
             <div v-else-if="approval.denialNote" class="request-result denied" role="status">
               <strong>거절 메모</strong>
@@ -262,13 +262,13 @@ function formatDate(value: string): string {
   border-radius: var(--radius-lg);
 }
 .queue-heading { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
-.queue-eyebrow { color: #ffc36a; font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; }
+.queue-eyebrow { color: #ffc36a; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; }
 .queue-heading h2 { margin: 2px 0 4px; font-size: 15px; }
-.queue-heading p:last-child { font-size: 11px; opacity: 0.75; }
+.queue-heading p:last-child { font-size: 12px; opacity: 0.75; }
 .queue-summary { flex: 0 0 auto; display: flex; align-items: center; gap: 7px; padding: 7px 10px; background: rgba(255, 190, 92, 0.1); border-radius: var(--radius-md); }
 .queue-summary strong { color: #ffc36a; font-size: 18px; }
-.queue-summary span { font-size: 10px; opacity: 0.8; }
-.queue-empty, .queue-message { margin-top: 12px; padding: 10px; border-radius: var(--radius-md); font-size: 11px; }
+.queue-summary span { font-size: 12px; opacity: 0.8; }
+.queue-empty, .queue-message { margin-top: 12px; padding: 10px; border-radius: var(--radius-md); font-size: 12px; }
 .queue-empty { background: var(--Highlight1); opacity: 0.78; }
 .queue-message { background: rgba(255, 156, 156, 0.12); color: #ffb3b3; }
 .approval-list { display: flex; flex-direction: column; gap: 9px; margin-top: 12px; }
@@ -281,8 +281,8 @@ summary { display: flex; justify-content: space-between; gap: 12px; align-items:
 summary::marker { color: #ffc36a; }
 .request-title { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; min-width: 0; }
 .request-title strong { font-size: 12px; overflow-wrap: anywhere; }
-.request-title > span:last-child, .request-source { font-size: 10px; opacity: 0.7; }
-.status-badge { padding: 3px 7px; border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 10px; }
+.request-title > span:last-child, .request-source { font-size: 12px; opacity: 0.7; }
+.status-badge { padding: 3px 7px; border-radius: 999px; background: rgba(255,255,255,0.08); font-size: 12px; }
 .status-pending .status-badge { color: #ffc36a; background: rgba(255, 190, 92, 0.12); }
 .status-applied .status-badge { color: #7ce3a4; background: rgba(95, 208, 138, 0.12); }
 .status-failed .status-badge, .status-stale .status-badge { color: #ffb3b3; background: rgba(255, 156, 156, 0.12); }
@@ -290,20 +290,20 @@ summary::marker { color: #ffc36a; }
 .stage-track { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); list-style: none; gap: 6px; }
 .stage-track li { padding: 7px; border-radius: var(--radius-sm); background: var(--Highlight3); border-top: 2px solid rgba(255,255,255,0.15); min-width: 0; }
 .stage-track strong, .stage-track span { display: block; overflow-wrap: anywhere; }
-.stage-track strong { font-size: 10px; }
-.stage-track span { margin-top: 2px; font-size: 9px; opacity: 0.7; }
+.stage-track strong { font-size: 12px; }
+.stage-track span { margin-top: 2px; font-size: 12px; opacity: 0.7; }
 .stage-track .complete { border-color: #5fd08a; }
 .stage-track .current { border-color: #ffc36a; }
 .stage-track .stopped { border-color: #ff9c9c; }
 .stage-track .waiting { opacity: 0.58; }
 .request-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
 .request-meta div { min-width: 0; }
-.request-meta dt { font-size: 9px; opacity: 0.58; }
-.request-meta dd { margin-top: 2px; font-size: 10px; overflow-wrap: anywhere; }
+.request-meta dt { font-size: 12px; opacity: 0.58; }
+.request-meta dd { margin-top: 2px; font-size: 12px; overflow-wrap: anywhere; }
 .invariant-list { display: flex; flex-wrap: wrap; gap: 5px; }
-.invariant-list span { padding: 3px 7px; border-radius: 999px; background: rgba(95, 208, 138, 0.1); color: #8ce5ae; font-size: 9px; }
+.invariant-list span { padding: 3px 7px; border-radius: 999px; background: rgba(95, 208, 138, 0.1); color: #8ce5ae; font-size: 12px; }
 .preview { background: #0f1018; border-radius: var(--radius-md); overflow: hidden; }
-.preview-heading { display: flex; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 10px; }
+.preview-heading { display: flex; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 12px; }
 .preview-heading span { opacity: 0.58; }
 .preview-table { max-height: 320px; overflow: auto; }
 .preview-operation { display: grid; grid-template-columns: 44px minmax(0, 1fr); border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -314,8 +314,9 @@ summary::marker { color: #ffc36a; }
 .preview-line code { white-space: pre-wrap; overflow-wrap: anywhere; font: 10px/1.45 Consolas, 'Courier New', monospace; }
 .preview-line.before { background: rgba(255, 116, 116, 0.08); color: #ffcaca; }
 .preview-line.after { background: rgba(95, 208, 138, 0.08); color: #bdf3d2; }
-.request-result { padding: 9px 10px; border-radius: var(--radius-md); font-size: 10px; }
+.request-result { padding: 9px 10px; border-radius: var(--radius-md); font-size: 12px; }
 .request-result p { margin-top: 3px; overflow-wrap: anywhere; }
+.result-meta { display: flex; flex-wrap: wrap; gap: 0 12px; }
 .request-result span { display: block; margin-top: 3px; opacity: 0.72; }
 .request-result.failure { background: rgba(255, 156, 156, 0.1); color: #ffb3b3; }
 .request-result.success { background: rgba(95, 208, 138, 0.1); color: #9aebba; }
@@ -323,7 +324,7 @@ summary::marker { color: #ffc36a; }
 .request-result.audit-warning { background: rgba(255, 190, 92, 0.1); color: #ffce8a; }
 .audit-warning-label { color: #ffce8a; }
 .approval-actions { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
-.approval-actions label { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 9px; opacity: 0.8; }
+.approval-actions label { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 12px; opacity: 0.8; }
 .approval-actions textarea { resize: vertical; min-height: 48px; max-height: 120px; padding: 7px; background: #0f1018; color: var(--mainColor); border: var(--border); border-radius: var(--radius-sm); font: 10px inherit; }
 .approval-actions > div { display: flex; gap: 7px; }
 .approval-actions button { padding: 8px 10px; border-radius: var(--radius-sm); color: var(--mainColor); font: 11px inherit; cursor: pointer; }
