@@ -154,3 +154,5 @@ Agent Workspace와 외부 MCP 서버는 프로젝트 상태와 번역 품질 분
 ## 라이선스
 
 GPL-3.0
+
+이 프로젝트는 gramedcart의 [tsukuru_extractor](https://github.com/gramedcart/tsukuru_extractor)(GPL-3.0)에서 시작해 크게 수정·확장한 프로젝트입니다.
